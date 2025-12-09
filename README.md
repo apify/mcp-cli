@@ -1,4 +1,4 @@
-# **mcpc**
+# **mcpc** - The command-line MCP client
 
 Wrap any remote or local MCP server as a friendly command-line tool.
 
