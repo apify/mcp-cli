@@ -1,4 +1,4 @@
-# **mcpc** - The command-line MCP client
+# **mcpc** - a command-line MCP client
 
 Wrap any remote or local MCP server as a friendly command-line tool.
 
@@ -47,7 +47,8 @@ mcpc https://mcp.example.com shell
 ## Usage
 
 ```bash
-mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--verbose] <target> <command...>
+mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--verbose] [--schema <file>]
+     <target> <command...>
 
 # MCP commands
 mcpc <target> instructions
@@ -99,6 +100,11 @@ Instead of forcing every command to reconnect and reinitialize,
 - multiplexes multiple concurrent requests,
 - lets you run **many servers at once** and pipe outputs between them.
 
+`mcpc` saves its state to `~/.mcpc/` directory, in the following two files:
+
+- `~/.mcpc/sessions.json` - a JSON object with all active sessions
+- `~/.mcpc/auths.json` - a JSON object with all active logins to MCP server
+
 ### Managing sessions
 
 ```bash
@@ -120,16 +126,28 @@ mcpc @apify close
 ### Piping between sessions
 
 ```bash
-mcpc --json @apify tools call search-actors --arg keywords="web scraper" \
+mcpc --json @apify tools call search-actors --arg keywords="tiktok scraper" \
   | jq '.results[0]' \
   | mcpc @playwright tools call run-browser --arg input=-
 ```
 
+### Scripting
+
+`mcpc` is designed to be easily usable in (AI-generated) scripts. To ensure consistency
+of your scripts with the current MCP server interface, you can use `--schema <file>` argument
+to pass `mcpc` the expected schema. If the MCP server's current schema is incompatible,
+the command returns an error.
+
+```bash
+mcpc --json @apify tools get search-actors > tool-schema.json
+mcpc @apify tools call search-actors --schema tool-schema.json --arg keywords="tiktok scraper" 
+```
+
 ## MCP protocol notes
 
-* `mcpc` negotiates protocol version on init; subsequent HTTP requests include the negotiated `MCP-Protocol-Version`.
-* For Streamable HTTP, the bridge manages SSE streams, reconnection, and optional `Last-Event-ID` resumption.
-* `mcpc` supports MCP server features (tools/resources/prompts)
+-`mcpc` negotiates protocol version on init; subsequent HTTP requests include the negotiated `MCP-Protocol-Version`.
+- For Streamable HTTP, the bridge manages SSE streams, reconnection, and optional `Last-Event-ID` resumption.
+- `mcpc` supports MCP server features (tools/resources/prompts)
   and handles server-initiated flows where possible (e.g., progress, logging, change notifications, cancellation).
 
 ## Security
@@ -140,7 +158,7 @@ MCP enables arbitrary tool execution and data access; treat servers like you tre
 * prefer trusted endpoints,
 * audit what tools do before running them.
 
-## Error Handling
+## Error handling
 
 `mcpc` provides clear error messages for common issues:
 
@@ -151,16 +169,50 @@ MCP enables arbitrary tool execution and data access; treat servers like you tre
 
 Use `--verbose` flag for detailed debugging information.
 
-## Status
+## Implementation details
 
-`mcpc` is under active development. Current focus areas:
+`mcpc` is under active development.
+The library is implemented in TypeScript. It has the following components:
 
-- ✅ Core MCP protocol support (tools, resources, prompts)
-- ✅ HTTP and stdio transports
-- ✅ Session management and persistence
-- 🚧 Shell completion (bash, zsh, fish)
-- 🚧 Configuration file enhancements
-- 🚧 Secure credential storage
+### Core runtime-agnostic
+
+Implemented in the `packages/core` package, which has very few dependencies
+so that it can run in both Node.js and Bun.
+
+Core responsibilities:
+
+- Transport selection: http vs stdio
+- MCP init + version negotiation
+- Session state machine
+- SSE management (reconnect, Last-Event-ID)
+- Multiplexing concurrent requests
+- JSON-RPC-ish request/response correlation (if MCP does that)
+- Event emitter abstraction
+
+### Bridge as a separate executable
+
+Implemented in `packages/bridge` package, which imports `core` and provides the bridge process that does the following:
+
+- session persistence (file store)
+- process lifecycle (for local package servers)
+- stdio framing
+- a control channel (stdin/stdout JSON lines, unix socket, or HTTP localhost)
+
+This lets `mcpc` start/stop/reuse bridge processes per session, without coupling everything to the CLI.
+
+### Thin CLI executable
+
+Implemented in `packages/cli` package, provides the main CLI process which handles:
+
+- argument parsing
+- formatting (human vs `--json`)
+- calls into bridge (or into core directly for ephemeral sessions)
+- interactive shell mode implemented here (REPL-ish)
+
+This separation is what makes “shell” sane: your shell is just another client of the same command executor the one-shot CLI uses.
+
+For interactive commands, the library uses the `@inquirer/prompts` NPM package.
+
 
 ## Contributing
 
@@ -175,5 +227,5 @@ Please open an issue or pull request on [GitHub](https://github.com/jancurn/mcpc
 
 ## License
 
-Apache-2.0 - see [LICENSE](LICENSE) for details.
+Apache-2.0 - see [LICENSE](./LICENSE) for details.
 
