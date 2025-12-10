@@ -13,6 +13,9 @@ export default {
       },
     ],
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(chalk|cli-table3|#ansi-styles|#supports-color)/)',
+  ],
   testMatch: [
     '**/test/**/*.test.ts',
     '**/test/**/*.spec.ts',

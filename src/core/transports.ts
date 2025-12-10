@@ -120,9 +120,8 @@ export function createTransportFromConfig(config: TransportConfig): Transport {
       return createStreamableHttpTransport(config.url, options);
     }
 
-    default: {
-      const exhaustiveCheck: never = config;
-      throw new ClientError(`Unknown transport type: ${(exhaustiveCheck as { type: string }).type}`);
-    }
+    default:
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new ClientError(`Unknown transport type: ${config.type}`);
   }
 }
