@@ -2,8 +2,8 @@
 
 Wrap any remote or local MCP server as a friendly command-line tool.
 
-`mcpc` is a command-line client for the Model Context Protocol (MCP)
-over standard transports (Streamable HTTP and stdio).
+`mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
+over standard transports (streamable HTTP and stdio).
 It maps MCP concepts to intuitive CLI commands, and uses a bridge process per session,
 so you can keep multiple MCP connections alive simultaneously.
 
@@ -109,7 +109,7 @@ Transports are selected automatically: HTTP/HTTPS URLs use the MCP HTTP transpor
 --arg data=-
 
 # Load all arguments from JSON file
---args-file arguments.json
+--args-file tool-arguments.json
 ```
 
 **Global flags:**
@@ -165,7 +165,7 @@ mcpc @apify close
 ### Piping between sessions
 
 ```bash
-mcpc --json @apify tools call search-actors --arg keywords="tiktok scraper" \
+mcpc --json @apify tools call search-actors --arg query="tiktok scraper" \
   | jq '.data.results[0]' \
   | mcpc @playwright tools call run-browser --arg input=-
 ```
@@ -185,7 +185,7 @@ mcpc --json @apify tools get search-actors > tool-schema.json
 mcpc @apify tools call search-actors \
   --schema tool-schema.json \
   --schema-mode strict \
-  --arg keywords="tiktok scraper"
+  --arg query="tiktok scraper"
 ```
 
 **Schema validation modes:**
@@ -203,7 +203,7 @@ Configuration can be provided via file, environment variables, or command-line f
 3. Config file (when specified with `--config`)
 4. Built-in defaults
 
-### Config File
+### Config file
 
 `mcpc` uses the standard MCP config file format, compatible with Claude Desktop and other MCP clients. You can point to an existing config file with `--config`:
 
@@ -303,7 +303,7 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 - `mcpc` supports all MCP server features (tools/resources/prompts) and handles server-initiated flows (progress, logging, change notifications)
 - Request multiplexing: supports up to 10 concurrent requests, queues up to 100 additional requests
 
-## Package Resolution
+## Package resolution
 
 When a target is identified as a local package, `mcpc` resolves it as follows:
 
@@ -328,7 +328,7 @@ npm install -g @modelcontextprotocol/server-filesystem
 mcpc @modelcontextprotocol/server-filesystem resources list
 ```
 
-## Output Format
+## Output format
 
 ### Human-readable (default)
 
@@ -336,14 +336,14 @@ Default output is formatted for human readability with colors, tables, and forma
 
 ### JSON mode (`--json`)
 
-All output follows a consistent JSON schema:
+All output follows a JSON schema consistent with the MCP protocol.
 
 **Success response:**
 ```json
 {
   "success": true,
   "data": {
-    // Command-specific data
+    "//": "Command-specific data"
   },
   "metadata": {
     "session": "myserver",
@@ -407,7 +407,7 @@ MCP enables arbitrary tool execution and data access; treat servers like you tre
 
 Use `--verbose` flag for detailed debugging information (shows JSON-RPC messages, SSE events, and protocol negotiation).
 
-### Exit Codes
+### Exit codes
 
 - `0` - Success
 - `1` - Client error (invalid arguments, command not found, etc.)
@@ -415,14 +415,14 @@ Use `--verbose` flag for detailed debugging information (shows JSON-RPC messages
 - `3` - Network error (connection failed, timeout, etc.)
 - `4` - Authentication error (invalid credentials, forbidden, etc.)
 
-### Retry Strategy
+### Retry strategy
 
 - **Network errors**: Automatic retry with exponential backoff (3 attempts)
 - **SSE reconnection**: Starts at 1s, doubles to max 30s
 - **Bridge restart**: Automatic on crash detection, manual with `mcpc @name reconnect`
 - **Timeouts**: Configurable per-request timeout (default: 5 minutes)
 
-## Interactive Shell
+## Interactive shell
 
 The interactive shell provides a REPL-style interface for MCP servers:
 
@@ -446,7 +446,7 @@ mcpc @apify shell
 ```
 $ mcpc @apify shell
 Connected to apify (https://mcp.apify.com)
-Protocol version: 1.0
+MCP version: 2025-11-25
 
 mcpc(@apify)> tools list
 Available tools:
@@ -454,7 +454,7 @@ Available tools:
   - get-actor
   - run-actor
 
-mcpc(@apify)> tools call search-actors --arg keywords="tiktok"
+mcpc(@apify)> tools call search-actors --arg query="tiktok scraper"
 [results...]
 
 mcpc(@apify)> exit
@@ -567,7 +567,7 @@ Later...
 14. CLI: Formats and displays to user
 ```
 
-### Error Recovery
+### Error recovery
 
 **Bridge crashes:**
 1. CLI detects socket connection failure
@@ -593,29 +593,29 @@ Later...
 
 ## Testing Strategy
 
-**Unit Tests:**
+**Unit tests:**
 - Core protocol implementation (mocked transports)
 - Argument parsing and validation
 - Output formatting (human and JSON modes)
 
-**Integration Tests:**
+**Integration tests:**
 - Mock MCP server (simple HTTP + stdio servers)
 - Bridge lifecycle (start, connect, restart, cleanup)
 - Session management with file locking
 - SSE reconnection logic
 
-**E2E Tests:**
+**E2E tests:**
 - Real MCP server implementations
 - Cross-runtime (Node.js and Bun)
 - Interactive shell workflows
 
-**Test Utilities:**
+**Test utilities:**
 - `examples/test-server/` - Reference MCP server for testing
 - `test/mock-keychain.ts` - Mock OS keychain for testing
 
 ## Troubleshooting
 
-### Common Issues
+### Common issues
 
 **"Cannot connect to bridge"**
 - Bridge may have crashed. Try: `mcpc @session reconnect` or `mcpc connect session <target>`
@@ -635,7 +635,7 @@ Later...
 - Use environment variable: `Authorization: Bearer ${TOKEN}` in config
 - Re-authenticate: `mcpc auth login <server>`
 
-### Debug Mode
+### Debug mode
 
 Enable detailed logging with `--verbose`:
 
@@ -668,11 +668,11 @@ Contributions are welcome! Areas where we'd especially appreciate help:
 - Testing with various MCP servers
 - Windows compatibility testing
 
-### Development Setup
+### Development setup
 
 ```bash
 # Clone repository
-git clone https://github.com/jancurn/mcpc.git
+git clone https://github.com/apify/mcpc.git
 cd mcpc
 
 # Install dependencies
@@ -689,7 +689,7 @@ npm link
 mcpc --help
 ```
 
-### Release Process
+### Release process
 
 ```bash
 # Run tests
@@ -708,7 +708,7 @@ npm publish
 git push --tags
 ```
 
-Please open an issue or pull request on [GitHub](https://github.com/jancurn/mcpc).
+Please open an issue or pull request on [GitHub](https://github.com/apify/mcpc).
 
 ## License
 
