@@ -38,18 +38,27 @@ const OPTIONS_WITH_VALUES = [
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
-  // Special case: no arguments means list sessions
-  if (args.length === 0) {
-    await sessions.listSessions({ outputMode: 'human' });
+  // Check for help or version flags first
+  if (args.includes('--help') || args.includes('-h') || args.includes('--version') || args.includes('-v')) {
+    const program = createProgram();
+    await program.parseAsync(process.argv);
     return;
   }
 
   // Find first non-option argument (the target)
   let target: string | undefined;
   let targetIndex = -1;
+  let hasJsonFlag = false;
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (!arg) continue;
+
+    // Track --json flag
+    if (arg === '--json' || arg === '-j') {
+      hasJsonFlag = true;
+    }
+
     // Skip options and their values
     if (arg.startsWith('-')) {
       // Check if this option takes a value
@@ -67,10 +76,12 @@ async function main(): Promise<void> {
     break;
   }
 
-  // If no target found, show help
+  // If no target found, list sessions (special case: no positional arguments)
   if (!target) {
-    const program = createProgram();
-    program.outputHelp();
+    await sessions.listSessions({ outputMode: hasJsonFlag ? 'json' : 'human' });
+    if (!hasJsonFlag) {
+      console.log('\nRun "mcpc --help" for usage information.');
+    }
     return;
   }
 
@@ -91,6 +102,7 @@ function createProgram(): Command {
   program
     .name('mcpc')
     .description('Command-line client for the Model Context Protocol (MCP)')
+    .usage('[options] <target> [command]')
     .version(packageJson.version, '-v, --version', 'Output the version number')
     .option('-j, --json', 'Output in JSON format')
     .option('--verbose', 'Enable verbose logging')
@@ -101,6 +113,25 @@ function createProgram(): Command {
     .option('--schema <file>', 'Validate against expected tool/prompt schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible, or ignore')
     .option('--insecure', 'Disable SSL certificate validation');
+
+  // Add examples to help
+  program.addHelpText(
+    'after',
+    `
+Examples:
+  $ mcpc                                        # List all sessions
+  $ mcpc @apify connect https://mcp.apify.com   # Create a session
+  $ mcpc @apify tools-list                      # List tools
+  $ mcpc https://example.com tools-call search --args query="hello"
+  $ mcpc --json @apify resources-list           # JSON output
+
+Where <target> can be:
+  @<name>           Named session (e.g., @apify)
+  https://...       Remote MCP server URL
+  <config-entry>    Entry from config file (with --config)
+  <package>         Local MCP server package
+`
+  );
 
   return program;
 }

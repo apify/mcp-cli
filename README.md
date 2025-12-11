@@ -588,7 +588,7 @@ The main `mcpc` command provides the user interface.
 ### Session lifecycle
 
 ```
-1. User: mcpc connect apify https://mcp.apify.com
+1. User: mcpc @apify connect https://mcp.apify.com
 2. CLI: Creates session entry in sessions.json
 3. CLI: Spawns bridge process (mcpc-bridge)
 4. Bridge: Creates Unix socket at ~/.mcpc/bridges/apify.sock
@@ -661,13 +661,13 @@ Later...
 ### Common issues
 
 **"Cannot connect to bridge"**
-- Bridge may have crashed. Try: `mcpc @session reconnect` or `mcpc connect session <target>`
+- Bridge may have crashed. Try: `mcpc @session connect <server>`
 - Check bridge is running: `ps aux | grep mcpc-bridge`
 - Check socket exists: `ls ~/.mcpc/bridges/`
 
 **"Session not found"**
-- Session may have expired. Create new session: `mcpc connect <name> <target>`
-- List existing sessions: `mcpc sessions`
+- Session may have expired. Create new session: `mcpc <target> connect <server>`
+- List existing sessions: `mcpc`
 
 **"Package not found"**
 - Ensure package is installed: `npm list -g <package>` or `npm list <package>`

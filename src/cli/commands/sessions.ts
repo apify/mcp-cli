@@ -39,7 +39,12 @@ export async function connectSession(
 export async function listSessions(options: { outputMode: OutputMode }): Promise<void> {
   // TODO: Read from sessions.json
 
-  const mockSessions = [
+  const mockSessions: Array<{
+    name: string;
+    target: string;
+    transport: string;
+    createdAt: string;
+  }> = [
     {
       name: 'apify',
       target: 'https://mcp.apify.com',
@@ -54,7 +59,18 @@ export async function listSessions(options: { outputMode: OutputMode }): Promise
     },
   ];
 
-  console.log(formatOutput(mockSessions, options.outputMode));
+  if (options.outputMode === 'json') {
+    console.log(formatOutput(mockSessions, 'json'));
+  } else {
+    if (mockSessions.length === 0) {
+      console.log('No active sessions.');
+    } else {
+      console.log('Active sessions:');
+      for (const session of mockSessions) {
+        console.log(`  @${session.name} → ${session.target} (${session.transport})`);
+      }
+    }
+  }
 }
 
 /**
