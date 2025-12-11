@@ -179,10 +179,10 @@ Instead of forcing every command to reconnect and reinitialize (which is slow an
 mcpc @apify connect https://mcp.apify.com/
 
 # List active sessions
-mcpc sessions
+mcpc
 
 # Use the session
-mcpc @apify tools list
+mcpc @apify tools-list
 mcpc @apify shell
 
 # Close the session (terminates bridge process)
@@ -192,9 +192,9 @@ mcpc @apify close
 ### Piping between sessions
 
 ```bash
-mcpc --json @apify tools call search-actors --args query="tiktok scraper" \
+mcpc --json @apify tools-call search-actors --args query="tiktok scraper" \
   | jq '.data.results[0]' \
-  | mcpc @playwright tools call run-browser
+  | mcpc @playwright tools-call run-browser
 ```
 
 ### Scripting
@@ -206,10 +206,10 @@ the command returns an error.
 
 ```bash
 # Save tool schema for future validation
-mcpc --json @apify tools get search-actors > tool-schema.json
+mcpc --json @apify tools-get search-actors > tool-schema.json
 
 # Use schema to ensure compatibility (fails if schema changed)
-mcpc @apify tools call search-actors \
+mcpc @apify tools-call search-actors \
   --schema tool-schema.json \
   --schema-mode strict \
   --args query="tiktok scraper"
@@ -236,10 +236,10 @@ Configuration can be provided via file, environment variables, or command-line f
 
 ```bash
 # Use Claude Desktop config (macOS)
-mcpc --config ~/Library/Application\ Support/Claude/claude_desktop_config.json apify tools list
+mcpc --config ~/Library/Application\ Support/Claude/claude_desktop_config.json apify tools-list
 
 # Use custom config file
-mcpc --config ./mcp-config.json myserver resources list
+mcpc --config ./mcp-config.json myserver resources-list
 ```
 
 **Standard MCP config format:**
@@ -286,12 +286,12 @@ When `--config` is provided, you can reference servers by name:
 
 ```bash
 # With config file, use server names directly
-mcpc --config mcp-config.json apify tools list
-mcpc --config mcp-config.json filesystem resources list
+mcpc --config mcp-config.json apify tools-list
+mcpc --config mcp-config.json filesystem resources-list
 
 # Create a named session from config
 mcpc --config mcp-config.json connect my-apify apify
-mcpc @my-apify tools call search
+mcpc @my-apify tools-call search
 ```
 
 **Environment variable substitution:**
@@ -361,11 +361,11 @@ When a target is identified as a local package, `mcpc` resolves it as follows:
 ```bash
 # Use locally installed package
 npm install @modelcontextprotocol/server-filesystem
-mcpc @modelcontextprotocol/server-filesystem resources list
+mcpc @modelcontextprotocol/server-filesystem resources-list
 
 # Use globally installed package
 npm install -g @modelcontextprotocol/server-filesystem
-mcpc @modelcontextprotocol/server-filesystem resources list
+mcpc @modelcontextprotocol/server-filesystem resources-list
 ```
 
 ## Output format
@@ -488,13 +488,13 @@ $ mcpc @apify shell
 Connected to apify (https://mcp.apify.com)
 MCP version: 2025-11-25
 
-mcpc(@apify)> tools list
+mcpc(@apify)> tools-list
 Available tools:
   - search-actors
   - get-actor
   - run-actor
 
-mcpc(@apify)> tools call search-actors --args query="tiktok scraper"
+mcpc(@apify)> tools-call search-actors --args query="tiktok scraper"
 [results...]
 
 mcpc(@apify)> exit
@@ -671,7 +671,7 @@ Later...
 
 **"Package not found"**
 - Ensure package is installed: `npm list -g <package>` or `npm list <package>`
-- Try with full path: `mcpc /path/to/package/bin/server resources list`
+- Try with full path: `mcpc /path/to/package/bin/server resources-list`
 
 **"Authentication failed"**
 - Check credentials in OS keychain: `mcpc auth list`
@@ -683,7 +683,7 @@ Later...
 Enable detailed logging with `--verbose`:
 
 ```bash
-mcpc --verbose @apify tools list
+mcpc --verbose @apify tools-list
 ```
 
 This shows:
