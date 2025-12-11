@@ -18,7 +18,7 @@ export async function connectSession(
   if (options.outputMode === 'human') {
     console.log(formatSuccess(`Session '${name}' created successfully`));
     console.log(`  Target: ${target}`);
-    console.log(`\nUse "mcpc @${name} tools list" to list available tools.`);
+    console.log(`\nUse "mcpc ${name} tools-list" to list available tools.`);
   } else {
     console.log(
       formatOutput(
@@ -79,4 +79,52 @@ export async function closeSession(
       )
     );
   }
+}
+
+/**
+ * Get server instructions
+ */
+export async function getInstructions(
+  target: string,
+  options: { outputMode: OutputMode }
+): Promise<void> {
+  // TODO: Connect to MCP server using target and get instructions
+
+  const mockInstructions = `Instructions for ${target}:
+
+This is a placeholder for server-provided instructions.
+Instructions would typically explain how to use the server's tools and resources.`;
+
+  if (options.outputMode === 'human') {
+    console.log(`[Using target: ${target}]\n`);
+    console.log(mockInstructions);
+  } else {
+    console.log(
+      formatOutput(
+        {
+          target,
+          instructions: mockInstructions,
+        },
+        'json'
+      )
+    );
+  }
+}
+
+/**
+ * Open an interactive shell for a target
+ */
+export async function openShell(
+  target: string,
+  _options: { outputMode: OutputMode }
+): Promise<void> {
+  // TODO: Implement interactive shell using @inquirer/prompts
+
+  console.log(`[Using target: ${target}]`);
+  console.log('Interactive shell not implemented yet.');
+  console.log('This would provide a REPL interface with:');
+  console.log('  - Command history (saved to ~/.mcpc/history)');
+  console.log('  - Tab completion for commands and tool names');
+  console.log('  - Multi-line editing');
+  console.log('  - Prompt showing session name');
 }

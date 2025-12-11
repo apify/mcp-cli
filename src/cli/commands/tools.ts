@@ -9,11 +9,14 @@ import { ClientError } from '../../lib/errors.js';
 /**
  * List available tools
  */
-export async function listTools(options: {
-  cursor?: string;
-  outputMode: OutputMode;
-}): Promise<void> {
-  // TODO: Connect to MCP client and list tools
+export async function listTools(
+  target: string,
+  options: {
+    cursor?: string;
+    outputMode: OutputMode;
+  }
+): Promise<void> {
+  // TODO: Connect to MCP client using target and list tools
   // For now, return mock data
 
   const mockTools = [
@@ -41,14 +44,19 @@ export async function listTools(options: {
     },
   ];
 
+  console.log(`[Using target: ${target}]`);
   console.log(formatOutput(mockTools, options.outputMode));
 }
 
 /**
  * Get information about a specific tool
  */
-export async function getTool(name: string, options: { outputMode: OutputMode }): Promise<void> {
-  // TODO: Connect to MCP client and get tool
+export async function getTool(
+  target: string,
+  name: string,
+  options: { outputMode: OutputMode }
+): Promise<void> {
+  // TODO: Connect to MCP client using target and get tool
 
   const mockTool = {
     name,
@@ -64,6 +72,7 @@ export async function getTool(name: string, options: { outputMode: OutputMode })
   if (options.outputMode === 'json') {
     console.log(formatOutput(mockTool, 'json'));
   } else {
+    console.log(`[Using target: ${target}]`);
     console.log(formatToolDetail(mockTool));
   }
 }
@@ -72,21 +81,48 @@ export async function getTool(name: string, options: { outputMode: OutputMode })
  * Call a tool with arguments
  */
 export async function callTool(
+  target: string,
   name: string,
   options: {
-    args?: string;
+    args?: string[];
+    argsFile?: string;
     outputMode: OutputMode;
   }
 ): Promise<void> {
-  // TODO: Connect to MCP client and call tool
+  // TODO: Connect to MCP client using target and call tool
 
-  // Parse args JSON
+  // Parse args from key=value or key:=json pairs
   let parsedArgs: Record<string, unknown> = {};
-  if (options.args) {
-    try {
-      parsedArgs = JSON.parse(options.args) as Record<string, unknown>;
-    } catch (error) {
-      throw new ClientError(`Invalid JSON in --args: ${(error as Error).message}`);
+
+  if (options.argsFile) {
+    // TODO: Load args from file
+    throw new ClientError('--args-file is not implemented yet');
+  } else if (options.args) {
+    // Parse key=value or key:=json pairs
+    for (const pair of options.args) {
+      if (pair.includes(':=')) {
+        const parts = pair.split(':=', 2);
+        const key = parts[0];
+        const jsonValue = parts[1];
+        if (!key || jsonValue === undefined) {
+          throw new ClientError(`Invalid argument format: ${pair}. Use key=value or key:=json`);
+        }
+        try {
+          parsedArgs[key] = JSON.parse(jsonValue);
+        } catch (error) {
+          throw new ClientError(`Invalid JSON value for ${key}: ${(error as Error).message}`);
+        }
+      } else if (pair.includes('=')) {
+        const parts = pair.split('=', 2);
+        const key = parts[0];
+        const value = parts[1];
+        if (!key || value === undefined) {
+          throw new ClientError(`Invalid argument format: ${pair}. Use key=value or key:=json`);
+        }
+        parsedArgs[key] = value;
+      } else {
+        throw new ClientError(`Invalid argument format: ${pair}. Use key=value or key:=json`);
+      }
     }
   }
 
@@ -100,6 +136,7 @@ export async function callTool(
   };
 
   if (options.outputMode === 'human') {
+    console.log(`[Using target: ${target}]`);
     console.log(formatSuccess(`Tool ${name} executed successfully`));
     console.log(formatOutput(mockResult, 'human'));
   } else {

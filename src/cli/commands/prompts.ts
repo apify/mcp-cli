@@ -9,11 +9,14 @@ import { ClientError } from '../../lib/errors.js';
 /**
  * List available prompts
  */
-export async function listPrompts(options: {
-  cursor?: string;
-  outputMode: OutputMode;
-}): Promise<void> {
-  // TODO: Connect to MCP client and list prompts
+export async function listPrompts(
+  target: string,
+  options: {
+    cursor?: string;
+    outputMode: OutputMode;
+  }
+): Promise<void> {
+  // TODO: Connect to MCP client using target and list prompts
 
   const mockPrompts = [
     {
@@ -31,6 +34,7 @@ export async function listPrompts(options: {
     },
   ];
 
+  console.log(`[Using target: ${target}]`);
   console.log(formatOutput(mockPrompts, options.outputMode));
 }
 
@@ -38,21 +42,42 @@ export async function listPrompts(options: {
  * Get a prompt by name
  */
 export async function getPrompt(
+  target: string,
   name: string,
   options: {
-    args?: string;
+    args?: string[];
     outputMode: OutputMode;
   }
 ): Promise<void> {
-  // TODO: Connect to MCP client and get prompt
+  // TODO: Connect to MCP client using target and get prompt
 
-  // Parse args JSON
-  let parsedArgs: Record<string, string> = {};
+  // Parse args from key=value or key:=json pairs
+  let parsedArgs: Record<string, unknown> = {};
   if (options.args) {
-    try {
-      parsedArgs = JSON.parse(options.args) as Record<string, string>;
-    } catch (error) {
-      throw new ClientError(`Invalid JSON in --args: ${(error as Error).message}`);
+    for (const pair of options.args) {
+      if (pair.includes(':=')) {
+        const parts = pair.split(':=', 2);
+        const key = parts[0];
+        const jsonValue = parts[1];
+        if (!key || jsonValue === undefined) {
+          throw new ClientError(`Invalid argument format: ${pair}. Use key=value or key:=json`);
+        }
+        try {
+          parsedArgs[key] = JSON.parse(jsonValue);
+        } catch (error) {
+          throw new ClientError(`Invalid JSON value for ${key}: ${(error as Error).message}`);
+        }
+      } else if (pair.includes('=')) {
+        const parts = pair.split('=', 2);
+        const key = parts[0];
+        const value = parts[1];
+        if (!key || value === undefined) {
+          throw new ClientError(`Invalid argument format: ${pair}. Use key=value or key:=json`);
+        }
+        parsedArgs[key] = value;
+      } else {
+        throw new ClientError(`Invalid argument format: ${pair}. Use key=value or key:=json`);
+      }
     }
   }
 
@@ -69,5 +94,6 @@ export async function getPrompt(
     ],
   };
 
+  console.log(`[Using target: ${target}]`);
   console.log(formatOutput(mockPrompt, options.outputMode));
 }

@@ -23,7 +23,69 @@ import type { OutputMode } from '../lib/types.js';
 // Get version from package.json
 const packageJson = { version: '0.1.0' }; // TODO: Import dynamically
 
+// Options that take a value (not boolean flags)
+const OPTIONS_WITH_VALUES = [
+  '-c',
+  '--config',
+  '-H',
+  '--header',
+  '--timeout',
+  '--protocol-version',
+  '--schema',
+  '--schema-mode',
+];
+
 async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+
+  // Special case: no arguments means list sessions
+  if (args.length === 0) {
+    await sessions.listSessions({ outputMode: 'human' });
+    return;
+  }
+
+  // Find first non-option argument (the target)
+  let target: string | undefined;
+  let targetIndex = -1;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg) continue;
+    // Skip options and their values
+    if (arg.startsWith('-')) {
+      // Check if this option takes a value
+      const optionName = arg.includes('=') ? arg.substring(0, arg.indexOf('=')) : arg;
+      const takesValue = OPTIONS_WITH_VALUES.includes(optionName);
+
+      // If option takes a value and value is not inline (no =), skip next arg
+      if (takesValue && !arg.includes('=') && i + 1 < args.length) {
+        i++; // Skip the value
+      }
+      continue;
+    }
+    target = arg;
+    targetIndex = i;
+    break;
+  }
+
+  // If no target found, show help
+  if (!target) {
+    const program = createProgram();
+    program.outputHelp();
+    return;
+  }
+
+  // Build modified argv without the target
+  const modifiedArgv = [
+    ...process.argv.slice(0, 2),
+    ...args.slice(0, targetIndex),
+    ...args.slice(targetIndex + 1),
+  ];
+
+  // Handle commands
+  await handleCommands(target, modifiedArgv);
+}
+
+function createProgram(): Command {
   const program = new Command();
 
   program
@@ -32,164 +94,192 @@ async function main(): Promise<void> {
     .version(packageJson.version, '-v, --version', 'Output the version number')
     .option('-j, --json', 'Output in JSON format')
     .option('--verbose', 'Enable verbose logging')
-    .option('-c, --config <path>', 'Path to configuration file');
+    .option('-c, --config <path>', 'Path to configuration file')
+    .option('-H, --header <header>', 'Add HTTP header (can be repeated)', [])
+    .option('--timeout <seconds>', 'Request timeout in seconds')
+    .option('--protocol-version <version>', 'Force specific MCP protocol version')
+    .option('--schema <file>', 'Validate against expected tool/prompt schema')
+    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible, or ignore')
+    .option('--insecure', 'Disable SSL certificate validation');
 
-  // Connect command
+  return program;
+}
+
+async function handleCommands(target: string, argv: string[]): Promise<void> {
+  const program = createProgram();
+  program.argument('<target>', 'Target (session @name, URL, config entry, or package)');
+
+  // Get options to pass to handlers
+  const getOptions = (command: Command) => {
+    const opts = command.optsWithGlobals ? command.optsWithGlobals() : command.opts();
+    if (opts.verbose) setVerbose(true);
+    return { outputMode: (opts.json ? 'json' : 'human') as OutputMode };
+  };
+
+  // Instructions command
   program
-    .command('connect <name> <target>')
-    .description('Connect to an MCP server and create a session')
-    .action(async (name, target, _options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
-
-      await sessions.connectSession(name, target, {
-        outputMode: opts.json ? 'json' : 'human',
-      });
-    });
-
-  // Sessions command
-  program
-    .command('sessions')
-    .description('List active sessions')
+    .command('instructions')
+    .description('Get server instructions')
     .action(async (_options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
+      await sessions.getInstructions(target, getOptions(command));
+    });
 
-      await sessions.listSessions({
-        outputMode: opts.json ? 'json' : 'human',
+  // Shell command
+  program
+    .command('shell')
+    .description('Interactive shell for the target')
+    .action(async (_options, command) => {
+      await sessions.openShell(target, getOptions(command));
+    });
+
+  // Close command
+  program
+    .command('close')
+    .description('Close the session')
+    .action(async (_options, command) => {
+      await sessions.closeSession(target, getOptions(command));
+    });
+
+  // Connect command: mcpc <target> connect <server>
+  program
+    .command('connect <server>')
+    .description('Connect to an MCP server and create a session')
+    .action(async (server, _options, command) => {
+      await sessions.connectSession(target, server, getOptions(command));
+    });
+
+  // Tools commands (hyphenated)
+  program
+    .command('tools')
+    .description('List available tools (shorthand for tools-list)')
+    .option('--cursor <cursor>', 'Pagination cursor')
+    .action(async (options, command) => {
+      await tools.listTools(target, {
+        cursor: options.cursor,
+        ...getOptions(command),
       });
     });
 
-  // Tools commands
-  const toolsCmd = program.command('tools').description('Manage MCP tools');
-
-  toolsCmd
-    .command('list')
+  program
+    .command('tools-list')
     .description('List available tools')
     .option('--cursor <cursor>', 'Pagination cursor')
     .action(async (options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
-
-      await tools.listTools({
+      await tools.listTools(target, {
         cursor: options.cursor,
-        outputMode: opts.json ? 'json' : 'human',
+        ...getOptions(command),
       });
     });
 
-  toolsCmd
-    .command('get <name>')
+  program
+    .command('tools-get <name>')
     .description('Get information about a specific tool')
     .action(async (name, _options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
-
-      await tools.getTool(name, {
-        outputMode: opts.json ? 'json' : 'human',
-      });
+      await tools.getTool(target, name, getOptions(command));
     });
 
-  toolsCmd
-    .command('call <name>')
+  program
+    .command('tools-call <name>')
     .description('Call a tool with arguments')
-    .option('-a, --args <json>', 'Tool arguments as JSON')
+    .option('--args [pairs...]', 'Tool arguments as key=val or key:=json pairs')
+    .option('--args-file <file>', 'Load arguments from JSON file')
     .action(async (name, options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
-
-      await tools.callTool(name, {
+      await tools.callTool(target, name, {
         args: options.args,
-        outputMode: opts.json ? 'json' : 'human',
+        argsFile: options.argsFile,
+        ...getOptions(command),
       });
     });
 
-  // Resources commands
-  const resourcesCmd = program.command('resources').description('Manage MCP resources');
+  // Resources commands (hyphenated)
+  program
+    .command('resources')
+    .description('List available resources (shorthand for resources-list)')
+    .option('--cursor <cursor>', 'Pagination cursor')
+    .action(async (options, command) => {
+      await resources.listResources(target, {
+        cursor: options.cursor,
+        ...getOptions(command),
+      });
+    });
 
-  resourcesCmd
-    .command('list')
+  program
+    .command('resources-list')
     .description('List available resources')
     .option('--cursor <cursor>', 'Pagination cursor')
     .action(async (options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
-
-      await resources.listResources({
+      await resources.listResources(target, {
         cursor: options.cursor,
-        outputMode: opts.json ? 'json' : 'human',
+        ...getOptions(command),
       });
     });
 
-  resourcesCmd
-    .command('get <uri>')
+  program
+    .command('resources-get <uri>')
     .description('Get a resource by URI')
-    .action(async (uri, _options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
-
-      await resources.getResource(uri, {
-        outputMode: opts.json ? 'json' : 'human',
+    .option('-o, --output <file>', 'Write resource to file')
+    .option('--raw', 'Output raw resource content')
+    .option('--max-size <bytes>', 'Maximum resource size in bytes')
+    .action(async (uri, options, command) => {
+      await resources.getResource(target, uri, {
+        output: options.output,
+        raw: options.raw,
+        maxSize: options.maxSize,
+        ...getOptions(command),
       });
     });
 
-  resourcesCmd
-    .command('subscribe <uri>')
+  program
+    .command('resources-subscribe <uri>')
     .description('Subscribe to resource updates')
     .action(async (uri, _options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
-
-      await resources.subscribeResource(uri, {
-        outputMode: opts.json ? 'json' : 'human',
-      });
+      await resources.subscribeResource(target, uri, getOptions(command));
     });
 
-  resourcesCmd
-    .command('unsubscribe <uri>')
+  program
+    .command('resources-unsubscribe <uri>')
     .description('Unsubscribe from resource updates')
     .action(async (uri, _options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
+      await resources.unsubscribeResource(target, uri, getOptions(command));
+    });
 
-      await resources.unsubscribeResource(uri, {
-        outputMode: opts.json ? 'json' : 'human',
+  // Prompts commands (hyphenated)
+  program
+    .command('prompts')
+    .description('List available prompts (shorthand for prompts-list)')
+    .option('--cursor <cursor>', 'Pagination cursor')
+    .action(async (options, command) => {
+      await prompts.listPrompts(target, {
+        cursor: options.cursor,
+        ...getOptions(command),
       });
     });
 
-  // Prompts commands
-  const promptsCmd = program.command('prompts').description('Manage MCP prompts');
-
-  promptsCmd
-    .command('list')
+  program
+    .command('prompts-list')
     .description('List available prompts')
     .option('--cursor <cursor>', 'Pagination cursor')
     .action(async (options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
-
-      await prompts.listPrompts({
+      await prompts.listPrompts(target, {
         cursor: options.cursor,
-        outputMode: opts.json ? 'json' : 'human',
+        ...getOptions(command),
       });
     });
 
-  promptsCmd
-    .command('get <name>')
+  program
+    .command('prompts-get <name>')
     .description('Get a prompt by name')
-    .option('-a, --args <json>', 'Prompt arguments as JSON')
+    .option('--args [pairs...]', 'Prompt arguments as key=val or key:=json pairs')
     .action(async (name, options, command) => {
-      const opts = command.optsWithGlobals();
-      if (opts.verbose) setVerbose(true);
-
-      await prompts.getPrompt(name, {
+      await prompts.getPrompt(target, name, {
         args: options.args,
-        outputMode: opts.json ? 'json' : 'human',
+        ...getOptions(command),
       });
     });
 
   // Parse and execute
   try {
-    await program.parseAsync(process.argv);
+    await program.parseAsync(argv);
   } catch (error) {
     const opts = program.opts();
     const outputMode: OutputMode = opts.json ? 'json' : 'human';

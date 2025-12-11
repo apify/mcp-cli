@@ -8,11 +8,14 @@ import { formatOutput, formatSuccess } from '../output.js';
 /**
  * List available resources
  */
-export async function listResources(options: {
-  cursor?: string;
-  outputMode: OutputMode;
-}): Promise<void> {
-  // TODO: Connect to MCP client and list resources
+export async function listResources(
+  target: string,
+  options: {
+    cursor?: string;
+    outputMode: OutputMode;
+  }
+): Promise<void> {
+  // TODO: Connect to MCP client using target and list resources
 
   const mockResources = [
     {
@@ -29,14 +32,24 @@ export async function listResources(options: {
     },
   ];
 
+  console.log(`[Using target: ${target}]`);
   console.log(formatOutput(mockResources, options.outputMode));
 }
 
 /**
  * Get a resource by URI
  */
-export async function getResource(uri: string, options: { outputMode: OutputMode }): Promise<void> {
-  // TODO: Connect to MCP client and get resource
+export async function getResource(
+  target: string,
+  uri: string,
+  options: {
+    output?: string;
+    raw?: boolean;
+    maxSize?: number;
+    outputMode: OutputMode;
+  }
+): Promise<void> {
+  // TODO: Connect to MCP client using target and get resource
 
   const mockResource = {
     uri,
@@ -49,6 +62,7 @@ export async function getResource(uri: string, options: { outputMode: OutputMode
     ],
   };
 
+  console.log(`[Using target: ${target}]`);
   console.log(formatOutput(mockResource, options.outputMode));
 }
 
@@ -56,12 +70,14 @@ export async function getResource(uri: string, options: { outputMode: OutputMode
  * Subscribe to resource updates
  */
 export async function subscribeResource(
+  target: string,
   uri: string,
   options: { outputMode: OutputMode }
 ): Promise<void> {
-  // TODO: Connect to MCP client and subscribe
+  // TODO: Connect to MCP client using target and subscribe
 
   if (options.outputMode === 'human') {
+    console.log(`[Using target: ${target}]`);
     console.log(formatSuccess(`Subscribed to resource: ${uri}`));
   } else {
     console.log(formatOutput({ subscribed: true, uri }, 'json'));
@@ -72,12 +88,14 @@ export async function subscribeResource(
  * Unsubscribe from resource updates
  */
 export async function unsubscribeResource(
+  target: string,
   uri: string,
   options: { outputMode: OutputMode }
 ): Promise<void> {
-  // TODO: Connect to MCP client and unsubscribe
+  // TODO: Connect to MCP client using target and unsubscribe
 
   if (options.outputMode === 'human') {
+    console.log(`[Using target: ${target}]`);
     console.log(formatSuccess(`Unsubscribed from resource: ${uri}`));
   } else {
     console.log(formatOutput({ unsubscribed: true, uri }, 'json'));
