@@ -122,12 +122,11 @@ function createProgram(): Command {
     `
 Where <target> can be:
   @<name>                       Named session (e.g., @apify)
-  https://mcp.example.com       Remote MCP server URL
+  https://...                   Remote MCP server URL
   <config-entry>                Entry from config file (with --config)
   <package>                     Local MCP server package
 
 Examples:
-  $ mcpc                                                # List all sessions
   $ mcpc https://mcp.apify.com connect --name @apify    # Create a session
   $ mcpc @apify                                         # Show server info and capabilities
   $ mcpc @apify tools-list                              # List server tools
@@ -147,7 +146,24 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
   const getOptions = (command: Command) => {
     const opts = command.optsWithGlobals ? command.optsWithGlobals() : command.opts();
     if (opts.verbose) setVerbose(true);
-    return { outputMode: (opts.json ? 'json' : 'human') as OutputMode };
+
+    const options: {
+      outputMode: OutputMode;
+      config?: string;
+      headers?: string[];
+      timeout?: number;
+      verbose?: boolean;
+    } = {
+      outputMode: (opts.json ? 'json' : 'human') as OutputMode,
+    };
+
+    // Only include optional properties if they're present
+    if (opts.config) options.config = opts.config;
+    if (opts.header) options.headers = opts.header; // Commander stores repeated options as arrays
+    if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
+    if (opts.verbose) options.verbose = opts.verbose;
+
+    return options;
   };
 
   // Check if no command provided - show server info and instructions

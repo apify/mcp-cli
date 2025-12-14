@@ -40,6 +40,12 @@ export interface CreateClientOptions {
    * @default true
    */
   autoConnect?: boolean;
+
+  /**
+   * Enable verbose logging
+   * @default false
+   */
+  verbose?: boolean;
 }
 
 /**
@@ -70,19 +76,27 @@ export interface CreateClientOptions {
  * });
  */
 export async function createClient(options: CreateClientOptions): Promise<McpClient> {
-  const logger = createLogger('ClientFactory');
-  const { autoConnect = true } = options;
+  const { autoConnect = true, verbose = false } = options;
 
-  logger.debug('Creating MCP client', {
-    clientName: options.clientInfo.name,
-    transportType: options.transport.type,
-  });
+  // Create logger only in verbose mode
+  const logger = verbose ? createLogger('ClientFactory') : undefined;
+
+  if (logger) {
+    logger.debug('Creating MCP client', {
+      clientName: options.clientInfo.name,
+      transportType: options.transport.type,
+    });
+  }
 
   // Create the client
   const clientOptions: McpClientOptions = {
     capabilities: options.capabilities || {},
-    logger: createLogger(`McpClient:${options.clientInfo.name}`),
   };
+
+  // Only pass logger if verbose mode is enabled
+  if (verbose) {
+    clientOptions.logger = createLogger(`McpClient:${options.clientInfo.name}`);
+  }
 
   const client = new McpClient(options.clientInfo, clientOptions);
 

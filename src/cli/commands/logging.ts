@@ -5,6 +5,7 @@
 import type { OutputMode, LoggingLevel } from '../../lib/types.js';
 import { formatOutput, formatSuccess, logTarget } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
+import { withMcpClient } from '../helpers.js';
 
 const VALID_LOG_LEVELS: LoggingLevel[] = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
 
@@ -14,7 +15,13 @@ const VALID_LOG_LEVELS: LoggingLevel[] = ['debug', 'info', 'notice', 'warning', 
 export async function setLogLevel(
   target: string,
   level: string,
-  options: { outputMode: OutputMode }
+  options: {
+    outputMode: OutputMode;
+    config?: string;
+    headers?: string[];
+    timeout?: number;
+    verbose?: boolean;
+  }
 ): Promise<void> {
   // Validate log level
   if (!VALID_LOG_LEVELS.includes(level as LoggingLevel)) {
@@ -23,20 +30,22 @@ export async function setLogLevel(
     );
   }
 
-  // TODO: Connect to MCP server using target and send logging/setLevel request
+  await withMcpClient(target, options, async (client) => {
+    await client.setLoggingLevel(level);
 
-  logTarget(target, options.outputMode);
-  if (options.outputMode === 'human') {
-    console.log(formatSuccess(`Server log level set to: ${level}`));
-  } else {
-    console.log(
-      formatOutput(
-        {
-          level,
-          success: true,
-        },
-        'json'
-      )
-    );
-  }
+    logTarget(target, options.outputMode);
+    if (options.outputMode === 'human') {
+      console.log(formatSuccess(`Server log level set to: ${level}`));
+    } else {
+      console.log(
+        formatOutput(
+          {
+            level,
+            success: true,
+          },
+          'json'
+        )
+      );
+    }
+  });
 }

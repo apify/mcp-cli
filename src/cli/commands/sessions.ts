@@ -102,62 +102,85 @@ export async function closeSession(
  */
 export async function getInstructions(
   target: string,
-  options: { outputMode: OutputMode }
-): Promise<void> {
-  // TODO: Connect to MCP server using target and get capabilities
-
-  const mockInstructions = `Instructions for ${target}:
-
-This is a placeholder for server-provided instructions.
-Instructions would typically explain how to use the server's tools and resources.`;
-
-  // Mock capabilities - in real implementation, these would come from server
-  const mockCapabilities = {
-    tools: ['search', 'calculate', 'get_weather'],
-    resources: true,
-    prompts: true,
-  };
-
-  if (options.outputMode === 'human') {
-    logTarget(target, options.outputMode);
-    console.log('');
-    console.log(mockInstructions);
-    console.log('');
-    console.log('Available capabilities:');
-    console.log(`  • Tools: ${mockCapabilities.tools.length} available`);
-    console.log(`  • Resources: ${mockCapabilities.resources ? 'supported' : 'not supported'}`);
-    console.log(`  • Prompts: ${mockCapabilities.prompts ? 'supported' : 'not supported'}`);
-    console.log('');
-    console.log('Common commands:');
-    console.log(`  mcpc ${target} tools-list              List all tools`);
-    console.log(`  mcpc ${target} resources-list          List all resources`);
-    console.log(`  mcpc ${target} prompts-list            List all prompts`);
-    console.log(`  mcpc ${target} tools-call <name>       Call a tool`);
-    console.log(`  mcpc ${target} logging-set-level <lvl> Set server log level`);
-    console.log(`  mcpc ${target} shell                   Open interactive shell`);
-  } else {
-    console.log(
-      formatOutput(
-        {
-          target,
-          instructions: mockInstructions,
-          capabilities: mockCapabilities,
-          availableCommands: [
-            'tools-list',
-            'tools-get',
-            'tools-call',
-            'resources-list',
-            'resources-get',
-            'prompts-list',
-            'prompts-get',
-            'logging-set-level',
-            'shell',
-          ],
-        },
-        'json'
-      )
-    );
+  options: {
+    outputMode: OutputMode;
+    config?: string;
+    headers?: string[];
+    timeout?: number;
+    verbose?: boolean;
   }
+): Promise<void> {
+  const { withMcpClient } = await import('../helpers.js');
+
+  await withMcpClient(target, options, async (client) => {
+    const serverInfo = client.getServerVersion();
+    const capabilities = client.getServerCapabilities();
+    const instructions = client.getInstructions();
+
+    // Get tool count
+    const toolsResult = await client.listTools();
+    const toolCount = toolsResult.tools.length;
+
+    if (options.outputMode === 'human') {
+      logTarget(target, options.outputMode);
+      console.log('');
+
+      // Server info
+      if (serverInfo) {
+        console.log(`Server: ${serverInfo.name} v${serverInfo.version}`);
+        console.log('');
+      }
+
+      // Instructions
+      if (instructions) {
+        console.log(instructions);
+        console.log('');
+      }
+
+      // Capabilities
+      console.log('Available capabilities:');
+      console.log(`  • Tools: ${toolCount} available`);
+      console.log(`  • Resources: ${capabilities?.resources ? 'supported' : 'not supported'}`);
+      console.log(`  • Prompts: ${capabilities?.prompts ? 'supported' : 'not supported'}`);
+      console.log('');
+
+      // Commands
+      console.log('Common commands:');
+      console.log(`  mcpc ${target} tools-list              List all tools`);
+      console.log(`  mcpc ${target} resources-list          List all resources`);
+      console.log(`  mcpc ${target} prompts-list            List all prompts`);
+      console.log(`  mcpc ${target} tools-call <name>       Call a tool`);
+      console.log(`  mcpc ${target} logging-set-level <lvl> Set server log level`);
+      console.log(`  mcpc ${target} shell                   Open interactive shell`);
+    } else {
+      console.log(
+        formatOutput(
+          {
+            target,
+            server: serverInfo,
+            instructions: instructions || null,
+            capabilities: {
+              tools: toolCount,
+              resources: !!capabilities?.resources,
+              prompts: !!capabilities?.prompts,
+            },
+            availableCommands: [
+              'tools-list',
+              'tools-get',
+              'tools-call',
+              'resources-list',
+              'resources-get',
+              'prompts-list',
+              'prompts-get',
+              'logging-set-level',
+              'shell',
+            ],
+          },
+          'json'
+        )
+      );
+    }
+  });
 }
 
 /**

@@ -788,6 +788,15 @@ git push --tags
 
 Please open an issue or pull request on [GitHub](https://github.com/apify/mcpc).
 
+
+### References
+
+- [Official MCP documentation](https://modelcontextprotocol.io/llms.txt)
+- [Official TypeScript SDK for MCP servers and clients](https://www.npmjs.com/package/@modelcontextprotocol/sdk)
+- [MCP Inspector](https://github.com/modelcontextprotocol/inspector) - CLI client implementation for reference
+
+
 ## License
 
 Apache-2.0 - see [LICENSE](./LICENSE) for details.
+

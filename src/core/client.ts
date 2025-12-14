@@ -15,7 +15,7 @@ import type {
   GetPromptResult,
   ServerCapabilities,
 } from '@modelcontextprotocol/sdk/types.js';
-import { createLogger, type Logger } from '../lib/logger.js';
+import { createNoOpLogger, type Logger } from '../lib/logger.js';
 import { ServerError, NetworkError } from '../lib/errors.js';
 
 /**
@@ -37,7 +37,7 @@ export class McpClient {
   private logger: Logger;
 
   constructor(clientInfo: Implementation, options: McpClientOptions = {}) {
-    this.logger = options.logger || createLogger('McpClient');
+    this.logger = options.logger || createNoOpLogger();
 
     this.client = new SDKClient(clientInfo, {
       capabilities: options.capabilities || {},
@@ -282,6 +282,23 @@ export class McpClient {
       this.logger.error(`Failed to get prompt ${name}:`, error);
       throw new ServerError(
         `Failed to get prompt ${name}: ${(error as Error).message}`,
+        { originalError: error }
+      );
+    }
+  }
+
+  /**
+   * Set the logging level on the server
+   */
+  async setLoggingLevel(level: string): Promise<void> {
+    try {
+      this.logger.debug(`Setting log level to: ${level}`);
+      await this.client.setLoggingLevel(level as any);
+      this.logger.debug('Log level set successfully');
+    } catch (error) {
+      this.logger.error(`Failed to set log level:`, error);
+      throw new ServerError(
+        `Failed to set log level: ${(error as Error).message}`,
         { originalError: error }
       );
     }

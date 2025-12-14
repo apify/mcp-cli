@@ -162,3 +162,25 @@ export class Logger {
 export function createLogger(context: string): Logger {
   return new Logger(context);
 }
+
+/**
+ * No-op logger that doesn't output anything
+ */
+class NoOpLogger extends Logger {
+  constructor() {
+    super();
+  }
+
+  override debug(): void {}
+  override info(): void {}
+  override warn(): void {}
+  override error(): void {}
+  override log(): void {}
+}
+
+/**
+ * Create a no-op logger that doesn't output anything
+ */
+export function createNoOpLogger(): Logger {
+  return new NoOpLogger();
+}

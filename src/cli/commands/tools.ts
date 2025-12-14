@@ -5,6 +5,7 @@
 import type { OutputMode } from '../../lib/types.js';
 import { formatOutput, formatToolDetail, formatSuccess, logTarget } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
+import { withMcpClient } from '../helpers.js';
 
 /**
  * List available tools
@@ -14,61 +15,23 @@ export async function listTools(
   options: {
     cursor?: string;
     outputMode: OutputMode;
+    config?: string;
+    headers?: string[];
+    timeout?: number;
+    verbose?: boolean;
   }
 ): Promise<void> {
-  // TODO: Connect to MCP client using target and list tools
-  // For now, return mock data
+  await withMcpClient(target, options, async (client) => {
+    const result = await client.listTools(options.cursor);
 
-  const mockTools = [
-    {
-      "name": "get_weather",
-      "title": "Weather Information Provider",
-      "description": "Get current weather information for a location",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "location": {
-            "type": "string",
-            "description": "City name or zip code"
-          }
-        },
-        "required": ["location"]
-      },
-      "icons": [
-        {
-          "src": "https://example.com/weather-icon.png",
-          "mimeType": "image/png",
-          "sizes": ["48x48"]
-        }
-      ]
-    },
-    {
-      name: 'search',
-      description: 'Search for information in database',
-      title: 'Search stuff',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'Search query' },
-        },
-        required: ['query'],
-      },
-    },
-    {
-      name: 'calculate',
-      description: 'Perform mathematical calculations',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          expression: { type: 'string', description: 'Math expression' },
-        },
-        required: ['expression'],
-      },
-    },
-  ];
+    logTarget(target, options.outputMode);
+    console.log(formatOutput(result.tools, options.outputMode));
 
-  logTarget(target, options.outputMode);
-  console.log(formatOutput(mockTools, options.outputMode));
+    // Show pagination info if there's a next cursor
+    if (result.nextCursor && options.outputMode === 'human') {
+      console.log(`\nMore tools available. Use --cursor ${result.nextCursor} to see more.`);
+    }
+  });
 }
 
 /**
@@ -77,27 +40,30 @@ export async function listTools(
 export async function getTool(
   target: string,
   name: string,
-  options: { outputMode: OutputMode }
-): Promise<void> {
-  // TODO: Connect to MCP client using target and get tool
-
-  const mockTool = {
-    name,
-    description: `Description for ${name}`,
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        param: { type: 'string' },
-      },
-    },
-  };
-
-  logTarget(target, options.outputMode);
-  if (options.outputMode === 'human') {
-    console.log(formatToolDetail(mockTool));
-  } else {
-    console.log(formatOutput(mockTool, 'json'));
+  options: {
+    outputMode: OutputMode;
+    config?: string;
+    headers?: string[];
+    timeout?: number;
+    verbose?: boolean;
   }
+): Promise<void> {
+  await withMcpClient(target, options, async (client) => {
+    // List all tools and find the matching one
+    const result = await client.listTools();
+    const tool = result.tools.find((t) => t.name === name);
+
+    if (!tool) {
+      throw new ClientError(`Tool not found: ${name}`);
+    }
+
+    logTarget(target, options.outputMode);
+    if (options.outputMode === 'human') {
+      console.log(formatToolDetail(tool));
+    } else {
+      console.log(formatOutput(tool, 'json'));
+    }
+  });
 }
 
 /**
@@ -110,10 +76,12 @@ export async function callTool(
     args?: string[];
     argsFile?: string;
     outputMode: OutputMode;
+    config?: string;
+    headers?: string[];
+    timeout?: number;
+    verbose?: boolean;
   }
 ): Promise<void> {
-  // TODO: Connect to MCP client using target and call tool
-
   // Parse args from inline JSON, key=value pairs, or key:=json pairs
   let parsedArgs: Record<string, unknown> = {};
 
@@ -166,20 +134,15 @@ export async function callTool(
     }
   }
 
-  const mockResult = {
-    content: [
-      {
-        type: 'text',
-        text: `Result of calling ${name} with args: ${JSON.stringify(parsedArgs)}`,
-      },
-    ],
-  };
+  await withMcpClient(target, options, async (client) => {
+    const result = await client.callTool(name, parsedArgs);
 
-  logTarget(target, options.outputMode);
-  if (options.outputMode === 'human') {
-    console.log(formatSuccess(`Tool ${name} executed successfully`));
-    console.log(formatOutput(mockResult, 'human'));
-  } else {
-    console.log(formatOutput(mockResult, 'json'));
-  }
+    logTarget(target, options.outputMode);
+    if (options.outputMode === 'human') {
+      console.log(formatSuccess(`Tool ${name} executed successfully`));
+      console.log(formatOutput(result, 'human'));
+    } else {
+      console.log(formatOutput(result, 'json'));
+    }
+  });
 }
