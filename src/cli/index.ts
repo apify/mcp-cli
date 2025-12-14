@@ -18,6 +18,7 @@ import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
 import * as prompts from './commands/prompts.js';
 import * as sessions from './commands/sessions.js';
+import * as logging from './commands/logging.js';
 import type { OutputMode } from '../lib/types.js';
 
 // Get version from package.json
@@ -328,6 +329,14 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
         args: options.args,
         ...getOptions(command),
       });
+    });
+
+  // Logging commands
+  program
+    .command('logging-set-level <level>')
+    .description('Set server logging level (debug, info, notice, warning, error, critical, alert, emergency)')
+    .action(async (level, _options, command) => {
+      await logging.setLogLevel(target, level, getOptions(command));
     });
 
   // Parse and execute

@@ -133,6 +133,7 @@ Instructions would typically explain how to use the server's tools and resources
     console.log(`  mcpc ${target} resources-list          List all resources`);
     console.log(`  mcpc ${target} prompts-list            List all prompts`);
     console.log(`  mcpc ${target} tools-call <name>       Call a tool`);
+    console.log(`  mcpc ${target} logging-set-level <lvl> Set server log level`);
     console.log(`  mcpc ${target} shell                   Open interactive shell`);
   } else {
     console.log(
@@ -149,6 +150,7 @@ Instructions would typically explain how to use the server's tools and resources
             'resources-get',
             'prompts-list',
             'prompts-get',
+            'logging-set-level',
             'shell',
           ],
         },

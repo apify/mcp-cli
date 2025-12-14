@@ -75,6 +75,9 @@ mcpc <target> prompts
 mcpc <target> prompts-list [--cursor <cursor>]
 mcpc <target> prompts-get <name> [--args key=val key2:=json ...]
 
+# Logging
+mcpc <target> logging-set-level <level>    # Set server log level
+
 # Session management
 mcpc <target> connect --name @<name>
 mcpc         # prints alls sessions
@@ -104,6 +107,9 @@ Transports are selected automatically: HTTP/HTTPS URLs use the MCP Streamable HT
 `mcpc` supports multiple ways to pass arguments to tools and prompts:
 
 ```bash
+# Inline JSON object (most convenient)
+--args '{"query":"hello","count":10}'
+
 # String values (default) - use = for strings
 --args name=value query="hello world"
 
@@ -122,8 +128,9 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 ```
 
 **Rules:**
-- Use only one method: `--args`, `--args-file`, or stdin (piped input)
-- After `--args`, all `key=value` or `key:=json` pairs are consumed until next flag or end
+- Use only one method: `--args` (inline JSON or key=value pairs), `--args-file`, or stdin (piped input)
+- Inline JSON: If first argument starts with `{` or `[`, it's parsed as JSON object/array
+- Key=value pairs: After `--args`, all `key=value` or `key:=json` pairs are consumed until next flag
 - `=` assigns as string, `:=` parses as JSON
 - Stdin is automatically detected when input is piped (not interactive terminal)
 
@@ -138,6 +145,30 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 - `--schema <file>` - Validate against expected tool/prompt schema
 - `--schema-mode <mode>` - Schema validation mode: `strict`, `compatible`, or `ignore` (default: `compatible`)
 - `--insecure` - Disable SSL certificate validation (not recommended)
+
+## Logging
+
+MCP servers can be instructed to adjust their logging level using the `logging/setLevel` request:
+
+```bash
+# Set server log level to debug for detailed output
+mcpc @apify logging-set-level debug
+
+# Reduce server logging to only errors
+mcpc @apify logging-set-level error
+```
+
+**Available log levels** (from most to least verbose):
+- `debug` - Detailed debugging information
+- `info` - General informational messages
+- `notice` - Normal but significant events
+- `warning` - Warning messages
+- `error` - Error messages
+- `critical` - Critical conditions
+- `alert` - Action must be taken immediately
+- `emergency` - System is unusable
+
+**Note:** This sets the logging level on the **server side**. The actual log output depends on the server's implementation. For client-side verbose logging, use the `--verbose` flag.
 
 ## Sessions
 
