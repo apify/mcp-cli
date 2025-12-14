@@ -108,10 +108,10 @@ function createProgram(): Command {
     .option('--verbose', 'Enable verbose logging')
     .option('-c, --config <path>', 'Path to MCP server config file')
     .option('-H, --header <header>', 'Add HTTP header (can be repeated)')
-    .option('--timeout <seconds>', 'Request timeout in seconds')
+    .option('--timeout <seconds>', 'Request timeout in seconds (default 30 secs)')
     .option('--protocol-version <version>', 'Force specific MCP protocol version')
     .option('--schema <file>', 'Validate against expected tool/prompt schema')
-    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible, or ignore')
+    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), or ignore')
     .option('--insecure', 'Disable SSL certificate validation');
 
   // Add examples to help
@@ -125,12 +125,12 @@ Where <target> can be:
   <package>         Local MCP server package
 
 Examples:
-  $ mcpc                                        # List all sessions
-  $ mcpc @apify connect https://mcp.apify.com   # Create a session
-  $ mcpc @apify                                 # Show server info and instructions
-  $ mcpc @apify tools-list                      # List tools
+  $ mcpc                                                # List all sessions
+  $ mcpc https://mcp.apify.com connect --name @apify    # Create a session
+  $ mcpc @apify                                         # Show server info and instructions
+  $ mcpc @apify tools-list                              # List tools
   $ mcpc https://example.com tools-call search --args query="hello"
-  $ mcpc --json @apify resources-list           # JSON output
+  $ mcpc --json @apify resources-list                   # JSON output
 `
   );
 
@@ -183,12 +183,13 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
       await sessions.closeSession(target, getOptions(command));
     });
 
-  // Connect command: mcpc <target> connect <server>
+  // Connect command: mcpc <target> connect --name <name>
   program
-    .command('connect <server>')
+    .command('connect')
     .description('Connect to an MCP server and create a session')
-    .action(async (server, _options, command) => {
-      await sessions.connectSession(target, server, getOptions(command));
+    .requiredOption('--name <name>', 'Session name (e.g., @apify)')
+    .action(async (options, command) => {
+      await sessions.connectSession(options.name, target, getOptions(command));
     });
 
   // Tools commands (hyphenated)

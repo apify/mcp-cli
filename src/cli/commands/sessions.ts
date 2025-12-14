@@ -17,14 +17,14 @@ export async function connectSession(
 
   if (options.outputMode === 'human') {
     console.log(formatSuccess(`Session '${name}' created successfully`));
-    console.log(`  Target: ${target}`);
+    console.log(`  Server: ${target}`);
     console.log(`\nUse "mcpc ${name} tools-list" to list available tools.`);
   } else {
     console.log(
       formatOutput(
         {
-          session: name,
-          target,
+          sessionName: name,
+          server: target,
           created: true,
         },
         'json'

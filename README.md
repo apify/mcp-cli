@@ -41,7 +41,7 @@ mcpc @modelcontextprotocol/server-filesystem tools-list
 mcpc --config ~/.vscode/mcp.json myserver tools-list
 
 # Create a persistent session
-mcpc @myserver connect https://mcp.example.com
+mcpc https://mcp.example.com connect --name @myserver
 mcpc @myserver tools-call search --args query=hello
 
 # Interactive shell
@@ -75,7 +75,7 @@ mcpc <target> prompts-list [--cursor <cursor>]
 mcpc <target> prompts-get <name> [--args key=val key2:=json ...]
 
 # Session management
-mcpc <target> connect <server>
+mcpc <target> connect --name @<name>
 mcpc         # prints alls sessions
 mcpc @<name> <command...>
 mcpc @<name> close
@@ -176,7 +176,8 @@ Instead of forcing every command to reconnect and reinitialize (which is slow an
 
 ```bash
 # Create a persistent session
-mcpc @apify connect https://mcp.apify.com/
+mcpc https://mcp.apify.com/ connect --name @apify
+
 
 # List active sessions
 mcpc
@@ -241,7 +242,7 @@ You can point to an existing config file with `--config`:
 mcpc --config .vscode/mcp.json apify tools-list
 
 # Open a session to a server specified in the custom config file
-mcpc --config .vscode/mcp.json apify connect
+mcpc --config .vscode/mcp.json apify connect --name @my-apify
 ```
 
 **Example MCP server config file:**
@@ -291,8 +292,8 @@ When `--config` is provided, you can reference servers by name:
 mcpc --config .vscode/mcp.json filesystem resources-list
 
 # Create a named session from server in config
-mcpc --config .vscode/mcp.json connect @fs
-mcpc @my-apify tools-call search
+mcpc --config .vscode/mcp.json filesystem connect --name @fs
+mcpc @fs tools-call search
 ```
 
 **Environment variable substitution:**
@@ -589,7 +590,7 @@ The main `mcpc` command provides the user interface.
 ### Session lifecycle
 
 ```
-1. User: mcpc @apify connect https://mcp.apify.com
+1. User: mcpc https://mcp.apify.com connect --name @apify
 2. CLI: Creates session entry in sessions.json
 3. CLI: Spawns bridge process (mcpc-bridge)
 4. Bridge: Creates Unix socket at ~/.mcpc/bridges/apify.sock
@@ -662,12 +663,12 @@ Later...
 ### Common issues
 
 **"Cannot connect to bridge"**
-- Bridge may have crashed. Try: `mcpc @session connect <server>`
+- Bridge may have crashed. Try: `mcpc <server> connect --name @session`
 - Check bridge is running: `ps aux | grep mcpc-bridge`
 - Check socket exists: `ls ~/.mcpc/bridges/`
 
 **"Session not found"**
-- Session may have expired. Create new session: `mcpc <target> connect <server>`
+- Session may have expired. Create new session: `mcpc <target> connect --name @session`
 - List existing sessions: `mcpc`
 
 **"Package not found"**
