@@ -1,6 +1,4 @@
-# **mcpc** - a command-line MCP client
-
-Wrap any remote or local MCP server as a friendly command-line tool.
+# mcpc: a command-line client for MCP
 
 `mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 over standard transports (Streamable HTTP and stdio).
@@ -9,15 +7,15 @@ so you can keep multiple MCP connections alive simultaneously.
 
 `mcpc` is useful for testing and debugging of MCP servers,
 as well as for AI coding agents to compose MCP tools using code generation
-rather than tool function calling, in order to save tokens and increase accuracy.
+rather than tool function calling, to save tokens and increase accuracy.
 
 ## Features
 
-- 🔌 **Universal MCP client** - Works with any MCP server over HTTP or stdio.
+- 🔌 **Universal MCP client** - Works with any MCP server over streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
 - 🚀 **Zero setup** - Connect to remote servers or run local packages instantly.
 - 🔧 **Full protocol support** - Tools, resources, prompts, sampling, dynamic discovery, and async notifications.
-- 📊 **JSON output** - Easy integration with jq, scripts, and other CLI tools.
+- 📊 **JSON output** - Easy integration with `jq`, scripts, and other CLI tools.
 - 🤖 **AI-friendly** - Designed for code generation and automated workflows.
 - 🔒 **Secure** - OS keychain integration for credentials, encrypted auth storage.
 
@@ -80,11 +78,11 @@ mcpc <target> prompts-get <name> [--args key=val key2:=json ...]
 mcpc <target> logging-set-level <level>    # Set server log level
 
 # Session management
-mcpc <target> connect --session @<name>
-mcpc         # prints alls sessions
-mcpc @<name> <command...>
-mcpc @<name> help
-mcpc @<name> close
+mcpc <target> connect --session @<session-name>
+mcpc                   # prints alls sessions
+mcpc @<session-name> <command...>
+mcpc @<session-name> help
+mcpc @<session-name> close
 
 # Interactive
 mcpc <target> shell
@@ -101,9 +99,7 @@ Target types are resolved in the order listed above. Use explicit format to avoi
 
 Transports are selected automatically: HTTP/HTTPS URLs use the MCP Streamable HTTP transport, local packages are spawned and spoken to over stdio.
 
-### Advanced arguments
-
-**Argument types:**
+### MCP command arguments
 
 `mcpc` supports multiple ways to pass arguments to tools and prompts:
 
@@ -135,7 +131,7 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 - `=` assigns as string, `:=` parses as JSON
 - Stdin is automatically detected when input is piped (not interactive terminal)
 
-**Global flags:**
+## Global flags
 
 - `--json` - Input and output in JSON format for scripting
 - `--config <file>` - Use MCP config file (e.g., `.vscode/mcp.json`)
@@ -148,29 +144,48 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 - `--no-cache` - Disable prefetching and caching of server objects. 
 - `--insecure` - Disable SSL certificate validation (not recommended)
 
-## Logging
+## Caching
 
-MCP servers can be instructed to adjust their logging level using the `logging/setLevel` request:
+By default, `mcpc` prefetches and caches data about all available server objects (tools, prompts, resources),
+in order to reduce the number of requests made to the server and simplify the CLI experience.
+This means that all subsequent commands such as `tools-list` or `tools-get` will use the cached data.
+
+To disable caching, use the `--no-cache` flag. In that case, you-ll need to manually call commands
+like `tools-list` or `resources-list` to get the data, and the g
+
+## Authentication
+
+`mcpc` supports all standard [authentication methods](https://modelcontextprotocol.io/specification/latest/basic/authorization) for MCP servers,
+including the `WWW-Authenticate` discovery mechanism.
+It uses OS keychain to securely store authentication tokens.
+
+### No authentication
+
+For local servers (stdio) or remove servers (streamable HTTP) which do not require credentials,
+`mcpc` can be used without authentication tokens or settings.
+
+### HTTP token
+
+For remote servers that require an access token,
+use the `--header` flag to specify the header name and value. For example:
 
 ```bash
-# Set server log level to debug for detailed output
-mcpc @apify logging-set-level debug
-
-# Reduce server logging to only errors
-mcpc @apify logging-set-level error
+mcpc --header "Authorization: Bearer ${APIFY_TOKEN}" https://mcp.apify.com tools-list
 ```
 
-**Available log levels** (from most to least verbose):
-- `debug` - Detailed debugging information
-- `info` - General informational messages
-- `notice` - Normal but significant events
-- `warning` - Warning messages
-- `error` - Error messages
-- `critical` - Critical conditions
-- `alert` - Action must be taken immediately
-- `emergency` - System is unusable
+### OAuth
 
-**Note:** This sets the logging level on the **server side**. The actual log output depends on the server's implementation. For client-side verbose logging, use the `--verbose` flag.
+TODO: This needs more thought...
+
+For remote servers that require OAuth authentication,
+`mcpc` asks the user if it can open a browser window to let the user authenticate.
+
+To re-authenticate to a remote server with OAuth, use:
+
+```bash
+mcpc <target> login
+mcpc https://apify
+```
 
 ## Sessions
 
@@ -195,24 +210,12 @@ Instead of forcing every command to reconnect and reinitialize (which is slow an
 - `~/.mcpc/bridges/` - directory containing Unix domain socket files for each bridge process
 - OS keychain - authentication tokens (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux)
 
-### Authentication
-
-`mcpc` supports multiple authentication methods for the MCP servers:
-
-- **No authentication** - for local servers (stdio) or remove servers (streamable HTTP) which do not require credentials.
-- **HTTP token** - for remote servers that require an access token,
-  use the `--header` flag to specify the header name and value (e.g. `--header "Authorization: Bearer YOUR_ACCESS_TOKEN"`).
-- **OAuth** - for remote servers that require OAuth authentication,
-  the CLI asks the user if it can open a browser window to let the user authenticate.
-
-`mcpc` uses OS keychain to securly store authentication tokens.
 
 ### Managing sessions
 
 ```bash
 # Create a persistent session
 mcpc https://mcp.apify.com/ connect --session @apify
-
 
 # List active sessions
 mcpc
@@ -256,6 +259,32 @@ mcpc @apify tools-call search-actors \
 - `compatible` (default) - Backwards compatible (new optional fields OK, required fields and types must match)
 - `ignore` - Skip schema validation
 
+
+## Logging
+
+MCP servers can be instructed to adjust their logging level using the `logging/setLevel` request ([see specification](https://modelcontextprotocol.io/specification/latest/server/utilities/logging)):
+
+```bash
+# Set server log level to debug for detailed output
+mcpc @apify logging-set-level debug
+
+# Reduce server logging to only errors
+mcpc @apify logging-set-level error
+```
+
+**Available log levels** (from most to least verbose):
+- `debug` - Detailed debugging information
+- `info` - General informational messages
+- `notice` - Normal but significant events
+- `warning` - Warning messages
+- `error` - Error messages
+- `critical` - Critical conditions
+- `alert` - Action must be taken immediately
+- `emergency` - System is unusable
+
+**Note:** This sets the logging level on the **server side**. The actual log output depends on the server's implementation. For client-side verbose logging, use the `--verbose` flag.
+
+
 ## Configuration
 
 Configuration can be provided via file, environment variables, or command-line flags.
@@ -268,7 +297,7 @@ Configuration can be provided via file, environment variables, or command-line f
 
 ### Config file
 
-`mcpc` supports the [standard](https://gofastmcp.com/integrations/mcp-json-configuration)
+`mcpc` supports the ["standard"](https://gofastmcp.com/integrations/mcp-json-configuration)
 MCP server JSON config file, compatible with Claude Desktop, VS Code, and other MCP clients.
 You can point to an existing config file with `--config`:
 
@@ -370,11 +399,13 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 - **Stdio**: Direct bidirectional JSON-RPC communication over standard input/output
 
 **Protocol features:**
-- Supports all MCP primitives:
+- Supports all MCP primitives in both Streamable HTTP and stdio transports:
   - **Instructions**: Fetches and stores MCP server-provided `instructions`
   - **Tools**: Executable functions with JSON Schema-validated arguments.
   - **Resources**: Data sources identified by URIs (e.g., `file:///path/to/file`, `https://example.com/data`), with optional subscriptions for change notifications
   - **Prompts**: Reusable message templates with customizable arguments
+  - **Completion**: Provides access to Completion API for tools and resources, and offers completions in shell mode
+  - **Logging**: Supports server logging settings and messages, and prints them to stderr or stdout based on verbosity level.
 - Handles server notifications: progress tracking, logging, and change notifications (`notifications/tools/list_changed`, `notifications/resources/list_changed`, `notifications/prompts/list_changed`)
 - Request multiplexing: supports up to 10 concurrent requests, queues up to 100 additional requests
 - Pagination: List operations return `nextCursor` when more results are available; use `--cursor` to fetch next page
@@ -616,10 +647,10 @@ The main `mcpc` command provides the user interface.
 - Configuration file loading (standard MCP JSON format)
 - Credential management (OS keychain via `keytar` package)
 
-**Shell Implementation:**
+**Shell implementation:**
 - Built on `@inquirer/prompts` for input handling
 - Command history using `~/.mcpc/history`
-- Tab completion using inquirer autocomplete
+- Tab completion using inquirer autocomplete and MCP completion API
 - Graceful exit handling (cleanup on Ctrl+C/Ctrl+D)
 
 ### Session lifecycle
@@ -698,12 +729,12 @@ Later...
 ### Common issues
 
 **"Cannot connect to bridge"**
-- Bridge may have crashed. Try: `mcpc <server> connect --session @session`
+- Bridge may have crashed. Try: `mcpc <server> connect --session @<session-name>`
 - Check bridge is running: `ps aux | grep mcpc-bridge`
 - Check socket exists: `ls ~/.mcpc/bridges/`
 
 **"Session not found"**
-- Session may have expired. Create new session: `mcpc <target> connect --session @session`
+- Session may have expired. Create new session: `mcpc <target> connect --session @<session-name>`
 - List existing sessions: `mcpc`
 
 **"Package not found"**
@@ -711,9 +742,9 @@ Later...
 - Try with full path: `mcpc /path/to/package/bin/server resources-list`
 
 **"Authentication failed"**
-- Check credentials in OS keychain: `mcpc auth list`
-- Use environment variable: `Authorization: Bearer ${TOKEN}` in config
-- Re-authenticate: `mcpc auth login <server>`
+- Check credentials in OS keychain: `mcpc --list-credentials`
+- Use environment variable: `Authorization: Bearer ${TOKEN}` in MCP server config file
+- Re-authenticate: `mcpc <server> login`
 
 ### Debug mode
 
@@ -729,24 +760,18 @@ This shows:
 - Streaming events and reconnection attempts
 - Bridge communication (socket messages)
 - File locking operations
+- Prints server log messages with with severity `debug`, `info`, and `notice` to standard output
 
 ### Logs
 
 Bridge processes log to:
-- `~/.mcpc/logs/bridge-<session>.log`
+- `~/.mcpc/logs/bridge-<session-name>.log`
 
 Log rotation: Keep last 10MB per session, max 5 files.
 
 ## Contributing
 
-Contributions are welcome! Areas where we'd especially appreciate help:
-
-- Transport compatibility tests (Streamable HTTP + stdio)
-- Shell completion scripts (bash, zsh, fish)
-- Documentation and examples
-- Bug reports and feature requests
-- Testing with various MCP servers
-- Windows compatibility testing
+Contributions are welcome!
 
 ### Development setup
 

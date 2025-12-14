@@ -105,6 +105,15 @@ export function formatToolDetail(tool: Tool): string {
   lines.push(JSON.stringify(tool.inputSchema, null, 2));
   lines.push('```');
 
+  // Add output schema if present
+  if ('outputSchema' in tool && tool.outputSchema) {
+    lines.push('');
+    lines.push('## Output schema');
+    lines.push('```json');
+    lines.push(JSON.stringify(tool.outputSchema, null, 2));
+    lines.push('```');
+  }
+
   return lines.join('\n');
 }
 
