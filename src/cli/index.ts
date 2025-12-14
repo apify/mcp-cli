@@ -159,7 +159,11 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
 
     // Only include optional properties if they're present
     if (opts.config) options.config = opts.config;
-    if (opts.header) options.headers = opts.header; // Commander stores repeated options as arrays
+    if (opts.header) {
+      // Commander stores repeated options as arrays, but single values as strings
+      // Always convert to array for consistent handling
+      options.headers = Array.isArray(opts.header) ? opts.header : [opts.header];
+    }
     if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
     if (opts.verbose) options.verbose = opts.verbose;
 

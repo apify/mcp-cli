@@ -117,9 +117,12 @@ export async function getInstructions(
     const capabilities = client.getServerCapabilities();
     const instructions = client.getInstructions();
 
-    // Get tool count
-    const toolsResult = await client.listTools();
-    const toolCount = toolsResult.tools.length;
+    // Get tool count if tools are supported
+    let toolCount = 0;
+    if (capabilities?.tools) {
+      const toolsResult = await client.listTools();
+      toolCount = toolsResult.tools.length;
+    }
 
     if (options.outputMode === 'human') {
       logTarget(target, options.outputMode);
@@ -137,44 +140,133 @@ export async function getInstructions(
         console.log('');
       }
 
-      // Capabilities
+      // Capabilities - only show what the server actually exposes
       console.log('Available capabilities:');
-      console.log(`  • Tools: ${toolCount} available`);
-      console.log(`  • Resources: ${capabilities?.resources ? 'supported' : 'not supported'}`);
-      console.log(`  • Prompts: ${capabilities?.prompts ? 'supported' : 'not supported'}`);
+
+      const capabilityList: string[] = [];
+
+      if (capabilities?.tools) {
+        capabilityList.push(`  • tools: ${toolCount} available${capabilities.tools.listChanged ? ' (supports list change notifications)' : ''}`);
+      }
+
+      if (capabilities?.resources) {
+        const features: string[] = [];
+        if (capabilities.resources.subscribe) features.push('subscribe');
+        if (capabilities.resources.listChanged) features.push('list change notifications');
+        const featureStr = features.length > 0 ? ` (supports ${features.join(', ')})` : '';
+        capabilityList.push(`  • resources${featureStr}`);
+      }
+
+      if (capabilities?.prompts) {
+        const featureStr = capabilities.prompts.listChanged ? ' (supports list change notifications)' : '';
+        capabilityList.push(`  • prompts${featureStr}`);
+      }
+
+      if (capabilities?.logging) {
+        capabilityList.push('  • logging');
+      }
+
+      if (capabilities?.completions) {
+        capabilityList.push('  • completions');
+      }
+
+      if (capabilityList.length > 0) {
+        console.log(capabilityList.join('\n'));
+      } else {
+        console.log('  (none)');
+      }
       console.log('');
 
       // Commands
       console.log('Common commands:');
-      console.log(`  mcpc ${target} tools-list              List all tools`);
-      console.log(`  mcpc ${target} resources-list          List all resources`);
-      console.log(`  mcpc ${target} prompts-list            List all prompts`);
-      console.log(`  mcpc ${target} tools-call <name>       Call a tool`);
-      console.log(`  mcpc ${target} logging-set-level <lvl> Set server log level`);
-      console.log(`  mcpc ${target} shell                   Open interactive shell`);
+      const commands: string[] = [];
+
+      if (capabilities?.tools) {
+        commands.push(`  mcpc ${target} tools-list              List all tools`);
+        commands.push(`  mcpc ${target} tools-call <name>       Call a tool`);
+      }
+
+      if (capabilities?.resources) {
+        commands.push(`  mcpc ${target} resources-list          List all resources`);
+        commands.push(`  mcpc ${target} resources-get <uri>     Get a resource`);
+      }
+
+      if (capabilities?.prompts) {
+        commands.push(`  mcpc ${target} prompts-list            List all prompts`);
+        commands.push(`  mcpc ${target} prompts-get <name>      Get a prompt`);
+      }
+
+      if (capabilities?.logging) {
+        commands.push(`  mcpc ${target} logging-set-level <lvl> Set server log level`);
+      }
+
+      commands.push(`  mcpc ${target} shell                   Open interactive shell`);
+
+      console.log(commands.join('\n'));
     } else {
+      // JSON output - only include capabilities that are present
+      const jsonCapabilities: Record<string, any> = {};
+
+      if (capabilities?.tools) {
+        jsonCapabilities.tools = {
+          count: toolCount,
+          listChanged: capabilities.tools.listChanged || false,
+        };
+      }
+
+      if (capabilities?.resources) {
+        jsonCapabilities.resources = {
+          subscribe: capabilities.resources.subscribe || false,
+          listChanged: capabilities.resources.listChanged || false,
+        };
+      }
+
+      if (capabilities?.prompts) {
+        jsonCapabilities.prompts = {
+          listChanged: capabilities.prompts.listChanged || false,
+        };
+      }
+
+      if (capabilities?.logging) {
+        jsonCapabilities.logging = {};
+      }
+
+      if (capabilities?.completions) {
+        jsonCapabilities.completions = {};
+      }
+
+      // Build available commands list based on capabilities
+      const availableCommands: string[] = [];
+
+      if (capabilities?.tools) {
+        availableCommands.push('tools-list', 'tools-get', 'tools-call');
+      }
+
+      if (capabilities?.resources) {
+        availableCommands.push('resources-list', 'resources-get');
+        if (capabilities.resources.subscribe) {
+          availableCommands.push('resources-subscribe', 'resources-unsubscribe');
+        }
+      }
+
+      if (capabilities?.prompts) {
+        availableCommands.push('prompts-list', 'prompts-get');
+      }
+
+      if (capabilities?.logging) {
+        availableCommands.push('logging-set-level');
+      }
+
+      availableCommands.push('shell');
+
       console.log(
         formatOutput(
           {
             target,
             server: serverInfo,
             instructions: instructions || null,
-            capabilities: {
-              tools: toolCount,
-              resources: !!capabilities?.resources,
-              prompts: !!capabilities?.prompts,
-            },
-            availableCommands: [
-              'tools-list',
-              'tools-get',
-              'tools-call',
-              'resources-list',
-              'resources-get',
-              'prompts-list',
-              'prompts-get',
-              'logging-set-level',
-              'shell',
-            ],
+            capabilities: jsonCapabilities,
+            availableCommands,
           },
           'json'
         )
