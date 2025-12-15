@@ -1,0 +1,30 @@
+# Development files
+src/
+test/
+scripts/
+examples/
+
+# Config files
+.vscode/
+.github/
+tsconfig.json
+jest.config.js
+.eslintrc.js
+.prettierrc
+
+# Build artifacts
+*.log
+*.tgz
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Documentation drafts
+CLAUDE.md
+README.placeholder.md
+
+# Misc
+.DS_Store
+coverage/

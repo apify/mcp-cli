@@ -14,12 +14,12 @@
   "author": "Jan Curn (@jancurn)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jancurn/mcpc.git"
+    "url": "git+https://github.com/apify/mcpc.git"
   },
   "bugs": {
-    "url": "https://github.com/jancurn/mcpc/issues"
+    "url": "https://github.com/apify/mcpc/issues"
   },
-  "homepage": "https://github.com/jancurn/mcpc#readme",
+  "homepage": "https://github.com/apify/mcpc#readme",
   "bin": {
     "mcpc": "./bin/mcpc",
     "mcpc-bridge": "./bin/mcpc-bridge"
@@ -38,7 +38,8 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "publish:placeholder": "bash scripts/publish-placeholder.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.24.3",

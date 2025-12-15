@@ -61,21 +61,21 @@ mcpc <target> help    # same as above
 # MCP commands
 mcpc <target> tools
 mcpc <target> tools-list [--cursor <cursor>]
-mcpc <target> tools-get <tool>
-mcpc <target> tools-call <tool> [--args key=val key2:=json ...] [--args-file <file>]
+mcpc <target> tools-get <tool-name>
+mcpc <target> tools-call <tool-name> [--args key=val key2:=json ...] [--args-file <file>]
 
 mcpc <target> resources
 mcpc <target> resources-list [--cursor <cursor>]
-mcpc <target> resources-get <uri> [-o <file>] [--raw] [--max-size <bytes>]
+mcpc <target> resources-read <uri> [-o <file>] [--raw] [--max-size <bytes>]
 mcpc <target> resources-subscribe <uri>
 mcpc <target> resources-unsubscribe <uri>
+mcpc <target> resources-templates-list
 
 mcpc <target> prompts
 mcpc <target> prompts-list [--cursor <cursor>]
 mcpc <target> prompts-get <name> [--args key=val key2:=json ...]
 
-# Logging
-mcpc <target> logging-set-level <level>    # Set server log level
+mcpc <target> logging-set-level <level>
 
 # Session management
 mcpc <target> connect --session @<session-name>
@@ -84,7 +84,7 @@ mcpc @<session-name> <command...>
 mcpc @<session-name> help
 mcpc @<session-name> close
 
-# Interactive
+# Interactive shell
 mcpc <target> shell
 ```
 
@@ -97,7 +97,7 @@ where `<target>` can be one of:
 
 Target types are resolved in the order listed above. Use explicit format to avoid ambiguity.
 
-Transports are selected automatically: HTTP/HTTPS URLs use the MCP Streamable HTTP transport, local packages are spawned and spoken to over stdio.
+Transports are selected automatically: HTTP/HTTPS URLs use the MCP streamable HTTP transport, local packages are spawned and spoken to over stdio.
 
 ### MCP command arguments
 
@@ -146,12 +146,15 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 
 ## Caching
 
-By default, `mcpc` prefetches and caches data about all available server objects (tools, prompts, resources),
-in order to reduce the number of requests made to the server and simplify the CLI experience.
-This means that all subsequent commands such as `tools-list` or `tools-get` will use the cached data.
+By default, `mcpc` prefetches and caches the full list of server tools, prompts, and resources,
+to reduce the number of requests made to the server and simplify the use of CLI.
+This means that commands such as `tools-list` or `tools-get` use the cached data rather than 
+making a request to the server. Also, `mcpc` automatically refreshes the cache when
+the server sends a `notifications/tools/list_changed` or `notifications/resources/list_changed` notification.
 
-To disable caching, use the `--no-cache` flag. In that case, you-ll need to manually call commands
-like `tools-list` or `resources-list` to get the data, and the g
+To disable caching, use the `--no-cache` flag. In that case, you-ll need to explicitely run commands
+like `tools-list` or `resources-list` to get the lists and handle the
+[pagination](https://modelcontextprotocol.io/specification/latest/server/utilities/pagination) using `--cursor`.
 
 ## Authentication
 
@@ -399,13 +402,13 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 - **Stdio**: Direct bidirectional JSON-RPC communication over standard input/output
 
 **Protocol features:**
-- Supports all MCP primitives in both Streamable HTTP and stdio transports:
+- `mcpc` supports all MCP primitives in both Streamable HTTP and stdio transports:
   - **Instructions**: Fetches and stores MCP server-provided `instructions`
   - **Tools**: Executable functions with JSON Schema-validated arguments.
   - **Resources**: Data sources identified by URIs (e.g., `file:///path/to/file`, `https://example.com/data`), with optional subscriptions for change notifications
   - **Prompts**: Reusable message templates with customizable arguments
   - **Completion**: Provides access to Completion API for tools and resources, and offers completions in shell mode
-  - **Logging**: Supports server logging settings and messages, and prints them to stderr or stdout based on verbosity level.
+- Supports server logging settings (`logging/setLevel`) and messages (`notifications/message`), and prints them to stderr or stdout based on verbosity level.
 - Handles server notifications: progress tracking, logging, and change notifications (`notifications/tools/list_changed`, `notifications/resources/list_changed`, `notifications/prompts/list_changed`)
 - Request multiplexing: supports up to 10 concurrent requests, queues up to 100 additional requests
 - Pagination: List operations return `nextCursor` when more results are available; use `--cursor` to fetch next page

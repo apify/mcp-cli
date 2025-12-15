@@ -188,7 +188,7 @@ export async function getInstructions(
 
       if (capabilities?.resources) {
         commands.push(`  mcpc ${target} resources-list          List all resources`);
-        commands.push(`  mcpc ${target} resources-get <uri>     Get a resource`);
+        commands.push(`  mcpc ${target} resources-read <uri>     Get a resource`);
       }
 
       if (capabilities?.prompts) {
@@ -243,7 +243,7 @@ export async function getInstructions(
       }
 
       if (capabilities?.resources) {
-        availableCommands.push('resources-list', 'resources-get');
+        availableCommands.push('resources-list', 'resources-read');
         if (capabilities.resources.subscribe) {
           availableCommands.push('resources-subscribe', 'resources-unsubscribe');
         }

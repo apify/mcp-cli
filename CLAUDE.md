@@ -116,7 +116,7 @@ mcpc/
 - Tab completion for commands, tool names, and resource URIs
 
 **CLI Command Structure:**
-- All MCP commands use hyphenated format: `tools-list`, `tools-call`, `resources-get`, etc.
+- All MCP commands use hyphenated format: `tools-list`, `tools-call`, `resources-read`, etc.
 - `mcpc` - List all sessions
 - `mcpc <target>` - Show server info, instructions, capabilities, and available commands
 - `mcpc <target> help` - Alias for above
@@ -355,7 +355,7 @@ When implementing features:
 6. **Output formatting** - Support both human-readable (default) and JSON (`--json`) modes
 7. **Protocol compliance** - Follow MCP specification strictly; handle all notification types
 8. **Session management** - Always clean up resources; handle orphaned processes; provide reconnection
-9. **Hyphenated commands** - All MCP commands use hyphens: `tools-list`, `resources-get`, `prompts-list`
+9. **Hyphenated commands** - All MCP commands use hyphens: `tools-list`, `resources-read`, `prompts-list`
 10. **Target-first syntax** - Commands follow `mcpc <target> <command>` pattern consistently
 11. **JSON field naming** - Use consistent field names in JSON output:
     - `sessionName` (not `name`) for session identifiers
@@ -386,7 +386,7 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
 - **Logging**: Structured logging with verbose mode support
 - **Command Handlers**: All command stubs with mock data
   - `tools-list`, `tools-get`, `tools-call`
-  - `resources-list`, `resources-get`, `resources-subscribe`, `resources-unsubscribe`
+  - `resources-list`, `resources-read`, `resources-subscribe`, `resources-unsubscribe`
   - `prompts-list`, `prompts-get`
   - `logging-set-level`
   - `connect`, `close`, `help`, `shell` (stub)

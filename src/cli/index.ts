@@ -289,7 +289,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     });
 
   program
-    .command('resources-get <uri>')
+    .command('resources-read <uri>')
     .description('Get a resource by URI')
     .option('-o, --output <file>', 'Write resource to file')
     .option('--raw', 'Output raw resource content')
