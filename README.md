@@ -167,17 +167,17 @@ This means that commands such as `tools-list` or `tools-schema` use the cached d
 making a request to the server. Also, `mcpc` automatically refreshes the cache when
 the server sends a `notifications/tools/list_changed` or `notifications/resources/list_changed` notification.
 
-To disable caching, use the `--no-cache` flag. In that case, you-ll need to explicitely run commands
+To disable caching, use the `--no-cache` flag. In that case, you'll need to explicitly run commands
 like `tools-list` or `resources-list` to get the lists and handle the
 [pagination](https://modelcontextprotocol.io/specification/latest/server/utilities/pagination) using `--cursor`.
 
 ## Authentication
 
-`mcpc` supports all standard [authorization methods](https://modelcontextprotocol.io/specification/latest/basic/authorization) for MCP servers,
+`mcpc` supports all standard [authentication methods](https://modelcontextprotocol.io/specification/latest/basic/authorization) for MCP servers,
 including the `WWW-Authenticate` discovery mechanism and OAuth 2.1 with PKCE.
 It uses OS keychain to securely store authentication tokens and credentials.
 
-### Anonymous access
+### No authentication
 
 For local servers (stdio) or remote servers (Streamable HTTP) which do not require credentials,
 `mcpc` can be used without authentication:
@@ -216,7 +216,7 @@ For OAuth-enabled servers, `mcpc` implements the full OAuth 2.1 flow with PKCE, 
 - Automatic token refresh
 
 The OAuth authentication is performed via a web browser.
-`mcpc` **always** prompts the user before opening the browser and requesting the login.
+`mcpc` **always** prompts the user before opening the browser and requesting the user to log in.
 
 #### Authentication profiles
 
@@ -227,9 +227,9 @@ This allows you to:
 - Manage credentials independently from sessions
 
 **Key concepts:**
-- **Auth profile**: Named set of OAuth credentials for a specific server (stored in `~/.mcpc/auth-profiles.json` + OS keychain)
-- **Session**: Active connection to a server that might reference an auth profile (stored in `~/.mcpc/sessions.json`)
-- **Default profile**: When `--profile` is not specified, `mcpc` uses the auth profile named `default`
+- **Authentication profile**: Named set of OAuth credentials for a specific server (stored in `~/.mcpc/auth-profiles.json` + OS keychain)
+- **Session**: Active connection to a server that may reference an authentication profile (stored in `~/.mcpc/sessions.json`)
+- **Default profile**: When `--profile` is not specified, `mcpc` uses the authentication profile named `default`
 
 **Example:**
 
@@ -333,16 +333,17 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
 3. **Config file headers** - Headers from `--config` file for the server
 4. **No authentication** - Attempts unauthenticated connection
 
-Example:
-
-- Config file has: `"headers": {"Authorization": "Bearer ${TOKEN1}"}`
-- Session uses profile with different OAuth token
-- Command provides: `--header "Authorization: Bearer ${TOKEN2}"`
-- Result: Uses `TOKEN2` (command-line flag wins)
+**Example:**
+```bash
+# Config file has: "headers": {"Authorization": "Bearer ${TOKEN1}"}
+# Session uses profile with different OAuth token
+# Command provides: --header "Authorization: Bearer ${TOKEN2}"
+# Result: Uses TOKEN2 (command-line flag wins)
+```
 
 ### Authentication profiles storage format
 
-By default, the auth profiles are stored in the `~/.mcpc/auth-profiles.json` profile with the following structure:
+By default, authentication profiles are stored in the `~/.mcpc/auth-profiles.json` file with the following structure:
 
 ```json
 {
@@ -397,7 +398,7 @@ Instead of forcing every command to reconnect and reinitialize (which is slow an
 - Multiplexes multiple concurrent requests (up to 10 concurrent, 100 queued)
 - Enables piping data between multiple MCP servers simultaneously
 
-`mcpc` saves its state to `~/.mcpc/` directory (unless overriden by `MCP_STATE_DIR`), in the following files:
+`mcpc` saves its state to `~/.mcpc/` directory (unless overridden by `MCPC_STATE_DIR`), in the following files:
 
 - `~/.mcpc/sessions.json` - Active sessions with references to auth profiles (file-locked for concurrent access)
 - `~/.mcpc/auth-profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
@@ -496,7 +497,7 @@ mcpc @apify logging-set-level error
 Configuration can be provided via file, environment variables, or command-line flags.
 
 **Precedence** (highest to lowest):
-1. Command-line flags, including config file when specified with `--config`
+1. Command-line flags (including `--config` option)
 2. Environment variables
 3. Built-in defaults
 
@@ -583,7 +584,7 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 }
 ```
 
-## Environment variables
+### Environment variables
 
 - `MCPC_STATE_DIR` - Directory for session and auth profiles data (default is `~/.mcpc`)
 - `MCPC_VERBOSE` - Enable verbose logging (instead of using `--verbose`, set to `1` or `true`)
@@ -616,12 +617,12 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 - Handles server notifications: progress tracking, logging, and change notifications (`notifications/tools/list_changed`, `notifications/resources/list_changed`, `notifications/prompts/list_changed`)
 - Request multiplexing: supports up to 10 concurrent requests, queues up to 100 additional requests
 - Pagination: List operations return `nextCursor` when more results are available; use `--cursor` to fetch next page
-- Pings: `mcpc` periodically issues a `ping` request to keep the connection alive
-- Sampling is not supported as `mcpc` has no access to an LLM.
+- Pings: `mcpc` periodically issues the MCP `ping` request to keep the connection alive
+- Sampling is not supported as `mcpc` has no access to an LLM
 
 ## Package resolution
 
-When a <target> is identified as a local package, `mcpc` resolves it as follows:
+When a `<target>` is identified as a local package, `mcpc` resolves it as follows:
 
 1. Check `./node_modules` (local project dependencies)
 2. Check global npm packages (`npm root -g`)
@@ -935,7 +936,7 @@ This shows:
 - Streaming events and reconnection attempts
 - Bridge communication (socket messages)
 - File locking operations
-- Prints server log messages with with severity `debug`, `info`, and `notice` to standard output
+- Prints server log messages with severity `debug`, `info`, and `notice` to standard output
 
 ### Logs
 
