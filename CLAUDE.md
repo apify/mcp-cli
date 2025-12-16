@@ -126,7 +126,7 @@ mcpc/
 **CLI Command Structure:**
 - All MCP commands use hyphenated format: `tools-list`, `tools-call`, `resources-read`, etc.
 - `mcpc` - List all sessions and authentication profiles
-- `mcpc <target>` - Show server info, instructions, capabilities, and current session auth
+- `mcpc <target>` - Show server info, instructions, and capabilities
 - `mcpc @<session>` - Show session info, server capabilities, and authentication details
 - `mcpc <target> help` - Alias for `mcpc <target>`
 - `mcpc <target> <command>` - Execute MCP command
@@ -233,9 +233,11 @@ mcpc/
 3. Client sends `initialized` notification to activate session
 
 **MCP Primitives:**
+- **Instructions**: Server-provided instructions fetched and stored
 - **Tools**: Executable functions with JSON Schema-validated arguments
 - **Resources**: Data sources with URIs (e.g., `file:///`, `https://`), optional subscriptions for change notifications
 - **Prompts**: Reusable message templates with customizable arguments
+- **Completion**: Provides access to Completion API for tools and resources
 - **Logging**: Server-side logging level control via `logging/setLevel` request
 
 **Notifications:**
@@ -247,6 +249,10 @@ mcpc/
 **Pagination:**
 - List operations return `nextCursor` when more results available
 - Use `--cursor` flag to fetch next page
+
+**Other Protocol Features:**
+- **Pings**: Client periodically issues MCP `ping` request to keep connection alive
+- **Sampling**: Not supported (mcpc has no access to an LLM)
 
 **Argument Passing:**
 
@@ -429,6 +435,8 @@ mcpc <server> connect --session @<name> --profile <profile>
 
 ## State and Data Storage
 
+All state files are stored in `~/.mcpc/` directory (unless overridden by `MCPC_STATE_DIR` environment variable):
+
 - `~/.mcpc/sessions.json` - Active sessions with references to auth profiles (file-locked for concurrent access)
 - `~/.mcpc/auth-profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
 - `~/.mcpc/bridges/` - Unix domain socket files for bridge processes
@@ -504,6 +512,13 @@ Enable verbose mode: `--verbose` flag shows:
 
 Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
 
+## Environment Variables
+
+- `MCPC_STATE_DIR` - Directory for session and auth profiles data (default: `~/.mcpc`)
+- `MCPC_VERBOSE` - Enable verbose logging (set to `1` or `true`)
+- `MCPC_TIMEOUT` - Default timeout in seconds (default: `300`)
+- `MCPC_JSON` - Enable JSON output (set to `1` or `true`)
+
 ## Current Implementation Status
 
 ### ✅ Completed
@@ -516,10 +531,11 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
 - **Logging**: Structured logging with verbose mode support
 - **Command Handlers**: All command stubs with mock data
   - `tools-list`, `tools-schema`, `tools-call`
-  - `resources-list`, `resources-read`, `resources-subscribe`, `resources-unsubscribe`
+  - `resources-list`, `resources-read`, `resources-subscribe`, `resources-unsubscribe`, `resources-templates-list`
   - `prompts-list`, `prompts-get`
   - `logging-set-level`
   - `connect`, `close`, `help`, `shell` (stub)
+  - `auth`, `auth-list`, `auth-show`, `auth-delete` (authentication management)
 
 ### 🚧 In Progress / TODO
 - **Bridge Process**: Persistent MCP connections (placeholder exists)
@@ -529,10 +545,12 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
 - **CLI-to-MCP Integration**: Connect command handlers to actual MCP client
 - **Interactive Shell**: REPL with command history and tab completion
 - **Config File Loading**: Parse and use MCP config files
-- **Keychain Integration**: Store credentials securely
+- **Keychain Integration**: Store credentials securely (OS keychain via `keytar`)
 - **Package Resolution**: Find and run local MCP packages
+- **OAuth Implementation**: Full OAuth 2.1 flow with PKCE, authentication profiles
 - **Notification Handling**: Handle server-sent notifications
 - **Error Recovery**: Bridge crash recovery, automatic reconnection
+- **Caching**: Prefetch and cache tools/resources/prompts lists
 
 ### 📋 Implementation Approach
 

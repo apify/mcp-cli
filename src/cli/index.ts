@@ -110,7 +110,7 @@ function createProgram(): Command {
     .option('--verbose', 'Enable verbose logging')
     .option('-c, --config <path>', 'Path to MCP server config file')
     .option('-H, --header <header>', 'Add HTTP header (can be repeated)')
-    .option('--timeout <seconds>', 'Request timeout in seconds (default 30 secs)')
+    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--protocol-version <version>', 'Force specific MCP protocol version')
     .option('--schema <file>', 'Validate against expected tool/prompt schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), or ignore')

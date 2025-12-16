@@ -156,14 +156,14 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 - `--protocol-version <version>` - Force specific MCP protocol version (e.g., `2025-11-25`)
 - `--schema <file>` - Validate against expected tool/prompt schema
 - `--schema-mode <mode>` - Schema validation mode: `strict`, `compatible`, or `ignore` (default: `compatible`)
-- `--no-cache` - Disable prefetching and caching of server objects. 
+- `--no-cache` - Disable prefetching and caching of server objects
 - `--insecure` - Disable SSL certificate validation (not recommended)
 
 ## Caching
 
 By default, `mcpc` prefetches and caches the full list of server tools, prompts, and resources,
 to reduce the number of requests made to the server and simplify the use of CLI.
-This means that commands such as `tools-list` or `tools-schema` use the cached data rather than 
+This means that commands such as `tools-list` or `tools-schema` use the cached data rather than
 making a request to the server. Also, `mcpc` automatically refreshes the cache when
 the server sends a `notifications/tools/list_changed` or `notifications/resources/list_changed` notification.
 
@@ -745,10 +745,39 @@ mcpc(@apify)> tools-call search-actors --args query="tiktok scraper"
 mcpc(@apify)> exit
 ```
 
-## Implementation details
+## Implementation status
 
-`mcpc` is under active development. This README contains the final state, but most of the implementation is still missing.
-The library is implemented in TypeScript as a single package with internal modules.
+**Note:** This README describes the target architecture. `mcpc` is under active development and not all features are currently implemented.
+
+### What's implemented
+
+**✅ Core functionality:**
+- MCP protocol client (wrapper around official SDK)
+- CLI structure with Commander.js
+- Basic command handlers for all MCP operations
+- Output formatting (human-readable and JSON modes)
+- Argument parsing (inline JSON, key=value, key:=json)
+- Error handling with exit codes
+- Verbose logging
+
+### What's not yet implemented
+
+**📋 Major features pending:**
+- **Bridge process & persistent sessions**: Currently uses ephemeral connections
+- **Authentication**: OAuth profiles, keychain storage, `auth-*` commands
+- **Caching**: `--no-cache` flag and list caching
+- **Interactive shell**: REPL features (history, tab completion)
+- **Config file loading**: MCP server config file parsing
+- **Package resolution**: Local MCP package discovery
+- **Environment variables**: `MCPC_*` environment variables
+- **IPC layer**: Unix socket communication
+- **File locking**: Concurrent access protection
+- **Notification handling**: Server-sent notifications
+- **Error recovery**: Bridge restart, reconnection
+
+Most commands currently work with mock data or direct (non-persistent) connections.
+
+## Implementation details
 
 ### Architecture overview
 
