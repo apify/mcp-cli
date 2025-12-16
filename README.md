@@ -11,7 +11,7 @@ rather than direct tool calling, to [save tokens](https://www.anthropic.com/engi
 
 ## Features
 
-- 🔌 **Universal MCP client** - Works with any MCP server over streamable HTTP or stdio.
+- 🔌 **Universal MCP client** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
 - 🚀 **Zero setup** - Connect to remote servers or run local packages instantly.
 - 🔧 **Full protocol support** - Tools, resources, prompts, sampling, dynamic discovery, and async notifications.
@@ -173,13 +173,13 @@ like `tools-list` or `resources-list` to get the lists and handle the
 
 ## Authentication
 
-`mcpc` supports all standard [authentication methods](https://modelcontextprotocol.io/specification/latest/basic/authorization) for MCP servers,
+`mcpc` supports all standard [authorization methods](https://modelcontextprotocol.io/specification/latest/basic/authorization) for MCP servers,
 including the `WWW-Authenticate` discovery mechanism and OAuth 2.1 with PKCE.
 It uses OS keychain to securely store authentication tokens and credentials.
 
-### No authentication
+### Anonymous access
 
-For local servers (stdio) or remote servers (streamable HTTP) which do not require credentials,
+For local servers (stdio) or remote servers (Streamable HTTP) which do not require credentials,
 `mcpc` can be used without authentication:
 
 ```bash
@@ -215,8 +215,8 @@ For OAuth-enabled servers, `mcpc` implements the full OAuth 2.1 flow with PKCE, 
 - Dynamic client registration (RFC 7591)
 - Automatic token refresh
 
-The OAuth authentication is performed via a web browser. `mcpc`
-always prompts the user before opening the browser and requesting the user to login.
+The OAuth authentication is performed via a web browser.
+`mcpc` **always** prompts the user before opening the browser and requesting the login.
 
 #### Authentication profiles
 
@@ -227,14 +227,14 @@ This allows you to:
 - Manage credentials independently from sessions
 
 **Key concepts:**
-- **Profile**: Named set of OAuth credentials for a specific server (stored in `~/.mcpc/auth-profiles.json` + OS keychain)
-- **Session**: Active connection to a server that references a profile (stored in `~/.mcpc/sessions.json`)
+- **Auth profile**: Named set of OAuth credentials for a specific server (stored in `~/.mcpc/auth-profiles.json` + OS keychain)
+- **Session**: Active connection to a server that might reference an auth profile (stored in `~/.mcpc/sessions.json`)
 - **Default profile**: When `--profile` is not specified, `mcpc` uses the auth profile named `default`
 
 **Example:**
 
 ```bash
-# Authenticate and save as named profile
+# Authenticate to server and save as named auth profile
 mcpc https://mcp.apify.com auth --profile personal
 
 # Authenticate with 'default' profile name
@@ -247,7 +247,7 @@ mcpc https://mcp.apify.com auth --profile personal
 #### Managing authentication profiles
 
 ```bash
-# List all profiles for a server
+# List all profiles for a specific server
 mcpc https://mcp.apify.com auth-list
 
 # Show detailed info for a profile
@@ -257,24 +257,37 @@ mcpc https://mcp.apify.com auth-show --profile personal
 mcpc https://mcp.apify.com auth-delete --profile work
 ```
 
-#### Creating sessions with profiles
+#### Automatic OAuth behavior
+
+When calling a server or creating a session without specifying an auth profile,
+`mcpc` looks for the `default` auth profile and behaves as follows:
+
+- If the `default` profile exists:
+    - Try to authenticate with it.
+    - Otherwise, attempt an anonymous connection.
+- On success, run the server command or create a session, and return.
+- On failure (OAuth returns 401 with `WWW-Authenticate` header), prompt user for (re-)authentication:
+    - If it succeeds, update the `default` profile and return.
+    - If re-authentication fails, return an error
+
+This flow:
+- Ensures you only authenticate when necessary
+- Avoids unexpected downgrade from authenticated to un-authenticated session
+- Allows using sessions with named auth profiles and anonymous access at the same time
+
+Examples:
 
 ```bash
 # Create session with specific profile:
 # - Uses 'personal' profile if it exists and works
-# - Otherwise prompts user for authenticaton in a web browser
+# - Otherwise, prompts the user for login in a web browser, and saves it to `personal` profile on success
 mcpc https://mcp.apify.com connect --session @apify1 --profile personal
 
-# Create session without specifying auth profile: TODO
+# Create session without specifying auth profile:
 # - Uses 'default' profile if it exists
-# - If 'default' doesn't exist but other profiles do, prompts for selection
-# - If no profiles exist, attempts unauthenticated connection
-# - If server requires auth (401 response), prompts to create new profile
+# - If 'default' doesn't exist, attempts unauthenticated connection
+# - If server requires auth (401 response), prompts to login and saves the `default` profile
 mcpc https://mcp.apify.com connect --session @apify2
-
-# Create session with non-existent auth profile (prompts to create it)
-mcpc https://mcp.apify.com connect --session @apify4 --profile client-demo
-? Profile 'client-demo' not found. Authenticate now? (Y/n) y
 ```
 
 #### Multiple accounts for the same server
@@ -297,22 +310,9 @@ mcpc @apify-personal tools-list  # Uses personal account
 mcpc @apify-work tools-list      # Uses work account
 ```
 
-#### Automatic OAuth detection
+#### OAuth in JSON mode
 
-When creating a session without specifying an auth profile, `mcpc` first attempts an unauthenticated connection.
-If the server requires OAuth (returns 401 with `WWW-Authenticate` header), `mcpc` guides you through authentication:
-
-```bash
-mcpc https://mcp.apify.com connect --session @apify
-# Attempts connection...
-? Server requires OAuth authentication. Authenticate now? (Y/n) y
-? Enter profile name (default):
-? Opening browser to authenticate...
-✓ Profile 'default' created
-✓ Session '@apify' created
-```
-
-This flow ensures you only authenticate when necessary.
+If `--json` option is used, `mcpc` never asks for interactive user input and fails instead.
 
 ### Authentication precedence
 
@@ -323,13 +323,12 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
 3. **Config file headers** - Headers from `--config` file for the server
 4. **No authentication** - Attempts unauthenticated connection
 
-**Example:**
-```bash
-# Config file has: "headers": {"Authorization": "Bearer ${TOKEN1}"}
-# Session uses profile with different OAuth token
-# Command provides: --header "Authorization: Bearer ${TOKEN2}"
-# Result: Uses TOKEN2 (command-line flag wins)
-```
+Example:
+
+- Config file has: `"headers": {"Authorization": "Bearer ${TOKEN1}"}`
+- Session uses profile with different OAuth token
+- Command provides: `--header "Authorization: Bearer ${TOKEN2}"`
+- Result: Uses `TOKEN2` (command-line flag wins)
 
 ### Authentication profiles storage format
 
@@ -607,6 +606,7 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 - Handles server notifications: progress tracking, logging, and change notifications (`notifications/tools/list_changed`, `notifications/resources/list_changed`, `notifications/prompts/list_changed`)
 - Request multiplexing: supports up to 10 concurrent requests, queues up to 100 additional requests
 - Pagination: List operations return `nextCursor` when more results are available; use `--cursor` to fetch next page
+- Pings: `mcpc` periodically issues a `ping` request to keep the connection alive
 - Sampling is not supported as `mcpc` has no access to an LLM.
 
 ## Package resolution
