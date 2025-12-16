@@ -21,7 +21,7 @@ const logger = createLogger('cli');
  * - <package> - Local package name
  * - <config-entry> - Entry from config file (when --config is used)
  */
-export async function resolveTarget(
+export function resolveTarget(
   target: string,
   options: {
     config?: string;
@@ -29,7 +29,7 @@ export async function resolveTarget(
     timeout?: number;
     verbose?: boolean;
   } = {}
-): Promise<TransportConfig> {
+): TransportConfig {
   if (options.verbose) {
     setVerbose(true);
   }
@@ -111,7 +111,7 @@ export async function withMcpClient<T>(
   callback: (client: McpClient) => Promise<T>
 ): Promise<T> {
   // Resolve target to transport config
-  const transportConfig = await resolveTarget(target, options);
+  const transportConfig = resolveTarget(target, options);
 
   logger.debug('Resolved target:', { target, transportConfig });
 

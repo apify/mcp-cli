@@ -31,7 +31,8 @@ export async function setLogLevel(
   }
 
   await withMcpClient(target, options, async (client) => {
-    await client.setLoggingLevel(level);
+    // After validation above, we know level is a valid LoggingLevel
+    await client.setLoggingLevel(level as LoggingLevel);
 
     logTarget(target, options.outputMode);
     if (options.outputMode === 'human') {

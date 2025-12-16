@@ -143,7 +143,13 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
   program.argument('<target>', 'Target (session @name, server URL, config entry, or package)');
 
   // Get options to pass to handlers
-  const getOptions = (command: Command) => {
+  const getOptions = (command: Command): {
+    outputMode: OutputMode;
+    config?: string;
+    headers?: string[];
+    timeout?: number;
+    verbose?: boolean;
+  } => {
     const opts = command.optsWithGlobals ? command.optsWithGlobals() : command.opts();
     if (opts.verbose) setVerbose(true);
 
