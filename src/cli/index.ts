@@ -191,6 +191,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
 
     await sessions.getInstructions(target, {
       outputMode: hasJsonFlag ? 'json' : 'human',
+      verbose: hasVerboseFlag,
     });
     return;
   }

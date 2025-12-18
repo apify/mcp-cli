@@ -15,6 +15,10 @@ let isVerbose = false;
  */
 export function setVerbose(verbose: boolean): void {
   isVerbose = verbose;
+  // When verbose is enabled, set log level to debug to show all logs
+  if (verbose) {
+    currentLogLevel = 'debug';
+  }
 }
 
 /**
