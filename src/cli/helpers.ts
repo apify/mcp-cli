@@ -9,6 +9,7 @@ import type { OutputMode, TransportConfig } from '../lib/types.js';
 import { ClientError, NetworkError } from '../lib/errors.js';
 import { isValidUrl } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
+import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
 
 const logger = createLogger('cli');
 
@@ -76,11 +77,74 @@ export function resolveTarget(
 
   // Config file entry
   if (options.config) {
-    // TODO: Load config file and look up entry
-    throw new ClientError(
-      `Config files not yet implemented. Entry: ${target}\n` +
-      `For now, use direct URLs like: mcpc https://mcp.example.com tools-list`
-    );
+    logger.debug(`Loading config file: ${options.config}`);
+
+    // Load and parse config file
+    const config = loadConfig(options.config);
+
+    // Get server configuration by name
+    const serverConfig = getServerConfig(config, target);
+
+    // Validate server configuration
+    validateServerConfig(serverConfig);
+
+    // Convert to TransportConfig
+    if (serverConfig.url) {
+      // HTTP/HTTPS server
+      const headers: Record<string, string> = {};
+
+      // Merge headers from config file
+      if (serverConfig.headers) {
+        Object.assign(headers, serverConfig.headers);
+      }
+
+      // Override with CLI --header flags (CLI flags take precedence)
+      if (options.headers) {
+        for (const header of options.headers) {
+          const colonIndex = header.indexOf(':');
+          if (colonIndex < 1) {
+            throw new ClientError(`Invalid header format: ${header}. Use "Key: Value"`);
+          }
+          const key = header.substring(0, colonIndex).trim();
+          const value = header.substring(colonIndex + 1).trim();
+          headers[key] = value;
+        }
+      }
+
+      const transportConfig: TransportConfig = {
+        type: 'http',
+        url: serverConfig.url,
+        headers,
+      };
+
+      // Timeout: CLI flag > config file > default
+      if (options.timeout) {
+        transportConfig.timeout = options.timeout * 1000;
+      } else if (serverConfig.timeout) {
+        transportConfig.timeout = serverConfig.timeout * 1000;
+      }
+
+      return transportConfig;
+    } else if (serverConfig.command) {
+      // Stdio server
+      const transportConfig: TransportConfig = {
+        type: 'stdio',
+        command: serverConfig.command,
+      };
+
+      if (serverConfig.args !== undefined) {
+        transportConfig.args = serverConfig.args;
+      }
+
+      if (serverConfig.env !== undefined) {
+        transportConfig.env = serverConfig.env;
+      }
+
+      return transportConfig;
+    }
+
+    // Should never reach here due to validateServerConfig
+    throw new ClientError(`Invalid server configuration for: ${target}`);
   }
 
   // Local package
