@@ -10,6 +10,7 @@ import { ClientError, NetworkError } from '../lib/errors.js';
 import { isValidUrl } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
+import { resolvePackage, createPackageTransport } from '../lib/package-resolver.js';
 
 const logger = createLogger('cli');
 
@@ -148,11 +149,31 @@ export function resolveTarget(
   }
 
   // Local package
-  // TODO: Resolve package to stdio transport
-  throw new ClientError(
-    `Local packages not yet implemented. Package: ${target}\n` +
-    `For now, use direct URLs like: mcpc https://mcp.example.com tools-list`
-  );
+  logger.debug(`Attempting to resolve as package: ${target}`);
+
+  try {
+    const pkg = resolvePackage(target);
+    const transportConfig = createPackageTransport(pkg);
+
+    logger.debug(`Resolved package: ${pkg.name}@${pkg.version || 'unknown'}`);
+
+    return transportConfig;
+  } catch (error) {
+    // Re-throw with additional context
+    if (error instanceof ClientError) {
+      throw error;
+    }
+
+    throw new ClientError(
+      `Failed to resolve target: ${target}\n` +
+      `Target must be one of:\n` +
+      `  - Named session (@name)\n` +
+      `  - HTTP/HTTPS URL (https://...)\n` +
+      `  - Config file entry (with --config flag)\n` +
+      `  - Local package name\n\n` +
+      `Error: ${(error as Error).message}`
+    );
+  }
 }
 
 /**
