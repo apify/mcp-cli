@@ -221,7 +221,7 @@ export async function showServerInfo(
 
       // Instructions
       if (instructions) {
-        console.log('Server instructions');
+        console.log('Server instructions:');
         console.log(instructions);
         console.log('');
       }
