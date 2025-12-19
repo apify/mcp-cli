@@ -82,6 +82,13 @@ export interface SessionData {
 }
 
 /**
+ * Sessions storage structure (sessions.json)
+ */
+export interface SessionsStorage {
+  sessions: Record<string, SessionData>; // sessionName -> SessionData
+}
+
+/**
  * Authentication profile data stored in auth-profiles.json
  * Only OAuth authentication is supported for profiles
  */

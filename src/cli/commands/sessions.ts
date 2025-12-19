@@ -5,6 +5,7 @@
 import type { OutputMode } from '../../lib/types.js';
 import { formatOutput, formatSuccess, logTarget } from '../output.js';
 import { listAuthProfiles } from '../../lib/auth-profiles.js';
+import { listSessions } from '../../lib/sessions.js';
 
 /**
  * Connect to an MCP server and create a session
@@ -37,37 +38,18 @@ export async function connectSession(
 /**
  * List active sessions and authentication profiles
  */
-export async function listSessions(options: { outputMode: OutputMode }): Promise<void> {
-  // TODO: Read from sessions.json
+export async function listSessionsAndAuthProfiles(options: { outputMode: OutputMode }): Promise<void> {
+  // Load sessions from disk
+  const sessions = await listSessions();
 
-  const mockSessions: Array<{
-    sessionName: string;
-    server: string;
-    transport: string;
-    createdAt: Date;
-  }> = [
-    {
-      sessionName: 'apify',
-      server: 'https://mcp.apify.com',
-      transport: 'http',
-      createdAt: new Date(),
-    },
-    {
-      sessionName: 'local',
-      server: 'node server.js',
-      transport: 'stdio',
-      createdAt: new Date(),
-    },
-  ];
-
-  // Load auth profiles
+  // Load auth profiles from disk
   const authProfiles = await listAuthProfiles();
 
   if (options.outputMode === 'json') {
     console.log(
       formatOutput(
         {
-          sessions: mockSessions,
+          sessions,
           authProfiles,
         },
         'json'
@@ -75,12 +57,12 @@ export async function listSessions(options: { outputMode: OutputMode }): Promise
     );
   } else {
     // Display sessions
-    if (mockSessions.length === 0) {
+    if (sessions.length === 0) {
       console.log('No active sessions.');
     } else {
       console.log('Active sessions:');
-      for (const session of mockSessions) {
-        console.log(`  @${session.sessionName} → ${session.server} (${session.transport})`);
+      for (const session of sessions) {
+        console.log(`  @${session.name} → ${session.target} (${session.transport})`);
       }
     }
 

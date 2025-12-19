@@ -84,7 +84,7 @@ async function main(): Promise<void> {
 
   // If no <target> found, list sessions (special case: no positional arguments)
   if (!target) {
-    await sessions.listSessions({ outputMode: hasJsonFlag ? 'json' : 'human' });
+    await sessions.listSessionsAndAuthProfiles({ outputMode: hasJsonFlag ? 'json' : 'human' });
     if (!hasJsonFlag) {
       console.log('\nRun "mcpc --help" for usage information.');
     }
