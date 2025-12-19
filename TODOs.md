@@ -5,4 +5,5 @@
 - on server/session info, print also auth info
 - validate new session name
 - nit: Colorize output, e.g. JSONs in one color.
+- Check if we show tool annotations
 

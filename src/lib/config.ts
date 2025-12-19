@@ -12,7 +12,7 @@ import { createLogger } from './logger.js';
 const logger = createLogger('config');
 
 /**
- * Load and parse an MCP configuration file
+ * Load and parse a standard MCP configuration file (see https://gofastmcp.com/integrations/mcp-json-configuration)
  *
  * @param configPath - Path to the config file
  * @returns Parsed configuration

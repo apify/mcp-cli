@@ -10,7 +10,6 @@ import { ClientError, NetworkError } from '../lib/errors.js';
 import { isValidUrl, isValidSessionName } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
-import { resolvePackage, createPackageTransport } from '../lib/package-resolver.js';
 
 const logger = createLogger('cli');
 
@@ -20,7 +19,6 @@ const logger = createLogger('cli');
  * Target types:
  * - @<name> - Named session (looks up in sessions.json)
  * - https://... - Remote HTTP server
- * - <package> - Local package name
  * - <config-entry> - Entry from config file (when --config is used)
  */
 export function resolveTarget(
@@ -144,32 +142,15 @@ export function resolveTarget(
     throw new ClientError(`Invalid server configuration for: ${target}`);
   }
 
-  // Local package
-  logger.debug(`Attempting to resolve as package: ${target}`);
-
-  try {
-    const pkg = resolvePackage(target);
-    const transportConfig = createPackageTransport(pkg);
-
-    logger.debug(`Resolved package: ${pkg.name}@${pkg.version || 'unknown'}`);
-
-    return transportConfig;
-  } catch (error) {
-    // Re-throw with additional context
-    if (error instanceof ClientError) {
-      throw error;
-    }
-
-    throw new ClientError(
-      `Failed to resolve target: ${target}\n` +
-        `Target must be one of:\n` +
-        `  - Named session (@name)\n` +
-        `  - HTTP/HTTPS URL (https://...)\n` +
-        `  - Config file entry (with --config flag)\n` +
-        `  - Local package name\n\n` +
-        `Error: ${(error as Error).message}`
-    );
-  }
+  // Target not recognized
+  throw new ClientError(
+    `Failed to resolve target: ${target}\n` +
+      `Target must be one of:\n` +
+      `  - Named session (@name)\n` +
+      `  - HTTP/HTTPS URL (https://...)\n` +
+      `  - Config file entry (with --config flag)\n\n` +
+      `For local MCP servers, use a config file with the --config flag.`
+  );
 }
 
 /**

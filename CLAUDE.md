@@ -275,19 +275,6 @@ Tools and prompts accept arguments via `--args` flag in three formats:
 
 Detection logic: If first argument starts with `{` or `[`, it's parsed as inline JSON. Otherwise, key=value/key:=json pairs are parsed.
 
-## Package Resolution
-
-When a target is identified as a local package (e.g., `@modelcontextprotocol/server-filesystem`):
-
-1. Check `./node_modules` (local project dependencies)
-2. Check global npm packages (`npm root -g`)
-3. Check Bun global packages (if using Bun)
-
-Package requirements:
-- Must have executable in `package.json` `bin` field or `main` field
-- Should support MCP stdio transport
-- Optional: `mcpServer` field in `package.json` to specify entry point
-
 ## Configuration Format
 
 Uses standard MCP config format (compatible with Claude Desktop):
@@ -534,19 +521,18 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
   - `resources-list`, `resources-read`, `resources-subscribe`, `resources-unsubscribe`, `resources-templates-list`
   - `prompts-list`, `prompts-get`
   - `logging-set-level`
-  - `connect`, `close`, `help`, `shell` (stub)
-  - `auth`, `auth-list`, `auth-show`, `auth-delete` (authentication management)
+  - `connect`, `close`, `help` (session management)
+  - `auth`, `auth-list`, `auth-show`, `auth-delete` (authentication management - structure in place)
+- **Bridge Process**: Persistent MCP connections with Unix domain socket IPC
+- **Session Management**: Complete `sessions.json` persistence with file locking
+- **IPC Layer**: Unix socket communication between CLI and bridge (BridgeClient, SessionClient)
+- **Target Resolution**: URL/session/config resolution logic (sessions and HTTP servers working)
+- **CLI-to-MCP Integration**: Full integration via direct connection and session bridge
 
 ### 🚧 In Progress / TODO
-- **Bridge Process**: Persistent MCP connections (placeholder exists)
-- **Session Management**: `sessions.json` persistence with file locking
-- **IPC Layer**: Unix socket communication between CLI and bridge
-- **Target Resolution**: URL/package/config resolution logic
-- **CLI-to-MCP Integration**: Connect command handlers to actual MCP client
 - **Interactive Shell**: REPL with command history and tab completion
-- **Config File Loading**: Parse and use MCP config files
+- **Config File Loading**: Parse and use MCP config files (stdio transport support)
 - **Keychain Integration**: Store credentials securely (OS keychain via `keytar`)
-- **Package Resolution**: Find and run local MCP packages
 - **OAuth Implementation**: Full OAuth 2.1 flow with PKCE, authentication profiles
 - **Notification Handling**: Handle server-sent notifications
 - **Error Recovery**: Bridge crash recovery, automatic reconnection

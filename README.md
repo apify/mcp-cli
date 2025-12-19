@@ -13,7 +13,7 @@ rather than direct tool calling, to [save tokens](https://www.anthropic.com/engi
 
 - 🔌 **Universal MCP client** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
-- 🚀 **Zero setup** - Connect to remote servers or run local packages instantly.
+- 🚀 **Zero setup** - Connect to remote servers instantly with just a URL.
 - 🔧 **Full protocol support** - Tools, resources, prompts, sampling, dynamic discovery, and async notifications.
 - 📊 **JSON output** - Easy integration with `jq`, scripts, and other CLI tools.
 - 🤖 **AI-friendly** - Designed for code generation and automated workflows.
@@ -103,16 +103,15 @@ mcpc <server> auth-delete --profile <name>
 
 where `<target>` can be one of:
 
-- **Named session** prefixed with `@` (e.g. `@apify`) - highest priority
-- **Remote MCP endpoint** URL (e.g. `https://mcp.apify.com`)
-- **Named entry** in a config file, when used with `--config` (e.g. `linear-mcp`)
-- **Local MCP server package** (e.g. `@microsoft/playwright-mcp`)
+- **Named session** prefixed with `@` (e.g. `@apify`) - persistent connection via bridge process
+- **Remote MCP endpoint** URL (e.g. `https://mcp.apify.com`) - direct HTTP connection
+- **Named entry** in a config file, when used with `--config` (e.g. `linear-mcp`) - local or remote server
 
-Target types are resolved in the order listed above. Use explicit format to avoid ambiguity.
+For local MCP servers (stdio transport), use a config file to specify the command, arguments, and environment variables. See [Configuration](#configuration) below.
 
-`mcpc` automatically selects the transport protocol based on the `<target>`:
-- HTTP/HTTPS URLs use the MCP Streamable HTTP transport (only current standard; HTTP with SSE is not supported)
-- Local packages use stdio transport (spawned as subprocess)
+`mcpc` automatically selects the transport protocol:
+- HTTP/HTTPS URLs use the MCP Streamable HTTP transport (current standard; HTTP with SSE is not supported)
+- Config file entries use the transport specified in the config (stdio for local servers, HTTP for remote)
 
 ### MCP command arguments
 
@@ -620,31 +619,6 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 - Pings: `mcpc` periodically issues the MCP `ping` request to keep the connection alive
 - Sampling is not supported as `mcpc` has no access to an LLM
 
-## Package resolution
-
-When a `<target>` is identified as a local package, `mcpc` resolves it as follows:
-
-1. Check `./node_modules` (local project dependencies)
-2. Check global npm packages (`npm root -g`)
-3. Check Bun global packages (if using Bun runtime)
-
-**Package requirements:**
-- Package must have executable specified in `package.json` `bin` field or `main` field
-- Package should support MCP stdio transport
-- Optional: define `mcpServer` field in `package.json` to specify entry point
-
-**Example package usage:**
-
-```bash
-# Use locally installed package
-npm install @modelcontextprotocol/server-filesystem
-mcpc @modelcontextprotocol/server-filesystem resources-list
-
-# Use globally installed package
-npm install -g @modelcontextprotocol/server-filesystem
-mcpc @modelcontextprotocol/server-filesystem resources-list
-```
-
 ## Output format
 
 ### Human-readable (default)
@@ -761,19 +735,13 @@ mcpc(@apify)> exit
 ### What's not yet implemented
 
 **📋 Major features pending:**
-- **Bridge process & persistent sessions**: Currently uses ephemeral connections
 - **Authentication**: OAuth profiles, keychain storage, `auth-*` commands
 - **Caching**: `--no-cache` flag and list caching
 - **Interactive shell**: REPL features (history, tab completion)
-- **Config file loading**: MCP server config file parsing
-- **Package resolution**: Local MCP package discovery
+- **Config file loading**: MCP server config file parsing (stdio transport support)
 - **Environment variables**: `MCPC_*` environment variables
-- **IPC layer**: Unix socket communication
-- **File locking**: Concurrent access protection
 - **Notification handling**: Server-sent notifications
 - **Error recovery**: Bridge restart, reconnection
-
-Most commands currently work with mock data or direct (non-persistent) connections.
 
 ## Implementation details
 
