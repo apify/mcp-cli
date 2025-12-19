@@ -179,6 +179,7 @@ export function resolveTarget(
 /**
  * Execute an operation with an MCP client
  * Handles connection, execution, and cleanup
+ * Automatically detects and uses sessions (targets starting with @)
  *
  * @param target - Target string (URL, @session, package, etc.)
  * @param options - CLI options (verbose, config, headers, etc.)
@@ -195,7 +196,17 @@ export async function withMcpClient<T>(
   },
   callback: (client: McpClient) => Promise<T>
 ): Promise<T> {
-  // Resolve target to transport config
+  // Check if this is a session target
+  if (target.startsWith('@')) {
+    const { withSessionClient } = await import('../lib/session-client.js');
+
+    logger.debug('Using session:', target);
+
+    // Use session client (it implements the same interface as McpClient)
+    return await withSessionClient(target, callback as any);
+  }
+
+  // Regular direct connection
   const transportConfig = resolveTarget(target, options);
 
   logger.debug('Resolved target:', { target, transportConfig });
