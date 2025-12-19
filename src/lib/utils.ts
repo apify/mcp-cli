@@ -135,10 +135,10 @@ export function isValidUrl(str: string): boolean {
 
 /**
  * Validate if a string is a valid session name
- * Session names must be alphanumeric with hyphens/underscores, 1-64 chars
+ * Session names must start with @ followed be alphanumeric string with hyphens/underscores, 1-64 chars
  */
 export function isValidSessionName(name: string): boolean {
-  return /^[a-zA-Z0-9_-]{1,64}$/.test(name);
+  return /^@[a-zA-Z0-9_-]{1,64}$/.test(name);
 }
 
 /**

@@ -115,17 +115,24 @@ describe('isValidUrl', () => {
 
 describe('isValidSessionName', () => {
   it('should return true for valid session names', () => {
-    expect(isValidSessionName('test')).toBe(true);
-    expect(isValidSessionName('test-123')).toBe(true);
-    expect(isValidSessionName('test_session')).toBe(true);
-    expect(isValidSessionName('abc123XYZ')).toBe(true);
+    expect(isValidSessionName('@test')).toBe(true);
+    expect(isValidSessionName('@test-123')).toBe(true);
+    expect(isValidSessionName('@test_session')).toBe(true);
+    expect(isValidSessionName('@abc123XYZ')).toBe(true);
   });
 
   it('should return false for invalid session names', () => {
     expect(isValidSessionName('')).toBe(false);
+    expect(isValidSessionName('test')).toBe(false); // space
     expect(isValidSessionName('test session')).toBe(false); // space
     expect(isValidSessionName('test.session')).toBe(false); // dot
     expect(isValidSessionName('test@session')).toBe(false); // @
+    expect(isValidSessionName('test/session')).toBe(false); // /
+    expect(isValidSessionName('@test/session')).toBe(false); // /
+    expect(isValidSessionName('@test.session')).toBe(false); // .
+    expect(isValidSessionName('@test session')).toBe(false); // space
+    expect(isValidSessionName('@test ')).toBe(false); // space
+    expect(isValidSessionName(' @test')).toBe(false); // space
     expect(isValidSessionName('a'.repeat(65))).toBe(false); // too long
   });
 });

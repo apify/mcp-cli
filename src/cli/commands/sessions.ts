@@ -24,7 +24,7 @@ export async function connectSession(
     if (!isValidSessionName(name)) {
       throw new ClientError(
         `Invalid session name: ${name}\n` +
-        `Session names must be 1-64 characters, alphanumeric with hyphens or underscores only.`
+        `Session names must start with @ and be followed by 1-64 characters, alphanumeric with hyphens or underscores only (for example: @my-session).`
       );
     }
 
@@ -32,7 +32,7 @@ export async function connectSession(
     if (await sessionExists(name)) {
       throw new ClientError(
         `Session already exists: ${name}\n` +
-        `Use "mcpc @${name} close" to close it first, or choose a different name.`
+        `Use "mcpc ${name} close" to close it first, or choose a different name.`
       );
     }
 
@@ -48,11 +48,11 @@ export async function connectSession(
 
     // Success!
     if (options.outputMode === 'human') {
-      console.log(formatSuccess(`Session '@${name}' created successfully`));
+      console.log(formatSuccess(`Session ${name} created successfully`));
       console.log(`  Target: ${target}`);
       console.log(`  Transport: ${transportConfig.type}`);
-      console.log(`\nUse "mcpc @${name} tools-list" to list available tools.`);
-      console.log(`Use "mcpc @${name} close" to terminate the session.`);
+      console.log(`\nUse "mcpc ${name} tools-list" to list available tools.`);
+      console.log(`Use "mcpc ${name} close" to terminate the session.`);
     } else {
       console.log(
         formatOutput(
@@ -113,7 +113,7 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
     } else {
       console.log('Active MCP sessions:');
       for (const session of sessions) {
-        console.log(`  @${session.name} → ${session.target} (${session.transport})`);
+        console.log(`  ${session.name} → ${session.target} (${session.transport})`);
       }
     }
 
@@ -154,7 +154,7 @@ export async function closeSession(
 
     // Success!
     if (options.outputMode === 'human') {
-      console.log(formatSuccess(`Session '@${name}' closed successfully`));
+      console.log(formatSuccess(`Session ${name} closed successfully`));
     } else {
       console.log(
         formatOutput(

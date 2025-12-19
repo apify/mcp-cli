@@ -1,9 +1,8 @@
 
 
-- get rid of --cursor and do it automatically, update README accordingly
+- get rid of --cursor and handle pagination automatically by CLI, update README accordingly
 - nit: If tool response has `structuredContent` and `content:` [ type: 'text', 'text': ... }], print the latter as Markdown in text mode
 - on server/session info, print also auth info
 - validate new session name
-- Get rid of `--cursor` and handle pagination automatically by CLI
 - nit: Colorize output, e.g. JSONs in one color.
 

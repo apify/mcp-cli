@@ -7,7 +7,7 @@ import { createClient } from '../core/factory.js';
 import type { McpClient } from '../core/client.js';
 import type { OutputMode, TransportConfig } from '../lib/types.js';
 import { ClientError, NetworkError } from '../lib/errors.js';
-import { isValidUrl } from '../lib/utils.js';
+import { isValidUrl, isValidSessionName } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
 import { resolvePackage, createPackageTransport } from '../lib/package-resolver.js';
@@ -36,13 +36,9 @@ export function resolveTarget(
     setVerbose(true);
   }
 
-  // Named session (@name)
-  if (target.startsWith('@')) {
-    // TODO: Look up session in ~/.mcpc/sessions.json
-    throw new ClientError(
-      `Named sessions not yet implemented. Session: ${target}\n` +
-      `For now, use direct URLs like: mcpc https://mcp.example.com tools-list`
-    );
+  // Named session (@name) is handled in withMcpClient, should not reach here
+  if (isValidSessionName(target)) {
+    throw new ClientError(`Session target should be handled by withMcpClient: ${target}`);
   }
 
   // HTTP/HTTPS URL
@@ -166,12 +162,12 @@ export function resolveTarget(
 
     throw new ClientError(
       `Failed to resolve target: ${target}\n` +
-      `Target must be one of:\n` +
-      `  - Named session (@name)\n` +
-      `  - HTTP/HTTPS URL (https://...)\n` +
-      `  - Config file entry (with --config flag)\n` +
-      `  - Local package name\n\n` +
-      `Error: ${(error as Error).message}`
+        `Target must be one of:\n` +
+        `  - Named session (@name)\n` +
+        `  - HTTP/HTTPS URL (https://...)\n` +
+        `  - Config file entry (with --config flag)\n` +
+        `  - Local package name\n\n` +
+        `Error: ${(error as Error).message}`
     );
   }
 }
@@ -196,8 +192,8 @@ export async function withMcpClient<T>(
   },
   callback: (client: McpClient) => Promise<T>
 ): Promise<T> {
-  // Check if this is a session target
-  if (target.startsWith('@')) {
+  // Check if this is a session target (@name, not @scope/package)
+  if (isValidSessionName(target)) {
     const { withSessionClient } = await import('../lib/session-client.js');
 
     logger.debug('Using session:', target);

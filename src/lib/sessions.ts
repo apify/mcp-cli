@@ -168,7 +168,7 @@ export async function getSession(sessionName: string): Promise<SessionData | und
 
 /**
  * Create or update a session
- * @param sessionName - Name of the session (without @ prefix)
+ * @param sessionName - Name of the session (with @ prefix)
  * @param sessionData - Session data to store
  */
 export async function saveSession(
@@ -191,7 +191,7 @@ export async function saveSession(
 
     await saveSessionsInternal(storage);
 
-    logger.info(`Session '${sessionName}' saved`);
+    logger.info(`Session ${sessionName} saved`);
   });
 }
 
@@ -222,7 +222,7 @@ export async function updateSession(
 
     await saveSessionsInternal(storage);
 
-    logger.info(`Session '${sessionName}' updated`);
+    logger.info(`Session ${sessionName} updated`);
   });
 }
 
@@ -242,7 +242,7 @@ export async function deleteSession(sessionName: string): Promise<void> {
 
     await saveSessionsInternal(storage);
 
-    logger.info(`Session '${sessionName}' deleted`);
+    logger.info(`Session ${sessionName} deleted`);
   });
 }
 

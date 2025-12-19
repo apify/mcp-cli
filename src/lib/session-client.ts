@@ -111,25 +111,22 @@ export class SessionClient {
  * Automatically handles bridge health checks and reconnection
  */
 export async function createSessionClient(sessionName: string): Promise<SessionClient> {
-  // Remove @ prefix if present
-  const cleanName = sessionName.startsWith('@') ? sessionName.slice(1) : sessionName;
-
   // Get session info
-  const session = await getSession(cleanName);
+  const session = await getSession(sessionName);
 
   if (!session) {
-    throw new ClientError(`Session not found: ${cleanName}`);
+    throw new ClientError(`Session not found: ${sessionName}`);
   }
 
   if (!session.socketPath) {
-    throw new ClientError(`Session ${cleanName} has no socket path`);
+    throw new ClientError(`Session ${sessionName} has no socket path`);
   }
 
   // Ensure bridge is healthy (auto-restart if needed)
-  await ensureBridgeHealthy(cleanName);
+  await ensureBridgeHealthy(sessionName);
 
   // Create and connect client
-  const client = new SessionClient(cleanName, session.socketPath);
+  const client = new SessionClient(sessionName, session.socketPath);
   await client.connect();
 
   return client;
