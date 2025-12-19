@@ -128,7 +128,7 @@ function createProgram(): Command {
 Where <target> can be:
   @<name>                       Named session (e.g., @apify)
   https://...                   Remote MCP server URL
-  <config-entry>                Entry from config file (with --config)
+  <config-entry>                Entry from --config file
   <package>                     Local MCP server package
 
 Examples:
@@ -194,7 +194,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     const hasVerboseFlag = argv.includes('--verbose');
     if (hasVerboseFlag) setVerbose(true);
 
-    await sessions.getInstructions(target, {
+    await sessions.showServerInfo(target, {
       outputMode: hasJsonFlag ? 'json' : 'human',
       verbose: hasVerboseFlag,
     });

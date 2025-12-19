@@ -3,6 +3,7 @@
  */
 
 import type { OutputMode } from '../../lib/types.js';
+import { LATEST_PROTOCOL_VERSION } from '../../lib/types.js';
 import { formatOutput, formatSuccess, logTarget } from '../output.js';
 import { listAuthProfiles } from '../../lib/auth-profiles.js';
 import { listSessions } from '../../lib/sessions.js';
@@ -19,7 +20,7 @@ export async function connectSession(
 
   if (options.outputMode === 'human') {
     console.log(formatSuccess(`Session '${name}' created successfully`));
-    console.log(`  Server: ${target}`);
+    console.log(`  MCP server: ${target}`);
     console.log(`\nUse "mcpc ${name} tools-list" to list available tools.`);
   } else {
     console.log(
@@ -58,9 +59,9 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
   } else {
     // Display sessions
     if (sessions.length === 0) {
-      console.log('No active sessions.');
+      console.log('No active MCP sessions.');
     } else {
-      console.log('Active sessions:');
+      console.log('Active MCP sessions:');
       for (const session of sessions) {
         console.log(`  @${session.name} → ${session.target} (${session.transport})`);
       }
@@ -112,7 +113,7 @@ export async function closeSession(
 /**
  * Get server instructions and capabilities (also used for help command)
  */
-export async function getInstructions(
+export async function showServerInfo(
   target: string,
   options: {
     outputMode: OutputMode;
@@ -142,18 +143,19 @@ export async function getInstructions(
 
       // Server info
       if (serverInfo) {
-        console.log(`Server: ${serverInfo.name} v${serverInfo.version}`);
+        console.log(`MCP server: ${serverInfo.name} v${serverInfo.version} (protocol: ${LATEST_PROTOCOL_VERSION})`);
         console.log('');
       }
 
       // Instructions
       if (instructions) {
+        console.log('# MCP server instructions');
         console.log(instructions);
         console.log('');
       }
 
       // Capabilities - only show what the server actually exposes
-      console.log('Available capabilities:');
+      console.log('# Available capabilities:');
 
       const capabilityList: string[] = [];
 
@@ -190,29 +192,29 @@ export async function getInstructions(
       console.log('');
 
       // Commands
-      console.log('Common commands:');
+      console.log('# Available commands:');
       const commands: string[] = [];
 
       if (capabilities?.tools) {
-        commands.push(`  mcpc ${target} tools-list              List all tools`);
-        commands.push(`  mcpc ${target} tools-call <name>       Call a tool`);
+        commands.push(`  mcpc ${target} tools-list`);
+        commands.push(`  mcpc ${target} tools-call <name>`);
       }
 
       if (capabilities?.resources) {
-        commands.push(`  mcpc ${target} resources-list          List all resources`);
-        commands.push(`  mcpc ${target} resources-read <uri>    Get a resource`);
+        commands.push(`  mcpc ${target} resources-list`);
+        commands.push(`  mcpc ${target} resources-read <uri>`);
       }
 
       if (capabilities?.prompts) {
-        commands.push(`  mcpc ${target} prompts-list            List all prompts`);
-        commands.push(`  mcpc ${target} prompts-get <name>      Get a prompt`);
+        commands.push(`  mcpc ${target} prompts-list`);
+        commands.push(`  mcpc ${target} prompts-get <name>`);
       }
 
       if (capabilities?.logging) {
         commands.push(`  mcpc ${target} logging-set-level <lvl> Set server log level`);
       }
 
-      commands.push(`  mcpc ${target} shell                   Open interactive shell`);
+      commands.push(`  mcpc ${target} shell`);
 
       console.log(commands.join('\n'));
     } else {
@@ -294,7 +296,7 @@ export async function showHelp(
   target: string,
   options: { outputMode: OutputMode }
 ): Promise<void> {
-  await getInstructions(target, options);
+  await showServerInfo(target, options);
 }
 
 /**
