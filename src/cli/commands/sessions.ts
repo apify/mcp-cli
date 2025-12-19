@@ -143,14 +143,9 @@ export async function showServerInfo(
 
       // Server info
       if (serverInfo) {
-        console.log(`MCP server: ${serverInfo.name} v${serverInfo.version} (protocol: ${LATEST_PROTOCOL_VERSION})`);
-        console.log('');
-      }
-
-      // Instructions
-      if (instructions) {
-        console.log('# MCP server instructions');
-        console.log(instructions);
+        console.log(
+          `MCP server: ${serverInfo.name} v${serverInfo.version} (protocol: ${LATEST_PROTOCOL_VERSION})`
+        );
         console.log('');
       }
 
@@ -160,7 +155,9 @@ export async function showServerInfo(
       const capabilityList: string[] = [];
 
       if (capabilities?.tools) {
-        capabilityList.push(`  • tools: ${toolCount} available${capabilities.tools.listChanged ? ' (supports list change notifications)' : ''}`);
+        capabilityList.push(
+          `  • tools: ${toolCount} available${capabilities.tools.listChanged ? ' (supports list change notifications)' : ''}`
+        );
       }
 
       if (capabilities?.resources) {
@@ -172,7 +169,9 @@ export async function showServerInfo(
       }
 
       if (capabilities?.prompts) {
-        const featureStr = capabilities.prompts.listChanged ? ' (supports list change notifications)' : '';
+        const featureStr = capabilities.prompts.listChanged
+          ? ' (supports list change notifications)'
+          : '';
         capabilityList.push(`  • prompts${featureStr}`);
       }
 
@@ -217,6 +216,13 @@ export async function showServerInfo(
       commands.push(`  mcpc ${target} shell`);
 
       console.log(commands.join('\n'));
+
+      // Instructions
+      if (instructions) {
+        console.log('# MCP server instructions');
+        console.log(instructions);
+        console.log('');
+      }
     } else {
       // JSON output - only include capabilities that are present
       const jsonCapabilities: Record<string, any> = {};
