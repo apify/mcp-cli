@@ -130,11 +130,11 @@ export async function showServerInfo(
     const instructions = client.getInstructions();
     const protocolVersion = client.getProtocolVersion();
 
-    // Get tool count if tools are supported
-    let toolCount = 0;
+    // Get tools if supported
+    let toolNames: string[] = [];
     if (capabilities?.tools) {
       const toolsResult = await client.listTools();
-      toolCount = toolsResult.tools.length;
+      toolNames = toolsResult.tools.map((tool) => tool.name);
     }
 
     if (options.outputMode === 'human') {
@@ -155,22 +155,23 @@ export async function showServerInfo(
 
       if (capabilities?.tools) {
         capabilityList.push(
-          `  • tools: ${toolCount} available${capabilities.tools.listChanged ? ' (supports list change notifications)' : ''}`
+          `  • tools ${capabilities.tools.listChanged ? '(dynamic)' : '(static)'}`
         );
+        if (toolNames.length > 0) {
+          capabilityList[capabilityList.length - 1] += `: ` + toolNames.join(', ');
+        }
       }
 
       if (capabilities?.resources) {
         const features: string[] = [];
         if (capabilities.resources.subscribe) features.push('subscribe');
-        if (capabilities.resources.listChanged) features.push('list change notifications');
+        if (capabilities.resources.listChanged) features.push('dynamic list');
         const featureStr = features.length > 0 ? ` (supports ${features.join(', ')})` : '';
         capabilityList.push(`  • resources${featureStr}`);
       }
 
       if (capabilities?.prompts) {
-        const featureStr = capabilities.prompts.listChanged
-          ? ' (supports list change notifications)'
-          : '';
+        const featureStr = capabilities.prompts.listChanged ? ' (dynamic list)' : '';
         capabilityList.push(`  • prompts${featureStr}`);
       }
 
@@ -229,8 +230,8 @@ export async function showServerInfo(
 
       if (capabilities?.tools) {
         jsonCapabilities.tools = {
-          count: toolCount,
           listChanged: capabilities.tools.listChanged || false,
+          names: toolNames,
         };
       }
 
