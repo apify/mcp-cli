@@ -196,7 +196,8 @@ export async function showServerInfo(
 
       if (capabilities?.tools) {
         commands.push(`  mcpc ${target} tools-list`);
-        commands.push(`  mcpc ${target} tools-call <name>`);
+        commands.push(`  mcpc ${target} tools-schema <name>`);
+        commands.push(`  mcpc ${target} tools-call <name> [--args key=val ...] [--args-file <file>]`);
       }
 
       if (capabilities?.resources) {

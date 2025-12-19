@@ -72,6 +72,7 @@ export function formatHuman(data: unknown): string {
 export function formatTools(tools: Tool[]): string {
   const lines: string[] = [];
 
+  lines.push(`# Tools`);
   for (const tool of tools) {
     lines.push(`## \`${tool.name}\``);
     if (tool.description) {
@@ -91,7 +92,7 @@ export function formatTools(tools: Tool[]): string {
 export function formatToolDetail(tool: Tool): string {
   const lines: string[] = [];
 
-  lines.push(`# ${tool.name}`);
+  lines.push(`# Tool ${tool.name}`);
   lines.push('');
 
   if (tool.description) {
