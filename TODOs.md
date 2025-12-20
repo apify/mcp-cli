@@ -10,3 +10,5 @@
 - [Using session: apify-docs] => change to show server + transport + version?
 
 - add "mcpc --close-all" command to clean up old sessions
+
+- add end-to-end tests - one bash script per test suite, organized in directories, and one master script that runs them all or selected ones (per directory) in parallel
