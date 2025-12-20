@@ -98,7 +98,7 @@ export function formatTools(tools: Tool[]): string {
 export function formatToolDetail(tool: Tool): string {
   const lines: string[] = [];
 
-  lines.push(`# Tool ${tool.name}`);
+  lines.push(`# Tool \`${tool.name}\``);
   lines.push('');
 
   if (tool.description) {
