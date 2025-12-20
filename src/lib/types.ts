@@ -3,7 +3,36 @@
  * Re-exports MCP SDK types and defines additional application-specific types
  */
 
-// Re-export core MCP types from the official SDK
+// Import types for use in interface definitions
+import type {
+  Tool,
+  Resource,
+  Prompt,
+  PromptArgument,
+  Implementation,
+  ClientCapabilities,
+  ServerCapabilities,
+  InitializeRequest,
+  InitializeResult,
+  CallToolRequest,
+  CallToolResult,
+  ListToolsRequest,
+  ListToolsResult,
+  ListResourcesRequest,
+  ListResourcesResult,
+  ReadResourceRequest,
+  ReadResourceResult,
+  ListPromptsRequest,
+  ListPromptsResult,
+  GetPromptRequest,
+  GetPromptResult,
+  SubscribeRequest,
+  UnsubscribeRequest,
+  LoggingLevel,
+  ListResourceTemplatesResult,
+} from '@modelcontextprotocol/sdk/types.js';
+
+// Re-export core MCP types for external use
 export type {
   Tool,
   Resource,
@@ -29,7 +58,7 @@ export type {
   SubscribeRequest,
   UnsubscribeRequest,
   LoggingLevel,
-} from '@modelcontextprotocol/sdk/types.js';
+};
 
 // Re-export protocol version constants
 export { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
@@ -185,4 +214,37 @@ export interface McpServerConfig {
   env?: Record<string, string>;
   headers?: Record<string, string>;
   timeout?: number;
+}
+
+/**
+ * Common interface for MCP clients
+ * Both McpClient (direct SDK wrapper) and SessionClient (bridge IPC wrapper) implement this
+ *
+ * Note: Server info methods return Promises to accommodate SessionClient's IPC calls.
+ * McpClient wraps synchronous SDK calls in resolved Promises for consistency.
+ */
+export interface IMcpClient {
+  // Connection management
+  close(): Promise<void>;
+
+  // Server information
+  // Note: These return Promises because SessionClient must do IPC to get them from bridge
+  // McpClient has them cached locally but returns Promises for interface consistency
+  getServerCapabilities(): Promise<ServerCapabilities | undefined>;
+  getServerVersion(): Promise<Implementation | undefined>;
+  getInstructions(): Promise<string | undefined>;
+  getProtocolVersion(): Promise<string | undefined>;
+
+  // MCP operations
+  ping(): Promise<void>;
+  listTools(cursor?: string): Promise<ListToolsResult>;
+  callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult>;
+  listResources(cursor?: string): Promise<ListResourcesResult>;
+  listResourceTemplates(cursor?: string): Promise<ListResourceTemplatesResult>;
+  readResource(uri: string): Promise<ReadResourceResult>;
+  subscribeResource(uri: string): Promise<void>;
+  unsubscribeResource(uri: string): Promise<void>;
+  listPrompts(cursor?: string): Promise<ListPromptsResult>;
+  getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult>;
+  setLoggingLevel(level: LoggingLevel): Promise<void>;
 }

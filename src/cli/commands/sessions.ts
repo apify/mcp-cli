@@ -202,10 +202,10 @@ export async function showServerInfo(
   const { withMcpClient } = await import('../helpers.js');
 
   await withMcpClient(target, options, async (client) => {
-    const serverInfo = client.getServerVersion();
-    const capabilities = client.getServerCapabilities();
-    const instructions = client.getInstructions();
-    const protocolVersion = client.getProtocolVersion();
+    const serverInfo = await client.getServerVersion();
+    const capabilities = await client.getServerCapabilities();
+    const instructions = await client.getInstructions();
+    const protocolVersion = await client.getProtocolVersion();
 
     // Get tools if supported
     let toolNames: string[] = [];

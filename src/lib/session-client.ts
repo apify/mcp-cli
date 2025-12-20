@@ -13,6 +13,7 @@ import type {
   ListPromptsResult,
   GetPromptResult,
   LoggingLevel,
+  IMcpClient,
 } from './types.js';
 import type { ListResourceTemplatesResult } from '@modelcontextprotocol/sdk/types.js';
 import { BridgeClient } from './bridge-client.js';
@@ -22,8 +23,9 @@ import { ClientError } from './errors.js';
 
 /**
  * Wrapper that makes BridgeClient compatible with McpClient interface
+ * Implements IMcpClient by sending requests to bridge process via IPC
  */
-export class SessionClient {
+export class SessionClient implements IMcpClient {
   private bridgeClient: BridgeClient;
 
   constructor(_sessionName: string, socketPath: string) {
@@ -138,7 +140,7 @@ export async function createSessionClient(sessionName: string): Promise<SessionC
  */
 export async function withSessionClient<T>(
   sessionName: string,
-  callback: (client: SessionClient) => Promise<T>
+  callback: (client: IMcpClient) => Promise<T>
 ): Promise<T> {
   const client = await createSessionClient(sessionName);
 

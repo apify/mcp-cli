@@ -4,8 +4,7 @@
  */
 
 import { createClient } from '../core/factory.js';
-import type { McpClient } from '../core/client.js';
-import type { OutputMode, TransportConfig } from '../lib/types.js';
+import type { IMcpClient, OutputMode, TransportConfig } from '../lib/types.js';
 import { ClientError, NetworkError } from '../lib/errors.js';
 import { normalizeServerUrl, isValidSessionName } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
@@ -173,7 +172,7 @@ export async function withMcpClient<T>(
     timeout?: number;
     verbose?: boolean;
   },
-  callback: (client: McpClient) => Promise<T>
+  callback: (client: IMcpClient) => Promise<T>
 ): Promise<T> {
   // Check if this is a session target (@name, not @scope/package)
   if (isValidSessionName(target)) {
@@ -181,8 +180,8 @@ export async function withMcpClient<T>(
 
     logger.debug('Using session:', target);
 
-    // Use session client (it implements the same interface as McpClient)
-    return await withSessionClient(target, callback as any);
+    // Use session client (SessionClient implements IMcpClient interface)
+    return await withSessionClient(target, callback);
   }
 
   // Regular direct connection
