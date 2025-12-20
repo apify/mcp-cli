@@ -11,4 +11,4 @@
 
 - add "mcpc --close-all" command to clean up old sessions
 
-- add end-to-end tests - one bash script per test suite, organized in directories, and one master script that runs them all or selected ones (per directory) in parallel
+- add end-to-end tests e.g. under `test/e2e` - one bash script per test suite , organized in directories, and one master script that runs them all or selected ones (per directory) in parallel

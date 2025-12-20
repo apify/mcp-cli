@@ -10,6 +10,8 @@ export default {
       'ts-jest',
       {
         useESM: true,
+        isolatedModules: true,
+        tsconfig: 'tsconfig.test.json',
       },
     ],
   },

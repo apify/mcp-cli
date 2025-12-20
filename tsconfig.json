@@ -5,8 +5,8 @@
     "lib": ["ES2022"],
 
     /* Modules */
-    "module": "ES2022",
-    "moduleResolution": "bundler",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "resolveJsonModule": true,
     "allowImportingTsExtensions": false,
 
@@ -18,6 +18,7 @@
     "sourceMap": true,
     "removeComments": true,
     "importHelpers": false,
+    "isolatedModules": true,
 
     /* Interop Constraints */
     "esModuleInterop": true,

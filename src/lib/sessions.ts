@@ -97,7 +97,7 @@ async function withLock<T>(
 
   try {
     // Acquire lock with timeout
-    logger.debug('Acquiring file lock...');
+    logger.debug(`Acquiring file lock for ${filePath}`);
     release = await lockfile.lock(filePath, {
       retries: {
         retries: 5,
