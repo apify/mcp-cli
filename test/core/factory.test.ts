@@ -2,7 +2,7 @@
  * Unit tests for MCP client factory
  */
 
-import { McpClient } from '../../src/core/client';
+import { McpClient } from '../../src/core/mcp-client';
 import { createClient, createStdioClient, createHttpClient } from '../../src/core/factory';
 
 // Mock the transports

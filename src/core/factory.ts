@@ -3,7 +3,7 @@
  */
 
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
-import { McpClient, type McpClientOptions } from './client.js';
+import { McpClient, type McpClientOptions } from './mcp-client.js';
 import { createTransportFromConfig } from './transports.js';
 import type { TransportConfig } from '../lib/types.js';
 import { createLogger } from '../lib/logger.js';
