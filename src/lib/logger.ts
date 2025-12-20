@@ -83,11 +83,12 @@ export function debug(message: string, ...args: unknown[]): void {
 }
 
 /**
- * Log an info message to stdout
+ * Log an info message to stderr to make it easy to separate program
+ * output from diagnostic information
  */
 export function info(message: string, ...args: unknown[]): void {
   if (shouldLog('info')) {
-    console.log(formatMessage('info', message), ...args);
+    console.error(formatMessage('info', message), ...args);
   }
 }
 

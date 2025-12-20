@@ -127,7 +127,7 @@ npm test
 
 # Run specific test file
 npm test -- test/lib/config.test.ts
-npm test -- test/lib/package-resolver.test.ts
+npm test -- test/lib/logger.test.ts
 
 # Run with coverage
 npm run test:coverage

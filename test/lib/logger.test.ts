@@ -67,10 +67,10 @@ describe('Logging functions', () => {
     expect(consoleErrorSpy.mock.calls[0]?.[0]).toContain('test debug');
   });
 
-  it('should log info messages to stdout', () => {
+  it('should log info messages to stderr', () => {
     info('test info');
-    expect(consoleLogSpy).toHaveBeenCalled();
-    expect(consoleLogSpy.mock.calls[0]?.[0]).toContain('test info');
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(consoleErrorSpy.mock.calls[0]?.[0]).toContain('test info');
   });
 
   it('should log warn messages to stderr', () => {
@@ -88,13 +88,13 @@ describe('Logging functions', () => {
   it('should include timestamp in verbose mode', () => {
     setVerbose(true);
     info('test message');
-    expect(consoleLogSpy.mock.calls[0]?.[0]).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(consoleErrorSpy.mock.calls[0]?.[0]).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   it('should not include timestamp without verbose mode', () => {
     setVerbose(false);
     info('test message');
-    expect(consoleLogSpy.mock.calls[0]?.[0]).toBe('test message');
+    expect(consoleErrorSpy.mock.calls[0]?.[0]).toBe('test message');
   });
 });
 
@@ -122,9 +122,9 @@ describe('Logger class', () => {
   it('should include context in log messages', () => {
     const logger = createLogger('TestContext');
     logger.info('test message');
-    expect(consoleLogSpy).toHaveBeenCalled();
-    expect(consoleLogSpy.mock.calls[0]?.[0]).toContain('[TestContext]');
-    expect(consoleLogSpy.mock.calls[0]?.[0]).toContain('test message');
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(consoleErrorSpy.mock.calls[0]?.[0]).toContain('[TestContext]');
+    expect(consoleErrorSpy.mock.calls[0]?.[0]).toContain('test message');
   });
 
   it('should log debug messages', () => {
@@ -138,8 +138,8 @@ describe('Logger class', () => {
   it('should log info messages', () => {
     const logger = createLogger('TestContext');
     logger.info('test info');
-    expect(consoleLogSpy).toHaveBeenCalled();
-    expect(consoleLogSpy.mock.calls[0]?.[0]).toContain('[TestContext]');
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(consoleErrorSpy.mock.calls[0]?.[0]).toContain('[TestContext]');
   });
 
   it('should log warn messages', () => {
@@ -159,7 +159,7 @@ describe('Logger class', () => {
   it('should log with specified level', () => {
     const logger = createLogger('TestContext');
     logger.log('info', 'test message');
-    expect(consoleLogSpy).toHaveBeenCalled();
-    expect(consoleLogSpy.mock.calls[0]?.[0]).toContain('[TestContext]');
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(consoleErrorSpy.mock.calls[0]?.[0]).toContain('[TestContext]');
   });
 });
