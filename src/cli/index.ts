@@ -20,21 +20,46 @@ import * as prompts from './commands/prompts.js';
 import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
 import type { OutputMode } from '../lib/types.js';
+import { findTarget, extractOptions, hasCommandAfterTarget } from './arg-parser.js';
 
 // Get version from package.json
 const packageJson = { version: '0.1.0' }; // TODO: Import dynamically
 
-// Options that take a value (not boolean flags)
-const OPTIONS_WITH_VALUES = [
-  '-c',
-  '--config',
-  '-H',
-  '--header',
-  '--timeout',
-  '--protocol-version',
-  '--schema',
-  '--schema-mode',
-];
+/**
+ * Options passed to command handlers
+ */
+interface HandlerOptions {
+  outputMode: OutputMode;
+  config?: string;
+  headers?: string[];
+  timeout?: number;
+  verbose?: boolean;
+}
+
+/**
+ * Extract options from Commander's Command object
+ * Used by command handlers to get parsed options in consistent format
+ */
+function getOptionsFromCommand(command: Command): HandlerOptions {
+  const opts = command.optsWithGlobals ? command.optsWithGlobals() : command.opts();
+  if (opts.verbose) setVerbose(true);
+
+  const options: HandlerOptions = {
+    outputMode: (opts.json ? 'json' : 'human') as OutputMode,
+  };
+
+  // Only include optional properties if they're present
+  if (opts.config) options.config = opts.config;
+  if (opts.header) {
+    // Commander stores repeated options as arrays, but single values as strings
+    // Always convert to array for consistent handling
+    options.headers = Array.isArray(opts.header) ? opts.header : [opts.header];
+  }
+  if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
+  if (opts.verbose) options.verbose = opts.verbose;
+
+  return options;
+}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -51,55 +76,30 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Find first non-option argument (the <target>)
-  let target: string | undefined;
-  let targetIndex = -1;
-  let hasJsonFlag = false;
+  // Find the target
+  const targetInfo = findTarget(args);
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (!arg) continue;
-
-    // Track --json flag
-    if (arg === '--json' || arg === '-j') {
-      hasJsonFlag = true;
-    }
-
-    // Skip options and their values
-    if (arg.startsWith('-')) {
-      // Check if this option takes a value
-      const optionName = arg.includes('=') ? arg.substring(0, arg.indexOf('=')) : arg;
-      const takesValue = OPTIONS_WITH_VALUES.includes(optionName);
-
-      // If option takes a value and value is not inline (no =), skip next arg
-      if (takesValue && !arg.includes('=') && i + 1 < args.length) {
-        i++; // Skip the value
-      }
-      continue;
-    }
-    target = arg;
-    targetIndex = i;
-    break;
-  }
-
-  // If no <target> found, list sessions (special case: no positional arguments)
-  if (!target) {
-    await sessions.listSessionsAndAuthProfiles({ outputMode: hasJsonFlag ? 'json' : 'human' });
-    if (!hasJsonFlag) {
+  // If no target found, list sessions
+  if (!targetInfo) {
+    const { json } = extractOptions(args);
+    await sessions.listSessionsAndAuthProfiles({ outputMode: json ? 'json' : 'human' });
+    if (!json) {
       console.log('\nRun "mcpc --help" for usage information.');
     }
     return;
   }
 
-  // Build modified argv without the <target>
-  const modifiedArgv = [
+  const { target, targetIndex } = targetInfo;
+
+  // Build modified argv without the target
+  const modifiedArgs = [
     ...process.argv.slice(0, 2),
     ...args.slice(0, targetIndex),
     ...args.slice(targetIndex + 1),
   ];
 
   // Handle commands
-  await handleCommands(target, modifiedArgv);
+  await handleCommands(target, modifiedArgs);
 }
 
 function createProgram(): Command {
@@ -142,120 +142,22 @@ Examples:
   return program;
 }
 
-async function handleCommands(target: string, argv: string[]): Promise<void> {
+async function handleCommands(target: string, args: string[]): Promise<void> {
   const program = createProgram();
   program.argument('<target>', 'Target (session @name, MCP config entry, or server URL)');
 
-  // Get options to pass to handlers
-  const getOptions = (command: Command): {
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
-  } => {
-    const opts = command.optsWithGlobals ? command.optsWithGlobals() : command.opts();
-    if (opts.verbose) setVerbose(true);
-
-    const options: {
-      outputMode: OutputMode;
-      config?: string;
-      headers?: string[];
-      timeout?: number;
-      verbose?: boolean;
-    } = {
-      outputMode: (opts.json ? 'json' : 'human') as OutputMode,
-    };
-
-    // Only include optional properties if they're present
-    if (opts.config) options.config = opts.config;
-    if (opts.header) {
-      // Commander stores repeated options as arrays, but single values as strings
-      // Always convert to array for consistent handling
-      options.headers = Array.isArray(opts.header) ? opts.header : [opts.header];
-    }
-    if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
-    if (opts.verbose) options.verbose = opts.verbose;
-
-    return options;
-  };
-
   // Check if no command provided - show server info and instructions
-  const hasCommand = (() => {
-    for (let i = 2; i < argv.length; i++) {
-      const arg = argv[i];
-      if (!arg) continue;
+  if (!hasCommandAfterTarget(args)) {
+    const options = extractOptions(args);
+    if (options.verbose) setVerbose(true);
 
-      // Skip options and their values
-      if (arg.startsWith('-')) {
-        // Check if this option takes a value
-        const optionName = arg.includes('=') ? arg.substring(0, arg.indexOf('=')) : arg;
-        const takesValue = OPTIONS_WITH_VALUES.includes(optionName);
-
-        // If option takes a value and value is not inline (no =), skip next arg
-        if (takesValue && !arg.includes('=')) {
-          i++; // Skip the value
-        }
-        continue;
-      }
-
-      // Found a non-option arg that's not an option value - this is a command
-      return true;
-    }
-    return false;
-  })();
-
-  if (!hasCommand) {
-    // No command provided, show server info and instructions
-    // Parse options from argv to get flags
-    const hasJsonFlag = argv.includes('--json') || argv.includes('-j');
-    const hasVerboseFlag = argv.includes('--verbose');
-    if (hasVerboseFlag) setVerbose(true);
-
-    // Extract --config option value
-    let configPath: string | undefined;
-    const configIndex = argv.findIndex((arg) => arg === '--config' || arg === '-c');
-    if (configIndex >= 0 && configIndex + 1 < argv.length) {
-      configPath = argv[configIndex + 1];
-    }
-
-    // Extract --header options (can be repeated)
-    const headers: string[] = [];
-    for (let i = 0; i < argv.length; i++) {
-      const arg = argv[i];
-      const nextArg = argv[i + 1];
-      if ((arg === '--header' || arg === '-H') && nextArg) {
-        headers.push(nextArg);
-      }
-    }
-
-    // Extract --timeout option
-    let timeout: number | undefined;
-    const timeoutIndex = argv.findIndex((arg) => arg === '--timeout');
-    if (timeoutIndex >= 0 && timeoutIndex + 1 < argv.length) {
-      const timeoutValue = argv[timeoutIndex + 1];
-      if (timeoutValue) {
-        timeout = parseInt(timeoutValue, 10);
-      }
-    }
-
-    // Build options object, only including defined values
-    const options: {
-      outputMode: OutputMode;
-      config?: string;
-      headers?: string[];
-      timeout?: number;
-      verbose?: boolean;
-    } = {
-      outputMode: hasJsonFlag ? 'json' : 'human',
-    };
-
-    if (hasVerboseFlag) options.verbose = true;
-    if (configPath) options.config = configPath;
-    if (headers.length > 0) options.headers = headers;
-    if (timeout !== undefined) options.timeout = timeout;
-
-    await sessions.showServerInfo(target, options);
+    await sessions.showServerInfo(target, {
+      outputMode: options.json ? 'json' : 'human',
+      ...(options.verbose && { verbose: true }),
+      ...(options.config && { config: options.config }),
+      ...(options.headers && { headers: options.headers }),
+      ...(options.timeout !== undefined && { timeout: options.timeout }),
+    });
     return;
   }
 
@@ -264,7 +166,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .command('help')
     .description('Show server instructions and available capabilities')
     .action(async (_options, command) => {
-      await sessions.showHelp(target, getOptions(command));
+      await sessions.showHelp(target, getOptionsFromCommand(command));
     });
 
   // Shell command
@@ -272,7 +174,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .command('shell')
     .description('Interactive shell for the target')
     .action(async (_options, command) => {
-      await sessions.openShell(target, getOptions(command));
+      await sessions.openShell(target, getOptionsFromCommand(command));
     });
 
   // Close command
@@ -280,7 +182,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .command('close')
     .description('Close the session')
     .action(async (_options, command) => {
-      await sessions.closeSession(target, getOptions(command));
+      await sessions.closeSession(target, getOptionsFromCommand(command));
     });
 
   // Connect command: mcpc <target> connect --session @<name>
@@ -289,7 +191,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .description('Connect to an MCP server and create a session')
     .requiredOption('--session <name>', 'Session name (e.g., @apify)')
     .action(async (options, command) => {
-      await sessions.connectSession(options.session, target, getOptions(command));
+      await sessions.connectSession(options.session, target, getOptionsFromCommand(command));
     });
 
   // Tools commands (hyphenated)
@@ -300,7 +202,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .action(async (options, command) => {
       await tools.listTools(target, {
         cursor: options.cursor,
-        ...getOptions(command),
+        ...getOptionsFromCommand(command),
       });
     });
 
@@ -311,7 +213,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .action(async (options, command) => {
       await tools.listTools(target, {
         cursor: options.cursor,
-        ...getOptions(command),
+        ...getOptionsFromCommand(command),
       });
     });
 
@@ -319,7 +221,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .command('tools-schema <name>')
     .description('Get information about a specific tool')
     .action(async (name, _options, command) => {
-      await tools.getTool(target, name, getOptions(command));
+      await tools.getTool(target, name, getOptionsFromCommand(command));
     });
 
   program
@@ -331,7 +233,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
       await tools.callTool(target, name, {
         args: options.args,
         argsFile: options.argsFile,
-        ...getOptions(command),
+        ...getOptionsFromCommand(command),
       });
     });
 
@@ -343,7 +245,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .action(async (options, command) => {
       await resources.listResources(target, {
         cursor: options.cursor,
-        ...getOptions(command),
+        ...getOptionsFromCommand(command),
       });
     });
 
@@ -354,7 +256,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .action(async (options, command) => {
       await resources.listResources(target, {
         cursor: options.cursor,
-        ...getOptions(command),
+        ...getOptionsFromCommand(command),
       });
     });
 
@@ -369,7 +271,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
         output: options.output,
         raw: options.raw,
         maxSize: options.maxSize,
-        ...getOptions(command),
+        ...getOptionsFromCommand(command),
       });
     });
 
@@ -377,14 +279,14 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .command('resources-subscribe <uri>')
     .description('Subscribe to resource updates')
     .action(async (uri, _options, command) => {
-      await resources.subscribeResource(target, uri, getOptions(command));
+      await resources.subscribeResource(target, uri, getOptionsFromCommand(command));
     });
 
   program
     .command('resources-unsubscribe <uri>')
     .description('Unsubscribe from resource updates')
     .action(async (uri, _options, command) => {
-      await resources.unsubscribeResource(target, uri, getOptions(command));
+      await resources.unsubscribeResource(target, uri, getOptionsFromCommand(command));
     });
 
   program
@@ -394,7 +296,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .action(async (options, command) => {
       await resources.listResourceTemplates(target, {
         cursor: options.cursor,
-        ...getOptions(command),
+        ...getOptionsFromCommand(command),
       });
     });
 
@@ -406,7 +308,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .action(async (options, command) => {
       await prompts.listPrompts(target, {
         cursor: options.cursor,
-        ...getOptions(command),
+        ...getOptionsFromCommand(command),
       });
     });
 
@@ -417,7 +319,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .action(async (options, command) => {
       await prompts.listPrompts(target, {
         cursor: options.cursor,
-        ...getOptions(command),
+        ...getOptionsFromCommand(command),
       });
     });
 
@@ -428,7 +330,7 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .action(async (name, options, command) => {
       await prompts.getPrompt(target, name, {
         args: options.args,
-        ...getOptions(command),
+        ...getOptionsFromCommand(command),
       });
     });
 
@@ -437,12 +339,12 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
     .command('logging-set-level <level>')
     .description('Set server logging level (debug, info, notice, warning, error, critical, alert, emergency)')
     .action(async (level, _options, command) => {
-      await logging.setLogLevel(target, level, getOptions(command));
+      await logging.setLogLevel(target, level, getOptionsFromCommand(command));
     });
 
   // Parse and execute
   try {
-    await program.parseAsync(argv);
+    await program.parseAsync(args);
   } catch (error) {
     const opts = program.opts();
     const outputMode: OutputMode = opts.json ? 'json' : 'human';

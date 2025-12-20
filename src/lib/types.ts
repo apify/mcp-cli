@@ -114,22 +114,6 @@ export interface AuthProfilesStorage {
 }
 
 /**
- * Parsed command-line arguments
- */
-export interface ParsedArgs {
-  command?: string;
-  subcommand?: string;
-  args: string[];
-  flags: Record<string, string | boolean>;
-  // Common flags
-  json?: boolean;
-  verbose?: boolean;
-  config?: string;
-  help?: boolean;
-  version?: boolean;
-}
-
-/**
  * IPC message types for CLI-bridge communication
  */
 export type IpcMessageType = 'request' | 'response' | 'health-check' | 'health-ok' | 'shutdown';
