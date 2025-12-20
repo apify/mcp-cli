@@ -5,7 +5,7 @@
 import type { OutputMode } from '../../lib/types.js';
 import { formatOutput, logTarget } from '../output.js';
 import { withMcpClient } from '../helpers.js';
-import { parseCommandArgs } from '../../lib/args-parser.js';
+import { parseCommandArgs } from '../parser.js';
 
 /**
  * List available prompts

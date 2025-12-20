@@ -6,7 +6,7 @@ import type { OutputMode } from '../../lib/types.js';
 import { formatOutput, formatToolDetail, formatSuccess, logTarget } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import { withMcpClient } from '../helpers.js';
-import { parseCommandArgs } from '../../lib/args-parser.js';
+import { parseCommandArgs } from '../parser.js';
 
 /**
  * List available tools

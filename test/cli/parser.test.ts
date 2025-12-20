@@ -2,7 +2,7 @@
  * Tests for argument parsing utilities
  */
 
-import { parseCommandArgs } from '../../src/lib/args-parser.js';
+import { parseCommandArgs } from '../../src/cli/parser.js';
 import { ClientError } from '../../src/lib/errors.js';
 
 describe('parseCommandArgs', () => {
