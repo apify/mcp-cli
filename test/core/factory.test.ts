@@ -3,7 +3,7 @@
  */
 
 import { McpClient } from '../../src/core/mcp-client';
-import { createClient, createStdioClient, createHttpClient } from '../../src/core/factory';
+import { createMcpClient, createStdioClient, createHttpClient } from '../../src/core/factory';
 
 // Mock the transports
 jest.mock('../../src/core/transports', () => ({
@@ -30,9 +30,9 @@ jest.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
   })),
 }));
 
-describe('createClient', () => {
+describe('createMcpClient', () => {
   it('should create a client with stdio transport', async () => {
-    const client = await createClient({
+    const client = await createMcpClient({
       clientInfo: { name: 'test-client', version: '1.0.0' },
       transport: {
         type: 'stdio',
@@ -45,7 +45,7 @@ describe('createClient', () => {
   });
 
   it('should create a client with http transport', async () => {
-    const client = await createClient({
+    const client = await createMcpClient({
       clientInfo: { name: 'test-client', version: '1.0.0' },
       transport: {
         type: 'http',
@@ -57,7 +57,7 @@ describe('createClient', () => {
   });
 
   it('should not auto-connect if autoConnect is false', async () => {
-    const client = await createClient({
+    const client = await createMcpClient({
       clientInfo: { name: 'test-client', version: '1.0.0' },
       transport: {
         type: 'http',
@@ -74,7 +74,7 @@ describe('createClient', () => {
       roots: { listChanged: true },
     };
 
-    const client = await createClient({
+    const client = await createMcpClient({
       clientInfo: { name: 'test-client', version: '1.0.0' },
       transport: {
         type: 'http',

@@ -4,7 +4,7 @@
  */
 
 // Export client wrapper
-export * from './client.js';
+export * from './mcp-client.js';
 
 // Export transports
 export * from './transports.js';

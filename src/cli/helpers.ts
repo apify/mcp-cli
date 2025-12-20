@@ -3,7 +3,7 @@
  * Provides target resolution and MCP client management
  */
 
-import { createClient } from '../core/factory.js';
+import { createMcpClient } from '../core/factory.js';
 import type { IMcpClient, OutputMode, TransportConfig } from '../lib/types.js';
 import { ClientError, NetworkError } from '../lib/errors.js';
 import { normalizeServerUrl, isValidSessionName } from '../lib/utils.js';
@@ -190,7 +190,7 @@ export async function withMcpClient<T>(
   logger.debug('Resolved target:', { target, transportConfig });
 
   // Create and connect client
-  const clientConfig: Parameters<typeof createClient>[0] = {
+  const clientConfig: Parameters<typeof createMcpClient>[0] = {
     clientInfo: { name: 'mcpc', version: '0.1.0' },
     transport: transportConfig,
     capabilities: {
@@ -206,7 +206,7 @@ export async function withMcpClient<T>(
     clientConfig.verbose = true;
   }
 
-  const client = await createClient(clientConfig);
+  const client = await createMcpClient(clientConfig);
 
   try {
     logger.debug('Connected successfully');

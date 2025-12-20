@@ -17,9 +17,9 @@ export interface ClientInfo {
 }
 
 /**
- * Options for creating and connecting a client
+ * Options for creating and connecting McpClient
  */
-export interface CreateClientOptions {
+export interface CreateMcpClientOptions {
   /**
    * Client identification info
    */
@@ -56,7 +56,7 @@ export interface CreateClientOptions {
  *
  * @example
  * // Create client with HTTP transport
- * const client = await createClient({
+ * const client = await createMcpClient({
  *   clientInfo: { name: 'mcpc', version: '0.1.0' },
  *   transport: {
  *     type: 'http',
@@ -66,7 +66,7 @@ export interface CreateClientOptions {
  *
  * @example
  * // Create client with stdio transport
- * const client = await createClient({
+ * const client = await createMcpClient({
  *   clientInfo: { name: 'mcpc', version: '0.1.0' },
  *   transport: {
  *     type: 'stdio',
@@ -75,7 +75,7 @@ export interface CreateClientOptions {
  *   },
  * });
  */
-export async function createClient(options: CreateClientOptions): Promise<McpClient> {
+export async function createMcpClient(options: CreateMcpClientOptions): Promise<McpClient> {
   const { autoConnect = true, verbose = false } = options;
 
   // Create logger only in verbose mode
@@ -136,7 +136,7 @@ export async function createStdioClient(
     transport.env = env;
   }
 
-  return createClient({
+  return createMcpClient({
     clientInfo,
     transport,
   });
@@ -169,7 +169,7 @@ export async function createHttpClient(
     transport.timeout = timeout;
   }
 
-  return createClient({
+  return createMcpClient({
     clientInfo,
     transport,
   });

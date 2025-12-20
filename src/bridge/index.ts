@@ -7,7 +7,7 @@
 
 import { createServer, type Server as NetServer, type Socket } from 'net';
 import { unlink } from 'fs/promises';
-import { createClient } from '../core/index.js';
+import { createMcpClient } from '../core/index.js';
 import type { McpClient } from '../core/index.js';
 import type { TransportConfig, IpcMessage } from '../lib/index.js';
 import { createLogger, setVerbose } from '../lib/index.js';
@@ -83,7 +83,7 @@ class BridgeProcess {
       verbose: this.options.verbose || false,
     };
 
-    this.client = await createClient(clientConfig);
+    this.client = await createMcpClient(clientConfig);
 
     logger.info('Connected to MCP server');
   }
