@@ -113,7 +113,7 @@ function createProgram(): Command {
     .helpOption('-h, --help', 'Display general help')
     .option('-j, --json', 'Output in JSON format')
     .option('--verbose', 'Enable verbose logging')
-    .option('-c, --config <path>', 'Path to MCP config JSON file')
+    .option('-c, --config <file>', 'Path to MCP config JSON file')
     .option('-H, --header <header>', 'Add HTTP header (can be repeated)')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--protocol-version <version>', 'Force specific MCP protocol version')

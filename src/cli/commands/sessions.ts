@@ -387,6 +387,7 @@ export async function showHelp(
 /**
  * Open an interactive shell for a target
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function openShell(
   target: string,
   options: { outputMode: OutputMode }

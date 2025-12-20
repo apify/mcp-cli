@@ -7,3 +7,4 @@
 - nit: Colorize output, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
 - Check if we show tool annotations
 
+- [Using session: apify-docs] => change to show server + transport + version?
