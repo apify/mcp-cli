@@ -77,7 +77,7 @@ export async function startBridge(options: StartBridgeOptions): Promise<void> {
     // Wait for socket file to be created (with timeout)
     try {
       await waitForFile(socketPath, { timeout: 5000 });
-    } catch (error) {
+    } catch {
       // Kill the process if socket wasn't created
       try {
         process.kill(bridgeProcess.pid, 'SIGTERM');

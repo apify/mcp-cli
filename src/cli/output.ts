@@ -62,8 +62,13 @@ export function formatHuman(data: unknown): string {
     return formatObject(data as Record<string, unknown>);
   }
 
-  // Primitive types
-  return String(data);
+  // Primitive types (string, number, boolean, bigint, symbol)
+  if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean') {
+    return String(data);
+  }
+
+  // Fallback for other primitive types
+  return JSON.stringify(data);
 }
 
 /**
@@ -191,7 +196,17 @@ export function formatObject(obj: Record<string, unknown>): string {
 
   for (const [key, value] of Object.entries(obj)) {
     const formattedKey = chalk.cyan(`${key}:`);
-    const formattedValue = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+    let formattedValue: string;
+    if (value === null || value === undefined) {
+      formattedValue = chalk.gray(String(value));
+    } else if (typeof value === 'object') {
+      formattedValue = JSON.stringify(value, null, 2);
+    } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      formattedValue = String(value);
+    } else {
+      // Fallback for other types (bigint, symbol, function)
+      formattedValue = JSON.stringify(value);
+    }
     lines.push(`${formattedKey} ${formattedValue}`);
   }
 

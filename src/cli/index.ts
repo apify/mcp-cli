@@ -21,9 +21,7 @@ import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
 import type { OutputMode } from '../lib/index.js';
 import { findTarget, extractOptions, hasCommandAfterTarget } from './parser.js';
-
-// Get version from package.json
-const packageJson = { version: '0.1.0' }; // TODO: Import dynamically
+import packageJson from '../../package.json';
 
 /**
  * Options passed to command handlers
