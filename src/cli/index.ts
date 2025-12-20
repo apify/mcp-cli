@@ -19,8 +19,8 @@ import * as resources from './commands/resources.js';
 import * as prompts from './commands/prompts.js';
 import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
-import type { OutputMode } from '../lib/types.js';
-import { findTarget, extractOptions, hasCommandAfterTarget } from './arg-parser.js';
+import type { OutputMode } from '../lib';
+import { findTarget, extractOptions, hasCommandAfterTarget } from './parser.js';
 
 // Get version from package.json
 const packageJson = { version: '0.1.0' }; // TODO: Import dynamically

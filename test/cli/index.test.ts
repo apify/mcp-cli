@@ -2,7 +2,7 @@
  * Unit tests for CLI argument parsing functions
  */
 
-import { findTarget, extractOptions } from '../../src/cli/arg-parser.js';
+import { findTarget, extractOptions } from '../../src/cli/parser.js';
 
 describe('findTarget', () => {
   it('should find simple target without options', () => {

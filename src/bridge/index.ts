@@ -7,12 +7,12 @@
 
 import { createServer, type Server as NetServer, type Socket } from 'net';
 import { unlink } from 'fs/promises';
-import { createClient } from '../core/factory.js';
-import type { McpClient } from '../core/client.js';
-import type { TransportConfig, IpcMessage } from '../lib/types.js';
-import { createLogger, setVerbose } from '../lib/logger.js';
-import { exists, getBridgesDir, ensureDir } from '../lib/utils.js';
-import { ClientError, NetworkError } from '../lib/errors.js';
+import { createClient } from '../core';
+import type { McpClient } from '../core';
+import type { TransportConfig, IpcMessage } from '../lib';
+import { createLogger, setVerbose } from '../lib';
+import { exists, getBridgesDir, ensureDir } from '../lib';
+import { ClientError, NetworkError } from '../lib';
 
 const logger = createLogger('bridge');
 
