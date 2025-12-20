@@ -7,11 +7,15 @@
 
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "${PWD}/"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "${PWD}"]
     },
 
-    "apify": {
-      "url": "api.example.com/mcp#blabla",
+    "apify-docs": {
+      "url": "https://mcp.apify.com/?tools=docs"
+    },
+
+    "apify-bearer": {
+      "url": "mcp.apify.com/#blabla",
       "headers": {
         "Authorization": "Bearer ${APIFY_TOKEN}"
       }

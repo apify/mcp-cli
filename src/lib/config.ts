@@ -8,6 +8,7 @@ import { resolve } from 'path';
 import type { McpConfig, McpServerConfig } from './types.js';
 import { ClientError } from './errors.js';
 import { createLogger } from './logger.js';
+import { normalizeServerUrl } from './utils.js';
 
 const logger = createLogger('config');
 
@@ -98,7 +99,15 @@ function substituteEnvVars(config: McpServerConfig): McpServerConfig {
   const result: McpServerConfig = {};
 
   if (config.url !== undefined) {
-    result.url = substituteString(config.url);
+    // Substitute environment variables and normalize URL
+    const substituted = substituteString(config.url);
+    try {
+      result.url = normalizeServerUrl(substituted);
+    } catch (error) {
+      throw new ClientError(
+        `Invalid URL in server config: ${substituted}\n${(error as Error).message}`
+      );
+    }
   }
 
   if (config.command !== undefined) {

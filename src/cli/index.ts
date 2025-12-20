@@ -144,7 +144,7 @@ Examples:
 
 async function handleCommands(target: string, argv: string[]): Promise<void> {
   const program = createProgram();
-  program.argument('<target>', 'Target (session @name, config entry, or server URL)');
+  program.argument('<target>', 'Target (session @name, MCP config entry, or server URL)');
 
   // Get options to pass to handlers
   const getOptions = (command: Command): {
@@ -181,22 +181,81 @@ async function handleCommands(target: string, argv: string[]): Promise<void> {
   };
 
   // Check if no command provided - show server info and instructions
-  const hasCommand = argv.some((arg, i) => {
-    if (i < 2) return false; // Skip node and script path
-    return !arg.startsWith('-'); // First non-option arg after target
-  });
+  const hasCommand = (() => {
+    for (let i = 2; i < argv.length; i++) {
+      const arg = argv[i];
+      if (!arg) continue;
+
+      // Skip options and their values
+      if (arg.startsWith('-')) {
+        // Check if this option takes a value
+        const optionName = arg.includes('=') ? arg.substring(0, arg.indexOf('=')) : arg;
+        const takesValue = OPTIONS_WITH_VALUES.includes(optionName);
+
+        // If option takes a value and value is not inline (no =), skip next arg
+        if (takesValue && !arg.includes('=')) {
+          i++; // Skip the value
+        }
+        continue;
+      }
+
+      // Found a non-option arg that's not an option value - this is a command
+      return true;
+    }
+    return false;
+  })();
 
   if (!hasCommand) {
     // No command provided, show server info and instructions
-    // Parse options from argv to get flags like --json
+    // Parse options from argv to get flags
     const hasJsonFlag = argv.includes('--json') || argv.includes('-j');
     const hasVerboseFlag = argv.includes('--verbose');
     if (hasVerboseFlag) setVerbose(true);
 
-    await sessions.showServerInfo(target, {
+    // Extract --config option value
+    let configPath: string | undefined;
+    const configIndex = argv.findIndex((arg) => arg === '--config' || arg === '-c');
+    if (configIndex >= 0 && configIndex + 1 < argv.length) {
+      configPath = argv[configIndex + 1];
+    }
+
+    // Extract --header options (can be repeated)
+    const headers: string[] = [];
+    for (let i = 0; i < argv.length; i++) {
+      const arg = argv[i];
+      const nextArg = argv[i + 1];
+      if ((arg === '--header' || arg === '-H') && nextArg) {
+        headers.push(nextArg);
+      }
+    }
+
+    // Extract --timeout option
+    let timeout: number | undefined;
+    const timeoutIndex = argv.findIndex((arg) => arg === '--timeout');
+    if (timeoutIndex >= 0 && timeoutIndex + 1 < argv.length) {
+      const timeoutValue = argv[timeoutIndex + 1];
+      if (timeoutValue) {
+        timeout = parseInt(timeoutValue, 10);
+      }
+    }
+
+    // Build options object, only including defined values
+    const options: {
+      outputMode: OutputMode;
+      config?: string;
+      headers?: string[];
+      timeout?: number;
+      verbose?: boolean;
+    } = {
       outputMode: hasJsonFlag ? 'json' : 'human',
-      verbose: hasVerboseFlag,
-    });
+    };
+
+    if (hasVerboseFlag) options.verbose = true;
+    if (configPath) options.config = configPath;
+    if (headers.length > 0) options.headers = headers;
+    if (timeout !== undefined) options.timeout = timeout;
+
+    await sessions.showServerInfo(target, options);
     return;
   }
 

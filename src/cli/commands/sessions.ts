@@ -24,7 +24,7 @@ export async function connectSession(
     if (!isValidSessionName(name)) {
       throw new ClientError(
         `Invalid session name: ${name}\n` +
-        `Session names must start with @ and be followed by 1-64 characters, alphanumeric with hyphens or underscores only (for example: @my-session).`
+        `Session names must start with @ and be followed by 1-64 characters, alphanumeric with hyphens or underscores only (e.g., @my-session).`
       );
     }
 
