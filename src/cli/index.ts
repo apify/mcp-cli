@@ -20,7 +20,7 @@ import * as prompts from './commands/prompts.js';
 import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
 import type { OutputMode } from '../lib/index.js';
-import { findTarget, extractOptions, hasCommandAfterTarget } from './parser.js';
+import { findTarget, extractOptions, hasCommandAfterTarget, getVerboseFromEnv, getJsonFromEnv } from './parser.js';
 import packageJson from '../../package.json' with { type: 'json' };
 
 /**
@@ -37,13 +37,20 @@ interface HandlerOptions {
 /**
  * Extract options from Commander's Command object
  * Used by command handlers to get parsed options in consistent format
+ * Environment variables MCPC_VERBOSE and MCPC_JSON are used as defaults
  */
 function getOptionsFromCommand(command: Command): HandlerOptions {
   const opts = command.optsWithGlobals ? command.optsWithGlobals() : command.opts();
-  if (opts.verbose) setVerbose(true);
+
+  // Check for verbose from flag or environment variable
+  const verbose = opts.verbose || getVerboseFromEnv();
+  if (verbose) setVerbose(true);
+
+  // Check for JSON mode from flag or environment variable
+  const json = opts.json || getJsonFromEnv();
 
   const options: HandlerOptions = {
-    outputMode: (opts.json ? 'json' : 'human') as OutputMode,
+    outputMode: (json ? 'json' : 'human') as OutputMode,
   };
 
   // Only include optional properties if they're present
@@ -54,7 +61,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
     options.headers = Array.isArray(opts.header) ? opts.header : [opts.header];
   }
   if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
-  if (opts.verbose) options.verbose = opts.verbose;
+  if (verbose) options.verbose = verbose;
 
   return options;
 }

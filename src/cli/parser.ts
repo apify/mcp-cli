@@ -5,6 +5,30 @@
 import { readFileSync } from 'fs';
 import { ClientError, resolvePath } from '../lib/index.js';
 
+/**
+ * Check if an environment variable is set to a truthy value
+ * Truthy values: '1', 'true', 'yes' (case-insensitive)
+ */
+function isEnvTrue(envVar: string | undefined): boolean {
+  if (!envVar) return false;
+  const normalized = envVar.toLowerCase().trim();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+/**
+ * Get verbose flag from environment variable
+ */
+export function getVerboseFromEnv(): boolean {
+  return isEnvTrue(process.env.MCPC_VERBOSE);
+}
+
+/**
+ * Get JSON mode flag from environment variable
+ */
+export function getJsonFromEnv(): boolean {
+  return isEnvTrue(process.env.MCPC_JSON);
+}
+
 // Options that take a value (not boolean flags)
 const OPTIONS_WITH_VALUES = [
   '-c',
@@ -52,6 +76,7 @@ export function findTarget(args: string[]): { target: string; targetIndex: numbe
 
 /**
  * Extract option values from args
+ * Environment variables MCPC_VERBOSE and MCPC_JSON are used as defaults
  */
 export function extractOptions(args: string[]): {
   config?: string;
@@ -61,8 +86,8 @@ export function extractOptions(args: string[]): {
   json: boolean;
 } {
   const options = {
-    verbose: args.includes('--verbose'),
-    json: args.includes('--json') || args.includes('-j'),
+    verbose: args.includes('--verbose') || getVerboseFromEnv(),
+    json: args.includes('--json') || args.includes('-j') || getJsonFromEnv(),
   };
 
   // Extract --config

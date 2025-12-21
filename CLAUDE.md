@@ -507,9 +507,8 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
 ## Environment Variables
 
 - `MCPC_HOME_DIR` - Directory for session and auth profiles data (default: `~/.mcpc`)
-- `MCPC_VERBOSE` - Enable verbose logging (set to `1` or `true`)
-- `MCPC_TIMEOUT` - Default timeout in seconds (default: `300`)
-- `MCPC_JSON` - Enable JSON output (set to `1` or `true`)
+- `MCPC_VERBOSE` - Enable verbose logging (set to `1`, `true`, or `yes`, case-insensitive)
+- `MCPC_JSON` - Enable JSON output (set to `1`, `true`, or `yes`, case-insensitive)
 
 ## Current Implementation Status
 

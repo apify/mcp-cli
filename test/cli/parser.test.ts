@@ -2,7 +2,7 @@
  * Tests for argument parsing utilities
  */
 
-import { parseCommandArgs, loadArgsFromFile } from '../../src/cli/parser.js';
+import { parseCommandArgs, loadArgsFromFile, getVerboseFromEnv, getJsonFromEnv } from '../../src/cli/parser.js';
 import { ClientError } from '../../src/lib/errors.js';
 import { join } from 'path';
 
@@ -301,5 +301,106 @@ describe('loadArgsFromFile', () => {
       // Clean up
       fs.unlinkSync(homeFile);
     }
+  });
+});
+
+describe('getVerboseFromEnv', () => {
+  const originalEnv = process.env.MCPC_VERBOSE;
+
+  afterEach(() => {
+    // Restore original environment variable
+    if (originalEnv === undefined) {
+      delete process.env.MCPC_VERBOSE;
+    } else {
+      process.env.MCPC_VERBOSE = originalEnv;
+    }
+  });
+
+  it('should return false when not set', () => {
+    delete process.env.MCPC_VERBOSE;
+    expect(getVerboseFromEnv()).toBe(false);
+  });
+
+  it('should return true when set to "1"', () => {
+    process.env.MCPC_VERBOSE = '1';
+    expect(getVerboseFromEnv()).toBe(true);
+  });
+
+  it('should return true when set to "true"', () => {
+    process.env.MCPC_VERBOSE = 'true';
+    expect(getVerboseFromEnv()).toBe(true);
+  });
+
+  it('should return true when set to "yes"', () => {
+    process.env.MCPC_VERBOSE = 'yes';
+    expect(getVerboseFromEnv()).toBe(true);
+  });
+
+  it('should be case-insensitive', () => {
+    process.env.MCPC_VERBOSE = 'TRUE';
+    expect(getVerboseFromEnv()).toBe(true);
+    process.env.MCPC_VERBOSE = 'Yes';
+    expect(getVerboseFromEnv()).toBe(true);
+  });
+
+  it('should trim whitespace', () => {
+    process.env.MCPC_VERBOSE = '  true  ';
+    expect(getVerboseFromEnv()).toBe(true);
+  });
+
+  it('should return false for other values', () => {
+    process.env.MCPC_VERBOSE = '0';
+    expect(getVerboseFromEnv()).toBe(false);
+    process.env.MCPC_VERBOSE = 'false';
+    expect(getVerboseFromEnv()).toBe(false);
+    process.env.MCPC_VERBOSE = 'no';
+    expect(getVerboseFromEnv()).toBe(false);
+    process.env.MCPC_VERBOSE = 'random';
+    expect(getVerboseFromEnv()).toBe(false);
+  });
+});
+
+describe('getJsonFromEnv', () => {
+  const originalEnv = process.env.MCPC_JSON;
+
+  afterEach(() => {
+    // Restore original environment variable
+    if (originalEnv === undefined) {
+      delete process.env.MCPC_JSON;
+    } else {
+      process.env.MCPC_JSON = originalEnv;
+    }
+  });
+
+  it('should return false when not set', () => {
+    delete process.env.MCPC_JSON;
+    expect(getJsonFromEnv()).toBe(false);
+  });
+
+  it('should return true when set to "1"', () => {
+    process.env.MCPC_JSON = '1';
+    expect(getJsonFromEnv()).toBe(true);
+  });
+
+  it('should return true when set to "true"', () => {
+    process.env.MCPC_JSON = 'true';
+    expect(getJsonFromEnv()).toBe(true);
+  });
+
+  it('should return true when set to "yes"', () => {
+    process.env.MCPC_JSON = 'yes';
+    expect(getJsonFromEnv()).toBe(true);
+  });
+
+  it('should be case-insensitive', () => {
+    process.env.MCPC_JSON = 'TRUE';
+    expect(getJsonFromEnv()).toBe(true);
+  });
+
+  it('should return false for other values', () => {
+    process.env.MCPC_JSON = '0';
+    expect(getJsonFromEnv()).toBe(false);
+    process.env.MCPC_JSON = 'false';
+    expect(getJsonFromEnv()).toBe(false);
   });
 });

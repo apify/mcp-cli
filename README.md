@@ -586,9 +586,8 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 ### Environment variables
 
 - `MCPC_HOME_DIR` - Directory for session and authentication profiles data (default is `~/.mcpc`)
-- `MCPC_VERBOSE` - Enable verbose logging (instead of using `--verbose`, set to `1` or `true`)
-- `MCPC_TIMEOUT` - Default timeout in seconds (instead of using `--timeout`, default is `300`)
-- `MCPC_JSON` - Enable JSON output (instead of using `--json`, set to `1` or `true`)
+- `MCPC_VERBOSE` - Enable verbose logging (set to `1`, `true`, or `yes`, case-insensitive)
+- `MCPC_JSON` - Enable JSON output (set to `1`, `true`, or `yes`, case-insensitive)
 
 ## MCP protocol notes
 
