@@ -6,13 +6,15 @@
  */
 
 import { createServer, type Server as NetServer, type Socket } from 'net';
-import { unlink } from 'fs/promises';
+import { unlink, readdir } from 'fs/promises';
 import { createMcpClient } from '../core/index.js';
 import type { McpClient } from '../core/index.js';
 import type { TransportConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
 import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
-import { fileExists, getBridgesDir, ensureDir } from '../lib/index.js';
+import { fileExists, getBridgesDir, ensureDir, getLogsDir } from '../lib/index.js';
 import { ClientError, NetworkError } from '../lib/index.js';
+import { loadSessions } from '../lib/sessions.js';
+import { join } from 'path';
 
 const logger = createLogger('bridge');
 
@@ -25,7 +27,7 @@ interface BridgeOptions {
 
 /**
  * Bridge process class
- * Manages MCP connection and Unix socket server
+ * Manages MCP connection and Unix socket server for a single session
  */
 class BridgeProcess {
   private client: McpClient | null = null;
@@ -43,24 +45,73 @@ class BridgeProcess {
   }
 
   /**
-   * Start the bridge process
-   * Initializes file logging, connects to MCP server, creates Unix socket server for IPC,
-   * and sets up signal handlers for graceful shutdown
+   * Clean up log files for sessions that no longer exist
+   * This prevents unlimited growth of log files over time
+   * Runs asynchronously without blocking bridge startup
+   */
+  private cleanupOrphanedLogFiles(): void {
+    // Run cleanup asynchronously without blocking startup
+    void (async () => {
+      try {
+        // Load active sessions using existing function (with lock)
+        const sessionsStorage = await loadSessions();
+        const activeSessions = sessionsStorage.sessions;
+
+        // List all bridge log files
+        const logsDir = getLogsDir();
+        await ensureDir(logsDir);
+
+        const files = await readdir(logsDir);
+
+        // Find all bridge log files (including rotated ones)
+        // Matches: bridge-<session>.log, bridge-<session>.log.1, bridge-<session>.log.2, etc.
+        const bridgeLogPattern = /^bridge-(@.+?)\.log(?:\.\d+)?$/;
+
+        for (const file of files) {
+          const match = file.match(bridgeLogPattern);
+          if (!match || !match[1]) continue;
+
+          const sessionName = match[1];
+
+          // Skip the current session's log files
+          if (sessionName === this.options.sessionName) {
+            continue;
+          }
+
+          // Delete log files for non-existent sessions
+          if (!activeSessions[sessionName]) {
+            const filePath = join(logsDir, file);
+            await unlink(filePath);
+            logger.debug(`Cleaned up orphaned log file: ${file}`);
+          }
+        }
+      } catch (error) {
+        // Don't fail startup if cleanup fails
+        logger.warn('Failed to clean up orphaned log files:', error);
+      }
+    })();
+  }
+
+  /**
+   * Start the bridge process for a specific session.
    */
   async start(): Promise<void> {
-    // 1. Initialize file logger
-    await initFileLogger('bridge.log', this.options.sessionName);
-
     logger.info(`Starting bridge for session: ${this.options.sessionName}`);
 
+    // 1. Clean up orphaned log files (runs asynchronously in background)
+    this.cleanupOrphanedLogFiles();
+
+    // 2. Initialize file logger
+    await initFileLogger(`bridge-${this.options.sessionName}.log`);
+
     try {
-      // 2. Connect to MCP server
+      // 3. Connect to MCP server
       await this.connectToMcp();
 
-      // 3. Create Unix socket server
+      // 4. Create Unix socket server
       await this.createSocketServer();
 
-      // 4. Set up signal handlers
+      // 5. Set up signal handlers
       this.setupSignalHandlers();
 
       logger.info('Bridge process started successfully');
@@ -200,7 +251,7 @@ class BridgeProcess {
   }
 
   /**
-   * Forward an MCP request to the server
+   * Forward an MCP request to the MCP server
    */
   private async handleMcpRequest(socket: Socket, message: IpcMessage): Promise<void> {
     if (!this.client) {

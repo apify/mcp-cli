@@ -39,9 +39,9 @@ export function getVerbose(): boolean {
 /**
  * Initialize file logger
  * @param logFileName - Name of the log file (e.g., 'cli.log', 'bridge.log')
- * @param prefix - Prefix for log messages (e.g., session name, target name)
+ * @param prefix - Optional prefix for log messages (e.g., session name, target name)
  */
-export async function initFileLogger(logFileName: string, prefix: string): Promise<void> {
+export async function initFileLogger(logFileName: string, prefix?: string): Promise<void> {
   // Close existing logger if any
   if (fileLogger) {
     await fileLogger.close();
@@ -52,7 +52,7 @@ export async function initFileLogger(logFileName: string, prefix: string): Promi
     filePath: logFilePath,
     maxSize: 10 * 1024 * 1024, // 10MB
     maxFiles: 5,
-    prefix,
+    ...(prefix ? { prefix } : {}),
   });
 
   await fileLogger.init();
@@ -63,8 +63,9 @@ export async function initFileLogger(logFileName: string, prefix: string): Promi
  */
 export async function closeFileLogger(): Promise<void> {
   if (fileLogger) {
-    await fileLogger.close();
+    const copy = fileLogger;
     fileLogger = null;
+    await copy.close();
   }
 }
 
