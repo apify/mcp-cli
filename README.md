@@ -67,7 +67,7 @@ mcpc
 # Shows server/session info, instructions, and capabilities         
 mcpc <target>
 
-# MCP commands (TODO: move to separate section to cover also shell, explain it's for <command...>)
+# MCP commands
 mcpc <target> tools
 mcpc <target> tools-list
 mcpc <target> tools-schema <tool-name>

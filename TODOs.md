@@ -1,13 +1,16 @@
 
 
-- on server/session info, print also auth info
-- [Using session: apify-docs] => change to show server + transport + version?
-- 
+- object caching in session!!!
+
 - Ensure we show tool annotations and tasks in text mode too
 - Handle MCP errors by failing the command tool, e.g. invalid tool name..
 
 - add "mcpc --close-all" command to clean up old sessions
 - logs are not working...
+
+
+- nit: on server/session info, print also auth info
+  - [Using session: apify-docs] => change to show server + transport + version?
 
 - nit: If tool response has `structuredContent` and `content:` [ type: 'text', 'text': ... }], print the latter as Markdown in text mode and skip the structuredContent
 
@@ -26,8 +29,8 @@ E2E tests
 - Can we track test coverage also this way?
 
 
-
 Later
 - nit: Colorize output, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
+- nit: in Readme, explain the MCP commands better
 
 
