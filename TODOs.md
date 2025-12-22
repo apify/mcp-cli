@@ -4,6 +4,7 @@
 
 authProfiles - prints secrets to JSON now
 
+- Implement logic from "Session failover" in README
 
 # Cosmetic
 - nit: on server/session info, print also auth info

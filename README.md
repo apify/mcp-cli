@@ -411,14 +411,6 @@ Instead of forcing every command to reconnect and reinitialize (which is slow an
 - `~/.mcpc/logs/bridge-*.log` - Log files for each bridge process
 - OS keychain - Sensitive credentials (OAuth tokens, bearer tokens, client secrets)
 
-**Note:** `mcpc` does not automatically close sessions.
-As long as the bridge process is running, it periodically pings to MCP server to keep the session alive.
-If the MCP server drops the session (indentified by `MCP-Session-Id`), the bridge process might keep running,
-but the session will be listed as **inactive** in `mcpc` output
-and attempts to use it will fail.
-You need to explicitly `close` the session to remove it from the list,
-or reconnect it using `connect` command.
-
 ### Managing sessions
 
 ```bash
@@ -478,6 +470,36 @@ mcpc @apify tools-call search-actors \
 - `compatible` (default) - Backwards compatible (new optional fields OK, required fields and types must match)
 - `ignore` - Skip schema validation
 
+### Session failover
+
+`mcpc` bridge process attempts to keep sessions alive by sending periodic ping messages to the MCP server.
+But even then, the session can fail for a number of reasons:
+
+- Network disconnects
+- Server drops the session for inactivity or other reasons
+- Bridge process crashes
+
+Here's how `mcpc` handles these situations:
+
+- If the bridge process is running, it will automatically try to reconnect to the server if the connection fails
+and establish the keep-alive pings.
+- If the server indicates the `MCP-Session-Id` is no longer valid,
+the bridge process will flag the session as **expired** in `~/.mcpc/sessions.json` and terminate.
+- If the bridge process crashes, `mcpc` attempts to restart it next time you use the specific session.
+
+Note that `mcpc` never automatically remove sessions from the list, but rather flags the session as **expired**,
+and any attempts to use it will fail.
+To remove the session from the list, you need to explicitly close it:
+
+```bash
+mcpc @apify close
+```
+
+Or restart it afresh using the `connect` command as follows (losing previous session state):
+
+```bash
+mcpc @apify connect
+```
 
 ## Logging
 
