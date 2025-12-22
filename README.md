@@ -1,13 +1,14 @@
-# mcpc: a command-line client for MCP
+# mcpc: MCP CLI client
 
-`mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-over standard transports (Streamable HTTP and stdio).
-It maps MCP concepts to intuitive CLI commands, and uses a bridge process per session,
-so you can keep multiple MCP connections alive simultaneously.
+`mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
+which maps MCP to intuitive CLI commands, for human shell access, scripts, or AI coding agents.
 
-`mcpc` is useful for testing and debugging of MCP servers,
-as well as for AI coding agents to compose MCP operations and tool calls using code generation
-rather than direct tool calling, to [save tokens](https://www.anthropic.com/engineering/code-execution-with-mcp) and increase accuracy.
+It supports all standard MCP operations, which can be run on one-shot basis,
+or as a persistent session that keeps the connection alive and keeps receiving notifications from the MCP server.
+
+`mcpc` is handy for manual testing of MCP servers, scripting,
+and AI coding agents to MCP in the ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp),
+for better accuracy and lower token use.
 
 ## Features
 
@@ -15,7 +16,7 @@ rather than direct tool calling, to [save tokens](https://www.anthropic.com/engi
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
 - 🚀 **Zero setup** - Connect to remote servers instantly with just a URL.
 - 🔧 **Full protocol support** - Tools, resources, prompts, sampling, dynamic discovery, and async notifications.
-- 📊 **JSON output** - Easy integration with `jq`, scripts, and other CLI tools.
+- 📊 **`--json` output** - Easy integration with `jq`, scripts, and other CLI tools.
 - 🤖 **AI-friendly** - Designed for code generation and automated workflows.
 - 🔒 **Secure** - OS keychain integration for credentials, encrypted auth storage.
 
@@ -468,6 +469,9 @@ mcpc @apify tools-call search-actors \
 
 ## Logging
 
+The background bridge process logs to `~/.mcpc/bridges/mcpc-<session-name>.log`.
+The main `mcpc` process doesn't save log files, but you can use `--verbose` flag to print all logs to stderr.
+
 MCP servers can be instructed to adjust their [logging level](https://modelcontextprotocol.io/specification/latest/server/utilities/logging)
 using the `logging/setLevel` command:
 
@@ -489,7 +493,7 @@ mcpc @apify logging-set-level error
 - `alert` - Action must be taken immediately
 - `emergency` - System is unusable
 
-**Note:** This sets the logging level on the **server side**. The actual log output depends on the server's implementation. For client-side verbose logging, use the `--verbose` flag.
+**Note:** This sets the logging level on the **server side**. The actual log output depends on the server's implementation.
 
 
 ## Configuration

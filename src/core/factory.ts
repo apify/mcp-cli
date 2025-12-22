@@ -2,7 +2,7 @@
  * Factory functions for creating MCP clients with transports
  */
 
-import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
+import type { ClientCapabilities, ListChangedHandlers } from '@modelcontextprotocol/sdk/types.js';
 import { McpClient, type McpClientOptions } from './mcp-client.js';
 import { createTransportFromConfig } from './transports.js';
 import type { TransportConfig } from '../lib/types.js';
@@ -34,6 +34,11 @@ export interface CreateMcpClientOptions {
    * Client capabilities to advertise
    */
   capabilities?: ClientCapabilities;
+
+  /**
+   * Handlers for list changed notifications
+   */
+  listChanged?: ListChangedHandlers;
 
   /**
    * Whether to automatically connect after creation
@@ -91,6 +96,7 @@ export async function createMcpClient(options: CreateMcpClientOptions): Promise<
   // Create the client
   const clientOptions: McpClientOptions = {
     capabilities: options.capabilities || {},
+    ...(options.listChanged && { listChanged: options.listChanged }),
   };
 
   // Only pass logger if verbose mode is enabled

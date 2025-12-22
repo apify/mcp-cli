@@ -14,6 +14,7 @@ import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../li
 import { fileExists, getBridgesDir, ensureDir, getLogsDir } from '../lib/index.js';
 import { ClientError, NetworkError } from '../lib/index.js';
 import { loadSessions } from '../lib/sessions.js';
+import { CacheManager } from './cache.js';
 import { join } from 'path';
 
 const logger = createLogger('bridge');
@@ -35,9 +36,11 @@ class BridgeProcess {
   private connections: Set<Socket> = new Set();
   private options: BridgeOptions;
   private isShuttingDown = false;
+  private cache: CacheManager;
 
   constructor(options: BridgeOptions) {
     this.options = options;
+    this.cache = new CacheManager();
 
     if (options.verbose) {
       setVerbose(true);
@@ -167,6 +170,29 @@ class BridgeProcess {
       capabilities: {
         roots: { listChanged: true },
         sampling: {},
+      },
+      listChanged: {
+        tools: {
+          autoRefresh: false, // We manage caching ourselves
+          onChanged: () => {
+            logger.debug('Tools list changed, invalidating cache');
+            this.cache.invalidate('tools');
+          },
+        },
+        resources: {
+          autoRefresh: false,
+          onChanged: () => {
+            logger.debug('Resources list changed, invalidating cache');
+            this.cache.invalidate('resources');
+          },
+        },
+        prompts: {
+          autoRefresh: false,
+          onChanged: () => {
+            logger.debug('Prompts list changed, invalidating cache');
+            this.cache.invalidate('prompts');
+          },
+        },
       },
       autoConnect: true,
       verbose: this.options.verbose || false,
@@ -304,9 +330,25 @@ class BridgeProcess {
           result = await this.client.ping();
           break;
 
-        case 'listTools':
-          result = await this.client.listTools(message.params as string | undefined);
+        case 'listTools': {
+          const cursor = message.params as string | undefined;
+          // Only use cache for first page (no cursor)
+          if (!cursor) {
+            const cached = this.cache.get('tools');
+            if (cached) {
+              result = cached;
+              break;
+            }
+          }
+
+          result = await this.client.listTools(cursor);
+
+          // Cache first page only
+          if (!cursor) {
+            this.cache.set('tools', result);
+          }
           break;
+        }
 
         case 'callTool': {
           const params = message.params as { name: string; arguments?: Record<string, unknown> };
@@ -314,9 +356,25 @@ class BridgeProcess {
           break;
         }
 
-        case 'listResources':
-          result = await this.client.listResources(message.params as string | undefined);
+        case 'listResources': {
+          const cursor = message.params as string | undefined;
+          // Only use cache for first page (no cursor)
+          if (!cursor) {
+            const cached = this.cache.get('resources');
+            if (cached) {
+              result = cached;
+              break;
+            }
+          }
+
+          result = await this.client.listResources(cursor);
+
+          // Cache first page only
+          if (!cursor) {
+            this.cache.set('resources', result);
+          }
           break;
+        }
 
         case 'readResource': {
           const params = message.params as { uri: string };
@@ -324,9 +382,25 @@ class BridgeProcess {
           break;
         }
 
-        case 'listResourceTemplates':
-          result = await this.client.listResourceTemplates(message.params as string | undefined);
+        case 'listResourceTemplates': {
+          const cursor = message.params as string | undefined;
+          // Only use cache for first page (no cursor)
+          if (!cursor) {
+            const cached = this.cache.get('resourceTemplates');
+            if (cached) {
+              result = cached;
+              break;
+            }
+          }
+
+          result = await this.client.listResourceTemplates(cursor);
+
+          // Cache first page only
+          if (!cursor) {
+            this.cache.set('resourceTemplates', result);
+          }
           break;
+        }
 
         case 'subscribeResource': {
           const params = message.params as { uri: string };
@@ -340,9 +414,25 @@ class BridgeProcess {
           break;
         }
 
-        case 'listPrompts':
-          result = await this.client.listPrompts(message.params as string | undefined);
+        case 'listPrompts': {
+          const cursor = message.params as string | undefined;
+          // Only use cache for first page (no cursor)
+          if (!cursor) {
+            const cached = this.cache.get('prompts');
+            if (cached) {
+              result = cached;
+              break;
+            }
+          }
+
+          result = await this.client.listPrompts(cursor);
+
+          // Cache first page only
+          if (!cursor) {
+            this.cache.set('prompts', result);
+          }
           break;
+        }
 
         case 'getPrompt': {
           const params = message.params as { name: string; arguments?: Record<string, string> };
