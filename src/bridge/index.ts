@@ -16,6 +16,7 @@ import { ClientError, NetworkError } from '../lib/index.js';
 import { loadSessions } from '../lib/sessions.js';
 import { CacheManager } from './cache.js';
 import { join } from 'path';
+import packageJson from '../../package.json' with { type: 'json' };
 
 const logger = createLogger('bridge');
 
@@ -165,7 +166,7 @@ class BridgeProcess {
     logger.debug('Connecting to MCP server...');
 
     const clientConfig = {
-      clientInfo: { name: 'mcpc-bridge', version: '0.1.0' },
+      clientInfo: { name: 'mcpc-bridge', version: packageJson.version },
       transport: this.options.target,
       capabilities: {
         roots: { listChanged: true },

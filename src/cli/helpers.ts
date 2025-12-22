@@ -9,6 +9,7 @@ import { ClientError, NetworkError } from '../lib/errors.js';
 import { normalizeServerUrl, isValidSessionName } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
+import packageJson from '../../package.json' with { type: 'json' };
 
 const logger = createLogger('cli');
 
@@ -191,7 +192,7 @@ export async function withMcpClient<T>(
 
   // Create and connect client
   const clientConfig: Parameters<typeof createMcpClient>[0] = {
-    clientInfo: { name: 'mcpc', version: '0.1.0' },
+    clientInfo: { name: 'mcpc', version: packageJson.version },
     transport: transportConfig,
     capabilities: {
       // Declare client capabilities
