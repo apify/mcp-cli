@@ -160,15 +160,16 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 
 ## Caching
 
-By default, `mcpc` prefetches and caches the full list of server tools, prompts, and resources,
+When using a session, `mcpc` prefetches and caches the full list of server tools, prompts, and resources,
 to reduce the number of requests made to the server and simplify the use of CLI.
 This means that commands such as `tools-list` or `tools-schema` use the cached data rather than
-making a request to the server. Also, `mcpc` automatically refreshes the cache when
+making a request to the server.
+The caching is done on the bridge process level, which keeps the connection session alive and automatically refreshes the local cache when
 the server sends a `notifications/tools/list_changed` or `notifications/resources/list_changed` notification.
 
-To disable caching, use the `--no-cache` flag. In that case, you'll need to explicitly run commands
-like `tools-list` or `resources-list` to get the lists. When list operations return paginated results,
-`mcpc` automatically fetches all pages transparently.
+To disable caching, use the `--no-cache` flag - either when creating new session or on the specific MCP command.
+In that case, you'll need to explicitly run commands  like `tools-list` or `resources-list` to get the lists.
+When list operations return paginated results, `mcpc` automatically fetches all pages transparently.
 
 ## Authentication
 
@@ -737,8 +738,6 @@ mcpc(@apify)> exit
 - **Authentication**: OAuth profiles, keychain storage, `auth-*` commands
 - **Caching**: `--no-cache` flag and list caching
 - **Interactive shell**: REPL features (history, tab completion)
-- **Config file loading**: MCP config JSON file parsing (stdio transport support)
-- **Environment variables**: `MCPC_*` environment variables
 - **Notification handling**: Server-sent notifications
 - **Error recovery**: Bridge restart, reconnection
 
@@ -757,6 +756,12 @@ mcpc (single package)
 │   ├── mcpc            # Main CLI executable
 │   └── mcpc-bridge     # Bridge process executable
 ```
+
+### Design goals
+
+- Make `mcpc` easy to use for AI agents: avoid unnecessary interaction roundtrips, save tokens, be extremely clear about what's happening
+- Make `mcpc` delightful for human users: clear messaging, colors, concise
+- Minimal dependencies, cross-platform
 
 ### Core module (runtime-agnostic)
 
