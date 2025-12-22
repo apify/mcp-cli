@@ -232,6 +232,16 @@ export async function createSessionClient(sessionName: string): Promise<SessionC
     throw new ClientError(`Session not found: ${sessionName}`);
   }
 
+  // Check if session is expired
+  if (session.status === 'expired') {
+    throw new ClientError(
+      `Session ${sessionName} has expired. ` +
+      `The MCP server indicated the session is no longer valid.\n` +
+      `To reconnect, run: mcpc ${sessionName} connect\n` +
+      `To remove the expired session, run: mcpc ${sessionName} close`
+    );
+  }
+
   if (!session.socketPath) {
     throw new ClientError(`Session ${sessionName} has no socket path`);
   }

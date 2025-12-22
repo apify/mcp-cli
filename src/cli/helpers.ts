@@ -211,7 +211,7 @@ export async function resolveTarget(
       `Failed to resolve target: ${target}\n` +
         `Target must be one of:\n` +
         `  - Named session (@name)\n` +
-        `  - Server URL (e.g., mcp.example.com or https://mcp.example.com)\n` +
+        `  - Server URL (e.g., mcp.apify.com or https://mcp.apify.com)\n` +
         `  - Config file entry (with --config flag)\n\n` +
         `For local MCP servers, use a config file with the --config flag.\n\n` +
         `Error: ${(urlError as Error).message}`

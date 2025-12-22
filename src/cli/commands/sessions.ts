@@ -114,7 +114,8 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
     } else {
       console.log('Active MCP sessions:');
       for (const session of sessions) {
-        console.log(`  ${session.name} → ${session.target} (${session.transport})`);
+        const statusInfo = session.status === 'expired' ? ' [EXPIRED]' : '';
+        console.log(`  ${session.name} → ${session.target} (${session.transport})${statusInfo}`);
       }
     }
 

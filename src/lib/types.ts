@@ -92,6 +92,13 @@ export interface TransportConfig {
 }
 
 /**
+ * Session status
+ * - active: Session is healthy and can be used
+ * - expired: Server indicated session is no longer valid (e.g., 404 response)
+ */
+export type SessionStatus = 'active' | 'expired';
+
+/**
  * Session data stored in sessions.json
  */
 export interface SessionData {
@@ -106,6 +113,7 @@ export interface SessionData {
     name: string;
     version: string;
   };
+  status?: SessionStatus; // Session health status (default: active)
   createdAt: string;
   updatedAt: string;
 }

@@ -13,10 +13,14 @@ import type { TransportConfig, IpcMessage, LoggingLevel } from '../lib/index.js'
 import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
 import { fileExists, getBridgesDir, ensureDir, getLogsDir } from '../lib/index.js';
 import { ClientError, NetworkError } from '../lib/index.js';
-import { loadSessions } from '../lib/sessions.js';
+import { loadSessions, updateSession } from '../lib/sessions.js';
 import { CacheManager } from './cache.js';
 import { join } from 'path';
 import packageJson from '../../package.json' with { type: 'json' };
+import * as util from 'node:util';
+
+// Keepalive ping interval in milliseconds (30 seconds)
+const KEEPALIVE_INTERVAL_MS = 30_000;
 
 const logger = createLogger('bridge');
 
@@ -38,6 +42,7 @@ class BridgeProcess {
   private options: BridgeOptions;
   private isShuttingDown = false;
   private cache: CacheManager;
+  private keepaliveInterval: NodeJS.Timeout | null = null;
 
   constructor(options: BridgeOptions) {
     this.options = options;
@@ -133,22 +138,25 @@ class BridgeProcess {
    * Start the bridge process for a specific session.
    */
   async start(): Promise<void> {
+    // 1. First, initialize file logger to see what's going on
+    await initFileLogger(`bridge-${this.options.sessionName}.log`, this.options.sessionName);
+
     logger.info(`Starting bridge for session: ${this.options.sessionName}`);
 
-    // 1. Clean up orphaned log files (runs asynchronously in background)
+    // 2. Clean up orphaned log files (runs asynchronously in background)
     this.cleanupOrphanedLogFiles();
-
-    // 2. Initialize file logger
-    await initFileLogger(`bridge-${this.options.sessionName}.log`, this.options.sessionName);
 
     try {
       // 3. Connect to MCP server
       await this.connectToMcp();
 
-      // 4. Create Unix socket server
+      // 4. Start keepalive ping
+      this.startKeepalive();
+
+      // 5. Create Unix socket server
       await this.createSocketServer();
 
-      // 5. Set up signal handlers
+      // 6. Set up signal handlers
       this.setupSignalHandlers();
 
       logger.info('Bridge process started successfully');
@@ -231,6 +239,79 @@ class BridgeProcess {
     this.client = await createMcpClient(clientConfig);
 
     logger.info('Connected to MCP server');
+  }
+
+  /**
+   * Start periodic keepalive ping to maintain connection
+   */
+  private startKeepalive(): void {
+    logger.debug(`Starting keepalive ping every ${KEEPALIVE_INTERVAL_MS / 1000}s`);
+
+    this.keepaliveInterval = setInterval(() => {
+      this.sendKeepalivePing().catch((error) => {
+        logger.error('Keepalive ping failed:', error);
+        // If ping fails, the session might be expired - check and handle
+        this.handlePossibleExpiration(error as Error);
+      });
+    }, KEEPALIVE_INTERVAL_MS);
+
+    // Don't block process exit waiting for this interval
+    this.keepaliveInterval.unref();
+  }
+
+  /**
+   * Send a single keepalive ping to the MCP server
+   */
+  private async sendKeepalivePing(): Promise<void> {
+    if (!this.client || this.isShuttingDown) {
+      return;
+    }
+
+    logger.debug('Sending keepalive ping');
+    await this.client.ping();
+    logger.debug('Keepalive ping successful');
+  }
+
+  /**
+   * Check if an error indicates session expiration and handle accordingly
+   */
+  private handlePossibleExpiration(error: Error): void {
+    // Check for session expiration indicators:
+    // - HTTP 404 (session not found)
+    // - Specific error messages indicating session is no longer valid
+    const errorMessage = error.message.toLowerCase();
+    const isExpired =
+      errorMessage.includes('404') ||
+      errorMessage.includes('session not found') ||
+      errorMessage.includes('session expired') ||
+      errorMessage.includes('invalid session');
+
+    if (isExpired) {
+      logger.warn('Session appears to be expired, marking as expired and shutting down', util.inspect(error));
+      this.markSessionExpiredAndExit().catch((e) => {
+        logger.error('Failed to mark session as expired:', e);
+        process.exit(1);
+      });
+    }
+  }
+
+  /**
+   * Mark the session as expired in sessions.json and exit
+   */
+  private async markSessionExpiredAndExit(): Promise<void> {
+    if (this.isShuttingDown) {
+      return;
+    }
+
+    try {
+      await updateSession(this.options.sessionName, { status: 'expired' });
+      logger.info(`Session ${this.options.sessionName} marked as expired`);
+    } catch (error) {
+      logger.error('Failed to update session status:', error);
+    }
+
+    // Gracefully shutdown
+    await this.shutdown();
   }
 
   /**
@@ -505,6 +586,9 @@ class BridgeProcess {
       }
     } catch (error) {
       this.sendError(socket, error as Error, message.id);
+
+      // Check if this error indicates session expiration
+      this.handlePossibleExpiration(error as Error);
     }
   }
 
@@ -571,6 +655,13 @@ class BridgeProcess {
    * Clean up resources
    */
   private async cleanup(): Promise<void> {
+    // Stop keepalive ping
+    if (this.keepaliveInterval) {
+      clearInterval(this.keepaliveInterval);
+      this.keepaliveInterval = null;
+      logger.debug('Keepalive interval stopped');
+    }
+
     // Close all client connections
     for (const socket of this.connections) {
       socket.end();

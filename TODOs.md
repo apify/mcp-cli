@@ -4,8 +4,6 @@
 
 authProfiles - prints secrets to JSON now
 
-- Implement logic from "Session failover" in README
-
 # Cosmetic
 - nit: on server/session info, print also auth info
   - [Using session: apify-docs] => change to show server + transport + version? + auth info!!!
@@ -36,5 +34,5 @@ authProfiles - prints secrets to JSON now
 - nit: Colorize output, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
 - nit: in Readme, explain the MCP commands better
 - Add support for MCP elicitations, and potentially for sampling (e.g. via shell interface?)
-- better session management - in the list show which sessions are alive/expired/dead 
 - docs: add Claude Skills file to /docs, maybe also man page?
+- add command to restart bridge process
