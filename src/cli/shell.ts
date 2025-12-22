@@ -9,12 +9,14 @@ import { join } from 'path';
 import { fileExists, getMcpcHome } from '../lib/utils.js';
 import { formatError as formatErrorOutput } from './output.js';
 import chalk from 'chalk';
-import type { OutputMode, CommandOptions } from '../lib/types.js';
+import type { OutputMode, CommandOptions, NotificationData } from '../lib/types.js';
 import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
 import * as prompts from './commands/prompts.js';
 import * as logging from './commands/logging.js';
 import { ping } from './commands/utilities.js';
+import { createSessionClient } from '../lib/session-client.js';
+import type { SessionClient } from '../lib/session-client.js';
 
 const HISTORY_FILE = 'history';
 const MAX_HISTORY = 1000;
@@ -26,6 +28,7 @@ interface ShellContext {
   target: string;
   history: string[];
   running: boolean;
+  notificationClient?: SessionClient; // For receiving notifications
 }
 
 /**
@@ -119,6 +122,63 @@ function addToHistory(ctx: ShellContext, line: string): void {
     return;
   }
   ctx.history.push(trimmed);
+}
+
+/**
+ * Format and display a notification
+ */
+function displayNotification(notification: NotificationData): void {
+  const timestamp = new Date().toLocaleTimeString();
+  let message = '';
+
+  switch (notification.method) {
+    case 'tools/list_changed':
+      message = chalk.yellow(`[${timestamp}] Server tools list changed`);
+      break;
+    case 'resources/list_changed':
+      message = chalk.yellow(`[${timestamp}] Server resources list changed`);
+      break;
+    case 'prompts/list_changed':
+      message = chalk.yellow(`[${timestamp}] Server prompts list changed`);
+      break;
+    case 'resources/updated':
+      message = chalk.yellow(`[${timestamp}] Resource updated`);
+      break;
+    case 'progress':
+      message = chalk.blue(`[${timestamp}] Progress: ${JSON.stringify(notification.params)}`);
+      break;
+    case 'logging/message':
+      message = chalk.gray(`[${timestamp}] Server log: ${JSON.stringify(notification.params)}`);
+      break;
+    default:
+      message = chalk.dim(`[${timestamp}] Notification: ${notification.method}`);
+  }
+
+  console.log(message);
+}
+
+/**
+ * Set up notification listener for the shell
+ * Creates a persistent client connection to receive notifications
+ */
+async function setupNotificationListener(ctx: ShellContext): Promise<void> {
+  try {
+    // Only set up notifications for session targets (start with @)
+    if (!ctx.target.startsWith('@')) {
+      return;
+    }
+
+    // Create a persistent client for receiving notifications
+    ctx.notificationClient = await createSessionClient(ctx.target);
+
+    // Set up notification handler
+    ctx.notificationClient.on('notification', (notification: NotificationData) => {
+      displayNotification(notification);
+    });
+  } catch (error) {
+    // Silently ignore errors setting up notifications
+    // The shell will still work for commands
+  }
 }
 
 /**
@@ -320,9 +380,16 @@ export async function startShell(target: string): Promise<void> {
   console.log(chalk.bold(`\nWelcome to mcpc shell for ${chalk.cyan(target)}`));
   console.log(chalk.dim('Type "help" for available commands, "exit" to quit\n'));
 
+  // Set up notification listener for session targets
+  await setupNotificationListener(ctx);
+
   // Set up cleanup on exit
   const cleanup = async (): Promise<void> => {
     await saveHistory(ctx.history);
+    // Close notification client if it exists
+    if (ctx.notificationClient) {
+      await ctx.notificationClient.close();
+    }
   };
 
   process.on('SIGINT', () => {

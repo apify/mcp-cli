@@ -145,7 +145,26 @@ export interface AuthProfilesStorage {
 /**
  * IPC message types for CLI-bridge communication
  */
-export type IpcMessageType = 'request' | 'response' | 'health-check' | 'health-ok' | 'shutdown';
+export type IpcMessageType = 'request' | 'response' | 'health-check' | 'health-ok' | 'shutdown' | 'notification';
+
+/**
+ * Notification types from MCP server
+ */
+export type NotificationType =
+  | 'tools/list_changed'
+  | 'resources/list_changed'
+  | 'resources/updated'
+  | 'prompts/list_changed'
+  | 'progress'
+  | 'logging/message';
+
+/**
+ * Notification data
+ */
+export interface NotificationData {
+  method: NotificationType;
+  params?: unknown;
+}
 
 /**
  * IPC message structure
@@ -156,6 +175,7 @@ export interface IpcMessage {
   method?: string; // MCP method name
   params?: unknown; // Method parameters
   result?: unknown; // Response result
+  notification?: NotificationData; // Notification data (for type='notification')
   error?: {
     code: number;
     message: string;

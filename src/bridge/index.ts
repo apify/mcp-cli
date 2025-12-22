@@ -160,6 +160,29 @@ class BridgeProcess {
   }
 
   /**
+   * Broadcast a notification to all connected clients
+   */
+  private broadcastNotification(method: string, params?: unknown): void {
+    const notification: IpcMessage = {
+      type: 'notification',
+      notification: {
+        method: method as IpcMessage['notification'] extends { method: infer M } ? M : never,
+        params,
+      },
+    };
+
+    const data = JSON.stringify(notification) + '\n';
+
+    for (const socket of this.connections) {
+      try {
+        socket.write(data);
+      } catch (error) {
+        logger.error('Failed to send notification to client:', error);
+      }
+    }
+  }
+
+  /**
    * Connect to the MCP server
    */
   private async connectToMcp(): Promise<void> {
@@ -178,6 +201,8 @@ class BridgeProcess {
           onChanged: () => {
             logger.debug('Tools list changed, invalidating cache');
             this.cache.invalidate('tools');
+            // Broadcast notification to all connected clients
+            this.broadcastNotification('tools/list_changed');
           },
         },
         resources: {
@@ -185,6 +210,8 @@ class BridgeProcess {
           onChanged: () => {
             logger.debug('Resources list changed, invalidating cache');
             this.cache.invalidate('resources');
+            // Broadcast notification to all connected clients
+            this.broadcastNotification('resources/list_changed');
           },
         },
         prompts: {
@@ -192,6 +219,8 @@ class BridgeProcess {
           onChanged: () => {
             logger.debug('Prompts list changed, invalidating cache');
             this.cache.invalidate('prompts');
+            // Broadcast notification to all connected clients
+            this.broadcastNotification('prompts/list_changed');
           },
         },
       },

@@ -4,7 +4,8 @@
  */
 
 import { connect, type Socket } from 'net';
-import type { IpcMessage } from './types.js';
+import { EventEmitter } from 'events';
+import type { IpcMessage, NotificationData } from './types.js';
 import { createLogger } from './logger.js';
 import { NetworkError } from './errors.js';
 import { generateRequestId } from './utils.js';
@@ -14,7 +15,7 @@ const logger = createLogger('bridge-client');
 // Timeout for bridge requests (3 minutes as per CLAUDE.md)
 const REQUEST_TIMEOUT = 3 * 60 * 1000;
 
-export class BridgeClient {
+export class BridgeClient extends EventEmitter {
   private socket: Socket | null = null;
   private socketPath: string;
   private pendingRequests = new Map<string, {
@@ -24,6 +25,7 @@ export class BridgeClient {
   }>();
 
   constructor(socketPath: string) {
+    super();
     this.socketPath = socketPath;
   }
 
@@ -96,7 +98,7 @@ export class BridgeClient {
    * Handle a response message from the bridge
    */
   private handleResponse(message: IpcMessage): void {
-    logger.debug('Received response:', { type: message.type, id: message.id });
+    logger.debug('Received message:', { type: message.type, id: message.id });
 
     if (message.type === 'response' && message.id) {
       const pending = this.pendingRequests.get(message.id);
@@ -113,6 +115,11 @@ export class BridgeClient {
           pending.resolve(message.result);
         }
       }
+    } else if (message.type === 'notification' && message.notification) {
+      // Emit notification event
+      const notification: NotificationData = message.notification;
+      logger.debug('Received notification:', notification.method);
+      this.emit('notification', notification);
     }
   }
 

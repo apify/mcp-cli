@@ -3,6 +3,7 @@
  * Adapts BridgeClient to look like McpClient for seamless session support
  */
 
+import { EventEmitter } from 'events';
 import type {
   Implementation,
   ServerCapabilities,
@@ -14,22 +15,88 @@ import type {
   GetPromptResult,
   LoggingLevel,
   IMcpClient,
+  NotificationData,
 } from './types.js';
 import type { ListResourceTemplatesResult } from '@modelcontextprotocol/sdk/types.js';
 import { BridgeClient } from './bridge-client.js';
 import { getSession } from './sessions.js';
 import { ensureBridgeHealthy } from './bridge-manager.js';
-import { ClientError } from './errors.js';
+import { ClientError, NetworkError } from './errors.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('session-client');
 
 /**
  * Wrapper that makes BridgeClient compatible with McpClient interface
  * Implements IMcpClient by sending requests to bridge process via IPC
+ * Extends EventEmitter to forward notifications from the bridge
  */
-export class SessionClient implements IMcpClient {
+export class SessionClient extends EventEmitter implements IMcpClient {
   private bridgeClient: BridgeClient;
+  private sessionName: string;
 
-  constructor(_sessionName: string, socketPath: string) {
+  constructor(sessionName: string, socketPath: string) {
+    super();
+    this.sessionName = sessionName;
     this.bridgeClient = new BridgeClient(socketPath);
+    this.setupNotificationForwarding();
+  }
+
+  /**
+   * Set up notification forwarding from bridge client
+   */
+  private setupNotificationForwarding(): void {
+    this.bridgeClient.on('notification', (notification: NotificationData) => {
+      logger.debug(`Forwarding notification: ${notification.method}`);
+      this.emit('notification', notification);
+    });
+  }
+
+  /**
+   * Execute a bridge request with automatic retry on failure
+   * If the request fails (bridge crashed), restart the bridge and retry
+   */
+  private async withRetry<T>(
+    operation: () => Promise<T>,
+    operationName: string
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      // Only retry on network errors (bridge crashed/disconnected)
+      if (error instanceof NetworkError) {
+        logger.warn(`Request failed (${operationName}), attempting bridge restart...`);
+
+        try {
+          // Ensure bridge is healthy (will restart if needed)
+          await ensureBridgeHealthy(this.sessionName);
+
+          // Reconnect to the new bridge
+          await this.bridgeClient.close();
+          const session = await getSession(this.sessionName);
+          if (!session || !session.socketPath) {
+            throw new ClientError(`Session ${this.sessionName} not found or invalid after restart`);
+          }
+
+          this.bridgeClient = new BridgeClient(session.socketPath);
+          this.setupNotificationForwarding(); // Re-setup notification forwarding for new client
+          await this.bridgeClient.connect();
+
+          logger.info(`Bridge restarted successfully, retrying ${operationName}`);
+
+          // Retry the operation
+          return await operation();
+        } catch (retryError) {
+          logger.error('Failed to restart bridge:', retryError);
+          throw new ClientError(
+            `Bridge restart failed: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`
+          );
+        }
+      }
+
+      // Re-throw non-network errors
+      throw error;
+    }
   }
 
   async connect(): Promise<void> {
@@ -42,64 +109,109 @@ export class SessionClient implements IMcpClient {
 
   // Server info methods
   async getServerCapabilities(): Promise<ServerCapabilities | undefined> {
-    return (await this.bridgeClient.request('getServerCapabilities')) as ServerCapabilities | undefined;
+    return this.withRetry(
+      () => this.bridgeClient.request('getServerCapabilities') as Promise<ServerCapabilities | undefined>,
+      'getServerCapabilities'
+    );
   }
 
   async getServerVersion(): Promise<Implementation | undefined> {
-    return (await this.bridgeClient.request('getServerVersion')) as Implementation | undefined;
+    return this.withRetry(
+      () => this.bridgeClient.request('getServerVersion') as Promise<Implementation | undefined>,
+      'getServerVersion'
+    );
   }
 
   async getInstructions(): Promise<string | undefined> {
-    return (await this.bridgeClient.request('getInstructions')) as string | undefined;
+    return this.withRetry(
+      () => this.bridgeClient.request('getInstructions') as Promise<string | undefined>,
+      'getInstructions'
+    );
   }
 
   async getProtocolVersion(): Promise<string | undefined> {
-    return (await this.bridgeClient.request('getProtocolVersion')) as string | undefined;
+    return this.withRetry(
+      () => this.bridgeClient.request('getProtocolVersion') as Promise<string | undefined>,
+      'getProtocolVersion'
+    );
   }
 
   // MCP operations
   async ping(): Promise<void> {
-    await this.bridgeClient.request('ping');
+    return this.withRetry(
+      () => this.bridgeClient.request('ping').then(() => undefined),
+      'ping'
+    );
   }
 
   async listTools(cursor?: string): Promise<ListToolsResult> {
-    return (await this.bridgeClient.request('listTools', cursor)) as ListToolsResult;
+    return this.withRetry(
+      () => this.bridgeClient.request('listTools', cursor) as Promise<ListToolsResult>,
+      'listTools'
+    );
   }
 
   async callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult> {
-    return (await this.bridgeClient.request('callTool', { name, arguments: args })) as CallToolResult;
+    return this.withRetry(
+      () => this.bridgeClient.request('callTool', { name, arguments: args }) as Promise<CallToolResult>,
+      'callTool'
+    );
   }
 
   async listResources(cursor?: string): Promise<ListResourcesResult> {
-    return (await this.bridgeClient.request('listResources', cursor)) as ListResourcesResult;
+    return this.withRetry(
+      () => this.bridgeClient.request('listResources', cursor) as Promise<ListResourcesResult>,
+      'listResources'
+    );
   }
 
   async listResourceTemplates(cursor?: string): Promise<ListResourceTemplatesResult> {
-    return (await this.bridgeClient.request('listResourceTemplates', cursor)) as ListResourceTemplatesResult;
+    return this.withRetry(
+      () => this.bridgeClient.request('listResourceTemplates', cursor) as Promise<ListResourceTemplatesResult>,
+      'listResourceTemplates'
+    );
   }
 
   async readResource(uri: string): Promise<ReadResourceResult> {
-    return (await this.bridgeClient.request('readResource', { uri })) as ReadResourceResult;
+    return this.withRetry(
+      () => this.bridgeClient.request('readResource', { uri }) as Promise<ReadResourceResult>,
+      'readResource'
+    );
   }
 
   async subscribeResource(uri: string): Promise<void> {
-    await this.bridgeClient.request('subscribeResource', { uri });
+    return this.withRetry(
+      () => this.bridgeClient.request('subscribeResource', { uri }).then(() => undefined),
+      'subscribeResource'
+    );
   }
 
   async unsubscribeResource(uri: string): Promise<void> {
-    await this.bridgeClient.request('unsubscribeResource', { uri });
+    return this.withRetry(
+      () => this.bridgeClient.request('unsubscribeResource', { uri }).then(() => undefined),
+      'unsubscribeResource'
+    );
   }
 
   async listPrompts(cursor?: string): Promise<ListPromptsResult> {
-    return (await this.bridgeClient.request('listPrompts', cursor)) as ListPromptsResult;
+    return this.withRetry(
+      () => this.bridgeClient.request('listPrompts', cursor) as Promise<ListPromptsResult>,
+      'listPrompts'
+    );
   }
 
   async getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult> {
-    return (await this.bridgeClient.request('getPrompt', { name, arguments: args })) as GetPromptResult;
+    return this.withRetry(
+      () => this.bridgeClient.request('getPrompt', { name, arguments: args }) as Promise<GetPromptResult>,
+      'getPrompt'
+    );
   }
 
   async setLoggingLevel(level: LoggingLevel): Promise<void> {
-    await this.bridgeClient.request('setLoggingLevel', level);
+    return this.withRetry(
+      () => this.bridgeClient.request('setLoggingLevel', level).then(() => undefined),
+      'setLoggingLevel'
+    );
   }
 
   // Compatibility method for SDK client
