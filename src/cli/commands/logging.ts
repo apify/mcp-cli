@@ -2,11 +2,10 @@
  * Logging command handlers
  */
 
-import type { LoggingLevel } from '../../lib/types.js';
+import type { LoggingLevel, CommandOptions } from '../../lib/types.js';
 import { formatOutput, formatSuccess, logTarget } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import { withMcpClient } from '../helpers.js';
-import type { CommandOptions } from './types.js';
 
 const VALID_LOG_LEVELS: LoggingLevel[] = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
 

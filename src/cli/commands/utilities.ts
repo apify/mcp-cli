@@ -4,7 +4,7 @@
 
 import { formatSuccess, formatOutput, logTarget } from '../output.js';
 import { withMcpClient } from '../helpers.js';
-import type { CommandOptions } from './types.js';
+import type { CommandOptions } from '../../lib/types.js';
 
 /**
  * Ping the MCP server to check if it's alive

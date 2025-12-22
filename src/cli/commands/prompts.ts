@@ -2,10 +2,10 @@
  * Prompts command handlers
  */
 
+import type { CommandOptions } from '../../lib/types.js';
 import { formatOutput, logTarget } from '../output.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs } from '../parser.js';
-import type { CommandOptions } from './types.js';
 
 /**
  * List available prompts

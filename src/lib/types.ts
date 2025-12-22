@@ -193,6 +193,17 @@ export type TargetResolution =
 export type OutputMode = 'human' | 'json';
 
 /**
+ * Standard options passed to command handlers
+ */
+export interface CommandOptions {
+  outputMode: OutputMode;
+  config?: string;
+  headers?: string[];
+  timeout?: number;
+  verbose?: boolean;
+}
+
+/**
  * Log levels matching MCP SDK
  */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';

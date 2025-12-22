@@ -4,9 +4,10 @@
 
 import { formatOutput, formatToolDetail, formatSuccess, logTarget } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
+import type { CommandOptions } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs, loadArgsFromFile } from '../parser.js';
-import type { CommandOptions } from './types.js';
+
 
 /**
  * List available tools

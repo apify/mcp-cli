@@ -4,7 +4,7 @@
 
 import { formatOutput, formatSuccess, logTarget } from '../output.js';
 import { withMcpClient } from '../helpers.js';
-import type { CommandOptions } from './types.js';
+import type { CommandOptions } from '../../lib/types.js';
 
 /**
  * List available resources

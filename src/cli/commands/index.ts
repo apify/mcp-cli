@@ -3,7 +3,6 @@
  * This module exports all command handlers and provides a registry
  */
 
-export * from './types.js';
 export * from './tools.js';
 export * from './resources.js';
 export * from './prompts.js';
