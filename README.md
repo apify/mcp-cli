@@ -86,7 +86,7 @@ mcpc <target> prompts-get <prompt-name> [--args key=val key2:=json ...] [--args-
 mcpc <target> resources
 mcpc <target> resources-list
 mcpc <target> resources-read <uri> [-o <file>] [--max-size <bytes>]
-mcpc <target> resources-subscribe <uri>     # TODO: automatically update the -o file on changes
+mcpc <target> resources-subscribe <uri>     # TODO: automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
 mcpc <target> resources-unsubscribe <uri>
 mcpc <target> resources-templates-list
 
@@ -408,8 +408,13 @@ Instead of forcing every command to reconnect and reinitialize (which is slow an
 - `~/.mcpc/sessions.json` - Active sessions with references to authentication profiles (file-locked for concurrent access)
 - `~/.mcpc/auth-profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
 - `~/.mcpc/bridges/` - Unix domain socket files for each bridge process
+- `~/.mcpc/logs/bridge-*.log` - Log files for each bridge process
 - OS keychain - Sensitive credentials (OAuth tokens, bearer tokens, client secrets)
 
+**Note:** `mcpc` does not automatically close sessions.
+As long as the bridge process is running, it periodically pings to MCP server to keep the session alive.
+If the MCP server loses the `MCP-Session-Id`, the bridge process might keep running,
+and the session will be listed as **inactive** in `mcpc` output.
 
 ### Managing sessions
 

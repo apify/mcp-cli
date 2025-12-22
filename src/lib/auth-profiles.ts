@@ -1,21 +1,27 @@
 /**
  * Authentication profiles management
  * Provides functions to read and manage auth profiles stored in ~/.mcpc/auth-profiles.json
+ * Uses file locking to prevent concurrent access issues
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { readFile, writeFile, rename, unlink } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import type { AuthProfile, AuthProfilesStorage } from './types.js';
-import { getAuthProfilesFilePath, fileExists } from './utils.js';
+import { getAuthProfilesFilePath, fileExists, ensureDir, getMcpcHome } from './utils.js';
+import { withFileLock } from './file-lock.js';
 import { createLogger } from './logger.js';
+import { ClientError } from './errors.js';
 
 const logger = createLogger('auth-profiles');
 
+const AUTH_PROFILES_DEFAULT_CONTENT = JSON.stringify({ profiles: {} }, null, 2);
+
 /**
- * Load auth profiles from storage file
+ * Load auth profiles from storage file (internal, no locking)
  * Returns an empty profiles structure if file doesn't exist
  */
-export async function loadAuthProfiles(): Promise<AuthProfilesStorage> {
+async function loadAuthProfilesInternal(): Promise<AuthProfilesStorage> {
   const filePath = getAuthProfilesFilePath();
 
   if (!(await fileExists(filePath))) {
@@ -24,7 +30,7 @@ export async function loadAuthProfiles(): Promise<AuthProfilesStorage> {
   }
 
   try {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = await readFile(filePath, 'utf-8');
     const storage = JSON.parse(content) as AuthProfilesStorage;
 
     if (!storage.profiles || typeof storage.profiles !== 'object') {
@@ -37,6 +43,46 @@ export async function loadAuthProfiles(): Promise<AuthProfilesStorage> {
     logger.warn(`Failed to load auth profiles: ${(error as Error).message}`);
     return { profiles: {} };
   }
+}
+
+/**
+ * Save auth profiles to storage file atomically (internal, no locking)
+ * Uses temp file + rename for atomicity
+ */
+async function saveAuthProfilesInternal(storage: AuthProfilesStorage): Promise<void> {
+  const filePath = getAuthProfilesFilePath();
+
+  // Ensure the directory exists
+  await ensureDir(getMcpcHome());
+
+  // Write to a temp file first (atomic operation)
+  const tempFile = join(tmpdir(), `mcpc-auth-profiles-${Date.now()}-${process.pid}.json`);
+
+  try {
+    const content = JSON.stringify(storage, null, 2);
+    await writeFile(tempFile, content, { encoding: 'utf-8', mode: 0o600 });
+
+    // Atomic rename
+    await rename(tempFile, filePath);
+
+    logger.debug('Auth profiles saved successfully');
+  } catch (error) {
+    // Clean up temp file on error
+    try {
+      await unlink(tempFile);
+    } catch {
+      // Ignore cleanup errors
+    }
+    throw new ClientError(`Failed to save auth profiles: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Load auth profiles from storage (with locking)
+ */
+export async function loadAuthProfiles(): Promise<AuthProfilesStorage> {
+  const filePath = getAuthProfilesFilePath();
+  return withFileLock(filePath, loadAuthProfilesInternal, AUTH_PROFILES_DEFAULT_CONTENT);
 }
 
 /**
@@ -87,67 +133,58 @@ export async function getAuthProfile(
 }
 
 /**
- * Save auth profiles to storage file
+ * Save auth profiles to storage file (with locking)
  */
 export async function saveAuthProfiles(storage: AuthProfilesStorage): Promise<void> {
   const filePath = getAuthProfilesFilePath();
-
-  // Ensure directory exists
-  const dir = dirname(filePath);
-  try {
-    mkdirSync(dir, { recursive: true });
-  } catch (error) {
-    // Ignore if directory already exists
-  }
-
-  // Write to file with restricted permissions
-  try {
-    const content = JSON.stringify(storage, null, 2);
-    writeFileSync(filePath, content, { encoding: 'utf-8', mode: 0o600 });
-    logger.debug('Auth profiles saved successfully');
-  } catch (error) {
-    logger.error(`Failed to save auth profiles: ${(error as Error).message}`);
-    throw error;
-  }
+  return withFileLock(filePath, async () => {
+    await saveAuthProfilesInternal(storage);
+  }, AUTH_PROFILES_DEFAULT_CONTENT);
 }
 
 /**
  * Save or update a single auth profile
  */
 export async function saveAuthProfile(profile: AuthProfile): Promise<void> {
-  const storage = await loadAuthProfiles();
+  const filePath = getAuthProfilesFilePath();
+  return withFileLock(filePath, async () => {
+    const storage = await loadAuthProfilesInternal();
 
-  // Ensure server entry exists
-  if (!storage.profiles[profile.serverUrl]) {
-    storage.profiles[profile.serverUrl] = {};
-  }
+    // Ensure server entry exists
+    if (!storage.profiles[profile.serverUrl]) {
+      storage.profiles[profile.serverUrl] = {};
+    }
 
-  // Update profile
-  storage.profiles[profile.serverUrl]![profile.name] = profile;
+    // Update profile
+    storage.profiles[profile.serverUrl]![profile.name] = profile;
 
-  await saveAuthProfiles(storage);
-  logger.info(`Saved auth profile: ${profile.name} for ${profile.serverUrl}`);
+    await saveAuthProfilesInternal(storage);
+    logger.info(`Saved auth profile: ${profile.name} for ${profile.serverUrl}`);
+  }, AUTH_PROFILES_DEFAULT_CONTENT);
 }
 
 /**
  * Delete a specific auth profile
  */
 export async function deleteAuthProfile(serverUrl: string, profileName: string): Promise<boolean> {
-  const storage = await loadAuthProfiles();
+  const filePath = getAuthProfilesFilePath();
+  return withFileLock(filePath, async () => {
+    const storage = await loadAuthProfilesInternal();
 
-  const serverProfiles = storage.profiles[serverUrl];
-  if (!serverProfiles || !serverProfiles[profileName]) {
-    return false;
-  }
+    const serverProfiles = storage.profiles[serverUrl];
+    if (!serverProfiles || !serverProfiles[profileName]) {
+      return false;
+    }
 
-  delete serverProfiles[profileName];
+    delete serverProfiles[profileName];
 
-  // Clean up empty server entries
-  if (Object.keys(serverProfiles).length === 0) {
-    delete storage.profiles[serverUrl];
-  }
+    // Clean up empty server entries
+    if (Object.keys(serverProfiles).length === 0) {
+      delete storage.profiles[serverUrl];
+    }
 
-  await saveAuthProfiles(storage);
-  logger.info(`Deleted auth profile: ${profileName} for ${serverUrl}`);
-  return true;
+    await saveAuthProfilesInternal(storage);
+    logger.info(`Deleted auth profile: ${profileName} for ${serverUrl}`);
+    return true;
+  }, AUTH_PROFILES_DEFAULT_CONTENT);
 }

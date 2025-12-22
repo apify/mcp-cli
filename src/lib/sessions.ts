@@ -7,16 +7,13 @@
 import { readFile, writeFile, rename, unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import * as lockfile from 'proper-lockfile';
 import type { SessionData, SessionsStorage } from './types.js';
 import { getSessionsFilePath, fileExists, ensureDir, getMcpcHome } from './utils.js';
+import { withFileLock } from './file-lock.js';
 import { createLogger } from './logger.js';
 import { ClientError } from './errors.js';
 
 const logger = createLogger('sessions');
-
-// Lock timeout in milliseconds (5 seconds as per CLAUDE.md)
-const LOCK_TIMEOUT = 5000;
 
 /**
  * Load sessions from storage file
@@ -78,67 +75,14 @@ async function saveSessionsInternal(storage: SessionsStorage): Promise<void> {
   }
 }
 
-/**
- * Execute an operation with file locking
- * Prevents concurrent access to sessions.json
- */
-async function withLock<T>(
-  operation: () => Promise<T>
-): Promise<T> {
-  const filePath = getSessionsFilePath();
-
-  // Ensure the directory and file exist before locking
-  await ensureDir(getMcpcHome());
-  if (!(await fileExists(filePath))) {
-    await writeFile(filePath, JSON.stringify({ sessions: {} }, null, 2), 'utf-8');
-  }
-
-  let release: (() => Promise<void>) | undefined;
-
-  try {
-    // Acquire lock with timeout
-    logger.debug(`Acquiring file lock for ${filePath}`);
-    release = await lockfile.lock(filePath, {
-      retries: {
-        retries: 5,
-        minTimeout: 100,
-        maxTimeout: LOCK_TIMEOUT,
-      },
-    });
-
-    logger.debug('Lock acquired');
-
-    // Execute operation
-    const result = await operation();
-
-    return result;
-  } catch (error) {
-    if ((error as Error).message.includes('ELOCKED')) {
-      throw new ClientError(
-        'Sessions file is locked by another process. Please try again.'
-      );
-    }
-    throw error;
-  } finally {
-    // Always release lock
-    if (release) {
-      try {
-        await release();
-        logger.debug('Lock released');
-      } catch (error) {
-        logger.warn('Failed to release lock:', error);
-      }
-    }
-  }
-}
+const SESSIONS_DEFAULT_CONTENT = JSON.stringify({ sessions: {} }, null, 2);
 
 /**
  * Load sessions from storage (with locking)
  */
 export async function loadSessions(): Promise<SessionsStorage> {
-  return withLock(async () => {
-    return await loadSessionsInternal();
-  });
+  const filePath = getSessionsFilePath();
+  return withFileLock(filePath, loadSessionsInternal, SESSIONS_DEFAULT_CONTENT);
 }
 
 /**
@@ -175,7 +119,8 @@ export async function saveSession(
   sessionName: string,
   sessionData: Omit<SessionData, 'name'>
 ): Promise<void> {
-  return withLock(async () => {
+  const filePath = getSessionsFilePath();
+  return withFileLock(filePath, async () => {
     const storage = await loadSessionsInternal();
 
     // Add name field and timestamps
@@ -192,7 +137,7 @@ export async function saveSession(
     await saveSessionsInternal(storage);
 
     logger.info(`Session ${sessionName} saved`);
-  });
+  }, SESSIONS_DEFAULT_CONTENT);
 }
 
 /**
@@ -204,7 +149,8 @@ export async function updateSession(
   sessionName: string,
   updates: Partial<Omit<SessionData, 'name' | 'createdAt' | 'updatedAt'>>
 ): Promise<void> {
-  return withLock(async () => {
+  const filePath = getSessionsFilePath();
+  return withFileLock(filePath, async () => {
     const storage = await loadSessionsInternal();
 
     const existingSession = storage.sessions[sessionName];
@@ -223,7 +169,7 @@ export async function updateSession(
     await saveSessionsInternal(storage);
 
     logger.info(`Session ${sessionName} updated`);
-  });
+  }, SESSIONS_DEFAULT_CONTENT);
 }
 
 /**
@@ -231,7 +177,8 @@ export async function updateSession(
  * @param sessionName - Name of the session to delete (without @ prefix)
  */
 export async function deleteSession(sessionName: string): Promise<void> {
-  return withLock(async () => {
+  const filePath = getSessionsFilePath();
+  return withFileLock(filePath, async () => {
     const storage = await loadSessionsInternal();
 
     if (!storage.sessions[sessionName]) {
@@ -243,7 +190,7 @@ export async function deleteSession(sessionName: string): Promise<void> {
     await saveSessionsInternal(storage);
 
     logger.info(`Session ${sessionName} deleted`);
-  });
+  }, SESSIONS_DEFAULT_CONTENT);
 }
 
 /**
