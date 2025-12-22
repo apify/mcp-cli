@@ -11,7 +11,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { Command } from 'commander';
-import { setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
+import { setVerbose, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatError } from '../lib/index.js';
 import { formatJsonError } from './output.js';
 import * as tools from './commands/tools.js';
@@ -100,9 +100,6 @@ async function main(): Promise<void> {
 
   // If no target found, list sessions
   if (!targetInfo) {
-    // Initialize file logger with "list" as prefix
-    await initFileLogger('cli.log', 'list');
-
     const { json } = extractOptions(args);
     await sessions.listSessionsAndAuthProfiles({ outputMode: json ? 'json' : 'human' });
     if (!json) {
@@ -114,9 +111,6 @@ async function main(): Promise<void> {
   }
 
   const { target, targetIndex } = targetInfo;
-
-  // Initialize file logger with target as prefix
-  await initFileLogger('cli.log', target);
 
   // Build modified argv without the target
   const modifiedArgs = [

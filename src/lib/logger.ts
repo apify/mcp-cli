@@ -41,18 +41,19 @@ export function getVerbose(): boolean {
  * @param logFileName - Name of the log file (e.g., 'cli.log', 'bridge.log')
  * @param prefix - Optional prefix for log messages (e.g., session name, target name)
  */
-export async function initFileLogger(logFileName: string, prefix?: string): Promise<void> {
+export async function initFileLogger(logFileName: string, prefix: string): Promise<void> {
   // Close existing logger if any
   if (fileLogger) {
+    log('warn', 'Logging file already open?');
     await fileLogger.close();
   }
 
-  const logFilePath = join(getLogsDir(), logFileName);
+  const filePath = join(getLogsDir(), logFileName);
   fileLogger = new FileLogger({
-    filePath: logFilePath,
+    filePath,
     maxSize: 10 * 1024 * 1024, // 10MB
     maxFiles: 5,
-    ...(prefix ? { prefix } : {}),
+    prefix,
   });
 
   await fileLogger.init();
