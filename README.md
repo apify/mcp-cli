@@ -1,18 +1,19 @@
-# mcpc: MCP CLI client
+# mcpc: an MCP command-line client
 
-`mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
+`mcpc` is a universal command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
 which maps MCP to intuitive CLI commands for shell access, scripts, and AI coding agents.
 
-`mcpc` can connect to any MCP server over Streamable HTTP transport or stdio,
+`mcpc` can connect to any MCP server over Streamable HTTP or stdio transports,
 securely store OAuth credentials,
-and keep long-term sessions to multiple MCP servers in parallel.
-It supports ALL major protocol features including tools/resources/prompts, asynchronous tasks, and notifications.
+and keep long-term sessions to multiple servers in parallel.
+It supports all major MCP features, including tools, resources, prompts, asynchronous tasks, and notifications.
 
 `mcpc` is handy for manual testing of MCP servers, scripting,
-and AI coding agents to instrument MCP workflows in ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp),
+and AI coding agents to use MCP in ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp),
 for better accuracy and lower token compared to traditional tool function calling.
+After all, UNIX-compatible shell script is THE most universal coding language, for both people and LLMs.
 
-After all, UNIX-compatible shell script is THE most universal coding language.
+Note that `mcpc` is deterministic and does not use any LLM on its own; that's for the higher layer to do.
 
 ## Features
 
@@ -101,6 +102,8 @@ mcpc @<session-name> close
 
 # Authentication profile management (for OAuth to remote MCP servers)
 mcpc <server> auth [--profile <name>]
+
+TODO: do we really need this? the command should be "login" not "auth"
 mcpc <server> auth-list
 mcpc <server> auth-show --profile <name>
 mcpc <server> auth-delete --profile <name>

@@ -7,6 +7,8 @@
 
 saveAuthProfiles - the auth profiles should use the file lock
 
+authProfiles - prints secrets to JSON now
+
 - nit: on server/session info, print also auth info
   - [Using session: apify-docs] => change to show server + transport + version? + auth info!!!
     Active MCP sessions:
@@ -14,7 +16,7 @@ saveAuthProfiles - the auth profiles should use the file lock
 
 - nit: If tool response has `structuredContent` and `content:` [ type: 'text', 'text': ... }], print the latter as Markdown in text mode and skip the structuredContent
 
-- add "mcpc --close-all" command to clean up old sessions
+- add "mcpc --reset-all" commands to clean up everyting 
 
 - docs: add the OAuth command to --help, otherwise people will not find it when they need it
 
@@ -36,5 +38,5 @@ E2E tests
 Later
 - nit: Colorize output, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
 - nit: in Readme, explain the MCP commands better
-
+- MCP elicitations 
 
