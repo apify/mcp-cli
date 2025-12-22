@@ -4,13 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`mcpc` is a command-line client for the Model Context Protocol (MCP). It wraps remote or local MCP servers as friendly command-line tools, mapping MCP concepts (tools, resources, prompts) to intuitive CLI commands.
+`mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
+which maps MCP to intuitive CLI commands, for human shell access, scripts, or AI coding agents.
+
+`mcpc` can connect to any MCP server over Streamable HTTP transport or stdio,
+securely store OAuth credentials,
+and keep long-term sessions alive to receive notifications.
+
+`mcpc` is handy for manual testing of MCP servers, scripting,
+and AI coding agents to use MCP in the ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp),
+for better accuracy and token use.
+
+After all, UNIX-compatible shell script is THE most universal coding language.
 
 **Key capabilities:**
 - Universal MCP client supporting Streamable HTTP and stdio transports
 - Persistent session management with bridge processes
 - Zero-setup connection to remote servers or local packages
 - AI-friendly design for code generation and automated workflows
+- Secure OAuth authentication with OS keychain integration
+- Real-time notification handling
 
 ## Build and Development Commands
 
@@ -54,18 +67,30 @@ mcpc @apify tools-list --json
 mcpc @apify tools-call search --args '{"query":"hello"}'
 mcpc @apify tools-call search --args query=hello limit:=10
 
-# Authenticate and create reusable profile (not yet functional)
+# Authenticate and create reusable profile
 mcpc mcp.apify.com auth --profile personal
 
-# Create a session with auth profile (not yet functional)
+# Create a session with auth profile
 mcpc mcp.apify.com connect --session @apify --profile personal
 
 # List all sessions and auth profiles
 mcpc
 
-# Set logging level (mock)
+# Set logging level
 mcpc @apify logging-set-level debug
+
+# Interactive shell with real-time notifications
+mcpc @apify shell
 ```
+
+## Design Principles
+
+- Make `mcpc` easy to use for AI agents: avoid unnecessary interaction roundtrips, save tokens, be extremely clear about what's happening
+- Make it delightful also for human users: good copy, colors, clear error messages
+- Options are as independent to reduce decision fatigue, users always know what to do next
+- Strict consistency with MCP specification and object schemas
+- Minimal dependencies, cross-platform
+- No slop
 
 ## Architecture
 
@@ -535,31 +560,50 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
 - **Target Resolution**: URL/session/config resolution logic (sessions and HTTP servers working)
 - **CLI-to-MCP Integration**: Full integration via direct connection and session bridge
 - **Caching**: In-memory cache with TTL (5min default), automatic invalidation via server notifications
-- **Notification Handling**: `list_changed` notifications automatically invalidate cache
+- **Notification Handling**: Full notification support with forwarding from bridge to clients
+  - `tools/list_changed`, `resources/list_changed`, `prompts/list_changed` notifications
+  - Automatic cache invalidation on list changes
+  - Real-time notification display in interactive shell with timestamps and color coding
+- **Interactive Shell**: Complete REPL implementation
+  - Command history (saved to `~/.mcpc/history`, last 1000 commands)
+  - Real-time notification display during shell sessions
+  - Persistent notification listener per shell session
+  - Graceful cleanup on exit
+- **Error Recovery**: Automatic recovery from failures
+  - Bridge crash detection and automatic restart
+  - Socket reconnection with preserved session state
+  - Automatic retry on network errors (with bridge restart)
+  - Clean handling of orphaned processes
+- **Config File Loading**: Complete stdio transport support for local packages
 
 ### 🚧 In Progress / TODO
-- **Interactive Shell**: REPL with command history and tab completion
-- **Config File Loading**: Complete stdio transport support for local packages
-- **Package Resolution**: Find and run local MCP packages
+- **Package Resolution**: Find and run local MCP packages (DEFERRED as nice-to-have)
 - **Keychain Integration**: Store credentials securely (OS keychain via `keytar`)
 - **OAuth Implementation**: Full OAuth 2.1 flow with PKCE, authentication profiles
-- **Error Recovery**: Bridge crash recovery, automatic reconnection with exponential backoff
+  - Interactive OAuth flow (browser-based)
+  - Authentication profiles (reusable credentials)
+  - Token refresh
+  - Integration with session management
 
 ### 📋 Implementation Approach
 
-Two options for connecting CLI commands to MCP:
+`mcpc` implements a **hybrid architecture** supporting both direct connections and persistent sessions:
 
-**Option 1: Direct Connection (Recommended Start)**
-- CLI command handlers create `McpClient` on-demand
+**Direct Connection** (for one-off commands without sessions):
+- CLI creates `McpClient` on-demand via `withMcpClient()` helper
 - Connect → Execute → Close for each command
-- Simpler, works immediately, good for ephemeral usage
-- No persistent sessions yet
+- Used when target is a URL or config entry (not a session name)
+- Good for ephemeral usage and scripts
 
-**Option 2: Bridge Process (Full Architecture)**
-- Persistent bridge maintains MCP connection
+**Bridge Process Architecture** (for persistent sessions):
+- Persistent bridge maintains MCP connection and state
 - CLI communicates via Unix socket IPC
-- Supports persistent sessions, notifications, better performance
-- More complex, implement after Option 1 works
+- Supports sessions, notifications, caching, and better performance
+- Used when target is a session name (e.g., `@apify`)
+- Bridge handles automatic reconnection and error recovery
+
+This hybrid approach provides flexibility: use direct connections for quick one-off commands,
+or create sessions for interactive use and long-running workflows.
 
 ## References
 
