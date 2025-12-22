@@ -2,26 +2,17 @@
  * Tools command handlers
  */
 
-import type { OutputMode } from '../../lib/types.js';
 import { formatOutput, formatToolDetail, formatSuccess, logTarget } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs, loadArgsFromFile } from '../parser.js';
+import type { CommandOptions } from './types.js';
 
 /**
  * List available tools
  * Automatically fetches all pages if pagination is present
  */
-export async function listTools(
-  target: string,
-  options: {
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
-  }
-): Promise<void> {
+export async function listTools(target: string, options: CommandOptions): Promise<void> {
   await withMcpClient(target, options, async (client) => {
     // Fetch all tools across all pages
     const allTools = [];
@@ -41,17 +32,7 @@ export async function listTools(
 /**
  * Get information about a specific tool
  */
-export async function getTool(
-  target: string,
-  name: string,
-  options: {
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
-  }
-): Promise<void> {
+export async function getTool(target: string, name: string, options: CommandOptions): Promise<void> {
   await withMcpClient(target, options, async (client) => {
     // List all tools and find the matching one
     const result = await client.listTools();
@@ -76,14 +57,9 @@ export async function getTool(
 export async function callTool(
   target: string,
   name: string,
-  options: {
+  options: CommandOptions & {
     args?: string[];
     argsFile?: string;
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
   }
 ): Promise<void> {
   // Parse args from inline JSON, key=value pairs, key:=json pairs, or load from file

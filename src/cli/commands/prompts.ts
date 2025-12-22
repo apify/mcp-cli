@@ -2,25 +2,16 @@
  * Prompts command handlers
  */
 
-import type { OutputMode } from '../../lib/types.js';
 import { formatOutput, logTarget } from '../output.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs } from '../parser.js';
+import type { CommandOptions } from './types.js';
 
 /**
  * List available prompts
  * Automatically fetches all pages if pagination is present
  */
-export async function listPrompts(
-  target: string,
-  options: {
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
-  }
-): Promise<void> {
+export async function listPrompts(target: string, options: CommandOptions): Promise<void> {
   await withMcpClient(target, options, async (client) => {
     // Fetch all prompts across all pages
     const allPrompts = [];
@@ -43,13 +34,8 @@ export async function listPrompts(
 export async function getPrompt(
   target: string,
   name: string,
-  options: {
+  options: CommandOptions & {
     args?: string[];
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
   }
 ): Promise<void> {
   // Parse args from inline JSON, key=value pairs, or key:=json pairs

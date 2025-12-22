@@ -2,24 +2,15 @@
  * Resources command handlers
  */
 
-import type { OutputMode } from '../../lib/types.js';
 import { formatOutput, formatSuccess, logTarget } from '../output.js';
 import { withMcpClient } from '../helpers.js';
+import type { CommandOptions } from './types.js';
 
 /**
  * List available resources
  * Automatically fetches all pages if pagination is present
  */
-export async function listResources(
-  target: string,
-  options: {
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
-  }
-): Promise<void> {
+export async function listResources(target: string, options: CommandOptions): Promise<void> {
   await withMcpClient(target, options, async (client) => {
     // Fetch all resources across all pages
     const allResources = [];
@@ -40,16 +31,7 @@ export async function listResources(
  * List available resource templates
  * Automatically fetches all pages if pagination is present
  */
-export async function listResourceTemplates(
-  target: string,
-  options: {
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
-  }
-): Promise<void> {
+export async function listResourceTemplates(target: string, options: CommandOptions): Promise<void> {
   await withMcpClient(target, options, async (client) => {
     // Fetch all resource templates across all pages
     const allTemplates = [];
@@ -72,15 +54,10 @@ export async function listResourceTemplates(
 export async function getResource(
   target: string,
   uri: string,
-  options: {
+  options: CommandOptions & {
     output?: string;
     raw?: boolean;
     maxSize?: number;
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
   }
 ): Promise<void> {
   await withMcpClient(target, options, async (client) => {
@@ -113,17 +90,7 @@ export async function getResource(
 /**
  * Subscribe to resource updates
  */
-export async function subscribeResource(
-  target: string,
-  uri: string,
-  options: {
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
-  }
-): Promise<void> {
+export async function subscribeResource(target: string, uri: string, options: CommandOptions): Promise<void> {
   await withMcpClient(target, options, async (client) => {
     await client.subscribeResource(uri);
 
@@ -139,17 +106,7 @@ export async function subscribeResource(
 /**
  * Unsubscribe from resource updates
  */
-export async function unsubscribeResource(
-  target: string,
-  uri: string,
-  options: {
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
-  }
-): Promise<void> {
+export async function unsubscribeResource(target: string, uri: string, options: CommandOptions): Promise<void> {
   await withMcpClient(target, options, async (client) => {
     await client.unsubscribeResource(uri);
 

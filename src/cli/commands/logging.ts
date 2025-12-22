@@ -2,27 +2,18 @@
  * Logging command handlers
  */
 
-import type { OutputMode, LoggingLevel } from '../../lib/types.js';
+import type { LoggingLevel } from '../../lib/types.js';
 import { formatOutput, formatSuccess, logTarget } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import { withMcpClient } from '../helpers.js';
+import type { CommandOptions } from './types.js';
 
 const VALID_LOG_LEVELS: LoggingLevel[] = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
 
 /**
  * Set server logging level
  */
-export async function setLogLevel(
-  target: string,
-  level: string,
-  options: {
-    outputMode: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
-    verbose?: boolean;
-  }
-): Promise<void> {
+export async function setLogLevel(target: string, level: string, options: CommandOptions): Promise<void> {
   // Validate log level
   if (!VALID_LOG_LEVELS.includes(level as LoggingLevel)) {
     throw new ClientError(

@@ -2,17 +2,9 @@
  * Server-level commands (ping, etc.)
  */
 
-import type { OutputMode } from '../../lib/index.js';
 import { formatSuccess, formatOutput, logTarget } from '../output.js';
 import { withMcpClient } from '../helpers.js';
-
-interface CommandOptions {
-  outputMode: OutputMode;
-  config?: string;
-  headers?: string[];
-  timeout?: number;
-  verbose?: boolean;
-}
+import type { CommandOptions } from './types.js';
 
 /**
  * Ping the MCP server to check if it's alive
