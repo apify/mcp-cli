@@ -3,7 +3,7 @@
  */
 
 import type { OutputMode } from '../../lib/index.js';
-import { formatOutput, formatSuccess, formatError, logTarget } from '../output.js';
+import { formatOutput, formatSuccess, formatError } from '../output.js';
 import { listAuthProfiles } from '../../lib/auth-profiles.js';
 import { listSessions, sessionExists } from '../../lib/sessions.js';
 import { startBridge, stopBridge } from '../../lib/bridge-manager.js';
@@ -197,6 +197,7 @@ export async function showServerInfo(
     headers?: string[];
     timeout?: number;
     verbose?: boolean;
+    hideTarget?: boolean;
   }
 ): Promise<void> {
   const { withMcpClient } = await import('../helpers.js');
@@ -215,7 +216,6 @@ export async function showServerInfo(
     }
 
     if (options.outputMode === 'human') {
-      logTarget(target, options.outputMode);
       console.log('');
 
       // Server info

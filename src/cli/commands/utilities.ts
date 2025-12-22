@@ -2,7 +2,7 @@
  * Server-level commands (ping, etc.)
  */
 
-import { formatSuccess, formatOutput, logTarget } from '../output.js';
+import { formatSuccess, formatOutput } from '../output.js';
 import { withMcpClient } from '../helpers.js';
 import type { CommandOptions } from '../../lib/types.js';
 
@@ -16,7 +16,6 @@ export async function ping(target: string, options: CommandOptions): Promise<voi
     const endTime = performance.now();
     const durationMs = Math.round(endTime - startTime);
 
-    logTarget(target, options.outputMode);
     if (options.outputMode === 'human') {
       console.log(formatSuccess(`Ping successful (${durationMs}ms)`));
     } else {

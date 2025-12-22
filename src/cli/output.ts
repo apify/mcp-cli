@@ -244,9 +244,10 @@ export function formatInfo(message: string): string {
 
 /**
  * Log target prefix (only in human mode)
+ * @param hide - If true, suppress the output (useful in interactive shell)
  */
-export function logTarget(target: string, outputMode: OutputMode): void {
-  if (outputMode === 'human') {
+export function logTarget(target: string, outputMode: OutputMode, hide = false): void {
+  if (outputMode === 'human' && !hide) {
     console.log(chalk.blue(`[Using session: ${target}]`));
   }
 }

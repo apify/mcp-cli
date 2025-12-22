@@ -2,7 +2,7 @@
  * Resources command handlers
  */
 
-import { formatOutput, formatSuccess, logTarget } from '../output.js';
+import { formatOutput, formatSuccess } from '../output.js';
 import { withMcpClient } from '../helpers.js';
 import type { CommandOptions } from '../../lib/types.js';
 
@@ -22,7 +22,6 @@ export async function listResources(target: string, options: CommandOptions): Pr
       cursor = result.nextCursor;
     } while (cursor);
 
-    logTarget(target, options.outputMode);
     console.log(formatOutput(allResources, options.outputMode));
   });
 }
@@ -43,7 +42,6 @@ export async function listResourceTemplates(target: string, options: CommandOpti
       cursor = result.nextCursor;
     } while (cursor);
 
-    logTarget(target, options.outputMode);
     console.log(formatOutput(allTemplates, options.outputMode));
   });
 }
@@ -82,7 +80,6 @@ export async function getResource(
       return;
     }
 
-    logTarget(target, options.outputMode);
     console.log(formatOutput(result, options.outputMode));
   });
 }
@@ -94,7 +91,6 @@ export async function subscribeResource(target: string, uri: string, options: Co
   await withMcpClient(target, options, async (client) => {
     await client.subscribeResource(uri);
 
-    logTarget(target, options.outputMode);
     if (options.outputMode === 'human') {
       console.log(formatSuccess(`Subscribed to resource: ${uri}`));
     } else {
@@ -110,7 +106,6 @@ export async function unsubscribeResource(target: string, uri: string, options: 
   await withMcpClient(target, options, async (client) => {
     await client.unsubscribeResource(uri);
 
-    logTarget(target, options.outputMode);
     if (options.outputMode === 'human') {
       console.log(formatSuccess(`Unsubscribed from resource: ${uri}`));
     } else {

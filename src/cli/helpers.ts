@@ -9,6 +9,7 @@ import { ClientError, NetworkError } from '../lib/errors.js';
 import { normalizeServerUrl, isValidSessionName } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
+import { logTarget } from './output.js';
 import packageJson from '../../package.json' with { type: 'json' };
 
 const logger = createLogger('cli');
@@ -159,6 +160,7 @@ export function resolveTarget(
  * Execute an operation with an MCP client
  * Handles connection, execution, and cleanup
  * Automatically detects and uses sessions (targets starting with @)
+ * Logs the target prefix before executing the operation
  *
  * @param target - Target string (URL, @session, package, etc.)
  * @param options - CLI options (verbose, config, headers, etc.)
@@ -172,6 +174,7 @@ export async function withMcpClient<T>(
     headers?: string[];
     timeout?: number;
     verbose?: boolean;
+    hideTarget?: boolean;
   },
   callback: (client: IMcpClient) => Promise<T>
 ): Promise<T> {
@@ -180,6 +183,11 @@ export async function withMcpClient<T>(
     const { withSessionClient } = await import('../lib/session-client.js');
 
     logger.debug('Using session:', target);
+
+    // Log target prefix (unless hidden)
+    if (options.outputMode) {
+      logTarget(target, options.outputMode, options.hideTarget);
+    }
 
     // Use session client (SessionClient implements IMcpClient interface)
     return await withSessionClient(target, callback);
@@ -211,6 +219,11 @@ export async function withMcpClient<T>(
 
   try {
     logger.debug('Connected successfully');
+
+    // Log target prefix (unless hidden)
+    if (options.outputMode) {
+      logTarget(target, options.outputMode, options.hideTarget);
+    }
 
     // Execute callback with connected client
     const result = await callback(client);

@@ -3,7 +3,7 @@
  */
 
 import type { LoggingLevel, CommandOptions } from '../../lib/types.js';
-import { formatOutput, formatSuccess, logTarget } from '../output.js';
+import { formatOutput, formatSuccess } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import { withMcpClient } from '../helpers.js';
 
@@ -24,7 +24,6 @@ export async function setLogLevel(target: string, level: string, options: Comman
     // After validation above, we know level is a valid LoggingLevel
     await client.setLoggingLevel(level as LoggingLevel);
 
-    logTarget(target, options.outputMode);
     if (options.outputMode === 'human') {
       console.log(formatSuccess(`Server log level set to: ${level}`));
     } else {

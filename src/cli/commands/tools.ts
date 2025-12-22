@@ -2,7 +2,7 @@
  * Tools command handlers
  */
 
-import { formatOutput, formatToolDetail, formatSuccess, logTarget } from '../output.js';
+import { formatOutput, formatToolDetail, formatSuccess } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import type { CommandOptions } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
@@ -25,7 +25,6 @@ export async function listTools(target: string, options: CommandOptions): Promis
       cursor = result.nextCursor;
     } while (cursor);
 
-    logTarget(target, options.outputMode);
     console.log(formatOutput(allTools, options.outputMode));
   });
 }
@@ -43,7 +42,6 @@ export async function getTool(target: string, name: string, options: CommandOpti
       throw new ClientError(`Tool not found: ${name}`);
     }
 
-    logTarget(target, options.outputMode);
     if (options.outputMode === 'human') {
       console.log(formatToolDetail(tool));
     } else {
@@ -79,7 +77,6 @@ export async function callTool(
   await withMcpClient(target, options, async (client) => {
     const result = await client.callTool(name, parsedArgs);
 
-    logTarget(target, options.outputMode);
     if (options.outputMode === 'human') {
       console.log(formatSuccess(`Tool ${name} executed successfully`));
       console.log(formatOutput(result, 'human'));

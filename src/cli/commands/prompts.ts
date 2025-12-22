@@ -3,7 +3,7 @@
  */
 
 import type { CommandOptions } from '../../lib/types.js';
-import { formatOutput, logTarget } from '../output.js';
+import { formatOutput } from '../output.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs } from '../parser.js';
 
@@ -23,7 +23,6 @@ export async function listPrompts(target: string, options: CommandOptions): Prom
       cursor = result.nextCursor;
     } while (cursor);
 
-    logTarget(target, options.outputMode);
     console.log(formatOutput(allPrompts, options.outputMode));
   });
 }
@@ -50,7 +49,6 @@ export async function getPrompt(
   await withMcpClient(target, options, async (client) => {
     const result = await client.getPrompt(name, promptArgs);
 
-    logTarget(target, options.outputMode);
     console.log(formatOutput(result, options.outputMode));
   });
 }

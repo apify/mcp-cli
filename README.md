@@ -757,6 +757,10 @@ mcpc(@apify)> exit
 ### Architecture overview
 
 ```
+TODO: improve diagram
+mcpc ──> cli ├──> bridge (UNIX socket) ──> MCP server (stdio/HTTP)
+             ├──> MCP server (stdio/HTTP)
+
 mcpc (single package)
 ├── src/
 │   ├── core/           # Core MCP protocol implementation
@@ -1013,7 +1017,7 @@ Please open an issue or pull request on [GitHub](https://github.com/apify/mcpc).
 
 ## Authors
 
-Built by [Jan Curn](https://x.com/jancurn) / [Apify](https://apify.com), and contributors.
+Built by [Jan Curn](https://x.com/jancurn), [Apify](https://apify.com), and contributors welcome.
 
 ## License
 
