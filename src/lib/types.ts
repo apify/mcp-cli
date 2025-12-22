@@ -118,6 +118,18 @@ export interface SessionsStorage {
 }
 
 /**
+ * OAuth tokens (stored in auth profile for now, will move to keychain later)
+ */
+export interface OAuthTokens {
+  access_token: string;
+  token_type: string;
+  expires_in?: number;
+  refresh_token?: string;
+  scope?: string;
+  expires_at?: number; // Unix timestamp when token expires
+}
+
+/**
  * Authentication profile data stored in auth-profiles.json
  * Only OAuth authentication is supported for profiles
  */
@@ -130,6 +142,8 @@ export interface AuthProfile {
   scopes?: string[];
   authenticatedAt?: string;
   expiresAt?: string;
+  // OAuth tokens (TODO: move to keychain)
+  tokens?: OAuthTokens;
   // Metadata
   createdAt: string;
   updatedAt: string;

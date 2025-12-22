@@ -20,6 +20,7 @@ import * as prompts from './commands/prompts.js';
 import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
 import * as utilities from './commands/utilities.js';
+import * as auth from './commands/auth.js';
 import type { OutputMode } from '../lib/index.js';
 import { findTarget, extractOptions, hasCommandAfterTarget, getVerboseFromEnv, getJsonFromEnv } from './parser.js';
 import packageJson from '../../package.json' with { type: 'json' };
@@ -218,6 +219,49 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     .requiredOption('--session <name>', 'Session name (e.g., @apify)')
     .action(async (options, command) => {
       await sessions.connectSession(options.session, target, getOptionsFromCommand(command));
+    });
+
+  // Authentication commands
+  program
+    .command('auth')
+    .description('Authenticate with a server and create/update auth profile')
+    .option('--profile <name>', 'Profile name (default: default)')
+    .option('--scope <scope>', 'OAuth scope(s) to request')
+    .action(async (options, command) => {
+      await auth.auth(target, {
+        profile: options.profile,
+        scope: options.scope,
+        ...getOptionsFromCommand(command),
+      });
+    });
+
+  program
+    .command('auth-list')
+    .description('List authentication profiles for the server')
+    .action(async (_options, command) => {
+      await auth.authList(target, getOptionsFromCommand(command));
+    });
+
+  program
+    .command('auth-show')
+    .description('Show details of an authentication profile')
+    .option('--profile <name>', 'Profile name (default: default)')
+    .action(async (options, command) => {
+      await auth.authShow(target, {
+        profile: options.profile,
+        ...getOptionsFromCommand(command),
+      });
+    });
+
+  program
+    .command('auth-delete')
+    .description('Delete an authentication profile')
+    .option('--profile <name>', 'Profile name (default: default)')
+    .action(async (options, command) => {
+      await auth.authDelete(target, {
+        profile: options.profile,
+        ...getOptionsFromCommand(command),
+      });
     });
 
   // Tools commands (hyphenated)
