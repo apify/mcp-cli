@@ -387,18 +387,8 @@ export async function showHelp(
 /**
  * Open an interactive shell for a target
  */
-// eslint-disable-next-line @typescript-eslint/require-await
-export async function openShell(
-  target: string,
-  options: { outputMode: OutputMode }
-): Promise<void> {
-  // TODO: Implement interactive shell using @inquirer/prompts
-
-  logTarget(target, options.outputMode);
-  console.log('Interactive shell not implemented yet.');
-  console.log('This would provide a REPL interface with:');
-  console.log('  - Command history (saved to ~/.mcpc/history)');
-  console.log('  - Tab completion for commands and tool names');
-  console.log('  - Multi-line editing');
-  console.log('  - Prompt showing session name');
+export async function openShell(target: string): Promise<void> {
+  // Import shell dynamically to avoid circular dependencies
+  const { startShell } = await import('../shell.js');
+  await startShell(target);
 }

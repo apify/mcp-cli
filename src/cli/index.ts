@@ -199,8 +199,8 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
   program
     .command('shell')
     .description('Interactive shell for the target')
-    .action(async (_options, command) => {
-      await sessions.openShell(target, getOptionsFromCommand(command));
+    .action(async () => {
+      await sessions.openShell(target);
     });
 
   // Close command

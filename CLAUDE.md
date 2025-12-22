@@ -515,16 +515,18 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
 ### ✅ Completed
 - **CLI Structure**: Complete command parsing and routing with Commander.js
 - **Output Formatting**: Human-readable (tables, colors) and JSON modes
-- **Argument Parsing**: Inline JSON, key=value, and key:=json formats
+- **Argument Parsing**: Inline JSON, key=value, and key:=json formats, `--args-file` support
 - **Core MCP Client**: Wrapper around official SDK with error handling
 - **Transport Layer**: HTTP and stdio transport creation and management
 - **Error Handling**: Typed errors with appropriate exit codes
-- **Logging**: Structured logging with verbose mode support
-- **Command Handlers**: All command stubs with mock data
+- **Logging**: Structured logging with verbose mode support, per-session bridge logs with rotation
+- **Environment Variables**: MCPC_HOME_DIR, MCPC_VERBOSE, MCPC_JSON support
+- **Command Handlers**: All MCP commands fully functional
   - `tools-list`, `tools-schema`, `tools-call`
   - `resources-list`, `resources-read`, `resources-subscribe`, `resources-unsubscribe`, `resources-templates-list`
   - `prompts-list`, `prompts-get`
   - `logging-set-level`
+  - `ping` (with roundtrip timing)
   - `connect`, `close`, `help` (session management)
   - `auth`, `auth-list`, `auth-show`, `auth-delete` (authentication management - structure in place)
 - **Bridge Process**: Persistent MCP connections with Unix domain socket IPC
@@ -532,15 +534,16 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
 - **IPC Layer**: Unix socket communication between CLI and bridge (BridgeClient, SessionClient)
 - **Target Resolution**: URL/session/config resolution logic (sessions and HTTP servers working)
 - **CLI-to-MCP Integration**: Full integration via direct connection and session bridge
+- **Caching**: In-memory cache with TTL (5min default), automatic invalidation via server notifications
+- **Notification Handling**: `list_changed` notifications automatically invalidate cache
 
 ### 🚧 In Progress / TODO
 - **Interactive Shell**: REPL with command history and tab completion
-- **Config File Loading**: Parse and use MCP config files (stdio transport support)
+- **Config File Loading**: Complete stdio transport support for local packages
+- **Package Resolution**: Find and run local MCP packages
 - **Keychain Integration**: Store credentials securely (OS keychain via `keytar`)
 - **OAuth Implementation**: Full OAuth 2.1 flow with PKCE, authentication profiles
-- **Notification Handling**: Handle server-sent notifications
-- **Error Recovery**: Bridge crash recovery, automatic reconnection
-- **Caching**: Prefetch and cache tools/resources/prompts lists
+- **Error Recovery**: Bridge crash recovery, automatic reconnection with exponential backoff
 
 ### 📋 Implementation Approach
 

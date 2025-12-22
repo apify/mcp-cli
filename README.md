@@ -3,12 +3,13 @@
 `mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
 which maps MCP to intuitive CLI commands, for human shell access, scripts, or AI coding agents.
 
-It supports all standard MCP operations, which can be run on one-shot basis,
-or as a persistent session that keeps the connection alive and keeps receiving notifications from the MCP server.
+`mcpc` can connect to any MCP server over Streamable HTTP transport or stdio,
+securely store OAuth credentials,
+and keep a long-term sessions alive to receive notifications.
 
 `mcpc` is handy for manual testing of MCP servers, scripting,
 and AI coding agents to MCP in the ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp),
-for better accuracy and lower token use.
+for better accuracy and token use. After all, shell script is the ultimate language.
 
 ## Features
 
@@ -730,20 +731,27 @@ mcpc(@apify)> exit
 **✅ Core functionality:**
 - MCP protocol client (wrapper around official SDK)
 - CLI structure with Commander.js
-- Basic command handlers for all MCP operations
+- All MCP command handlers fully functional
 - Output formatting (human-readable and JSON modes)
-- Argument parsing (inline JSON, key=value, key:=json)
+- Argument parsing (inline JSON, key=value, key:=json, `--args-file`)
 - Error handling with exit codes
 - Verbose logging
+- Bridge process with persistent sessions
+- Unix socket IPC between CLI and bridge
+- Session management with file locking
+- Environment variables (MCPC_HOME_DIR, MCPC_VERBOSE, MCPC_JSON)
+- Caching with TTL and notification-based invalidation
+- Server notification handling (`list_changed` events)
+- Per-session bridge logs with rotation
 
 ### What's not yet implemented
 
 **📋 Major features pending:**
-- **Authentication**: OAuth profiles, keychain storage, `auth-*` commands
-- **Caching**: `--no-cache` flag and list caching
+- **Authentication**: OAuth profiles, keychain storage (structure exists, flow not complete)
 - **Interactive shell**: REPL features (history, tab completion)
-- **Notification handling**: Server-sent notifications
-- **Error recovery**: Bridge restart, reconnection
+- **Config file**: Full stdio transport support for local packages
+- **Package resolution**: Find and run local MCP packages
+- **Error recovery**: Bridge crash recovery, automatic reconnection
 
 ## Implementation details
 
@@ -1001,6 +1009,9 @@ Please open an issue or pull request on [GitHub](https://github.com/apify/mcpc).
 - [Official TypeScript SDK for MCP servers and clients](https://www.npmjs.com/package/@modelcontextprotocol/sdk)
 - [MCP Inspector](https://github.com/modelcontextprotocol/inspector) - CLI client implementation for reference
 
+## Authors
+
+Built by [Jan Curn](https://x.com/jancurn) / [Apify](https://apify.com), and contributors.
 
 ## License
 

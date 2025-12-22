@@ -43,6 +43,8 @@
     "publish:placeholder": "bash scripts/publish-placeholder.sh"
   },
   "dependencies": {
+    "@inquirer/input": "^5.0.3",
+    "@inquirer/select": "^5.0.3",
     "@modelcontextprotocol/sdk": "^1.25.1",
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
