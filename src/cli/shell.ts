@@ -18,8 +18,9 @@ import { ping } from './commands/utilities.js';
 import { createSessionClient } from '../lib/session-client.js';
 import type { SessionClient } from '../lib/session-client.js';
 
-const HISTORY_FILE = 'history';
-const MAX_HISTORY = 1000;
+const HISTORY_MAX_COMMANDS = 1000;
+const HISTORY_FILE = 'shell-history';
+
 
 /**
  * Shell context
@@ -103,8 +104,8 @@ async function saveHistory(history: string[]): Promise<void> {
   // Ensure directory exists
   await mkdir(getMcpcHome(), { recursive: true });
 
-  // Keep only last MAX_HISTORY commands
-  const toSave = history.slice(-MAX_HISTORY);
+  // Keep only last HISTORY_MAX_COMMANDS commands
+  const toSave = history.slice(-HISTORY_MAX_COMMANDS);
 
   try {
     await writeFile(historyPath, toSave.join('\n') + '\n', 'utf-8');

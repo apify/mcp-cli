@@ -11,7 +11,6 @@ import {
   getSessionsFilePath,
   getBridgesDir,
   getLogsDir,
-  getHistoryFilePath,
   isValidHttpUrl,
   normalizeServerUrl,
   getAuthServerKey,
@@ -23,7 +22,7 @@ import {
   truncate,
   isProcessAlive,
   generateRequestId,
-} from '../../src/lib/utils';
+} from '../../src/lib/utils.js';
 
 describe('expandHome', () => {
   it('should expand ~ to home directory', () => {
@@ -115,13 +114,6 @@ describe('getLogsDir', () => {
   it('should return ~/.mcpc/logs/', () => {
     const dir = getLogsDir();
     expect(dir).toBe(join(homedir(), '.mcpc', 'logs'));
-  });
-});
-
-describe('getHistoryFilePath', () => {
-  it('should return ~/.mcpc/history', () => {
-    const path = getHistoryFilePath();
-    expect(path).toBe(join(homedir(), '.mcpc', 'history'));
   });
 });
 

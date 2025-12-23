@@ -62,13 +62,6 @@ export function getLogsDir(): string {
 }
 
 /**
- * Get the history file path (~/.mcpc/history)
- */
-export function getHistoryFilePath(): string {
-  return join(getMcpcHome(), 'history');
-}
-
-/**
  * Get the auth profiles file path (~/.mcpc/auth-profiles.json)
  */
 export function getAuthProfilesFilePath(): string {
