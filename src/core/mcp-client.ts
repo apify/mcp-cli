@@ -20,7 +20,6 @@ import type {
 import { createNoOpLogger, type Logger } from '../lib/logger.js';
 import { ServerError, NetworkError } from '../lib/errors.js';
 import type { IMcpClient } from '../lib/types.js';
-import * as util from 'node:util';
 
 /**
  * Transport with protocol version information (e.g., StreamableHTTPClientTransport)

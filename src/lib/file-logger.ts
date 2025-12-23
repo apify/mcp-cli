@@ -15,8 +15,6 @@ export interface FileLoggerOptions {
   maxSize?: number;
   /** Maximum number of rotated files to keep (default: 5) */
   maxFiles?: number;
-  /** Optional prefix for all log messages (e.g., session name) */
-  prefix?: string;
 }
 
 /**
@@ -26,7 +24,6 @@ export class FileLogger {
   private filePath: string;
   private maxSize: number;
   private maxFiles: number;
-  private prefix: string;
   private stream: WriteStream | null = null;
   private writtenBytes = 0;
 
@@ -34,7 +31,6 @@ export class FileLogger {
     this.filePath = options.filePath;
     this.maxSize = options.maxSize ?? 10 * 1024 * 1024; // 10MB default
     this.maxFiles = options.maxFiles ?? 5;
-    this.prefix = options.prefix ? `[${options.prefix}] ` : '';
   }
 
   /**
@@ -78,9 +74,8 @@ export class FileLogger {
       return;
     }
 
-    // Add prefix and ensure newline
-    const prefixedMessage = this.prefix + message;
-    const line = prefixedMessage.endsWith('\n') ? prefixedMessage : `${prefixedMessage}\n`;
+    // Ensure newline
+    const line = message.endsWith('\n') ? message : `${message}\n`;
     const bytes = Buffer.byteLength(line, 'utf8');
 
     // Write to file

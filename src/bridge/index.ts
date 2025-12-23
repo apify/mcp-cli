@@ -17,7 +17,6 @@ import { loadSessions, updateSession } from '../lib/sessions.js';
 import { CacheManager } from './cache.js';
 import { join } from 'path';
 import packageJson from '../../package.json' with { type: 'json' };
-import * as util from 'node:util';
 
 // Keepalive ping interval in milliseconds (30 seconds)
 const KEEPALIVE_INTERVAL_MS = 30_000;
@@ -139,7 +138,7 @@ class BridgeProcess {
    */
   async start(): Promise<void> {
     // 1. First, initialize file logger to see what's going on
-    await initFileLogger(`bridge-${this.options.sessionName}.log`, this.options.sessionName);
+    await initFileLogger(`bridge-${this.options.sessionName}.log`);
 
     logger.info(`Starting bridge for session: ${this.options.sessionName}`);
 
@@ -287,7 +286,7 @@ class BridgeProcess {
       errorMessage.includes('invalid session');
 
     if (isExpired) {
-      logger.warn('Session appears to be expired, marking as expired and shutting down', util.inspect(error));
+      logger.warn('Session appears to be expired, marking as expired and shutting down');
       this.markSessionExpiredAndExit().catch((e) => {
         logger.error('Failed to mark session as expired:', e);
         process.exit(1);
@@ -585,6 +584,8 @@ class BridgeProcess {
         });
       }
     } catch (error) {
+      logger.error('Failed to forward MCP request to server:', error);
+
       this.sendError(socket, error as Error, message.id);
 
       // Check if this error indicates session expiration
