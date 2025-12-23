@@ -68,7 +68,7 @@ mcpc @apify tools-call search --args '{"query":"hello"}'
 mcpc @apify tools-call search --args query=hello limit:=10
 
 # Authenticate and create reusable profile
-mcpc mcp.apify.com auth --profile personal
+mcpc mcp.apify.com login --profile personal
 
 # Create a session with auth profile
 mcpc mcp.apify.com connect --session @apify --profile personal
@@ -85,12 +85,17 @@ mcpc @apify shell
 
 ## Design Principles
 
-- Make `mcpc` easy to use for AI agents: avoid unnecessary interaction roundtrips, save tokens, be extremely clear about what's happening
-- Make it delightful also for human users: good copy, colors, clear error messages
-- Options are as independent to reduce decision fatigue, users always know what to do next
-- Strict consistency with MCP specification and object schemas
+- Make `mcpc` delightful to use for **both** AI agents and humans, interactively as well in scripts:
+    - Avoid unnecessary interaction loops to reduce room for error
+    - Keep functions orthogonal – there should be just one clear way to do things
+    - Do not ask for user input, except for `shell` and `login` commands
+    - Be clear what's happening and what to do next, especially on errors
+    - Be concise to save tokens
+    - Be forgiving and ignore irrelevant options, rather than fail
+    - Use colors for easy readability
+- Keep strict consistency with MCP specification and object schemas
 - Minimal dependencies, cross-platform
-- No slop
+- No slop!
 
 ## Architecture
 
@@ -156,7 +161,7 @@ mcpc/
 - `mcpc <target> help` - Alias for `mcpc <target>`
 - `mcpc <target> <command>` - Execute MCP command
 - Session creation: `mcpc <target> connect --session @<session-name> [--profile <name>]`
-- Authentication: `mcpc <server> auth [--profile <name>]`, `auth-list`, `auth-show`, `auth-delete`
+- Authentication: `mcpc <server> login [--profile <name>]`, `logout [--profile <name>]`
 
 **Target Types:**
 - `@<name>` - Named session (e.g., `@apify`) - persistent connection via bridge
@@ -382,23 +387,17 @@ Environment variable substitution supported: `${VAR_NAME}`
 **CLI Commands:**
 ```bash
 # Authenticate and create reusable profile
-mcpc <server> auth [--profile <name>]
+mcpc <server> login [--profile <name>]
 
-# List profiles for a server
-mcpc <server> auth-list
-
-# Show profile details
-mcpc <server> auth-show --profile <name>
-
-# Delete a profile
-mcpc <server> auth-delete --profile <name>
+# Delete a profile (logout)
+mcpc <server> logout --profile <name>
 
 # Create session with specific profile
 mcpc <server> connect --session @<name> --profile <profile>
 ```
 
 **OAuth Flow:**
-1. User runs `mcpc <server> auth --profile personal`
+1. User runs `mcpc <server> login --profile personal`
 2. CLI discovers OAuth metadata via `WWW-Authenticate` header or well-known URIs
 3. CLI creates local HTTP callback server on `http://localhost:<random-port>/callback`
 4. CLI opens browser to authorization URL with PKCE challenge
@@ -553,7 +552,7 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
   - `logging-set-level`
   - `ping` (with roundtrip timing)
   - `connect`, `close`, `help` (session management)
-  - `auth`, `auth-list`, `auth-show`, `auth-delete` (authentication management - structure in place)
+  - `login`, `logout` (authentication management - structure in place)
 - **Bridge Process**: Persistent MCP connections with Unix domain socket IPC
 - **Session Management**: Complete `sessions.json` persistence with file locking
 - **IPC Layer**: Unix socket communication between CLI and bridge (BridgeClient, SessionClient)

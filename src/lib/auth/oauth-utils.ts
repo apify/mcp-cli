@@ -131,7 +131,7 @@ export function createReauthError(
 ): AuthError {
   const command =
     profileName === DEFAULT_AUTH_PROFILE
-      ? `mcpc ${serverUrl} auth`
-      : `mcpc ${serverUrl} auth --profile ${profileName}`;
+      ? `mcpc ${serverUrl} login`
+      : `mcpc ${serverUrl} login --profile ${profileName}`;
   return new AuthError(`${message}. Please re-authenticate with: ${command}`);
 }

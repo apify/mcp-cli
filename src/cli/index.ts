@@ -226,12 +226,12 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
 
   // Authentication commands
   program
-    .command('auth')
-    .description('Authenticate with a server and create/update auth profile')
+    .command('login')
+    .description('Login to a server using OAuth and save authentication profile')
     .option('--profile <name>', 'Profile name (default: default)')
     .option('--scope <scope>', 'OAuth scope(s) to request')
     .action(async (options, command) => {
-      await auth.auth(target, {
+      await auth.login(target, {
         profile: options.profile,
         scope: options.scope,
         ...getOptionsFromCommand(command),
@@ -239,29 +239,11 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     });
 
   program
-    .command('auth-list')
-    .description('List authentication profiles for the server')
-    .action(async (_options, command) => {
-      await auth.authList(target, getOptionsFromCommand(command));
-    });
-
-  program
-    .command('auth-show')
-    .description('Show details of an authentication profile')
-    .option('--profile <name>', 'Profile name (default: default)')
-    .action(async (options, command) => {
-      await auth.authShow(target, {
-        profile: options.profile,
-        ...getOptionsFromCommand(command),
-      });
-    });
-
-  program
-    .command('auth-delete')
+    .command('logout')
     .description('Delete an authentication profile')
     .option('--profile <name>', 'Profile name (default: default)')
     .action(async (options, command) => {
-      await auth.authDelete(target, {
+      await auth.logout(target, {
         profile: options.profile,
         ...getOptionsFromCommand(command),
       });

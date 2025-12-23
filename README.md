@@ -4,7 +4,7 @@
 which maps MCP to intuitive CLI commands for shell access, scripts, and AI coding agents.
 
 `mcpc` can connect to any MCP server over Streamable HTTP or stdio transports,
-securely store OAuth credentials,
+securely login via OAuth credentials and store credentials,
 and keep long-term sessions to multiple servers in parallel.
 It supports all major MCP features, including tools, resources, prompts, asynchronous tasks, and notifications.
 
@@ -34,29 +34,23 @@ npm install -g mcpc
 ## Quickstart
 
 ```bash
-# Show information about a remote MCP server and list its tools
-mcpc mcp.apify.com
-mcpc mcp.apify.com tools-list
-
-# List tools of a local MCP server package
-mcpc @modelcontextprotocol/server-filesystem tools-list
-
-# Use your custom MCP config JSON file
-mcpc --config ~/.vscode/mcp.json myserver tools-list
-
-# Authenticate to OAuth-enabled server and save authentication profile
-mcpc mcp.apify.com auth --profile personal
-
-# Create a persistent session with authentication profile
-mcpc mcp.apify.com connect --session @test --profile personal
-mcpc @test tools-call search-actors --args query="web crawler"
-
 # List all active sessions and saved authentication profiles
 mcpc
 
-# Interactive shell
-mcpc @myserver shell
+# Use a local server package referenced by MCP config file
+mcpc --config ~/.vscode/mcp.json filesystem tools-list
+
+# Login to OAuth-enabled MCP server and save authentication for future use
+mcpc mcp.apify.com login
+
+# Show information about a remote MCP server and open interactive shell
+mcpc mcp.apify.com
 mcpc mcp.apify.com shell
+
+# Create a persistent session
+mcpc mcp.apify.com connect --session @test
+mcpc @test tools-call search-actors --args query="web crawler"
+mcpc @test shell
 ```
 
 ## Usage
@@ -101,18 +95,14 @@ mcpc @<session-name> <command...>
 mcpc @<session-name> close
 
 # Authentication profile management (for OAuth to remote MCP servers)
-mcpc <server> auth [--profile <name>]
-
-TODO: do we really need this? the command should be "login" not "auth"
-mcpc <server> auth-list
-mcpc <server> auth-show --profile <name>
-mcpc <server> auth-delete --profile <name>
+mcpc <server> login [--profile <name>]
+mcpc <server> logout [--profile <name>]
 ```
 
 where `<target>` can be one of (in this order of precedence):
 
 - **Named session** prefixed with `@` (e.g. `@apify`) - persisted connection via bridge process
-- **Named entry** in a config file, when used with `--config` (e.g. `linear-mcp`) - local or remote server
+- **Named entry** in a config file, when used with `--config` (e.g. `filesystem`) - local or remote server
 - **Remote MCP endpoint** URL (e.g. `mcp.apify.com` or `https://mcp.apify.com`) - direct HTTP connection
 
 For local MCP servers (stdio transport), use a config file to specify the command, arguments, and environment variables. See [Configuration](#configuration) below.
@@ -191,7 +181,7 @@ For local servers (stdio) or remote servers (Streamable HTTP) which do not requi
 `mcpc` can be used without authentication:
 
 ```bash
-# Remote server without auth
+# Remote server which enables anonymous access
 mcpc https://mcp.apify.com\?tools=docs tools-list
 ```
 
@@ -213,15 +203,15 @@ mcpc @apify tools-list
 
 ### OAuth authentication
 
-For OAuth-enabled servers, `mcpc` implements the full OAuth 2.1 flow with PKCE, including:
+For OAuth-enabled remote MCP servers, `mcpc` implements the full OAuth 2.1 flow with PKCE, including:
 - `WWW-Authenticate` header discovery
 - Authorization server metadata discovery (RFC 8414)
 - Client ID metadata documents (SEP-991)
 - Dynamic client registration (RFC 7591)
 - Automatic token refresh
 
-The OAuth authentication is performed via a web browser.
-`mcpc` **always** prompts the user before opening the browser and requesting the user to log in.
+The OAuth authentication is **always** initiated by the user calling the `login` command,
+which opens a web browser with login screen. `mcpc` doesn't open web browser in any other case.
 
 #### Authentication profiles
 
@@ -239,48 +229,41 @@ This allows you to:
 **Example:**
 
 ```bash
-# Authenticate to server and save as named authentication profile
-mcpc https://mcp.apify.com auth --profile personal
+# Login to server and save 'default' authentication profile for future use
+mcpc https://mcp.apify.com login
 
-# Authenticate with 'default' profile name
-mcpc https://mcp.apify.com auth
+# Use named authentication profile instead of 'default'
+mcpc https://mcp.apify.com login --profile personal
 
 # Re-authenticate existing profile (e.g., to refresh or change scopes)
-mcpc https://mcp.apify.com auth --profile personal
+mcpc https://mcp.apify.com login --profile personal
+
+# Delete an authentication profile
+mcpc https://mcp.apify.com logout --profile personal
+
 ```
 
-#### Managing authentication profiles
-
-```bash
-# List all profiles for a specific server
-mcpc https://mcp.apify.com auth-list
-
-# Show detailed info for a profile
-mcpc https://mcp.apify.com auth-show --profile personal
-
-# Delete a profile
-mcpc https://mcp.apify.com auth-delete --profile work
-```
-
-#### Automatic OAuth behavior
+#### Authentication behavior
 
 `mcpc` automatically handles authentication based on whether you specify a profile:
 
 **When `--profile <name>` is specified:**
 
-1. **Profile exists**: Use its stored credentials
+1. **Profile exists for the server**: Use its stored credentials
    - If authentication succeeds → Continue with command/session
-   - If authentication fails (expired/invalid) → Prompt to re-authenticate and update the profile
-2. **Profile doesn't exist**: Prompt to authenticate and create new profile with that name
+   - If authentication fails (expired/invalid) → Fail with an error
+2. **Profile doesn't exist**: Fail with an error
 
-**When no `--profile` is specified (uses `default` profile):**
+**When no `--profile` is specified:**
 
-1. **`default` profile exists**: Use its stored credentials
+1. **`default` profile exists for the server**: Use its stored credentials
    - If authentication succeeds → Continue with command/session
-   - If authentication fails (expired/invalid) → Prompt to re-authenticate and update `default`
+   - If authentication fails (expired/invalid) → Fail with an error
 2. **`default` profile doesn't exist**: Attempt unauthenticated connection
    - If server accepts (no auth required) → Continue without creating profile
-   - If server rejects with 401 + `WWW-Authenticate` → Prompt to authenticate and create `default` profile
+   - If server rejects with 401 + `WWW-Authenticate` → Fail with an error
+
+On failure, the error message includes instructions on how to login and save the profile, so the users know what to do.
 
 **This flow ensures:**
 - You only authenticate when necessary
@@ -292,13 +275,13 @@ mcpc https://mcp.apify.com auth-delete --profile work
 ```bash
 # With specific profile - always authenticated:
 # - Uses 'personal' if it exists
-# - Prompts to create 'personal' if it doesn't exist
+# - Fails if it doesn't exist
 mcpc https://mcp.apify.com connect --session @apify1 --profile personal
 
 # Without profile - opportunistic authentication:
 # - Uses 'default' if it exists
 # - Tries unauthenticated if 'default' doesn't exist
-# - Prompts to create 'default' only if server requires auth
+# - Fails if the server requires authentication
 mcpc https://mcp.apify.com connect --session @apify2
 
 # Public server - no authentication needed:
@@ -311,10 +294,10 @@ Authentication profiles enable using multiple accounts with the same MCP server:
 
 ```bash
 # Authenticate with personal account
-mcpc https://mcp.apify.com auth --profile personal
+mcpc https://mcp.apify.com login --profile personal
 
 # Authenticate with work account
-mcpc https://mcp.apify.com auth --profile work
+mcpc https://mcp.apify.com login --profile work
 
 # Create sessions using the two different credentials
 mcpc https://mcp.apify.com connect --session @apify-personal --profile personal
@@ -324,10 +307,6 @@ mcpc https://mcp.apify.com connect --session @apify-work --profile work
 mcpc @apify-personal tools-list  # Uses personal account
 mcpc @apify-work tools-list      # Uses work account
 ```
-
-#### OAuth in JSON mode
-
-If `--json` option is used, `mcpc` never asks for interactive user input and fails instead.
 
 ### Authentication precedence
 
@@ -838,12 +817,16 @@ mcpc (single package)
 
 ### Design principles
 
-- Make `mcpc` easy to use for AI agents: avoid unnecessary interaction roundtrips, save tokens, be extremely clear about what's happening
-- Make it delightful also for human users: good copy, colors, clear error messages
-- Options are as independent to reduce decision fatique, users always know what to do next
-- Strict consistency with MCP specification and object schemas
+- Make `mcpc` delightful to use for **both** AI agents and humans, interactively as well in scripts:
+  - Avoid unnecessary interaction loops to reduce room for error
+  - Keep functions orthogonal - there should be just one clear way to do things
+  - Do not ask for user input (except for `shell` and `login` commands)
+  - Be clear what's happening and what to do next, especially on errors
+  - Be concise to save tokens
+  - Use colors for easy readability
+- Keep strict consistency with MCP specification and object schemas
 - Minimal dependencies, cross-platform
-- No slop
+- No slop!
 
 ### Core module (runtime-agnostic)
 
@@ -999,8 +982,8 @@ Later...
 - Try with full path: `mcpc /path/to/package/bin/server resources-list`
 
 **"Authentication failed"**
-- List saved profiles: `mcpc <server> auth-list`
-- Re-authenticate: `mcpc <server> auth --profile <name>`
+- List saved profiles: `mcpc`
+- Re-authenticate: `mcpc <server> login --profile <name>`
 - For bearer tokens: provide `--header "Authorization: Bearer ${TOKEN}"` again
 
 ### Debug mode
