@@ -237,8 +237,10 @@ export async function performOAuthFlow(
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);
 
-  // Create OAuth provider
-  const provider = new McpcOAuthProvider(normalizedServerUrl, profileName, redirectUrl);
+  // Create OAuth provider with ignoreExistingTokens=true to force re-authentication
+  // This allows users to change scope or switch accounts
+  // Old tokens are only overwritten after successful authentication
+  const provider = new McpcOAuthProvider(normalizedServerUrl, profileName, redirectUrl, true);
 
   // Start callback server
   const { server, codePromise, destroyConnections } = startCallbackServer(port);

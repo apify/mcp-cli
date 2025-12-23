@@ -34,11 +34,13 @@ export class McpcOAuthProvider implements OAuthClientProvider {
   private _authProfile: AuthProfile | undefined;
   private _codeVerifier: string | undefined;
   private _clientInformation: OAuthClientInformationMixed | undefined;
+  private _ignoreExistingTokens: boolean;
 
-  constructor(serverUrl: string, profileName: string, redirectUrl: string) {
+  constructor(serverUrl: string, profileName: string, redirectUrl: string, ignoreExistingTokens = false) {
     this.serverUrl = serverUrl;
     this.profileName = profileName;
     this._redirectUrl = redirectUrl;
+    this._ignoreExistingTokens = ignoreExistingTokens;
   }
 
   /**
@@ -96,6 +98,12 @@ export class McpcOAuthProvider implements OAuthClientProvider {
   }
 
   async tokens(): Promise<OAuthTokens | undefined> {
+    // When forcing re-authentication, pretend no tokens exist
+    // This makes the SDK initiate a fresh OAuth flow
+    if (this._ignoreExistingTokens) {
+      return undefined;
+    }
+
     // Load tokens from keychain
     const storedTokens = await getOAuthTokens(this.serverUrl, this.profileName);
     if (!storedTokens) {
