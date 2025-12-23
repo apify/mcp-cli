@@ -4,26 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
-which maps MCP to intuitive CLI commands, for human shell access, scripts, or AI coding agents.
+`mcpc` is a universal command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
+which maps MCP to intuitive CLI commands for shell access, scripts, and AI coding agents.
 
-`mcpc` can connect to any MCP server over Streamable HTTP transport or stdio,
-securely store OAuth credentials,
-and keep long-term sessions alive to receive notifications.
+`mcpc` can connect to any MCP server over Streamable HTTP or stdio transports,
+securely login via OAuth credentials and store credentials,
+and keep long-term sessions to multiple servers in parallel.
+It supports all major MCP features, including tools, resources, prompts, asynchronous tasks, and notifications.
 
 `mcpc` is handy for manual testing of MCP servers, scripting,
-and AI coding agents to use MCP in the ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp),
-for better accuracy and token use.
-
-After all, UNIX-compatible shell script is THE most universal coding language.
+and AI coding agents to use MCP in ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp),
+for better accuracy and lower tokens compared to traditional tool function calling.
+After all, UNIX-compatible shell script is THE most universal coding language, for both people and LLMs.
 
 **Key capabilities:**
-- Universal MCP client supporting Streamable HTTP and stdio transports
-- Persistent session management with bridge processes
-- Zero-setup connection to remote servers or local packages
-- AI-friendly design for code generation and automated workflows
-- Secure OAuth authentication with OS keychain integration
-- Real-time notification handling
+- Universal MCP client - Works with any MCP server over Streamable HTTP or stdio
+- Persistent sessions - Keep multiple server connections alive simultaneously
+- Zero setup - Connect to remote servers instantly with just a URL
+- Full protocol support - Tools, resources, prompts, sampling, dynamic discovery, and async notifications
+- `--json` output - Easy integration with `jq`, scripts, and other CLI tools
+- AI-friendly - Designed for code generation and automated workflows
+- Secure - OS keychain integration for credentials, encrypted auth storage
 
 ## Build and Development Commands
 
@@ -49,15 +50,22 @@ npm run format
 ## Quick Start Examples
 
 ```bash
-# Show general help
-mcpc --help
-
-# List all sessions
+# List all active sessions and saved authentication profiles
 mcpc
 
-# Show server info and capabilities
+# Use a local server package referenced by MCP config file
+mcpc --config ~/.vscode/mcp.json filesystem tools-list
+
+# Login to OAuth-enabled MCP server and save authentication for future use
+mcpc mcp.apify.com login
+
+# Show information about a remote MCP server
 mcpc mcp.apify.com
-mcpc @apify
+
+# Create a persistent session
+mcpc mcp.apify.com connect --session @test
+mcpc @test tools-call search-actors --args query="web crawler"
+mcpc @test shell
 
 # List tools
 mcpc mcp.apify.com tools-list
@@ -67,20 +75,8 @@ mcpc @apify tools-list --json
 mcpc @apify tools-call search --args '{"query":"hello"}'
 mcpc @apify tools-call search --args query=hello limit:=10
 
-# Authenticate and create reusable profile
-mcpc mcp.apify.com login --profile personal
-
-# Create a session with auth profile
-mcpc mcp.apify.com connect --session @apify --profile personal
-
-# List all sessions and auth profiles
-mcpc
-
 # Set logging level
 mcpc @apify logging-set-level debug
-
-# Interactive shell with real-time notifications
-mcpc @apify shell
 ```
 
 ## Design Principles
@@ -161,7 +157,7 @@ mcpc/
 - `mcpc <target> help` - Alias for `mcpc <target>`
 - `mcpc <target> <command>` - Execute MCP command
 - Session creation: `mcpc <target> connect --session @<session-name> [--profile <name>]`
-- Authentication: `mcpc <server> login [--profile <name>]`, `logout [--profile <name>]`
+- Authentication: `mcpc <server> login [--profile <name>]` and `mcpc <server> logout [--profile <name>]`
 
 **Target Types:**
 - `@<name>` - Named session (e.g., `@apify`) - persistent connection via bridge
@@ -386,15 +382,30 @@ Environment variable substitution supported: `${VAR_NAME}`
 
 **CLI Commands:**
 ```bash
-# Authenticate and create reusable profile
+# Login and save authentication profile
 mcpc <server> login [--profile <name>]
 
-# Delete a profile (logout)
-mcpc <server> logout --profile <name>
+# Logout and delete authentication profile
+mcpc <server> logout [--profile <name>]
 
 # Create session with specific profile
 mcpc <server> connect --session @<name> --profile <profile>
 ```
+
+**Authentication Behavior:**
+
+When `--profile <name>` is specified:
+1. Profile exists for server → Use its stored credentials; fail with error if expired/invalid
+2. Profile doesn't exist → Fail with error
+
+When no `--profile` is specified (uses `default` profile):
+1. `default` profile exists for server → Use its credentials; fail with error if expired/invalid
+2. `default` profile doesn't exist → Attempt unauthenticated connection; fail with error if server requires auth
+
+On failure, the error message includes instructions on how to login. This ensures:
+- Authentication only happens when user explicitly calls `login`
+- Credentials are never silently downgraded
+- You can mix authenticated sessions and public access on the same server
 
 **OAuth Flow:**
 1. User runs `mcpc <server> login --profile personal`
@@ -574,15 +585,15 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
   - Automatic retry on network errors (with bridge restart)
   - Clean handling of orphaned processes
 - **Config File Loading**: Complete stdio transport support for local packages
+- **OAuth Implementation**: Full OAuth 2.1 flow with PKCE
+  - Interactive OAuth flow (browser-based)
+  - Authentication profiles (reusable credentials)
+  - Token refresh with automatic persistence
+  - Integration with session management
+- **Keychain Integration**: OS keychain via `keytar` for secure credential storage
 
 ### 🚧 In Progress / TODO
 - **Package Resolution**: Find and run local MCP packages (DEFERRED as nice-to-have)
-- **Keychain Integration**: Store credentials securely (OS keychain via `keytar`)
-- **OAuth Implementation**: Full OAuth 2.1 flow with PKCE, authentication profiles
-  - Interactive OAuth flow (browser-based)
-  - Authentication profiles (reusable credentials)
-  - Token refresh
-  - Integration with session management
 
 ### 📋 Implementation Approach
 
