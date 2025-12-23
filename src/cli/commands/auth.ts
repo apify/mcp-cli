@@ -13,6 +13,7 @@ import {
 import { performOAuthFlow } from '../../lib/auth/oauth-flow.js';
 import { normalizeServerUrl } from '../../lib/utils.js';
 import chalk from 'chalk';
+import { DEFAULT_AUTH_PROFILE } from '../../lib/auth/oauth-utils.js';
 
 /**
  * Authenticate with a server and create/update auth profile
@@ -23,7 +24,7 @@ export async function auth(
 ): Promise<void> {
   try {
     const normalizedUrl = normalizeServerUrl(serverUrl);
-    const profileName = options.profile || 'default';
+    const profileName = options.profile || DEFAULT_AUTH_PROFILE;
 
     if (options.outputMode === 'human') {
       console.log(formatInfo(`Starting OAuth authentication for ${chalk.cyan(normalizedUrl)}`));
@@ -148,7 +149,7 @@ export async function authShow(
 ): Promise<void> {
   try {
     const normalizedUrl = normalizeServerUrl(serverUrl);
-    const profileName = options.profile || 'default';
+    const profileName = options.profile || DEFAULT_AUTH_PROFILE;
 
     const profile = await getAuthProfile(normalizedUrl, profileName);
 
@@ -232,7 +233,7 @@ export async function authDelete(
 ): Promise<void> {
   try {
     const normalizedUrl = normalizeServerUrl(serverUrl);
-    const profileName = options.profile || 'default';
+    const profileName = options.profile || DEFAULT_AUTH_PROFILE;
 
     const deleted = await deleteAuthProfile(normalizedUrl, profileName);
 

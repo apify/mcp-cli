@@ -83,7 +83,7 @@ export class AuthError extends McpError {
 }
 
 /**
- * Type guard to check if an error is an McpError
+ * Type guard to check if an error is McpError
  */
 export function isMcpError(error: unknown): error is McpError {
   return error instanceof McpError;

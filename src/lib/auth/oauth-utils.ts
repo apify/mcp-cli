@@ -8,6 +8,8 @@ import { AuthError } from '../errors.js';
 
 const logger = createLogger('oauth-utils');
 
+export const DEFAULT_AUTH_PROFILE = 'default';
+
 /**
  * OAuth token endpoint response (per OAuth 2.0 spec - uses snake_case)
  */
@@ -115,4 +117,21 @@ export async function discoverAndRefreshToken(
   }
 
   return refreshAccessToken(tokenEndpoint, refreshToken);
+}
+
+
+/**
+ * Create an AuthError with a re-authentication hint
+ * Use this for errors that require the user to re-authenticate
+ */
+export function createReauthError(
+  serverUrl: string,
+  profileName: string,
+  message: string
+): AuthError {
+  const command =
+    profileName === DEFAULT_AUTH_PROFILE
+      ? `mcpc ${serverUrl} auth`
+      : `mcpc ${serverUrl} auth --profile ${profileName}`;
+  return new AuthError(`${message}. Please re-authenticate with: ${command}`);
 }

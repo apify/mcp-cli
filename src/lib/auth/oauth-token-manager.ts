@@ -6,7 +6,7 @@
 
 import { createLogger } from '../logger.js';
 import { AuthError } from '../errors.js';
-import { discoverAndRefreshToken, type OAuthTokenResponse } from './oauth-utils.js';
+import { discoverAndRefreshToken, createReauthError, type OAuthTokenResponse } from './oauth-utils.js';
 
 const logger = createLogger('oauth-token-manager');
 
@@ -112,9 +112,10 @@ export class OAuthTokenManager {
    */
   async refreshAccessToken(): Promise<OAuthTokenResponse> {
     if (!this.refreshToken) {
-      throw new AuthError(
-        `No refresh token available for profile ${this.profileName}. ` +
-          `Please re-authenticate with: mcpc ${this.serverUrl} auth --profile ${this.profileName}`
+      throw createReauthError(
+        this.serverUrl,
+        this.profileName,
+        `No refresh token available for profile ${this.profileName}`
       );
     }
 
@@ -147,15 +148,13 @@ export class OAuthTokenManager {
     } catch (error) {
       if (error instanceof AuthError) {
         // Add re-authentication hint
-        throw new AuthError(
-          `${error.message}. ` +
-            `Please re-authenticate with: mcpc ${this.serverUrl} auth --profile ${this.profileName}`
-        );
+        throw createReauthError(this.serverUrl, this.profileName, error.message);
       }
       logger.error(`Token refresh error: ${(error as Error).message}`);
-      throw new AuthError(
-        `Failed to refresh token: ${(error as Error).message}. ` +
-          `Please re-authenticate with: mcpc ${this.serverUrl} auth --profile ${this.profileName}`
+      throw createReauthError(
+        this.serverUrl,
+        this.profileName,
+        `Failed to refresh token: ${(error as Error).message}`
       );
     }
   }
