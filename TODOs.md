@@ -3,6 +3,12 @@
 - Handle MCP errors by failing the command tool, e.g. invalid tool name..
 
 authProfiles - prints secrets to JSON now
+- docs: add the OAuth command to --help, otherwise people will not find it when they need it
+
+
+- add "mcpc --reset-all" commands to clean up everyting, kill bridges, etc. It should keep shell-history and logs though.
+
+
 
 # Cosmetic
 - nit: on server/session info, print also auth info
@@ -10,9 +16,6 @@ authProfiles - prints secrets to JSON now
     Active MCP sessions:
     @fs → npx (stdio) --- show also args instead of just "npx"
 
-- add "mcpc --reset-all" commands to clean up everyting 
-
-- docs: add the OAuth command to --help, otherwise people will not find it when they need it
 
 # E2E tests
 - add end-to-end tests e.g. under `test/e2e` - one bash script per test suite , organized in directories, and one master script that runs them all or selected ones (per directory) in parallel
