@@ -160,7 +160,7 @@ export async function saveAuthProfile(profile: AuthProfile): Promise<void> {
     storage.profiles[profile.serverUrl]![profile.name] = profile;
 
     await saveAuthProfilesInternal(storage);
-    logger.info(`Saved auth profile: ${profile.name} for ${profile.serverUrl}`);
+    logger.debug(`Saved auth profile: ${profile.name} for ${profile.serverUrl}`);
   }, AUTH_PROFILES_DEFAULT_CONTENT);
 }
 
@@ -189,7 +189,7 @@ export async function deleteAuthProfile(serverUrl: string, profileName: string):
     }
 
     await saveAuthProfilesInternal(storage);
-    logger.info(`Deleted auth profile: ${profileName} for ${serverUrl}`);
+    logger.debug(`Deleted auth profile: ${profileName} for ${serverUrl}`);
     return true;
   }, AUTH_PROFILES_DEFAULT_CONTENT);
 }

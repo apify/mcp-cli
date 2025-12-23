@@ -81,7 +81,7 @@ export async function logout(
     if (!deleted) {
       if (options.outputMode === 'human') {
         console.error(
-          formatError(`Profile ${chalk.cyan(profileName)} not found for ${normalizedUrl}`)
+          formatError(`Profile ${chalk.cyan(profileName)} for ${normalizedUrl} not found`)
         );
       } else {
         console.error(formatOutput({ error: 'Profile not found' }, 'json'));
@@ -91,7 +91,7 @@ export async function logout(
     }
 
     if (options.outputMode === 'human') {
-      console.log(formatSuccess(`Profile ${chalk.cyan(profileName)} deleted`));
+      console.log(formatSuccess(`Profile ${chalk.cyan(profileName)} for ${normalizedUrl} deleted`));
     } else {
       console.log(
         formatOutput(

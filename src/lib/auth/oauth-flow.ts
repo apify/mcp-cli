@@ -226,7 +226,7 @@ export async function performOAuthFlow(
   profileName: string,
   scope?: string
 ): Promise<OAuthFlowResult> {
-  logger.info(`Starting OAuth flow for ${serverUrl} (profile: ${profileName})`);
+  logger.debug(`Starting OAuth flow for ${serverUrl} (profile: ${profileName})`);
 
   // Normalize server URL
   const normalizedServerUrl = normalizeServerUrl(serverUrl);
@@ -255,7 +255,7 @@ export async function performOAuthFlow(
 
     // Override redirectToAuthorization to open browser
     provider.redirectToAuthorization = async (authorizationUrl: URL) => {
-      logger.info('Opening browser for authorization...');
+      logger.debug('Opening browser for authorization...');
       console.log(`\nOpening browser to: ${authorizationUrl.toString()}`);
       console.log('If the browser does not open automatically, please visit the URL above.');
       console.log('Press Esc to cancel.\n');
@@ -312,7 +312,7 @@ export async function performOAuthFlow(
       throw new ClientError('Failed to save authentication profile');
     }
 
-    logger.info('OAuth flow completed successfully');
+    logger.debug('OAuth flow completed successfully');
     return {
       profile,
       success: true,
