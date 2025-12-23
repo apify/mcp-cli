@@ -10,6 +10,8 @@ import { normalizeServerUrl, isValidSessionName } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
 import { getAuthProfile } from '../lib/auth-profiles.js';
+import { isTokenExpired, hasRefreshToken, refreshAndSaveTokens } from '../lib/auth/token-refresh.js';
+import { getOAuthTokens } from '../lib/auth/keychain.js';
 import { logTarget } from './output.js';
 import packageJson from '../../package.json' with { type: 'json' };
 
@@ -17,6 +19,8 @@ const logger = createLogger('cli');
 
 /**
  * Load auth profile and add Authorization header if available
+ * Automatically refreshes expired tokens if a refresh token is available
+ * Tokens are read from OS keychain for security
  * Returns the updated headers object
  */
 async function addAuthHeader(
@@ -25,26 +29,45 @@ async function addAuthHeader(
   profileName: string = 'default'
 ): Promise<Record<string, string>> {
   try {
-    const profile = await getAuthProfile(url, profileName);
+    let profile = await getAuthProfile(url, profileName);
 
     if (!profile) {
       logger.debug(`No auth profile found for ${url} (profile: ${profileName})`);
       return headers;
     }
 
-    // Check if token is expired
-    if (profile.expiresAt) {
-      const expiresDate = new Date(profile.expiresAt);
-      if (expiresDate < new Date()) {
+    // Check if token is expired or about to expire (within 60 seconds)
+    if (isTokenExpired(profile, 60)) {
+      if (await hasRefreshToken(profile)) {
+        // Try to refresh the token
+        logger.info(`Access token expired, attempting refresh for profile: ${profileName}`);
+        try {
+          profile = await refreshAndSaveTokens(profile);
+          logger.info(`Token refreshed successfully for profile: ${profileName}`);
+        } catch (refreshError) {
+          // Re-throw AuthError from refresh
+          if (refreshError instanceof AuthError) {
+            throw refreshError;
+          }
+          throw new AuthError(
+            `Failed to refresh token: ${(refreshError as Error).message}. ` +
+              `Please re-authenticate with: mcpc ${url} auth --profile ${profileName}`
+          );
+        }
+      } else {
+        // No refresh token available
+        const expiresDate = new Date(profile.expiresAt!);
         throw new AuthError(
-          `Authentication token expired at ${expiresDate.toISOString()}. ` +
+          `Authentication token expired at ${expiresDate.toISOString()} and no refresh token available. ` +
             `Please re-authenticate with: mcpc ${url} auth --profile ${profileName}`
         );
       }
     }
 
-    if (!profile.tokens?.access_token) {
-      logger.warn(`Auth profile exists but has no access token: ${profileName}`);
+    // Get tokens from keychain
+    const tokens = await getOAuthTokens(profile.serverUrl, profileName);
+    if (!tokens?.accessToken) {
+      logger.warn(`Auth profile exists but has no access token in keychain: ${profileName}`);
       return headers;
     }
 
@@ -53,7 +76,7 @@ async function addAuthHeader(
     // Add Authorization header with Bearer token
     return {
       ...headers,
-      Authorization: `Bearer ${profile.tokens.access_token}`,
+      Authorization: `Bearer ${tokens.accessToken}`,
     };
   } catch (error) {
     // Re-throw AuthError

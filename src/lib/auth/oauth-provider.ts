@@ -1,6 +1,7 @@
 /**
  * OAuth provider implementation for mcpc
  * Implements the OAuthClientProvider interface from MCP SDK
+ * Stores tokens securely in OS keychain
  */
 
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
@@ -9,14 +10,22 @@ import type {
   OAuthClientInformationMixed,
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
-import type { AuthProfile, OAuthTokens as StoredTokens } from '../types.js';
+import type { AuthProfile } from '../types.js';
 import { getAuthProfile, saveAuthProfile } from '../auth-profiles.js';
+import {
+  getOAuthTokens,
+  storeOAuthTokens,
+  getOAuthClient,
+  storeOAuthClient,
+  type KeychainOAuthTokens,
+} from './keychain.js';
 import { createLogger } from '../logger.js';
 
 const logger = createLogger('oauth-provider');
 
 /**
  * OAuth provider that manages authentication for a single server and profile
+ * Tokens are stored in OS keychain for security
  */
 export class McpcOAuthProvider implements OAuthClientProvider {
   private serverUrl: string;
@@ -33,7 +42,7 @@ export class McpcOAuthProvider implements OAuthClientProvider {
   }
 
   /**
-   * Load auth profile from storage
+   * Load auth profile from storage (metadata only, tokens are in keychain)
    */
   private async loadProfile(): Promise<AuthProfile | undefined> {
     if (!this._authProfile) {
@@ -58,32 +67,52 @@ export class McpcOAuthProvider implements OAuthClientProvider {
   }
 
   async clientInformation(): Promise<OAuthClientInformationMixed | undefined> {
+    // Try to load from keychain if not in memory
+    if (!this._clientInformation) {
+      const storedClient = await getOAuthClient(this.serverUrl, this.profileName);
+      if (storedClient) {
+        this._clientInformation = {
+          client_id: storedClient.clientId,
+          client_secret: storedClient.clientSecret,
+        };
+      }
+    }
     return this._clientInformation;
   }
 
   async saveClientInformation(clientInformation: OAuthClientInformationMixed): Promise<void> {
     this._clientInformation = clientInformation;
-    logger.debug('Saved client information for dynamic registration');
+
+    // Store in keychain - only include clientSecret if defined
+    const keychainClient: Parameters<typeof storeOAuthClient>[2] = {
+      clientId: clientInformation.client_id,
+    };
+    if (clientInformation.client_secret !== undefined) {
+      keychainClient.clientSecret = clientInformation.client_secret;
+    }
+    await storeOAuthClient(this.serverUrl, this.profileName, keychainClient);
+
+    logger.debug('Saved client information to keychain');
   }
 
   async tokens(): Promise<OAuthTokens | undefined> {
-    const profile = await this.loadProfile();
-    if (!profile?.tokens) {
+    // Load tokens from keychain
+    const storedTokens = await getOAuthTokens(this.serverUrl, this.profileName);
+    if (!storedTokens) {
       return undefined;
     }
 
-    // Convert stored tokens to SDK format
-    const storedTokens = profile.tokens;
+    // Convert to SDK format (snake_case per OAuth spec)
     const result: OAuthTokens = {
-      access_token: storedTokens.access_token,
-      token_type: storedTokens.token_type,
+      access_token: storedTokens.accessToken,
+      token_type: storedTokens.tokenType,
     };
 
-    if (storedTokens.expires_in !== undefined) {
-      result.expires_in = storedTokens.expires_in;
+    if (storedTokens.expiresIn !== undefined) {
+      result.expires_in = storedTokens.expiresIn;
     }
-    if (storedTokens.refresh_token !== undefined) {
-      result.refresh_token = storedTokens.refresh_token;
+    if (storedTokens.refreshToken !== undefined) {
+      result.refresh_token = storedTokens.refreshToken;
     }
     if (storedTokens.scope !== undefined) {
       result.scope = storedTokens.scope;
@@ -93,38 +122,39 @@ export class McpcOAuthProvider implements OAuthClientProvider {
   }
 
   async saveTokens(tokens: OAuthTokens): Promise<void> {
-    logger.debug('Saving OAuth tokens');
+    logger.debug('Saving OAuth tokens to keychain');
 
-    // Load or create profile
-    let profile = await this.loadProfile();
-    const now = new Date().toISOString();
-
-    // Convert SDK tokens to stored format
-    const storedTokens: StoredTokens = {
-      access_token: tokens.access_token,
-      token_type: tokens.token_type,
+    // Store tokens in keychain (convert from OAuth snake_case to camelCase)
+    const keychainTokens: KeychainOAuthTokens = {
+      accessToken: tokens.access_token,
+      tokenType: tokens.token_type,
     };
 
     if (tokens.expires_in !== undefined) {
-      storedTokens.expires_in = tokens.expires_in;
-      storedTokens.expires_at = Math.floor(Date.now() / 1000) + tokens.expires_in;
+      keychainTokens.expiresIn = tokens.expires_in;
+      keychainTokens.expiresAt = Math.floor(Date.now() / 1000) + tokens.expires_in;
     }
     if (tokens.refresh_token !== undefined) {
-      storedTokens.refresh_token = tokens.refresh_token;
+      keychainTokens.refreshToken = tokens.refresh_token;
     }
     if (tokens.scope !== undefined) {
-      storedTokens.scope = tokens.scope;
+      keychainTokens.scope = tokens.scope;
     }
 
+    await storeOAuthTokens(this.serverUrl, this.profileName, keychainTokens);
+
+    // Update profile metadata (without tokens)
+    const now = new Date().toISOString(); // TODO: keep Date not string?
+    let profile = await this.loadProfile();
+
     if (!profile) {
-      // Create new profile
+      // Create new profile (metadata only)
       profile = {
         name: this.profileName,
         serverUrl: this.serverUrl,
         authType: 'oauth',
         oauthIssuer: '', // Will be set by caller
         authenticatedAt: now,
-        tokens: storedTokens,
         createdAt: now,
         updatedAt: now,
       };
@@ -132,25 +162,26 @@ export class McpcOAuthProvider implements OAuthClientProvider {
       if (tokens.scope) {
         profile.scopes = tokens.scope.split(' ');
       }
-      if (storedTokens.expires_at) {
-        profile.expiresAt = new Date(storedTokens.expires_at * 1000).toISOString();
+      if (keychainTokens.expiresAt) {
+        profile.expiresAt = new Date(keychainTokens.expiresAt * 1000).toISOString();
       }
     } else {
-      // Update existing profile
-      profile.tokens = storedTokens;
+      // Update existing profile metadata
       profile.authenticatedAt = now;
       profile.updatedAt = now;
 
       if (tokens.scope) {
         profile.scopes = tokens.scope.split(' ');
       }
-      if (storedTokens.expires_at) {
-        profile.expiresAt = new Date(storedTokens.expires_at * 1000).toISOString();
+      if (keychainTokens.expiresAt) {
+        profile.expiresAt = new Date(keychainTokens.expiresAt * 1000).toISOString();
       }
     }
 
     await saveAuthProfile(profile);
     this._authProfile = profile;
+
+    logger.debug('Tokens saved to keychain, profile metadata updated');
   }
 
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {

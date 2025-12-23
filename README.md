@@ -677,13 +677,44 @@ MCP enables arbitrary tool execution and data access; treat servers like you tre
 * Audit what tools do before running them
 * Review server permissions in interactive mode
 
-**Authentication:**
-- Credentials stored in OS keychain (encrypted by system)
-- Use environment variables for CI/CD: `Authorization: Bearer ${TOKEN}`
-- File permissions: `~/.mcpc/sessions.json` is set to `0600` (user-only)
-- Bridge sockets in `~/.mcpc/bridges/` are created with `0700` permissions
+### Credential storage
 
-**TODO: Network security:**
+**OS keychain integration:**
+- All OAuth tokens (access token - TODO:really?, refresh tokens) are stored in the OS keychain
+- OAuth client credentials (client_id, client_secret from dynamic registration) are stored in the keychain
+- Bearer tokens for sessions are stored in the keychain
+- The `~/.mcpc/auth-profiles.json` file only contains metadata (server URL, scopes, expiry timestamps) - never tokens
+
+**Keychain entries:**
+- OAuth tokens: `mcpc:auth:<serverUrl>:<profileName>:oauth-tokens`
+- OAuth client: `mcpc:auth:<serverUrl>:<profileName>:oauth-client`
+- Bearer tokens: `mcpc:session:<sessionName>:bearer-token` TODO: really?
+
+### Bridge process authentication
+
+Background bridge processes need access to tokens for making authenticated requests. To maintain security while allowing token refresh:
+
+1. **CLI retrieves refresh token** from OS keychain when creating or restarting a session
+2. **CLI sends refresh token to bridge** via Unix socket IPC (not command line arguments)
+3. **Bridge stores refresh token in memory only** - never written to disk
+4. **Bridge refreshes access tokens** periodically using the refresh token
+5. **Access tokens are kept in bridge memory** - never persisted to disk
+
+This architecture ensures:
+- Tokens are never stored in plaintext on disk
+- Bridge processes don't need direct keychain access (which may require user interaction)
+- Credentials are not visible in process arguments (`ps aux`)
+- Refresh tokens are securely transmitted via Unix socket (local IPC only)
+
+### File permissions
+
+- `~/.mcpc/sessions.json` is set to `0600` (user-only read/write)
+- `~/.mcpc/auth-profiles.json` is set to `0600` (user-only read/write)
+- Bridge sockets in `~/.mcpc/bridges/` are created with `0700` permissions
+- Log files in `~/.mcpc/logs/` are created with `0600` permissions
+
+### Network security
+
 - HTTPS enforced for remote servers (HTTP auto-upgraded)
 - Certificate validation enabled (use `--insecure` to disable, not recommended)
 - `Origin` header validation to prevent DNS rebinding attacks

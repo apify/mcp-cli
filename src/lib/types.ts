@@ -140,19 +140,18 @@ export interface OAuthTokens {
 /**
  * Authentication profile data stored in auth-profiles.json
  * Only OAuth authentication is supported for profiles
+ * NOTE: Tokens are stored securely in OS keychain, not in this file
  */
 export interface AuthProfile {
   name: string;
   serverUrl: string;
   authType: 'oauth';
-  // OAuth fields
+  // OAuth metadata
   oauthIssuer: string;
   scopes?: string[];
   authenticatedAt?: string;
   expiresAt?: string;
-  // OAuth tokens (TODO: move to keychain)
-  tokens?: OAuthTokens;
-  // Metadata
+  // Timestamps (TODO: why not Dates?)
   createdAt: string;
   updatedAt: string;
 }
@@ -167,7 +166,17 @@ export interface AuthProfilesStorage {
 /**
  * IPC message types for CLI-bridge communication
  */
-export type IpcMessageType = 'request' | 'response' | 'health-check' | 'health-ok' | 'shutdown' | 'notification';
+export type IpcMessageType = 'request' | 'response' | 'health-check' | 'health-ok' | 'shutdown' | 'notification' | 'set-auth-credentials';
+
+/**
+ * Auth credentials sent from CLI to bridge via IPC
+ * Contains refresh token for the bridge to use for token refresh
+ */
+export interface AuthCredentials {
+  refreshToken: string;
+  serverUrl: string;
+  profileName: string;
+}
 
 /**
  * Notification types from MCP server
@@ -198,6 +207,7 @@ export interface IpcMessage {
   params?: unknown; // Method parameters
   result?: unknown; // Response result
   notification?: NotificationData; // Notification data (for type='notification')
+  authCredentials?: AuthCredentials; // Auth credentials (for type='set-auth-credentials')
   error?: {
     code: number;
     message: string;

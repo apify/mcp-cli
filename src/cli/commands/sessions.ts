@@ -17,7 +17,7 @@ import { ClientError } from '../../lib/index.js';
 export async function connectSession(
   name: string,
   target: string,
-  options: { outputMode: OutputMode; verbose?: boolean; config?: string; headers?: string[]; timeout?: number }
+  options: { outputMode: OutputMode; verbose?: boolean; config?: string; headers?: string[]; timeout?: number; profile?: string }
 ): Promise<void> {
   try {
     // Validate session name
@@ -40,11 +40,15 @@ export async function connectSession(
     const transportConfig = await resolveTarget(target, options);
 
     // Start bridge process
-    await startBridge({
+    const bridgeOptions: Parameters<typeof startBridge>[0] = {
       sessionName: name,
       target: transportConfig,
       verbose: options.verbose || false,
-    });
+    };
+    if (options.profile) {
+      bridgeOptions.authProfile = options.profile;
+    }
+    await startBridge(bridgeOptions);
 
     // Success!
     if (options.outputMode === 'human') {

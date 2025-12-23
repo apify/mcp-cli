@@ -12,6 +12,9 @@ import { getBridgesDir, waitForFile, isProcessAlive, fileExists } from './utils.
 import { saveSession, deleteSession } from './sessions.js';
 import { createLogger } from './logger.js';
 import { ClientError } from './errors.js';
+import { BridgeClient } from './bridge-client.js';
+import { getOAuthTokens } from './auth/keychain.js';
+import { getAuthProfile } from './auth-profiles.js';
 
 const logger = createLogger('bridge-manager');
 
@@ -30,6 +33,7 @@ export interface StartBridgeOptions {
   sessionName: string;
   target: TransportConfig;
   verbose?: boolean;
+  authProfile?: string; // Auth profile name for token refresh
 }
 
 /**
@@ -37,7 +41,7 @@ export interface StartBridgeOptions {
  * Creates the session record and spawns the bridge process
  */
 export async function startBridge(options: StartBridgeOptions): Promise<void> {
-  const { sessionName, target, verbose } = options;
+  const { sessionName, target, verbose, authProfile } = options;
 
   logger.info(`Starting bridge for session: ${sessionName}`);
 
@@ -51,6 +55,11 @@ export async function startBridge(options: StartBridgeOptions): Promise<void> {
 
   if (verbose) {
     args.push('--verbose');
+  }
+
+  // Pass auth profile if specified
+  if (authProfile) {
+    args.push('--auth-profile', authProfile);
   }
 
   logger.debug('Bridge executable:', bridgeExecutable);
@@ -89,8 +98,13 @@ export async function startBridge(options: StartBridgeOptions): Promise<void> {
       );
     }
 
+    // If auth profile is specified, send refresh token to bridge via IPC
+    if (authProfile) {
+      await sendAuthCredentialsToBridge(socketPath, target.url || target.command || '', authProfile);
+    }
+
     // Save session to storage
-    await saveSession(sessionName, {
+    const sessionData: Parameters<typeof saveSession>[1] = {
       target: target.url || target.command || 'unknown',
       transport: target.type,
       pid: bridgeProcess.pid,
@@ -98,7 +112,14 @@ export async function startBridge(options: StartBridgeOptions): Promise<void> {
       // Protocol version will be populated on first command
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    });
+    };
+
+    // Store auth profile reference if specified
+    if (authProfile) {
+      sessionData.authProfile = authProfile;
+    }
+
+    await saveSession(sessionName, sessionData);
 
     logger.info(`Bridge started successfully for session: ${sessionName}`);
   } catch (error) {
@@ -216,10 +237,54 @@ export async function ensureBridgeHealthy(sessionName: string): Promise<void> {
             command: session.target,
           };
 
-    // Start a new bridge
-    await startBridge({
+    // Start a new bridge, preserving auth profile
+    const bridgeOptions: StartBridgeOptions = {
       sessionName,
       target,
+    };
+    if (session.authProfile) {
+      bridgeOptions.authProfile = session.authProfile;
+    }
+    await startBridge(bridgeOptions);
+  }
+}
+
+/**
+ * Send auth credentials to a bridge process via IPC
+ * Retrieves refresh token from keychain and sends it to the bridge
+ */
+async function sendAuthCredentialsToBridge(
+  socketPath: string,
+  serverUrl: string,
+  profileName: string
+): Promise<void> {
+  logger.debug(`Sending auth credentials for profile ${profileName} to bridge`);
+
+  // Get the auth profile to find the server URL
+  const profile = await getAuthProfile(serverUrl, profileName);
+  if (!profile) {
+    logger.warn(`Auth profile ${profileName} not found for ${serverUrl}, skipping auth credentials`);
+    return;
+  }
+
+  // Get tokens from keychain
+  const tokens = await getOAuthTokens(profile.serverUrl, profileName);
+  if (!tokens?.refreshToken) {
+    logger.warn(`No refresh token found in keychain for profile ${profileName} of ${serverUrl}, skipping auth credentials`);
+    return;
+  }
+
+  // Connect to bridge and send credentials
+  const client = new BridgeClient(socketPath);
+  try {
+    await client.connect();
+    client.sendAuthCredentials({
+      refreshToken: tokens.refreshToken,
+      serverUrl: profile.serverUrl,
+      profileName,
     });
+    logger.debug('Auth credentials sent to bridge successfully');
+  } finally {
+    await client.close();
   }
 }

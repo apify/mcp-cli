@@ -203,6 +203,24 @@ export class BridgeClient extends EventEmitter {
   }
 
   /**
+   * Send auth credentials to bridge (one-way, no response expected)
+   */
+  sendAuthCredentials(credentials: { refreshToken: string; serverUrl: string; profileName: string }): void {
+    if (!this.socket) {
+      throw new NetworkError('Not connected to bridge');
+    }
+
+    const message: IpcMessage = {
+      type: 'set-auth-credentials',
+      authCredentials: credentials,
+    };
+
+    logger.debug('Sending auth credentials to bridge');
+    const data = JSON.stringify(message) + '\n';
+    this.socket.write(data);
+  }
+
+  /**
    * Close the connection
    */
   async close(): Promise<void> {

@@ -12,8 +12,9 @@ import type { McpClient } from '../core/index.js';
 import type { TransportConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
 import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
 import { fileExists, getBridgesDir, ensureDir, getLogsDir } from '../lib/index.js';
-import { ClientError, NetworkError } from '../lib/index.js';
+import { ClientError, NetworkError, AuthError } from '../lib/index.js';
 import { loadSessions, updateSession } from '../lib/sessions.js';
+import type { AuthCredentials } from '../lib/types.js';
 import { CacheManager } from './cache.js';
 import { join } from 'path';
 import packageJson from '../../package.json' with { type: 'json' };
@@ -28,6 +29,7 @@ interface BridgeOptions {
   target: TransportConfig;
   socketPath: string;
   verbose?: boolean;
+  authProfile?: string; // Auth profile name for token refresh
 }
 
 /**
@@ -43,6 +45,11 @@ class BridgeProcess {
   private cache: CacheManager;
   private keepaliveInterval: NodeJS.Timeout | null = null;
 
+  // In-memory auth credentials (received from CLI via IPC)
+  private authCredentials: AuthCredentials | null = null;
+  private currentAccessToken: string | null = null;
+  private accessTokenExpiresAt: number | null = null; // Unix timestamp
+
   constructor(options: BridgeOptions) {
     this.options = options;
     this.cache = new CacheManager();
@@ -50,6 +57,190 @@ class BridgeProcess {
     if (options.verbose) {
       setVerbose(true);
     }
+  }
+
+  /**
+   * Set auth credentials received from CLI via IPC
+   * Stores refresh token in memory for token refresh
+   */
+  setAuthCredentials(credentials: AuthCredentials): void {
+    logger.info(`Received auth credentials for profile: ${credentials.profileName}`);
+    this.authCredentials = credentials;
+    // Clear cached access token to force refresh on next request
+    this.currentAccessToken = null;
+    this.accessTokenExpiresAt = null;
+  }
+
+  /**
+   * Check if the current access token is expired or about to expire
+   */
+  private isAccessTokenExpired(): boolean {
+    if (!this.currentAccessToken || !this.accessTokenExpiresAt) {
+      return true;
+    }
+    // Consider expired if within 60 seconds of expiry
+    const bufferSeconds = 60;
+    return Date.now() / 1000 > this.accessTokenExpiresAt - bufferSeconds;
+  }
+
+  /**
+   * Refresh the access token using the in-memory refresh token
+   */
+  private async refreshAccessToken(): Promise<void> {
+    if (!this.authCredentials) {
+      throw new AuthError('No auth credentials available for token refresh');
+    }
+
+    logger.info('Refreshing access token...');
+
+    // Discover token endpoint
+    const tokenEndpoint = await this.discoverTokenEndpoint(this.authCredentials.serverUrl);
+    if (!tokenEndpoint) {
+      throw new AuthError(
+        `Could not find OAuth token endpoint for ${this.authCredentials.serverUrl}. ` +
+          `Please re-authenticate with: mcpc ${this.authCredentials.serverUrl} auth --profile ${this.authCredentials.profileName}`
+      );
+    }
+
+    // Prepare refresh request
+    const params = new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: this.authCredentials.refreshToken,
+    });
+
+    try {
+      const response = await fetch(tokenEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
+        body: params.toString(),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error(`Token refresh failed: ${response.status} ${errorText}`);
+
+        if (response.status === 400 || response.status === 401) {
+          throw new AuthError(
+            `Refresh token is invalid or expired. ` +
+              `Please re-authenticate with: mcpc ${this.authCredentials.serverUrl} auth --profile ${this.authCredentials.profileName}`
+          );
+        }
+
+        throw new AuthError(`Failed to refresh token: ${response.status} ${response.statusText}`);
+      }
+
+      const tokenResponse = await response.json() as {
+        access_token: string;
+        token_type?: string;
+        expires_in?: number;
+        refresh_token?: string;
+      };
+
+      // Store new access token in memory
+      this.currentAccessToken = tokenResponse.access_token;
+
+      // Calculate expiry time
+      if (tokenResponse.expires_in) {
+        this.accessTokenExpiresAt = Math.floor(Date.now() / 1000) + tokenResponse.expires_in;
+      } else {
+        // Default to 1 hour if not specified
+        this.accessTokenExpiresAt = Math.floor(Date.now() / 1000) + 3600;
+      }
+
+      // Update refresh token if a new one was provided (token rotation)
+      // TODO: Shall we update it also in keychain?
+      if (tokenResponse.refresh_token) {
+        this.authCredentials.refreshToken = tokenResponse.refresh_token;
+        logger.debug('Received new refresh token (token rotation)');
+      }
+
+      logger.info('Access token refreshed successfully');
+    } catch (error) {
+      if (error instanceof AuthError) {
+        throw error;
+      }
+      logger.error(`Token refresh error: ${(error as Error).message}`);
+      throw new AuthError(`Failed to refresh token: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Discover OAuth token endpoint from server
+   */
+  private async discoverTokenEndpoint(serverUrl: string): Promise<string | undefined> {
+    const discoveryUrls = [
+      `${serverUrl}/.well-known/oauth-authorization-server`,
+      `${serverUrl}/.well-known/openid-configuration`,
+    ];
+
+    for (const url of discoveryUrls) {
+      try {
+        logger.debug(`Trying OAuth discovery at: ${url}`);
+        const response = await fetch(url, {
+          headers: { Accept: 'application/json' },
+        });
+
+        if (response.ok) {
+          const metadata = await response.json() as { token_endpoint?: string };
+          if (metadata.token_endpoint) {
+            logger.debug(`Found token endpoint: ${metadata.token_endpoint}`);
+            return metadata.token_endpoint;
+          }
+        }
+      } catch {
+        // Continue to next URL
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Get a valid access token, refreshing if necessary
+   * Returns undefined if no auth credentials are available
+   */
+  private async getValidAccessToken(): Promise<string | undefined> {
+    if (!this.authCredentials) {
+      return undefined;
+    }
+
+    // Check if we need to refresh
+    if (this.isAccessTokenExpired()) {
+      try {
+        await this.refreshAccessToken();
+      } catch (error) {
+        logger.error('Failed to refresh access token:', error);
+        // Mark session as expired if refresh fails
+        await this.markSessionExpiredAndExit();
+        throw error;
+      }
+    }
+
+    return this.currentAccessToken ?? undefined;
+  }
+
+  /**
+   * Update transport config with fresh Authorization header
+   */
+  private async updateTransportAuth(): Promise<TransportConfig> {
+    const config = { ...this.options.target };
+
+    // Only update auth for HTTP transport with auth credentials
+    if (config.type === 'http' && this.authCredentials) {
+      const token = await this.getValidAccessToken();
+      if (token) {
+        config.headers = {
+          ...config.headers,
+          Authorization: `Bearer ${token}`,
+        };
+        logger.debug('Updated transport config with fresh access token');
+      }
+    }
+
+    return config;
   }
 
   /**
@@ -195,9 +386,12 @@ class BridgeProcess {
   private async connectToMcp(): Promise<void> {
     logger.debug('Connecting to MCP server...');
 
+    // Get transport config with fresh auth token if using auth profile
+    const transport = await this.updateTransportAuth();
+
     const clientConfig = {
       clientInfo: { name: 'mcpc-bridge', version: packageJson.version },
-      transport: this.options.target,
+      transport,
       capabilities: {
         roots: { listChanged: true },
         sampling: {},
@@ -408,6 +602,17 @@ class BridgeProcess {
             this.sendResponse(socket, { type: 'response', id: message.id });
           }
           await this.shutdown();
+          break;
+
+        case 'set-auth-credentials':
+          if (message.authCredentials) {
+            this.setAuthCredentials(message.authCredentials);
+            if (message.id) {
+              this.sendResponse(socket, { type: 'response', id: message.id, result: { success: true } });
+            }
+          } else {
+            throw new ClientError('Missing authCredentials in set-auth-credentials message');
+          }
           break;
 
         default:
@@ -718,7 +923,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   if (args.length < 3) {
-    console.error('Usage: mcpc-bridge <sessionName> <socketPath> <transportConfigJson> [--verbose]');
+    console.error('Usage: mcpc-bridge <sessionName> <socketPath> <transportConfigJson> [--verbose] [--auth-profile <name>]');
     process.exit(1);
   }
 
@@ -727,15 +932,27 @@ async function main(): Promise<void> {
   const transportConfigJson = args[2] as string;
   const verbose = args.includes('--verbose');
 
+  // Parse --auth-profile argument
+  let authProfile: string | undefined;
+  const authProfileIndex = args.indexOf('--auth-profile');
+  if (authProfileIndex !== -1 && args[authProfileIndex + 1]) {
+    authProfile = args[authProfileIndex + 1];
+  }
+
   try {
     const target = JSON.parse(transportConfigJson) as TransportConfig;
 
-    const bridge = new BridgeProcess({
+    const bridgeOptions: BridgeOptions = {
       sessionName,
       target,
       socketPath,
       verbose,
-    });
+    };
+    if (authProfile) {
+      bridgeOptions.authProfile = authProfile;
+    }
+
+    const bridge = new BridgeProcess(bridgeOptions);
 
     await bridge.start();
   } catch (error) {
