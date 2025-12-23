@@ -47,6 +47,7 @@ export class McpClient implements IMcpClient {
   private client: SDKClient;
   private logger: Logger;
   private negotiatedProtocolVersion?: string;
+  private isClosing = false;
 
   constructor(clientInfo: Implementation, options: McpClientOptions = {}) {
     this.logger = options.logger || createNoOpLogger();
@@ -58,6 +59,11 @@ export class McpClient implements IMcpClient {
 
     // Set up error handling
     this.client.onerror = (error) => {
+      // Ignore abort errors during intentional close
+      if (this.isClosing && error instanceof Error && error.message.includes('AbortError')) {
+        this.logger.debug('Client aborted during close (expected)');
+        return;
+      }
       this.logger.error('Client error:', error);
     };
   }
@@ -71,6 +77,11 @@ export class McpClient implements IMcpClient {
 
       // Set up transport error handlers
       transport.onerror = (error) => {
+        // Ignore abort errors during intentional close
+        if (this.isClosing && error instanceof Error && error.message.includes('AbortError')) {
+          this.logger.debug('Transport aborted during close (expected)');
+          return;
+        }
         this.logger.error('Transport error:', error);
       };
 
@@ -110,8 +121,9 @@ export class McpClient implements IMcpClient {
   async close(): Promise<void> {
     try {
       this.logger.debug('Closing connection...');
+      this.isClosing = true;
       await this.client.close();
-      this.logger.info('Connection closed');
+      this.logger.debug('Connection closed');
     } catch (error) {
       this.logger.error('Error closing connection:', error);
       throw new NetworkError(

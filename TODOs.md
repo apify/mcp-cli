@@ -54,3 +54,4 @@
     (what if tools have ":" or "," in their names?)
     In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
 - Impelled shell completions (e.g. "mcpc @a...")
+- nit: Nicer OAuth flow finish web page, add Apify example there.
