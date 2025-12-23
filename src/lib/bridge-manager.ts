@@ -14,7 +14,7 @@ import { createLogger } from './logger.js';
 import { ClientError } from './errors.js';
 import { BridgeClient } from './bridge-client.js';
 import { getOAuthTokens } from './auth/keychain.js';
-import { getAuthProfile } from './auth-profiles.js';
+import { getAuthProfile } from './auth/auth-profiles.js';
 
 const logger = createLogger('bridge-manager');
 

@@ -9,7 +9,7 @@ import {
   getAuthProfilesForServer,
   getAuthProfile,
   deleteAuthProfile,
-} from '../../lib/auth-profiles.js';
+} from '../../lib/auth/auth-profiles.js';
 import { performOAuthFlow } from '../../lib/auth/oauth-flow.js';
 import { normalizeServerUrl } from '../../lib/utils.js';
 import chalk from 'chalk';

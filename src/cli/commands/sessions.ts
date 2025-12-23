@@ -4,7 +4,7 @@
 
 import type { OutputMode } from '../../lib/index.js';
 import { formatOutput, formatSuccess, formatError } from '../output.js';
-import { listAuthProfiles } from '../../lib/auth-profiles.js';
+import { listAuthProfiles } from '../../lib/auth/auth-profiles.js';
 import { listSessions, sessionExists } from '../../lib/sessions.js';
 import { startBridge, stopBridge } from '../../lib/bridge-manager.js';
 import { resolveTarget } from '../helpers.js';

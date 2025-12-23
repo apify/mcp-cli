@@ -9,7 +9,7 @@ import { ClientError, NetworkError, AuthError } from '../lib/errors.js';
 import { normalizeServerUrl, isValidSessionName } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
-import { getAuthProfile } from '../lib/auth-profiles.js';
+import { getAuthProfile } from '../lib/auth/auth-profiles.js';
 import { isTokenExpired, hasRefreshToken, refreshAndSaveTokens } from '../lib/auth/token-refresh.js';
 import { getOAuthTokens } from '../lib/auth/keychain.js';
 import { logTarget } from './output.js';

@@ -7,11 +7,11 @@
 import { readFile, writeFile, rename, unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import type { AuthProfile, AuthProfilesStorage } from './types.js';
-import { getAuthProfilesFilePath, fileExists, ensureDir, getMcpcHome } from './utils.js';
-import { withFileLock } from './file-lock.js';
-import { createLogger } from './logger.js';
-import { ClientError } from './errors.js';
+import type { AuthProfile, AuthProfilesStorage } from '../types.js';
+import { getAuthProfilesFilePath, fileExists, ensureDir, getMcpcHome } from '../utils.js';
+import { withFileLock } from '../file-lock.js';
+import { createLogger } from '../logger.js';
+import { ClientError } from '../errors.js';
 
 const logger = createLogger('auth-profiles');
 
