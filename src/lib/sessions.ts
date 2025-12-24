@@ -136,7 +136,7 @@ export async function saveSession(
 
     await saveSessionsInternal(storage);
 
-    logger.info(`Session ${sessionName} saved`);
+    logger.debug(`Session ${sessionName} saved`);
   }, SESSIONS_DEFAULT_CONTENT);
 }
 

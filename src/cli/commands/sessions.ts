@@ -99,14 +99,14 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
   const sessions = await listSessions();
 
   // Load auth profiles from disk
-  const authProfiles = await listAuthProfiles();
+  const profiles = await listAuthProfiles();
 
   if (options.outputMode === 'json') {
     console.log(
       formatOutput(
         {
           sessions,
-          authProfiles,
+          profiles,
         },
         'json'
       )
@@ -125,11 +125,11 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
 
     // Display auth profiles
     console.log('');
-    if (authProfiles.length === 0) {
+    if (profiles.length === 0) {
       console.log('No authentication profiles.');
     } else {
       console.log('Authentication profiles:');
-      for (const profile of authProfiles) {
+      for (const profile of profiles) {
         console.log(`  ${profile.name} → ${profile.serverUrl} (OAuth)`);
       }
     }

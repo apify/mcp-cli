@@ -192,7 +192,7 @@ class BridgeProcess {
     // 1. First, initialize file logger to see what's going on
     await initFileLogger(`bridge-${this.options.sessionName}.log`);
 
-    logger.info(`Starting bridge for session: ${this.options.sessionName}`);
+    logger.info(`Bridge process starting for session: ${this.options.sessionName}`);
 
     // 2. Clean up orphaned log files (runs asynchronously in background)
     this.cleanupOrphanedLogFiles();
@@ -251,7 +251,7 @@ class BridgeProcess {
     const transport = await this.updateTransportAuth();
 
     const clientConfig = {
-      clientInfo: { name: 'mcpc-bridge', version: packageJson.version },
+      clientInfo: { name: 'mcpc', version: packageJson.version },
       transport,
       capabilities: {
         roots: { listChanged: true },
@@ -830,10 +830,8 @@ async function main(): Promise<void> {
   }
 }
 
-// Run if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    console.error('Fatal error:', error);
-    process.exit(1);
-  });
-}
+// Run main function
+main().catch((error) => {
+  console.error('Fatal error:', error);
+  process.exit(1);
+});

@@ -43,7 +43,7 @@ export interface StartBridgeOptions {
 export async function startBridge(options: StartBridgeOptions): Promise<void> {
   const { sessionName, target, verbose, profileName } = options;
 
-  logger.info(`Starting bridge for session: ${sessionName}`);
+  logger.debug(`Launching bridge for session: ${sessionName}`);
 
   // Get socket path
   const socketPath = join(getBridgesDir(), `${sessionName}.sock`);
@@ -121,7 +121,7 @@ export async function startBridge(options: StartBridgeOptions): Promise<void> {
 
     await saveSession(sessionName, sessionData);
 
-    logger.info(`Bridge started successfully for session: ${sessionName}`);
+    logger.debug(`Bridge started successfully for session: ${sessionName}`);
   } catch (error) {
     logger.error('Failed to start bridge:', error);
 

@@ -971,7 +971,7 @@ Later...
 
 **"Cannot connect to bridge"**
 - Bridge may have crashed. Try: `mcpc <server> connect --session @<session-name>`
-- Check bridge is running: `ps aux | grep mcpc-bridge`
+- Check bridge is running: `ps aux | grep -e 'mcpc-bridge' -e '[m]cpc/dist/bridge'`
 - Check socket exists: `ls ~/.mcpc/bridges/`
 
 **"Session not found"**
