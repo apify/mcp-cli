@@ -2,8 +2,8 @@
  * Unit tests for MCP client factory
  */
 
-import { McpClient } from '../../src/core/mcp-client';
-import { createMcpClient, createStdioClient, createHttpClient } from '../../src/core/factory';
+import { McpClient } from '../../src/core/mcp-client.js';
+import { createMcpClient, createStdioClient, createHttpClient } from '../../src/core/factory.js';
 
 // Mock the transports
 jest.mock('../../src/core/transports', () => ({

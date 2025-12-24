@@ -46,7 +46,7 @@ export async function connectSession(
       verbose: options.verbose || false,
     };
     if (options.profile) {
-      bridgeOptions.authProfile = options.profile;
+      bridgeOptions.profileName = options.profile;
     }
     await startBridge(bridgeOptions);
 

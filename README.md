@@ -174,7 +174,6 @@ When list operations return paginated results, `mcpc` automatically fetches all 
 
 `mcpc` supports all standard [authentication methods](https://modelcontextprotocol.io/specification/latest/basic/authorization) for MCP servers,
 including the `WWW-Authenticate` discovery mechanism and OAuth 2.1 with PKCE.
-It uses OS keychain to securely store authentication tokens and credentials.
 
 ### No authentication
 
@@ -213,6 +212,8 @@ For OAuth-enabled remote MCP servers, `mcpc` implements the full OAuth 2.1 flow 
 
 The OAuth authentication is **always** initiated by the user calling the `login` command,
 which opens a web browser with login screen. `mcpc` doesn't open web browser in any other case.
+
+`mcpc` uses OS keychain to securely store OAuth authentication tokens.
 
 #### Authentication profiles
 
@@ -268,7 +269,7 @@ On failure, the error message includes instructions on how to login and save the
 
 **This flow ensures:**
 - You only authenticate when necessary
-- Credentials are never silently downgraded (authenticated → unauthenticated)
+- Credentials are never silently mixed up (personal → work) or downgraded (authenticated → unauthenticated)
 - You can mix authenticated sessions (with named profiles) and public access on the same server
 
 **Examples:**

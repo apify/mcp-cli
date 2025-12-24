@@ -30,7 +30,7 @@ interface BridgeOptions {
   target: TransportConfig;
   socketPath: string;
   verbose?: boolean;
-  authProfile?: string; // Auth profile name for token refresh
+  profileName?: string; // Auth profile name for token refresh
 }
 
 /**
@@ -802,10 +802,10 @@ async function main(): Promise<void> {
   const verbose = args.includes('--verbose');
 
   // Parse --auth-profile argument
-  let authProfile: string | undefined;
+  let profileName: string | undefined;
   const authProfileIndex = args.indexOf('--auth-profile');
   if (authProfileIndex !== -1 && args[authProfileIndex + 1]) {
-    authProfile = args[authProfileIndex + 1];
+    profileName = args[authProfileIndex + 1];
   }
 
   try {
@@ -817,8 +817,8 @@ async function main(): Promise<void> {
       socketPath,
       verbose,
     };
-    if (authProfile) {
-      bridgeOptions.authProfile = authProfile;
+    if (profileName) {
+      bridgeOptions.profileName = profileName;
     }
 
     const bridge = new BridgeProcess(bridgeOptions);

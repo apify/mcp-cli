@@ -33,7 +33,7 @@ export interface StartBridgeOptions {
   sessionName: string;
   target: TransportConfig;
   verbose?: boolean;
-  authProfile?: string; // Auth profile name for token refresh
+  profileName?: string; // Auth profile name for token refresh
 }
 
 /**
@@ -41,7 +41,7 @@ export interface StartBridgeOptions {
  * Creates the session record and spawns the bridge process
  */
 export async function startBridge(options: StartBridgeOptions): Promise<void> {
-  const { sessionName, target, verbose, authProfile } = options;
+  const { sessionName, target, verbose, profileName } = options;
 
   logger.info(`Starting bridge for session: ${sessionName}`);
 
@@ -58,8 +58,8 @@ export async function startBridge(options: StartBridgeOptions): Promise<void> {
   }
 
   // Pass auth profile if specified
-  if (authProfile) {
-    args.push('--auth-profile', authProfile);
+  if (profileName) {
+    args.push('--auth-profile', profileName);
   }
 
   logger.debug('Bridge executable:', bridgeExecutable);
@@ -99,8 +99,8 @@ export async function startBridge(options: StartBridgeOptions): Promise<void> {
     }
 
     // If auth profile is specified, send refresh token to bridge via IPC
-    if (authProfile) {
-      await sendAuthCredentialsToBridge(socketPath, target.url || target.command || '', authProfile);
+    if (profileName) {
+      await sendAuthCredentialsToBridge(socketPath, target.url || target.command || '', profileName);
     }
 
     // Save session to storage
@@ -115,8 +115,8 @@ export async function startBridge(options: StartBridgeOptions): Promise<void> {
     };
 
     // Store auth profile reference if specified
-    if (authProfile) {
-      sessionData.authProfile = authProfile;
+    if (profileName) {
+      sessionData.profileName = profileName;
     }
 
     await saveSession(sessionName, sessionData);
@@ -242,8 +242,8 @@ export async function ensureBridgeHealthy(sessionName: string): Promise<void> {
       sessionName,
       target,
     };
-    if (session.authProfile) {
-      bridgeOptions.authProfile = session.authProfile;
+    if (session.profileName) {
+      bridgeOptions.profileName = session.profileName;
     }
     await startBridge(bridgeOptions);
   }

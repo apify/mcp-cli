@@ -432,7 +432,7 @@ On failure, the error message includes instructions on how to login. This ensure
     "name": "apify-personal",
     "target": "https://mcp.apify.com",
     "transport": "http",
-    "authProfile": "personal",  // References profile
+    "profileName": "personal",  // References profile
     "pid": 12345,
     "socketPath": "~/.mcpc/bridges/apify-personal.sock"
   }
