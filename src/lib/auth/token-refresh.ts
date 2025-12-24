@@ -98,11 +98,6 @@ export async function refreshAndSaveTokens(
     updatedAt: now,
   };
 
-  // Update expiresAt if we have expiration info
-  if (newTokens.expires_at) {
-    updatedProfile.expiresAt = new Date(newTokens.expires_at * 1000).toISOString();
-  }
-
   // Update scopes if provided
   if (newTokens.scope) {
     updatedProfile.scopes = newTokens.scope.split(' ');
@@ -112,22 +107,6 @@ export async function refreshAndSaveTokens(
   await saveAuthProfile(updatedProfile);
 
   return updatedProfile;
-}
-
-/**
- * Check if a token is expired (or about to expire within buffer time)
- */
-export function isTokenExpired(profile: AuthProfile, bufferSeconds: number = 60): boolean {
-  if (!profile.expiresAt) {
-    // No expiration info, assume not expired
-    return false;
-  }
-
-  const expiresDate = new Date(profile.expiresAt);
-  const bufferMs = bufferSeconds * 1000;
-  const now = Date.now();
-
-  return expiresDate.getTime() - bufferMs < now;
 }
 
 /**
@@ -171,9 +150,6 @@ function createPersistenceCallback(
       authenticatedAt: now,
       updatedAt: now,
     };
-    if (keychainTokens.expiresAt) {
-      updatedProfile.expiresAt = new Date(keychainTokens.expiresAt * 1000).toISOString();
-    }
     if (newTokens.scope) {
       updatedProfile.scopes = newTokens.scope.split(' ');
     }

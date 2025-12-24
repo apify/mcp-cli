@@ -150,7 +150,6 @@ export interface AuthProfile {
   oauthIssuer: string;
   scopes?: string[];
   authenticatedAt?: string;
-  expiresAt?: string;
   // Timestamps (TODO: why not Dates?)
   createdAt: string;
   updatedAt: string;

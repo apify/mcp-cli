@@ -71,38 +71,10 @@ export class OAuthTokenManager {
   }
 
   /**
-   * Check if we have credentials to work with
-   */
-  hasCredentials(): boolean {
-    return !!this.refreshToken;
-  }
-
-  /**
    * Get the current refresh token
    */
   getRefreshToken(): string {
     return this.refreshToken;
-  }
-
-  /**
-   * Update the refresh token (e.g., after token rotation)
-   */
-  setRefreshToken(token: string): void {
-    this.refreshToken = token;
-  }
-
-  /**
-   * Get server URL
-   */
-  getServerUrl(): string {
-    return this.serverUrl;
-  }
-
-  /**
-   * Get profile name
-   */
-  getProfileName(): string {
-    return this.profileName;
   }
 
   /**
@@ -174,20 +146,5 @@ export class OAuthTokenManager {
     }
 
     return this.accessToken;
-  }
-
-  /**
-   * Get the current access token without checking expiry or refreshing
-   * Returns null if no token is available
-   */
-  getCurrentAccessToken(): string | null {
-    return this.accessToken;
-  }
-
-  /**
-   * Get the access token expiry timestamp
-   */
-  getAccessTokenExpiresAt(): number | null {
-    return this.accessTokenExpiresAt;
   }
 }

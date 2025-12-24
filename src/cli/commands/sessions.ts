@@ -130,13 +130,7 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
     } else {
       console.log('Authentication profiles:');
       for (const profile of authProfiles) {
-        const expiryInfo =
-          profile.expiresAt && new Date(profile.expiresAt) > new Date()
-            ? `expires ${new Date(profile.expiresAt).toISOString()}`
-            : profile.expiresAt
-              ? 'expired'
-              : '';
-        console.log(`  ${profile.name} → ${profile.serverUrl} (OAuth, ${expiryInfo})`);
+        console.log(`  ${profile.name} → ${profile.serverUrl} (OAuth)`);
       }
     }
   }

@@ -36,11 +36,6 @@ export async function login(
       if (result.profile.scopes && result.profile.scopes.length > 0) {
         console.log(formatInfo(`Scopes: ${result.profile.scopes.join(', ')}`));
       }
-
-      if (result.profile.expiresAt) {
-        const expiresDate = new Date(result.profile.expiresAt);
-        console.log(formatInfo(`Expires: ${expiresDate.toISOString()}`));
-      }
     } else {
       console.log(
         formatOutput(
@@ -48,7 +43,6 @@ export async function login(
             profile: profileName,
             serverUrl: normalizedUrl,
             scopes: result.profile.scopes,
-            expiresAt: result.profile.expiresAt,
           },
           'json'
         )

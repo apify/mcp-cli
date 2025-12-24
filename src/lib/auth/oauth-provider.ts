@@ -170,9 +170,6 @@ export class McpcOAuthProvider implements OAuthClientProvider {
       if (tokens.scope) {
         profile.scopes = tokens.scope.split(' ');
       }
-      if (keychainTokens.expiresAt) {
-        profile.expiresAt = new Date(keychainTokens.expiresAt * 1000).toISOString();
-      }
     } else {
       // Update existing profile metadata
       profile.authenticatedAt = now;
@@ -180,9 +177,6 @@ export class McpcOAuthProvider implements OAuthClientProvider {
 
       if (tokens.scope) {
         profile.scopes = tokens.scope.split(' ');
-      }
-      if (keychainTokens.expiresAt) {
-        profile.expiresAt = new Date(keychainTokens.expiresAt * 1000).toISOString();
       }
     }
 
