@@ -49,6 +49,9 @@ class BridgeProcess {
   // OAuth token manager (created when CLI sends auth credentials via IPC)
   private tokenManager: OAuthTokenManager | null = null;
 
+  // HTTP headers (received via IPC, stored in memory only)
+  private headers: Record<string, string> | null = null;
+
   constructor(options: BridgeOptions) {
     this.options = options;
     this.cache = new CacheManager();
@@ -60,39 +63,71 @@ class BridgeProcess {
 
   /**
    * Set auth credentials received from CLI via IPC
-   * Creates an OAuthTokenManager for handling token refresh
+   * Handles both OAuth (with refresh token) and HTTP headers
    */
   setAuthCredentials(credentials: AuthCredentials): void {
     logger.info(`Received auth credentials for profile: ${credentials.profileName}`);
-    this.tokenManager = new OAuthTokenManager({
-      serverUrl: credentials.serverUrl,
-      profileName: credentials.profileName,
-      refreshToken: credentials.refreshToken,
-      // TODO: Should we notify CLI when tokens are rotated?
-      // onTokenRefresh: (tokens) => { ... }
-    });
+
+    // Set up OAuth token manager if refresh token is provided
+    if (credentials.refreshToken) {
+      this.tokenManager = new OAuthTokenManager({
+        serverUrl: credentials.serverUrl,
+        profileName: credentials.profileName,
+        refreshToken: credentials.refreshToken,
+        // TODO: Should we notify CLI when tokens are rotated?
+        // onTokenRefresh: (tokens) => { ... }
+      });
+      logger.debug('OAuth token manager initialized');
+    }
+
+    // Store headers if provided (used when no OAuth refresh token available)
+    if (credentials.headers) {
+      this.headers = credentials.headers;
+      logger.debug(`Stored ${Object.keys(this.headers).length} headers in memory`);
+    }
   }
 
   /**
    * Get a valid access token, refreshing if necessary,
-   * and update transport config with a fresh Authorization header
+   * and update transport config with headers
+   *
+   * Priority:
+   * 1. OAuth token manager (uses refresh token to get fresh access token)
+   * 2. HTTP headers (static headers from --header flags)
    */
   private async updateTransportAuth(): Promise<TransportConfig> {
     const config = { ...this.options.target };
 
+    // Only update auth for HTTP transport
+    if (config.type !== 'http') {
+      return config;
+    }
+
     try {
-      // Only update auth for HTTP transport with token manager
-      if (config.type === 'http' && this.tokenManager) {
+      // Priority 1: Use OAuth token manager if available (can refresh tokens)
+      if (this.tokenManager) {
         const token = await this.tokenManager.getValidAccessToken();
         config.headers = {
+          ...this.headers, // Include any other headers from --header flags
           ...config.headers,
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`, // OAuth token takes priority
         };
-        logger.debug('Updated transport config with fresh access token');
+        logger.debug('Updated transport config with fresh OAuth access token');
+        return config;
+      }
+
+      // Priority 2: Use static headers if available
+      if (this.headers) {
+        config.headers = {
+          ...config.headers,
+          ...this.headers,
+        };
+        logger.debug(`Updated transport config with ${Object.keys(this.headers).length} headers`);
+        return config;
       }
     } catch (error) {
-      logger.error('Failed to refresh access token:', error);
-      // Mark session as expired if refresh fails
+      logger.error('Failed to get access token:', error);
+      // Mark session as expired if token refresh fails
       await this.markSessionExpiredAndExit();
       throw error;
     }
@@ -803,9 +838,9 @@ async function main(): Promise<void> {
 
   // Parse --profile argument
   let profileName: string | undefined;
-  const authProfileIndex = args.indexOf('--profile');
-  if (authProfileIndex !== -1 && args[authProfileIndex + 1]) {
-    profileName = args[authProfileIndex + 1];
+  const profileIndex = args.indexOf('--profile');
+  if (profileIndex !== -1 && args[profileIndex + 1]) {
+    profileName = args[profileIndex + 1];
   }
 
   try {

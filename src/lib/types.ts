@@ -169,13 +169,15 @@ export type IpcMessageType = 'request' | 'response' | 'health-check' | 'health-o
 
 /**
  * Auth credentials sent from CLI to bridge via IPC
- * Contains refresh token for the bridge to use for token refresh
- * TODO: might be extended to support also Bearer auth in the future
+ * Supports both OAuth (with refresh token) and HTTP headers
  */
 export interface AuthCredentials {
-  refreshToken: string;
   serverUrl: string;
   profileName: string;
+  // OAuth credentials (for refresh flow)
+  refreshToken?: string;
+  // HTTP headers (from --header flags, stored in keychain)
+  headers?: Record<string, string>;
 }
 
 /**

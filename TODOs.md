@@ -8,6 +8,8 @@
 
 - Auth: change to login/logout, keep profiles 
 - docs: add the OAuth commands to --help, otherwise people will not find it when they need it
+- OAuth issuer - save it and double-check it to ensure domain is not spoofed. Why do we need separate keychain entry for oauth-client?
+
 
 - add "mcpc --reset-all/clean-all/clean:a,b,c" ? command to clean up sessions, kill bridges, etc. It should keep shell-history and logs though.
   - add command to restart bridge process
@@ -44,7 +46,7 @@
 
 ## Later
 
-- nit: Colorize outpOkayut, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
+- nit: Colorize output, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
 - nit: in README, explain the MCP commands better in a standlone section, with details how they work
 - Add support for MCP elicitations, and potentially for sampling (e.g. via shell interface?)
 - docs: add Claude Skills file to /docs, maybe also man page?
@@ -53,5 +55,6 @@
   - `--proxy-capabilities tools:TOOL_NAME,TOOL_NAME2,...,prompts[:...],...` to limit access to selected MCP features and tools
     (what if tools have ":" or "," in their names?)
     In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
+  - Explain this is useful for AI sandboxing!
 - Impelled shell completions (e.g. "mcpc @a...")
 - nit: Nicer OAuth flow finish web page, add Apify example there.

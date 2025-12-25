@@ -188,7 +188,7 @@ mcpc https://mcp.apify.com\?tools=docs tools-list
 ### Bearer token authentication
 
 For remote servers that require a bearer token (but not OAuth), use the `--header` flag.
-The token is stored securely in the OS keychain for the session, but **not** saved as a reusable authentication profile:
+All headers are stored securely in the OS keychain for the session, but **not** saved as a reusable authentication profile:
 
 ```bash
 # One-time command with bearer token
@@ -342,7 +342,6 @@ By default, authentication profiles are stored in the `~/.mcpc/auth-profiles.jso
         "oauthIssuer": "https://auth.apify.com",
         "scopes": ["tools:read", "tools:write", "resources:read"],
         "authenticatedAt": "2025-12-14T10:00:00Z",
-        "expiresAt": "2025-12-15T10:00:00Z",
         "createdAt": "2025-12-14T10:00:00Z",
         "updatedAt": "2025-12-14T10:00:00Z"
       },
@@ -353,7 +352,6 @@ By default, authentication profiles are stored in the `~/.mcpc/auth-profiles.jso
         "oauthIssuer": "https://auth.apify.com",
         "scopes": ["tools:read"],
         "authenticatedAt": "2025-12-10T15:30:00Z",
-        "expiresAt": "2025-12-11T15:30:00Z",
         "createdAt": "2025-12-10T15:30:00Z",
         "updatedAt": "2025-12-10T15:30:00Z"
       }
@@ -365,7 +363,7 @@ By default, authentication profiles are stored in the `~/.mcpc/auth-profiles.jso
 **OS Keychain entries:**
 - OAuth tokens: `mcpc:auth:https://mcp.apify.com:personal:tokens`
 - OAuth client info: `mcpc:auth:https://mcp.apify.com:personal:client`
-- Bearer tokens (per-session): `mcpc:session:apify:bearer-token`
+- HTTP headers (per-session): `mcpc:session:apify:headers`
 
 ## Sessions
 
@@ -464,7 +462,7 @@ Here's how `mcpc` handles these situations:
 
 - If the bridge process is running, it will automatically try to reconnect to the server if the connection fails
 and establish the keep-alive pings.
-- If the server indicates the `MCP-Session-Id` is no longer valid,
+- If the server response indicates the `MCP-Session-Id` is no longer valid or authentication permanently failed (HTTP error 401 or 402),
 the bridge process will flag the session as **expired** in `~/.mcpc/sessions.json` and terminate.
 - If the bridge process crashes, `mcpc` attempts to restart it next time you use the specific session.
 
@@ -660,31 +658,41 @@ MCP enables arbitrary tool execution and data access; treat servers like you tre
 ### Credential storage
 
 **OS keychain integration:**
-- All OAuth tokens (access token - TODO:really?, refresh tokens) are stored in the OS keychain
+- OAuth refresh tokens are stored in the OS keychain (access tokens are kept in memory only)
 - OAuth client credentials (client_id, client_secret from dynamic registration) are stored in the keychain
-- Bearer tokens for sessions are stored in the keychain
-- The `~/.mcpc/auth-profiles.json` file only contains metadata (server URL, scopes, expiry timestamps) - never tokens
+- All HTTP headers from `--header` flags are stored per-session in the keychain (as JSON)
+- The `~/.mcpc/auth-profiles.json` file only contains metadata (server URL, scopes, timestamps) - never tokens
 
 **Keychain entries:**
 - OAuth tokens: `mcpc:auth:<serverUrl>:<profileName>:oauth-tokens`
 - OAuth client: `mcpc:auth:<serverUrl>:<profileName>:oauth-client`
-- Bearer tokens: `mcpc:session:<sessionName>:bearer-token` TODO: really?
+- HTTP headers: `mcpc:session:<sessionName>:headers`
 
 ### Bridge process authentication
 
-Background bridge processes need access to tokens for making authenticated requests. To maintain security while allowing token refresh:
+Background bridge processes need access to credentials for making authenticated requests. To maintain security while allowing token refresh:
 
+**For OAuth profiles:**
 1. **CLI retrieves refresh token** from OS keychain when creating or restarting a session
 2. **CLI sends refresh token to bridge** via Unix socket IPC (not command line arguments)
 3. **Bridge stores refresh token in memory only** - never written to disk
 4. **Bridge refreshes access tokens** periodically using the refresh token
 5. **Access tokens are kept in bridge memory** - never persisted to disk
 
+**For HTTP headers (from `--header` flags):**
+1. **All headers are treated as potentially sensitive** - not just `Authorization`
+2. **CLI stores all headers in OS keychain** per-session (as JSON)
+3. **CLI sends headers to bridge** via Unix socket IPC (not command line arguments)
+4. **Bridge stores headers in memory only** - never written to disk
+5. **Headers are deleted from keychain** when session is closed
+6. **On bridge crash/restart**, CLI retrieves headers from keychain and resends via IPC
+
 This architecture ensures:
-- Tokens are never stored in plaintext on disk
+- Credentials are never stored in plaintext on disk
+- Headers are not visible in process arguments (`ps aux`)
 - Bridge processes don't need direct keychain access (which may require user interaction)
-- Credentials are not visible in process arguments (`ps aux`)
-- Refresh tokens are securely transmitted via Unix socket (local IPC only)
+- Credentials are securely transmitted via Unix socket (local IPC only)
+- Failover works correctly - headers are preserved across bridge restarts
 
 ### File permissions
 

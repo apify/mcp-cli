@@ -5,10 +5,14 @@
 import { OutputMode, isValidSessionName, validateProfileName } from '../../lib/index.js';
 import { formatOutput, formatSuccess, formatError } from '../output.js';
 import { listAuthProfiles } from '../../lib/auth/auth-profiles.js';
-import { listSessions, sessionExists } from '../../lib/sessions.js';
+import { listSessions, sessionExists, deleteSession, saveSession, updateSession } from '../../lib/sessions.js';
 import { startBridge, stopBridge } from '../../lib/bridge-manager.js';
+import { deleteSessionHeaders, storeSessionHeaders } from '../../lib/auth/keychain.js';
 import { resolveTarget } from '../helpers.js';
 import { ClientError } from '../../lib/index.js';
+import { createLogger } from '../../lib/logger.js';
+
+const logger = createLogger('sessions');
 
 /**
  * Connect to an MCP server and create a session
@@ -43,16 +47,62 @@ export async function connectSession(
     // Resolve target to transport config
     const transportConfig = await resolveTarget(target, options);
 
-    // Start bridge process
-    const bridgeOptions: Parameters<typeof startBridge>[0] = {
-      sessionName: name,
-      target: transportConfig,
-      verbose: options.verbose || false,
+    // Store headers in OS keychain (secure storage) before starting bridge
+    let headers: Record<string, string> | undefined;
+    if (transportConfig.type === 'http' && transportConfig.headers && Object.keys(transportConfig.headers).length > 0) {
+      headers = transportConfig.headers;
+      logger.debug(`Storing ${Object.keys(headers).length} headers for session ${name} in keychain`);
+      await storeSessionHeaders(name, headers);
+    }
+
+    // Create initial session record (without pid/socketPath - those come from startBridge)
+    const now = new Date().toISOString();
+    const sessionData: Parameters<typeof saveSession>[1] = {
+      target: transportConfig.url || transportConfig.command || 'unknown',
+      transport: transportConfig.type,
+      createdAt: now,
+      updatedAt: now,
     };
     if (options.profile) {
-      bridgeOptions.profileName = options.profile;
+      sessionData.profileName = options.profile;
     }
-    await startBridge(bridgeOptions);
+    await saveSession(name, sessionData);
+    logger.debug(`Initial session record created for: ${name}`);
+
+    // Start bridge process (handles spawning and IPC credential delivery)
+    try {
+      const bridgeOptions: Parameters<typeof startBridge>[0] = {
+        sessionName: name,
+        target: transportConfig,
+        verbose: options.verbose || false,
+      };
+      if (headers) {
+        bridgeOptions.headers = headers;
+      }
+      if (options.profile) {
+        bridgeOptions.profileName = options.profile;
+      }
+
+      const { pid, socketPath } = await startBridge(bridgeOptions);
+
+      // Update session with bridge info
+      await updateSession(name, { pid, socketPath });
+      logger.debug(`Session ${name} updated with bridge PID: ${pid}`);
+    } catch (error) {
+      // Clean up session record and headers on bridge start failure
+      logger.debug(`Bridge start failed, cleaning up session ${name}`);
+      try {
+        await deleteSession(name);
+      } catch {
+        // Ignore cleanup errors
+      }
+      try {
+        await deleteSessionHeaders(name);
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw error;
+    }
 
     // Success!
     if (options.outputMode === 'human') {
@@ -155,6 +205,18 @@ export async function closeSession(
 
     // Stop the bridge process
     await stopBridge(name);
+
+    // Delete session record from storage
+    await deleteSession(name);
+    logger.debug(`Deleted session record: ${name}`);
+
+    // Delete headers from keychain (if any)
+    try {
+      await deleteSessionHeaders(name);
+      logger.debug(`Deleted headers from keychain for session: ${name}`);
+    } catch {
+      // Ignore errors - headers may not exist
+    }
 
     // Success!
     if (options.outputMode === 'human') {

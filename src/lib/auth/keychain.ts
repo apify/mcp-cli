@@ -25,11 +25,11 @@ function buildOAuthAccountName(serverUrl: string, profileName: string, type: Key
 }
 
 /**
- * Build a keychain account name for session bearer tokens
- * Format: session:<sessionName>:bearer-token
+ * Build a keychain account name for session headers
+ * Format: session:<sessionName>:headers
  */
 function buildSessionAccountName(sessionName: string): string {
-  return `session:${sessionName}:bearer-token`;
+  return `session:${sessionName}:headers`;
 }
 
 /**
@@ -158,42 +158,53 @@ export async function deleteOAuthClient(
 }
 
 /**
- * Store bearer token for a session in keychain
+ * Store HTTP headers for a session in keychain
+ * All headers from --header flags are treated as potentially sensitive
  */
-export async function storeSessionBearerToken(
+export async function storeSessionHeaders(
   sessionName: string,
-  token: string
+  headers: Record<string, string>
 ): Promise<void> {
   const account = buildSessionAccountName(sessionName);
+  const value = JSON.stringify(headers);
 
-  logger.debug(`Storing bearer token for session ${sessionName}`);
-  await keytar.setPassword(SERVICE_NAME, account, token);
+  logger.debug(`Storing headers for session ${sessionName}`);
+  await keytar.setPassword(SERVICE_NAME, account, value);
 }
 
 /**
- * Retrieve bearer token for a session from keychain
+ * Retrieve HTTP headers for a session from keychain
  */
-export async function getSessionBearerToken(
+export async function getSessionHeaders(
   sessionName: string
-): Promise<string | undefined> {
-  // TODO: why also not serverUrl? we could keep both consistent...
+): Promise<Record<string, string> | undefined> {
   const account = buildSessionAccountName(sessionName);
 
-  logger.debug(`Retrieving bearer token for session ${sessionName}`);
+  logger.debug(`Retrieving headers for session ${sessionName}`);
   const value = await keytar.getPassword(SERVICE_NAME, account);
 
-  return value || undefined;
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(value) as Record<string, string>;
+  } catch (error) {
+    logger.error(`Failed to parse headers from keychain: ${(error as Error).message}`);
+    // TODO: we should throw and fail rather than silently ignore the error
+    return undefined;
+  }
 }
 
 /**
- * Delete bearer token for a session from keychain
+ * Delete HTTP headers for a session from keychain
  */
-export async function deleteSessionBearerToken(
+export async function deleteSessionHeaders(
   sessionName: string
 ): Promise<boolean> {
   const account = buildSessionAccountName(sessionName);
 
-  logger.debug(`Deleting bearer token for session ${sessionName}`);
+  logger.debug(`Deleting headers for session ${sessionName}`);
   return keytar.deletePassword(SERVICE_NAME, account);
 }
 

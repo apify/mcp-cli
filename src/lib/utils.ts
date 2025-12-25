@@ -197,6 +197,7 @@ export function isValidProfileName(name: string): boolean {
  * Profile names must be alphanumeric with hyphens/underscores, 1-64 chars (no @ prefix)
  */
 export function validateProfileName(profileName: string): void {
+  // TODO: Add super simple unit test
   if (!isValidProfileName(profileName)) {
     throw new ClientError(
       `Invalid profile name: ${profileName}\n` +

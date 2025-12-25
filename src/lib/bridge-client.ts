@@ -204,8 +204,14 @@ export class BridgeClient extends EventEmitter {
 
   /**
    * Send auth credentials to bridge (one-way, no response expected)
+   * Supports both OAuth (refreshToken) and HTTP headers
    */
-  sendAuthCredentials(credentials: { refreshToken: string; serverUrl: string; profileName: string }): void {
+  sendAuthCredentials(credentials: {
+    serverUrl: string;
+    profileName: string;
+    refreshToken?: string;
+    headers?: Record<string, string>;
+  }): void {
     if (!this.socket) {
       throw new NetworkError('Not connected to bridge');
     }

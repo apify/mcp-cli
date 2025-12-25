@@ -9,11 +9,11 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import type { TransportConfig } from './types.js';
 import { getBridgesDir, waitForFile, isProcessAlive, fileExists } from './utils.js';
-import { saveSession, deleteSession } from './sessions.js';
+import { updateSession } from './sessions.js';
 import { createLogger } from './logger.js';
 import { ClientError } from './errors.js';
 import { BridgeClient } from './bridge-client.js';
-import { getOAuthTokens } from './auth/keychain.js';
+import { getOAuthTokens, getSessionHeaders } from './auth/keychain.js';
 import { getAuthProfile } from './auth/auth-profiles.js';
 
 const logger = createLogger('bridge-manager');
@@ -34,23 +34,47 @@ export interface StartBridgeOptions {
   target: TransportConfig;
   verbose?: boolean;
   profileName?: string; // Auth profile name for token refresh
+  headers?: Record<string, string>; // Headers to send via IPC (caller stores in keychain)
+}
+
+export interface StartBridgeResult {
+  pid: number;
+  socketPath: string;
 }
 
 /**
  * Start a bridge process for a session
- * Creates the session record and spawns the bridge process
+ * Spawns the bridge process and sends auth credentials via IPC
+ *
+ * SECURITY: All headers are treated as potentially sensitive:
+ * 1. Caller stores headers in OS keychain before calling this function
+ * 2. Headers are sent to bridge via IPC after startup
+ * 3. Never exposed in process listings
+ *
+ * NOTE: This function does NOT manage session storage. The caller is responsible for:
+ * - Creating the session record before calling startBridge()
+ * - Updating the session with pid/socketPath after startBridge() returns
+ *
+ * @returns Bridge process PID and socket path
  */
-export async function startBridge(options: StartBridgeOptions): Promise<void> {
-  const { sessionName, target, verbose, profileName } = options;
+export async function startBridge(options: StartBridgeOptions): Promise<StartBridgeResult> {
+  const { sessionName, target, verbose, profileName, headers } = options;
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
 
   // Get socket path
   const socketPath = join(getBridgesDir(), `${sessionName}.sock`);
 
-  // Prepare bridge arguments
+  // Create a sanitized transport config without any headers
+  // Headers will be sent to the bridge via IPC instead
+  const sanitizedTarget: TransportConfig = { ...target };
+  if (sanitizedTarget.type === 'http') {
+    delete sanitizedTarget.headers;
+  }
+
+  // Prepare bridge arguments (with sanitized config - no headers)
   const bridgeExecutable = getBridgeExecutable();
-  const targetJson = JSON.stringify(target);
+  const targetJson = JSON.stringify(sanitizedTarget);
   const args = [sessionName, socketPath, targetJson];
 
   if (verbose) {
@@ -66,78 +90,56 @@ export async function startBridge(options: StartBridgeOptions): Promise<void> {
   logger.debug('Bridge args:', args);
 
   // Spawn bridge process
-  let bridgeProcess: ChildProcess;
+  const bridgeProcess: ChildProcess = spawn('node', [bridgeExecutable, ...args], {
+    detached: true,
+    stdio: 'ignore', // Don't inherit stdio (run in background)
+  });
 
-  try {
-    bridgeProcess = spawn('node', [bridgeExecutable, ...args], {
-      detached: true,
-      stdio: 'ignore', // Don't inherit stdio (run in background)
-    });
+  // Allow the bridge to run independently
+  bridgeProcess.unref();
 
-    // Allow the bridge to run independently
-    bridgeProcess.unref();
+  logger.debug(`Bridge process spawned with PID: ${bridgeProcess.pid}`);
 
-    logger.debug(`Bridge process spawned with PID: ${bridgeProcess.pid}`);
-
-    if (!bridgeProcess.pid) {
-      throw new ClientError('Failed to spawn bridge process: no PID');
-    }
-
-    // Wait for socket file to be created (with timeout)
-    try {
-      await waitForFile(socketPath, { timeoutMs: 5000 });
-    } catch {
-      // Kill the process if socket wasn't created
-      try {
-        process.kill(bridgeProcess.pid, 'SIGTERM');
-      } catch {
-        // Ignore errors killing process
-      }
-      throw new ClientError(
-        `Bridge failed to start: socket file not created within timeout. Check bridge logs.`
-      );
-    }
-
-    // If auth profile is specified, send refresh token to bridge via IPC
-    if (profileName) {
-      await sendAuthCredentialsToBridge(socketPath, target.url || target.command || '', profileName);
-    }
-
-    // Save session to storage
-    const sessionData: Parameters<typeof saveSession>[1] = {
-      target: target.url || target.command || 'unknown',
-      transport: target.type,
-      pid: bridgeProcess.pid,
-      socketPath,
-      // Protocol version will be populated on first command
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    // Store auth profile reference if specified
-    if (profileName) {
-      sessionData.profileName = profileName;
-    }
-
-    await saveSession(sessionName, sessionData);
-
-    logger.debug(`Bridge started successfully for session: ${sessionName}`);
-  } catch (error) {
-    logger.error('Failed to start bridge:', error);
-
-    // Clean up on failure
-    try {
-      await deleteSession(sessionName);
-    } catch {
-      // Ignore cleanup errors
-    }
-
-    throw error;
+  if (!bridgeProcess.pid) {
+    throw new ClientError('Failed to spawn bridge process: no PID');
   }
+
+  const pid = bridgeProcess.pid;
+
+  // Wait for socket file to be created (with timeout)
+  try {
+    await waitForFile(socketPath, { timeoutMs: 5000 });
+  } catch {
+    // Kill the process if socket wasn't created
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // Ignore errors killing process
+    }
+    throw new ClientError(
+      `Bridge failed to start: socket file not created within timeout. Check bridge logs.`
+    );
+  }
+
+  // Send auth credentials to bridge via IPC (secure, not via command line)
+  // This handles both OAuth profiles (refresh token) and HTTP headers
+  if (profileName || headers) {
+    await sendAuthCredentialsToBridge(
+      socketPath,
+      target.url || target.command || '',
+      profileName,
+      headers
+    );
+  }
+
+  logger.debug(`Bridge started successfully for session: ${sessionName}`);
+
+  return { pid, socketPath };
 }
 
 /**
- * Stop a bridge process and remove the session
+ * Stop a bridge process (does NOT delete session or headers)
+ * Use closeSession() for full session cleanup
  */
 export async function stopBridge(sessionName: string): Promise<void> {
   logger.info(`Stopping bridge for session: ${sessionName}`);
@@ -168,8 +170,9 @@ export async function stopBridge(sessionName: string): Promise<void> {
     }
   }
 
-  // Remove session from storage
-  await deleteSession(sessionName);
+  // Note: Session record and headers are NOT deleted here.
+  // They are preserved for failover scenarios (bridge restart).
+  // Full cleanup happens in closeSession().
 
   logger.info(`Bridge stopped for session: ${sessionName}`);
 }
@@ -198,12 +201,17 @@ export async function isBridgeHealthy(sessionName: string): Promise<boolean> {
     return false;
   }
 
+  // TODO: Send ping message and check the bridge responds
+
   return true;
 }
 
 /**
  * Restart a bridge if it's unhealthy
- * Used for automatic recovery
+ * Used for automatic recovery (failover)
+ *
+ * Headers persist in keychain across bridge restarts, so they are
+ * retrieved here and passed to startBridge() which sends them via IPC.
  */
 export async function ensureBridgeHealthy(sessionName: string): Promise<void> {
   const healthy = await isBridgeHealthy(sessionName);
@@ -226,51 +234,98 @@ export async function ensureBridgeHealthy(sessionName: string): Promise<void> {
     }
 
     // Determine target from session data
-    const target: TransportConfig =
-      session.transport === 'http'
-        ? {
-            type: 'http' as const,
-            url: session.target,
-          }
-        : {
-            type: 'stdio' as const,
-            command: session.target,
-          };
+    const target: TransportConfig = {
+      type: session.transport === 'http' ? 'http' : 'stdio',
+      url: session.target,
+    };
+
+    // Retrieve headers from keychain for failover
+    let headers: Record<string, string> | undefined;
+    if (session.transport === 'http') {
+      try {
+        headers = await getSessionHeaders(sessionName);
+        if (headers) {
+          logger.debug(`Retrieved ${Object.keys(headers).length} headers from keychain for failover`);
+        }
+      } catch {
+        // Ignore errors - headers may not exist
+      }
+    }
 
     // Start a new bridge, preserving auth profile
     const bridgeOptions: StartBridgeOptions = {
       sessionName,
       target,
     };
+    if (headers) {
+      bridgeOptions.headers = headers;
+    }
     if (session.profileName) {
       bridgeOptions.profileName = session.profileName;
     }
-    await startBridge(bridgeOptions);
+
+    const { pid, socketPath } = await startBridge(bridgeOptions);
+
+    // Update session with new PID and socket path
+    await updateSession(sessionName, {
+      pid,
+      socketPath,
+    });
+
+    logger.debug(`Session ${sessionName} updated with new bridge PID: ${pid}`);
   }
 }
 
 /**
  * Send auth credentials to a bridge process via IPC
- * Retrieves refresh token from keychain and sends it to the bridge
+ * Handles both OAuth profiles (refresh token) and HTTP headers
+ *
+ * @param socketPath - Path to bridge's Unix socket
+ * @param serverUrl - Server URL for the session
+ * @param profileName - Optional OAuth profile name
+ * @param headers - Optional HTTP headers (from --header flags)
  */
 async function sendAuthCredentialsToBridge(
   socketPath: string,
   serverUrl: string,
-  profileName: string
+  profileName?: string,
+  headers?: Record<string, string>
 ): Promise<void> {
-  logger.debug(`Sending auth credentials for profile ${profileName} to bridge`);
+  // Build credentials object
+  const credentials: {
+    serverUrl: string;
+    profileName: string;
+    refreshToken?: string;
+    headers?: Record<string, string>;
+  } = {
+    serverUrl,
+    profileName: profileName || 'headers', // Use 'headers' as placeholder for headers-only auth
+  };
 
-  // Get the auth profile to find the server URL
-  const profile = await getAuthProfile(serverUrl, profileName);
-  if (!profile) {
-    logger.warn(`Auth profile ${profileName} not found for ${serverUrl}, skipping auth credentials`);
-    return;
+  // Try to get OAuth refresh token if profile is specified
+  if (profileName) {
+    logger.debug(`Looking up auth profile ${profileName} for ${serverUrl}`);
+
+    const profile = await getAuthProfile(serverUrl, profileName);
+    if (profile) {
+      const tokens = await getOAuthTokens(profile.serverUrl, profileName);
+      if (tokens?.refreshToken) {
+        credentials.refreshToken = tokens.refreshToken;
+        credentials.serverUrl = profile.serverUrl;
+        logger.debug(`Found OAuth refresh token for profile ${profileName}`);
+      }
+    }
   }
 
-  // Get tokens from keychain
-  const tokens = await getOAuthTokens(profile.serverUrl, profileName);
-  if (!tokens?.refreshToken) {
-    logger.warn(`No refresh token found in keychain for profile ${profileName} of ${serverUrl}, skipping auth credentials`);
+  // Add headers if provided
+  if (headers) {
+    credentials.headers = headers;
+    logger.debug(`Including ${Object.keys(headers).length} headers in credentials`);
+  }
+
+  // Only send if we have some credentials
+  if (!credentials.refreshToken && !credentials.headers) {
+    logger.debug('No auth credentials to send to bridge');
     return;
   }
 
@@ -278,11 +333,7 @@ async function sendAuthCredentialsToBridge(
   const client = new BridgeClient(socketPath);
   try {
     await client.connect();
-    client.sendAuthCredentials({
-      refreshToken: tokens.refreshToken,
-      serverUrl: profile.serverUrl,
-      profileName,
-    });
+    client.sendAuthCredentials(credentials);
     logger.debug('Auth credentials sent to bridge successfully');
   } finally {
     await client.close();
