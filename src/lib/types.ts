@@ -127,18 +127,6 @@ export interface SessionsStorage {
 }
 
 /**
- * OAuth tokens (stored in auth profile for now, will move to keychain later)
- */
-export interface OAuthTokens {
-  access_token: string;
-  token_type: string;
-  expires_in?: number;
-  refresh_token?: string;
-  scope?: string;
-  expires_at?: number; // Unix timestamp when token expires
-}
-
-/**
  * Authentication profile data stored in auth-profiles.json
  * Only OAuth authentication is supported for profiles
  * NOTE: Tokens are stored securely in OS keychain, not in this file
@@ -150,8 +138,8 @@ export interface AuthProfile {
   // OAuth metadata
   oauthIssuer: string;
   scopes?: string[];
-  authenticatedAt?: string;
   // Timestamps (TODO: why not Dates?)
+  authenticatedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -217,30 +205,6 @@ export interface IpcMessage {
     data?: unknown;
   };
 }
-
-/**
- * Target resolution result
- */
-export type TargetResolution =
-  | {
-      type: 'session';
-      name: string;
-    }
-  | {
-      type: 'http';
-      url: string;
-    }
-  | {
-      type: 'package';
-      path: string;
-      command: string;
-      args?: string[];
-    }
-  | {
-      type: 'config';
-      name: string;
-      config: TransportConfig;
-    };
 
 /**
  * Output format modes

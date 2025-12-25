@@ -4,118 +4,14 @@
  * Tokens are stored securely in OS keychain
  */
 
-import type { AuthProfile, OAuthTokens } from '../types.js';
+import type { AuthProfile } from '../types.js';
 import { getAuthProfile, saveAuthProfile } from '../auth/auth-profiles.js';
 import { createLogger } from '../logger.js';
 import { createReauthError, DEFAULT_AUTH_PROFILE } from './oauth-utils.js';
-import { getOAuthTokens, storeOAuthTokens, type KeychainOAuthTokens } from './keychain.js';
+import { getKeychainOAuthTokens, saveKeychainOAuthTokens, type OAuthTokenInfo } from './keychain.js';
 import { OAuthTokenManager, type OnTokenRefreshCallback } from './oauth-token-manager.js';
 
 const logger = createLogger('token-refresh');
-
-/**
- * Refresh OAuth tokens using the refresh token from keychain
- * Uses OAuthTokenManager for the refresh logic
- * Returns the new tokens on success, or throws an error on failure
- */
-export async function refreshTokens(
-  profile: AuthProfile
-): Promise<OAuthTokens> {
-  // Get refresh token from keychain
-  const storedTokens = await getOAuthTokens(profile.serverUrl, profile.name);
-  if (!storedTokens?.refreshToken) {
-    throw createReauthError(
-      profile.serverUrl,
-      profile.name,
-      `No refresh token available for profile ${profile.name}`
-    );
-  }
-
-  // Use OAuthTokenManager to handle the refresh
-  const tokenManager = new OAuthTokenManager({
-    serverUrl: profile.serverUrl,
-    profileName: profile.name,
-    refreshToken: storedTokens.refreshToken,
-  });
-
-  const tokenResponse = await tokenManager.refreshAccessToken();
-
-  // Build OAuthTokens object from response
-  const newTokens: OAuthTokens = {
-    access_token: tokenResponse.access_token,
-    token_type: tokenResponse.token_type || 'Bearer',
-  };
-
-  if (tokenResponse.expires_in !== undefined) {
-    newTokens.expires_in = tokenResponse.expires_in;
-    newTokens.expires_at = Math.floor(Date.now() / 1000) + tokenResponse.expires_in;
-  }
-
-  // Use new refresh token if provided, otherwise keep the old one
-  newTokens.refresh_token = tokenManager.getRefreshToken();
-
-  if (tokenResponse.scope !== undefined) {
-    newTokens.scope = tokenResponse.scope;
-  }
-
-  logger.info(`Token refreshed successfully for profile: ${profile.name}`);
-  return newTokens;
-}
-
-/**
- * Refresh tokens and save to keychain
- * Returns the updated profile metadata (tokens are stored in keychain)
- */
-export async function refreshAndSaveTokens(
-  profile: AuthProfile
-): Promise<AuthProfile> {
-  const newTokens = await refreshTokens(profile);
-
-  // Store tokens in keychain (convert from OAuth snake_case to camelCase)
-  const keychainTokens: KeychainOAuthTokens = {
-    accessToken: newTokens.access_token,
-    tokenType: newTokens.token_type,
-  };
-  if (newTokens.expires_in !== undefined) {
-    keychainTokens.expiresIn = newTokens.expires_in;
-  }
-  if (newTokens.expires_at !== undefined) {
-    keychainTokens.expiresAt = newTokens.expires_at;
-  }
-  if (newTokens.refresh_token !== undefined) {
-    keychainTokens.refreshToken = newTokens.refresh_token;
-  }
-  if (newTokens.scope !== undefined) {
-    keychainTokens.scope = newTokens.scope;
-  }
-  await storeOAuthTokens(profile.serverUrl, profile.name, keychainTokens);
-
-  // Update profile metadata (without tokens)
-  const now = new Date().toISOString();
-  const updatedProfile: AuthProfile = {
-    ...profile,
-    authenticatedAt: now,
-    updatedAt: now,
-  };
-
-  // Update scopes if provided
-  if (newTokens.scope) {
-    updatedProfile.scopes = newTokens.scope.split(' ');
-  }
-
-  // Save updated profile metadata
-  await saveAuthProfile(updatedProfile);
-
-  return updatedProfile;
-}
-
-/**
- * Check if a profile has a refresh token in keychain
- */
-export async function hasRefreshToken(profile: AuthProfile): Promise<boolean> {
-  const tokens = await getOAuthTokens(profile.serverUrl, profile.name);
-  return !!tokens?.refreshToken;
-}
 
 /**
  * Create a persistence callback for OAuthTokenManager that saves tokens to keychain
@@ -127,21 +23,21 @@ function createPersistenceCallback(
 ): OnTokenRefreshCallback {
   return async (newTokens) => {
     // Store tokens in keychain
-    const keychainTokens: KeychainOAuthTokens = {
+    const tokenInfo: OAuthTokenInfo = {
       accessToken: newTokens.access_token,
       tokenType: newTokens.token_type,
     };
     if (newTokens.expires_in !== undefined) {
-      keychainTokens.expiresIn = newTokens.expires_in;
-      keychainTokens.expiresAt = Math.floor(Date.now() / 1000) + newTokens.expires_in;
+      tokenInfo.expiresIn = newTokens.expires_in;
+      tokenInfo.expiresAt = Math.floor(Date.now() / 1000) + newTokens.expires_in;
     }
     if (newTokens.refresh_token !== undefined) {
-      keychainTokens.refreshToken = newTokens.refresh_token;
+      tokenInfo.refreshToken = newTokens.refresh_token;
     }
     if (newTokens.scope !== undefined) {
-      keychainTokens.scope = newTokens.scope;
+      tokenInfo.scope = newTokens.scope;
     }
-    await storeOAuthTokens(serverUrl, profileName, keychainTokens);
+    await saveKeychainOAuthTokens(serverUrl, profileName, tokenInfo);
 
     // Update profile metadata
     const now = new Date().toISOString();
@@ -178,7 +74,7 @@ export async function getValidAccessTokenFromKeychain(
   }
 
   // Load tokens from keychain
-  const tokens = await getOAuthTokens(serverUrl, profileName);
+  const tokens = await getKeychainOAuthTokens(serverUrl, profileName);
   if (!tokens?.accessToken) {
     logger.warn(`Auth profile exists but has no access token in keychain: ${profileName}`);
     return undefined;

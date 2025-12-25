@@ -7,7 +7,7 @@ import { formatOutput, formatSuccess, formatError } from '../output.js';
 import { listAuthProfiles } from '../../lib/auth/auth-profiles.js';
 import { listSessions, sessionExists, deleteSession, saveSession, updateSession } from '../../lib/sessions.js';
 import { startBridge, stopBridge } from '../../lib/bridge-manager.js';
-import { deleteSessionHeaders, storeSessionHeaders } from '../../lib/auth/keychain.js';
+import { deleteKeychainSessionHeaders, storeKeychainSessionHeaders } from '../../lib/auth/keychain.js';
 import { resolveTarget } from '../helpers.js';
 import { ClientError } from '../../lib/index.js';
 import { createLogger } from '../../lib/logger.js';
@@ -52,7 +52,7 @@ export async function connectSession(
     if (transportConfig.type === 'http' && transportConfig.headers && Object.keys(transportConfig.headers).length > 0) {
       headers = transportConfig.headers;
       logger.debug(`Storing ${Object.keys(headers).length} headers for session ${name} in keychain`);
-      await storeSessionHeaders(name, headers);
+      await storeKeychainSessionHeaders(name, headers);
     }
 
     // Create initial session record (without pid/socketPath - those come from startBridge)
@@ -98,7 +98,7 @@ export async function connectSession(
         // Ignore cleanup errors
       }
       try {
-        await deleteSessionHeaders(name);
+        await deleteKeychainSessionHeaders(name);
       } catch {
         // Ignore cleanup errors
       }
@@ -213,7 +213,7 @@ export async function closeSession(
 
     // Delete headers from keychain (if any)
     try {
-      await deleteSessionHeaders(name);
+      await deleteKeychainSessionHeaders(name);
       logger.debug(`Deleted headers from keychain for session: ${name}`);
     } catch {
       // Ignore errors - headers may not exist

@@ -12,7 +12,7 @@ import { getAuthProfilesFilePath, fileExists, ensureDir, getMcpcHome } from '../
 import { withFileLock } from '../file-lock.js';
 import { createLogger } from '../logger.js';
 import { ClientError } from '../errors.js';
-import { deleteOAuthProfile } from './keychain.js';
+import { deleteKeychainOAuthCredentials } from './keychain.js';
 
 const logger = createLogger('auth-profiles');
 
@@ -109,20 +109,6 @@ export async function listAuthProfiles(): Promise<AuthProfile[]> {
 }
 
 /**
- * Get auth profiles for a specific server URL
- */
-export async function getAuthProfilesForServer(serverUrl: string): Promise<AuthProfile[]> {
-  const storage = await loadAuthProfiles();
-  const serverProfiles = storage.profiles[serverUrl];
-
-  if (!serverProfiles) {
-    return [];
-  }
-
-  return Object.values(serverProfiles).filter((p): p is AuthProfile => p !== undefined);
-}
-
-/**
  * Get a specific auth profile by server URL and profile name
  */
 export async function getAuthProfile(
@@ -131,16 +117,6 @@ export async function getAuthProfile(
 ): Promise<AuthProfile | undefined> {
   const storage = await loadAuthProfiles();
   return storage.profiles[serverUrl]?.[profileName];
-}
-
-/**
- * Save auth profiles to storage file (with locking)
- */
-export async function saveAuthProfiles(storage: AuthProfilesStorage): Promise<void> {
-  const filePath = getAuthProfilesFilePath();
-  return withFileLock(filePath, async () => {
-    await saveAuthProfilesInternal(storage);
-  }, AUTH_PROFILES_DEFAULT_CONTENT);
 }
 
 /**
@@ -178,7 +154,7 @@ export async function deleteAuthProfile(serverUrl: string, profileName: string):
     }
 
     // Delete credentials from OS keychain (tokens + client info)
-    await deleteOAuthProfile(serverUrl, profileName);
+    await deleteKeychainOAuthCredentials(serverUrl, profileName);
 
     // Delete profile metadata from storage
     delete serverProfiles[profileName];
