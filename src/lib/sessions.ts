@@ -131,7 +131,6 @@ export async function saveSession(
       name: sessionName,
       ...sessionData,
       createdAt: existingSession?.createdAt || now,
-      updatedAt: now,
     };
 
     await saveSessionsInternal(storage);
@@ -147,7 +146,7 @@ export async function saveSession(
  */
 export async function updateSession(
   sessionName: string,
-  updates: Partial<Omit<SessionData, 'name' | 'createdAt' | 'updatedAt'>>
+  updates: Partial<Omit<SessionData, 'name' | 'createdAt'>>
 ): Promise<void> {
   const filePath = getSessionsFilePath();
   return withFileLock(filePath, async () => {
@@ -163,7 +162,6 @@ export async function updateSession(
       ...existingSession,
       ...updates,
       name: sessionName, // Ensure name doesn't change
-      updatedAt: new Date().toISOString(),
     };
 
     await saveSessionsInternal(storage);

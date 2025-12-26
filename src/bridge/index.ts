@@ -362,6 +362,9 @@ class BridgeProcess {
     this.client = await createMcpClient(clientConfig);
 
     logger.info('Connected to MCP server');
+
+    // Update lastSeenAt on successful connection
+    await this.updateLastSeenAt();
   }
 
   /**
@@ -393,6 +396,23 @@ class BridgeProcess {
     logger.debug('Sending keepalive ping');
     await this.client.ping();
     logger.debug('Keepalive ping successful');
+
+    // Update lastSeenAt on successful ping
+    await this.updateLastSeenAt();
+  }
+
+  /**
+   * Update lastSeenAt timestamp to track when server was last responsive
+   */
+  private async updateLastSeenAt(): Promise<void> {
+    try {
+      await updateSession(this.options.sessionName, {
+        lastSeenAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      // Don't fail operations if timestamp update fails
+      logger.error('Failed to update lastSeenAt:', error);
+    }
   }
 
   /**

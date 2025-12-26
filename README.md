@@ -341,9 +341,8 @@ By default, authentication profiles are stored in the `~/.mcpc/auth-profiles.jso
         "authType": "oauth",
         "oauthIssuer": "https://auth.apify.com",
         "scopes": ["tools:read", "tools:write", "resources:read"],
-        "authenticatedAt": "2025-12-14T10:00:00Z",
         "createdAt": "2025-12-14T10:00:00Z",
-        "updatedAt": "2025-12-14T10:00:00Z"
+        "authenticatedAt": "2025-12-14T10:00:00Z"
       },
       "work": {
         "name": "work",
@@ -351,9 +350,8 @@ By default, authentication profiles are stored in the `~/.mcpc/auth-profiles.jso
         "authType": "oauth",
         "oauthIssuer": "https://auth.apify.com",
         "scopes": ["tools:read"],
-        "authenticatedAt": "2025-12-10T15:30:00Z",
         "createdAt": "2025-12-10T15:30:00Z",
-        "updatedAt": "2025-12-10T15:30:00Z"
+        "authenticatedAt": "2025-12-10T15:30:00Z"
       }
     }
   }

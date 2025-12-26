@@ -56,12 +56,10 @@ export async function connectSession(
     }
 
     // Create initial session record (without pid/socketPath - those come from startBridge)
-    const now = new Date().toISOString();
     const sessionData: Parameters<typeof saveSession>[1] = {
       target: transportConfig.url || transportConfig.command || 'unknown',
       transport: transportConfig.type,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: new Date().toISOString(),
       headerCount: Object.keys(headers || {}).length,
     };
     if (options.profile) {

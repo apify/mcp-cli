@@ -5,7 +5,6 @@
 
 import { createLogger } from '../logger.js';
 import { AuthError } from '../errors.js';
-import * as util from 'node:util';
 
 const logger = createLogger('oauth-utils');
 

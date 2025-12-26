@@ -105,8 +105,9 @@ export interface SessionData {
     version: string;
   };
   status?: SessionStatus; // Session health status (default: active)
-  createdAt: string;
-  updatedAt: string;
+  // Timestamps (ISO 8601 strings)
+  createdAt: string; // When the session was created
+  lastSeenAt?: string; // Last successful server response (ping, command, etc.)
 }
 
 /**
@@ -128,10 +129,10 @@ export interface AuthProfile {
   // OAuth metadata
   oauthIssuer: string;
   scopes?: string[];
-  // Timestamps in ISO format (only used for reporting)
-  authenticatedAt?: string;
+  // Timestamps (ISO 8601 strings)
   createdAt: string;
-  updatedAt: string;
+  authenticatedAt?: string; // Last time the token was successfully used for authentication
+  refreshedAt?: string; // Last time the token was refreshed
 }
 
 /**

@@ -39,12 +39,10 @@ function createPersistenceCallback(
     }
     await storeKeychainOAuthTokenInfo(serverUrl, profileName, tokenInfo);
 
-    // Update profile metadata
-    const now = new Date().toISOString();
+    // Update profile metadata - mark as refreshed (not re-authenticated)
     const updatedProfile: AuthProfile = {
       ...profile,
-      authenticatedAt: now,
-      updatedAt: now,
+      refreshedAt: new Date().toISOString(),
     };
     if (newTokens.scope) {
       updatedProfile.scopes = newTokens.scope.split(' ');

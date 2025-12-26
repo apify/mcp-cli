@@ -152,7 +152,7 @@ export class McpcOAuthProvider implements OAuthClientProvider {
     await storeKeychainOAuthTokenInfo(this.serverUrl, this.profileName, tokenInfo);
 
     // Update profile metadata (without tokens)
-    const now = new Date().toISOString(); // TODO: keep Date not string?
+    const now = new Date().toISOString();
     let profile = await this.loadProfile();
 
     if (!profile) {
@@ -162,18 +162,16 @@ export class McpcOAuthProvider implements OAuthClientProvider {
         serverUrl: this.serverUrl,
         authType: 'oauth',
         oauthIssuer: '', // Will be set by caller
-        authenticatedAt: now,
         createdAt: now,
-        updatedAt: now,
+        authenticatedAt: now,
       };
 
       if (tokens.scope) {
         profile.scopes = tokens.scope.split(' ');
       }
     } else {
-      // Update existing profile metadata
+      // Update existing profile metadata - this is a fresh authentication
       profile.authenticatedAt = now;
-      profile.updatedAt = now;
 
       if (tokens.scope) {
         profile.scopes = tokens.scope.split(' ');
