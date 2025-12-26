@@ -2,23 +2,19 @@
 # TODOs
 
 - Ensure we show tool annotations and tasks in text mode too
-- Handle MCP errors by failing the command tool, e.g. invalid tool name..
-
 - Revise the caching - is it needed, why not use SDK autoRefresh? 
 
-- Auth: change to login/logout, keep profiles 
-- docs: add the OAuth commands to --help, otherwise people will not find it when they need it
 - OAuth issuer - save it and double-check it to ensure domain is not spoofed. Why do we need separate keychain entry for oauth-client?
-
 
 - add "mcpc --reset-all/clean-all/clean:a,b,c" ? command to clean up sessions, kill bridges, etc. It should keep shell-history and logs though.
   - add command to restart bridge process
 
+
 - "mcpc @apify-docs connect" still doesn't work: it should restart the session, or do nothing if it's already connected.
 -  "mcpc @apify-docs connect --session @apify-docs" should auto restart the session
 
-
 - Add `docs/skills.md` with instructions how to use mcpc
+
 
 ## Cosmetic
 - nit: on server/session info, print also auth info
@@ -26,6 +22,10 @@
     Active MCP sessions:
     @fs → npx (stdio) --- show also args instead of just "npx"
   - print PID of bridge process
+
+- Better error handling:
+  - "mcpc https://mcp.sentry.dev/mcp" => should hint to use "login"
+  - Handle MCP errors by failing the command tool, e.g. invalid tool name..
 
 
 ## E2E tests

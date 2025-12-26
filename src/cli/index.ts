@@ -161,7 +161,7 @@ Where <target> can be:
 
 Examples:
   $ mcpc                                                           # List sessions and auth profiles
-  $ mcpc mcp.apify.com login                                       # Login via OAuth
+  $ mcpc mcp.apify.com login                                       # Login to MCP server using OAuth
   $ mcpc mcp.apify.com                                             # Show server info
   $ mcpc --json mcp.apify.com tools-list                           # List tools in JSON mode
   $ mcpc mcp.apify.com connect --session @apify                    # Create persistent session

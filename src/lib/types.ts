@@ -128,7 +128,7 @@ export interface AuthProfile {
   // OAuth metadata
   oauthIssuer: string;
   scopes?: string[];
-  // Timestamps (TODO: why not Dates?)
+  // Timestamps in ISO format (only used for reporting)
   authenticatedAt?: string;
   createdAt: string;
   updatedAt: string;
