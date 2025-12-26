@@ -81,9 +81,13 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
     args.push('--verbose');
   }
 
-  // Pass auth profile if specified
+  // Pass auth profile to bridge
+  // Use dummy placeholder also when headers are provided (no OAuth profile),
+  // so the bridge process waits for headers before connecting to server
   if (profileName) {
     args.push('--profile', profileName);
+  } else if (headers && Object.keys(headers).length > 0) {
+    args.push('--profile', 'dummy');
   }
 
   logger.debug('Bridge executable:', bridgeExecutable);

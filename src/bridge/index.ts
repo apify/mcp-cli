@@ -52,6 +52,10 @@ class BridgeProcess {
   // HTTP headers (received via IPC, stored in memory only)
   private headers: Record<string, string> | null = null;
 
+  // Promise to track when auth credentials are received (for startup sequencing)
+  private authCredentialsReceived: Promise<void> | null = null;
+  private authCredentialsResolver: (() => void) | null = null;
+
   constructor(options: BridgeOptions) {
     this.options = options;
     this.cache = new CacheManager();
@@ -84,6 +88,12 @@ class BridgeProcess {
     if (credentials.headers) {
       this.headers = credentials.headers;
       logger.debug(`Stored ${Object.keys(this.headers).length} headers in memory`);
+    }
+
+    // Signal that auth credentials have been received (unblocks startup)
+    if (this.authCredentialsResolver) {
+      this.authCredentialsResolver();
+      this.authCredentialsResolver = null;
     }
   }
 
@@ -233,16 +243,35 @@ class BridgeProcess {
     this.cleanupOrphanedLogFiles();
 
     try {
-      // 3. Connect to MCP server
-      await this.connectToMcp();
-
-      // 4. Start keepalive ping
-      this.startKeepalive();
-
-      // 5. Create Unix socket server
+      // 3. Create Unix socket server FIRST (so CLI can send auth credentials)
       await this.createSocketServer();
 
-      // 6. Set up signal handlers
+      // 4. Wait for auth credentials from CLI if auth profile is specified
+      // The CLI sends credentials via IPC immediately after detecting the socket file
+      if (this.options.profileName) {
+        logger.debug(`Waiting for auth credentials (profile: ${this.options.profileName})...`);
+
+        // Create a promise that resolves when credentials are received
+        this.authCredentialsReceived = new Promise<void>((resolve) => {
+          this.authCredentialsResolver = resolve;
+        });
+
+        // Wait with timeout (5 seconds should be plenty for local IPC)
+        const timeout = new Promise<void>((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout waiting for auth credentials')), 5000);
+        });
+
+        await Promise.race([this.authCredentialsReceived, timeout]);
+        logger.debug('Auth credentials received, proceeding with MCP connection');
+      }
+
+      // 5. Connect to MCP server (now with auth credentials if provided)
+      await this.connectToMcp();
+
+      // 6. Start keepalive ping
+      this.startKeepalive();
+
+      // 7. Set up signal handlers
       this.setupSignalHandlers();
 
       logger.info('Bridge process started successfully');
