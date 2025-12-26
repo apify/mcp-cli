@@ -1,15 +1,25 @@
 /**
  * Bridge process lifecycle management
  * Spawns, monitors, and manages bridge processes for persistent MCP sessions
+ *
+ * Responsibilities:
+ * - Start/stop/restart bridge processes
+ * - Health checking (is bridge process responding?)
+ * - Ensuring bridge is ready before returning to caller
+ *
+ * NOT responsible for:
+ * - MCP protocol details (that's SessionClient's job)
+ * - Low-level socket communication (that's BridgeClient's job)
  */
 
 import { spawn, type ChildProcess } from 'child_process';
-import { join } from 'path';
+import { unlink } from 'fs/promises';
+import { connect, type Socket } from 'net';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import type { TransportConfig } from './types.js';
+import type { TransportConfig, IpcMessage, AuthCredentials } from './types.js';
 import { getBridgesDir, waitForFile, isProcessAlive, fileExists } from './utils.js';
-import { updateSession } from './sessions.js';
+import { updateSession, getSession } from './sessions.js';
 import { createLogger } from './logger.js';
 import { ClientError } from './errors.js';
 import { BridgeClient } from './bridge-client.js';
@@ -17,6 +27,9 @@ import { readKeychainOAuthTokenInfo, readKeychainOAuthClientInfo, readKeychainSe
 import { getAuthProfile } from './auth/auth-profiles.js';
 
 const logger = createLogger('bridge-manager');
+
+// Timeout for health check - covers connect + response (3 seconds)
+const HEALTH_CHECK_TIMEOUT = 3 * 1000;
 
 // Get the path to the bridge executable
 function getBridgeExecutable(): string {
@@ -64,6 +77,14 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
 
   // Get socket path
   const socketPath = join(getBridgesDir(), `${sessionName}.sock`);
+
+  // Remove existing socket file if it exists
+  // We MUST do it here, so waitForFile() below doesn't pick the old file!
+  // Plus, if it fails, the user will see the error
+  if (await fileExists(socketPath)) {
+    logger.debug(`Removing existing socket: ${socketPath}`);
+    await unlink(socketPath);
+  }
 
   // Create a sanitized transport config without any headers
   // Headers will be sent to the bridge via IPC instead
@@ -148,7 +169,6 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
 export async function stopBridge(sessionName: string): Promise<void> {
   logger.info(`Stopping bridge for session: ${sessionName}`);
 
-  const { getSession } = await import('./sessions.js');
   const session = await getSession(sessionName);
 
   if (!session) {
@@ -182,103 +202,71 @@ export async function stopBridge(sessionName: string): Promise<void> {
 }
 
 /**
- * Check if a bridge is healthy
- * Returns true if the process is alive and socket exists
- */
-export async function isBridgeHealthy(sessionName: string): Promise<boolean> {
-  const { getSession } = await import('./sessions.js');
-  const session = await getSession(sessionName);
-
-  if (!session) {
-    return false;
-  }
-
-  // Check if process is alive
-  if (session.pid && !isProcessAlive(session.pid)) {
-    logger.warn(`Bridge process ${session.pid} is not alive`);
-    return false;
-  }
-
-  // Check if socket exists
-  if (session.socketPath && !(await fileExists(session.socketPath))) {
-    logger.warn(`Bridge socket ${session.socketPath} does not exist`);
-    return false;
-  }
-
-  // TODO: Send ping message and check the bridge responds
-
-  return true;
-}
-
-/**
- * Restart a bridge if it's unhealthy
- * Used for automatic recovery (failover)
+ * Restart a bridge process for a session
+ * Used for automatic recovery when connection to bridge fails
  *
  * Headers persist in keychain across bridge restarts, so they are
  * retrieved here and passed to startBridge() which sends them via IPC.
  */
-export async function ensureBridgeHealthy(sessionName: string): Promise<void> {
-  const healthy = await isBridgeHealthy(sessionName);
+export async function restartBridge(sessionName: string): Promise<StartBridgeResult> {
+  logger.warn(`Restarting bridge for session ${sessionName}...`);
 
-  if (!healthy) {
-    logger.warn(`Bridge for session ${sessionName} is unhealthy, restarting...`);
+  const session = await getSession(sessionName);
 
-    const { getSession } = await import('./sessions.js');
-    const session = await getSession(sessionName);
-
-    if (!session) {
-      throw new ClientError(`Session not found: ${sessionName}`);
-    }
-
-    // Stop the old bridge (cleanup)
-    try {
-      await stopBridge(sessionName);
-    } catch {
-      // Ignore errors, we're restarting anyway
-    }
-
-    // Determine target from session data
-    const target: TransportConfig = {
-      type: session.transport === 'http' ? 'http' : 'stdio',
-      url: session.target,
-    };
-
-    // Retrieve transport headers from keychain for failover, and check their number
-    let headers: Record<string, string> | undefined;
-    if (session.transport === 'http' && session.headerCount && session.headerCount > 0) {
-      headers = await readKeychainSessionHeaders(sessionName);
-      const retrievedCount = Object.keys(headers || {}).length;
-      if (retrievedCount !== session.headerCount) {
-        throw new ClientError(
-          `Failed to retrieve ${session.headerCount} HTTP header(s) from keychain for session ${sessionName}. ` +
-            `The session may need to be recreated with "mcpc ${sessionName} close" followed by a new connect.`
-        );
-      }
-      logger.debug(`Retrieved ${retrievedCount} headers from keychain for failover`);
-    }
-
-    // Start a new bridge, preserving auth profile
-    const bridgeOptions: StartBridgeOptions = {
-      sessionName,
-      target,
-    };
-    if (headers) {
-      bridgeOptions.headers = headers;
-    }
-    if (session.profileName) {
-      bridgeOptions.profileName = session.profileName;
-    }
-
-    const { pid, socketPath } = await startBridge(bridgeOptions);
-
-    // Update session with new PID and socket path
-    await updateSession(sessionName, {
-      pid,
-      socketPath,
-    });
-
-    logger.debug(`Session ${sessionName} updated with new bridge PID: ${pid}`);
+  if (!session) {
+    throw new ClientError(`Session not found: ${sessionName}`);
   }
+
+  // Stop the old bridge (cleanup)
+  try {
+    await stopBridge(sessionName);
+  } catch {
+    // Ignore errors, we're restarting anyway
+  }
+
+  // Determine target from session data
+  const target: TransportConfig = {
+    type: session.transport === 'http' ? 'http' : 'stdio',
+    url: session.target,
+  };
+
+  // Retrieve transport headers from keychain for failover, and check their number
+  let headers: Record<string, string> | undefined;
+  if (session.transport === 'http' && session.headerCount && session.headerCount > 0) {
+    headers = await readKeychainSessionHeaders(sessionName);
+    const retrievedCount = Object.keys(headers || {}).length;
+    if (retrievedCount !== session.headerCount) {
+      throw new ClientError(
+        `Failed to retrieve ${session.headerCount} HTTP header(s) from keychain for session ${sessionName}. ` +
+          `The session may need to be recreated with "mcpc ${sessionName} close" followed by a new connect.`
+      );
+    }
+    logger.debug(`Retrieved ${retrievedCount} headers from keychain for failover`);
+  }
+
+  // Start a new bridge, preserving auth profile
+  const bridgeOptions: StartBridgeOptions = {
+    sessionName,
+    target,
+  };
+  if (headers) {
+    bridgeOptions.headers = headers;
+  }
+  if (session.profileName) {
+    bridgeOptions.profileName = session.profileName;
+  }
+
+  const { pid, socketPath } = await startBridge(bridgeOptions);
+
+  // Update session with new PID and socket path
+  await updateSession(sessionName, {
+    pid,
+    socketPath,
+  });
+
+  logger.info(`Bridge restarted for session ${sessionName} with PID: ${pid}`);
+
+  return { pid, socketPath };
 }
 
 /**
@@ -297,15 +285,10 @@ async function sendAuthCredentialsToBridge(
   headers?: Record<string, string>
 ): Promise<void> {
   // Build credentials object
-  const credentials: {
-    serverUrl: string;
-    profileName: string;
-    clientId?: string;
-    refreshToken?: string;
-    headers?: Record<string, string>;
-  } = {
+  const credentials: AuthCredentials = {
     serverUrl,
-    profileName: profileName || 'headers', // Use 'headers' as placeholder for headers-only auth
+    // TODO: do we need this dummy hack for anything? I don't think so...
+    profileName: profileName || 'dummy', // Use 'dummy' as placeholder for headers-only auth
   };
 
   // Try to get OAuth tokens and client info if profile is specified
@@ -352,4 +335,142 @@ async function sendAuthCredentialsToBridge(
   } finally {
     await client.close();
   }
+}
+
+/**
+ * Check if bridge process responds to health-check message
+ * Uses a simple socket connection without BridgeClient to avoid complexity
+ * TODO: Not using BridgeClient() actually increases complexity and duplicates code
+ *
+ * @param socketPath - Path to bridge's Unix socket
+ * @returns true if bridge responds to health-check, false otherwise
+ */
+async function testBridgeSocketHealth(socketPath: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let socket: Socket | null = null;
+    let settled = false;
+    let buffer = '';
+
+    const settle = (result: boolean): void => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+        if (socket) {
+          socket.destroy();
+          socket = null;
+        }
+        resolve(result);
+      }
+    };
+
+    // Single timeout for entire health check (connect + response)
+    const timeout = setTimeout(() => {
+      logger.debug('Health check: timeout');
+      settle(false);
+    }, HEALTH_CHECK_TIMEOUT);
+
+    try {
+      socket = connect(socketPath);
+
+      socket.on('connect', () => {
+        // Send health check immediately on connect
+        const message: IpcMessage = { type: 'health-check' };
+        socket?.write(JSON.stringify(message) + '\n');
+      });
+
+      socket.on('data', (data) => {
+        buffer += data.toString();
+
+        // Look for health-ok response
+        for (const line of buffer.split('\n')) {
+          if (!line.trim()) continue;
+          try {
+            const message = JSON.parse(line) as IpcMessage;
+            if (message.type === 'health-ok') {
+              logger.debug('Health check: bridge is healthy');
+              settle(true);
+              return;
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      });
+
+      socket.on('error', () => settle(false));
+      socket.on('close', () => settle(false));
+    } catch {
+      settle(false);
+    }
+  });
+}
+
+/**
+ * Ensure bridge is ready for use
+ * Checks health and restarts if necessary
+ *
+ * This is the main entry point for ensuring a session's bridge is usable.
+ * After this returns successfully, the bridge is guaranteed to be responding.
+ *
+ * @param sessionName - Name of the session
+ * @returns The socket path of the healthy bridge
+ * @throws ClientError if bridge cannot be made healthy
+ */
+export async function ensureBridgeReady(sessionName: string): Promise<string> {
+  const session = await getSession(sessionName);
+
+  if (!session) {
+    throw new ClientError(`Session not found: ${sessionName}`);
+  }
+
+  if (session.status === 'expired') {
+    throw new ClientError(
+      `Session ${sessionName} has expired. ` +
+      `The MCP server indicated the session is no longer valid.\n` +
+      `To reconnect, run: mcpc ${sessionName} connect\n` +
+      `To remove the expired session, run: mcpc ${sessionName} close`
+    );
+  }
+
+  if (!session.socketPath) {
+    throw new ClientError(`Session ${sessionName} has no socket path`);
+  }
+
+  // Quick check: is the process alive?
+  const processAlive = session.pid ? isProcessAlive(session.pid) : false;
+
+  if (processAlive) {
+    // Process alive, check if it responds to health check
+    const isHealthy = await testBridgeSocketHealth(session.socketPath);
+    if (isHealthy) {
+      logger.debug(`Bridge for ${sessionName} is healthy`);
+      return session.socketPath;
+    }
+    logger.warn(`Bridge process alive but not responding for ${sessionName}`);
+  } else {
+    logger.warn(`Bridge process not alive for ${sessionName}`);
+  }
+
+  // Bridge not healthy - restart it
+  logger.info(`Restarting bridge for ${sessionName}...`);
+  const { socketPath: freshSocketPath } = await restartBridge(sessionName);
+
+  // Wait for bridge to become responsive
+  // Bridge only responds to health-check when fully ready
+  const MAX_READY_ATTEMPTS = 10;
+  const READY_RETRY_DELAY = 500; // ms
+
+  for (let attempt = 1; attempt <= MAX_READY_ATTEMPTS; attempt++) {
+    const isHealthy = await testBridgeSocketHealth(freshSocketPath);
+    if (isHealthy) {
+      logger.info(`Bridge for ${sessionName} is now ready`);
+      return freshSocketPath;
+    }
+    if (attempt < MAX_READY_ATTEMPTS) {
+      logger.debug(`Bridge not ready yet, waiting... (${attempt}/${MAX_READY_ATTEMPTS})`);
+      await new Promise(resolve => setTimeout(resolve, READY_RETRY_DELAY));
+    }
+  }
+
+  throw new ClientError(`Bridge for ${sessionName} not responding after restart`);
 }

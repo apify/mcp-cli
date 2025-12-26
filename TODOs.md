@@ -1,6 +1,12 @@
 
 # TODOs
 
+
+- How about doing skipping "connect" keyword altogether?:
+  "mcpc mcp.apify.com [--session|session|connect] @test6" 
+  -> would establish session @test6, and print server info
+  -> consistent with "mcpc mcp.apify.com"
+
 - Ensure we show tool annotations and tasks in text mode too
 - Revise the caching - is it needed, why not use SDK autoRefresh? 
 
@@ -12,8 +18,6 @@
 
 - "mcpc @apify-docs connect" still doesn't work: it should restart the session, or do nothing if it's already connected.
 -  "mcpc @apify-docs connect --session @apify-docs" should auto restart the session
-
-- Add `docs/skills.md` with instructions how to use mcpc
 
 
 ## Cosmetic
@@ -33,6 +37,7 @@
 - Invariants:
   - --verbose only adds extra info to stderr, never to stdout
   - --json always returns single JSON object to stdout on success (exit code = 0), or an object or nothing at all on error (exit code != 0)
+- We'll need a testing server with all the available features and configurable, for testing.
 - Things to test:
   - handling of errors, invalid params, names, etc. 
   - pagination
@@ -41,6 +46,8 @@
   - sessions
   - for all commands, tests --verbose doesn't print anything extra to stdout, --json returns json
   - that on session close we send HTTP DELETE https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
+  - Test session failover - e.g. kill the bridge process, and try to access the session again (should be restarted)
+  - Test server session aborting - if session is aborted by server, bridge process should exit and set session status to "expired"
 - Can we track test coverage also this way?
 
 

@@ -1,6 +1,16 @@
 /**
  * Session-aware MCP client wrapper
  * Adapts BridgeClient to look like McpClient for seamless session support
+ *
+ * Responsibilities:
+ * - Implements IMcpClient interface by forwarding to bridge
+ * - Simple one-shot retry on socket failure (restart bridge once)
+ * - Forwards notifications from bridge
+ *
+ * NOT responsible for:
+ * - Bridge lifecycle management (that's bridge-manager's job)
+ * - Health checking (that's bridge-manager's job via ensureBridgeReady)
+ * - Complex retry logic (keep it simple: fail or restart once)
  */
 
 import { EventEmitter } from 'events';
@@ -18,8 +28,8 @@ import type {
 } from './types.js';
 import type { ListResourceTemplatesResult } from '@modelcontextprotocol/sdk/types.js';
 import { BridgeClient } from './bridge-client.js';
+import { ensureBridgeReady, restartBridge } from './bridge-manager.js';
 import { getSession } from './sessions.js';
-import { ensureBridgeHealthy } from './bridge-manager.js';
 import { ClientError, NetworkError } from './errors.js';
 import { createLogger } from './logger.js';
 
@@ -28,16 +38,15 @@ const logger = createLogger('session-client');
 /**
  * Wrapper that makes BridgeClient compatible with McpClient interface
  * Implements IMcpClient by sending requests to bridge process via IPC
- * Extends EventEmitter to forward notifications from the bridge
  */
 export class SessionClient extends EventEmitter implements IMcpClient {
   private bridgeClient: BridgeClient;
   private sessionName: string;
 
-  constructor(sessionName: string, socketPath: string) {
+  constructor(sessionName: string, bridgeClient: BridgeClient) {
     super();
     this.sessionName = sessionName;
-    this.bridgeClient = new BridgeClient(socketPath);
+    this.bridgeClient = bridgeClient;
     this.setupNotificationForwarding();
   }
 
@@ -52,8 +61,15 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   }
 
   /**
-   * Execute a bridge request with automatic retry on failure
-   * If the request fails (bridge crashed), restart the bridge and retry
+   * Execute a bridge request with one-shot restart on socket failure
+   *
+   * If the bridge socket connection fails (bridge crashed/killed), we:
+   * 1. Restart the bridge once
+   * 2. Reconnect
+   * 3. Retry the operation once
+   *
+   * This handles the common case of a crashed bridge without complex retry logic.
+   * MCP-level errors (server errors, auth errors) are NOT retried - they're returned to caller.
    */
   private async withRetry<T>(
     operation: () => Promise<T>,
@@ -62,44 +78,35 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     try {
       return await operation();
     } catch (error) {
-      // Only retry on network errors (bridge crashed/disconnected)
-      if (error instanceof NetworkError) {
-        logger.warn(`Request failed (${operationName}), attempting bridge restart...`);
-
-        try {
-          // Ensure bridge is healthy (will restart if needed)
-          await ensureBridgeHealthy(this.sessionName);
-
-          // Reconnect to the new bridge
-          await this.bridgeClient.close();
-          const session = await getSession(this.sessionName);
-          if (!session || !session.socketPath) {
-            throw new ClientError(`Session ${this.sessionName} not found or invalid after restart`);
-          }
-
-          this.bridgeClient = new BridgeClient(session.socketPath);
-          this.setupNotificationForwarding(); // Re-setup notification forwarding for new client
-          await this.bridgeClient.connect();
-
-          logger.info(`Bridge restarted successfully, retrying ${operationName}`);
-
-          // Retry the operation
-          return await operation();
-        } catch (retryError) {
-          logger.error('Failed to restart bridge:', retryError);
-          throw new ClientError(
-            `Bridge restart failed: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`
-          );
-        }
+      // Only retry on network errors (socket failures, connection lost)
+      if (!(error instanceof NetworkError)) {
+        throw error;
       }
 
-      // Re-throw non-network errors
-      throw error;
-    }
-  }
+      logger.warn(`Socket error during ${operationName}, restarting bridge...`);
 
-  async connect(): Promise<void> {
-    await this.bridgeClient.connect();
+      // Close the failed client
+      await this.bridgeClient.close();
+
+      // Restart bridge and get new socket path
+      await restartBridge(this.sessionName);
+
+      // Get fresh session data
+      const session = await getSession(this.sessionName);
+      if (!session?.socketPath) {
+        throw new ClientError(`Session ${this.sessionName} not found after bridge restart`);
+      }
+
+      // Reconnect
+      this.bridgeClient = new BridgeClient(session.socketPath);
+      this.setupNotificationForwarding();
+      await this.bridgeClient.connect();
+
+      logger.info(`Reconnected to bridge for ${this.sessionName}, retrying ${operationName}`);
+
+      // Retry once
+      return await operation();
+    }
   }
 
   async close(): Promise<void> {
@@ -200,38 +207,20 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
 /**
  * Create a client for a session
- * Automatically handles bridge health checks and reconnection
+ *
+ * Uses ensureBridgeReady() to guarantee the bridge is healthy before connecting.
+ * This handles all the restart logic in one place (bridge-manager).
  */
 export async function createSessionClient(sessionName: string): Promise<SessionClient> {
-  // Get session info
-  const session = await getSession(sessionName);
+  // Ensure bridge is healthy (may restart it)
+  const socketPath = await ensureBridgeReady(sessionName);
 
-  if (!session) {
-    throw new ClientError(`Session not found: ${sessionName}`);
-  }
+  // Connect to the healthy bridge
+  const bridgeClient = new BridgeClient(socketPath);
+  await bridgeClient.connect();
 
-  // Check if session is expired
-  if (session.status === 'expired') {
-    throw new ClientError(
-      `Session ${sessionName} has expired. ` +
-      `The MCP server indicated the session is no longer valid.\n` +
-      `To reconnect, run: mcpc ${sessionName} connect\n` +
-      `To remove the expired session, run: mcpc ${sessionName} close`
-    );
-  }
-
-  if (!session.socketPath) {
-    throw new ClientError(`Session ${sessionName} has no socket path`);
-  }
-
-  // Ensure bridge is healthy (auto-restart if needed)
-  await ensureBridgeHealthy(sessionName);
-
-  // Create and connect client
-  const client = new SessionClient(sessionName, session.socketPath);
-  await client.connect();
-
-  return client;
+  logger.debug(`Created SessionClient for ${sessionName}`);
+  return new SessionClient(sessionName, bridgeClient);
 }
 
 /**
@@ -245,8 +234,7 @@ export async function withSessionClient<T>(
   const client = await createSessionClient(sessionName);
 
   try {
-    const result = await callback(client);
-    return result;
+    return await callback(client);
   } finally {
     await client.close();
   }

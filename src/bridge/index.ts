@@ -533,15 +533,24 @@ class BridgeProcess {
    * Handle an IPC message from the CLI
    */
   private async handleMessage(socket: Socket, data: string): Promise<void> {
+    let messageId: string | undefined;
+
     try {
       const message = JSON.parse(data) as IpcMessage;
+      messageId = message.id;
 
       logger.debug('Received message:', { type: message.type, method: message.method });
 
       // Handle different message types
       switch (message.type) {
         case 'health-check':
-          this.sendResponse(socket, { type: 'health-ok' });
+          // Only respond when MCP client is connected (bridge is fully ready)
+          if (this.client) {
+            this.sendResponse(socket, { type: 'health-ok' });
+          }
+          // TODO: This is super ugly, we can do better, e.g. await for client creation and then send response,
+          //  ensuring the right timing, and returning underlying error to client to diagnose connection issues
+          // Don't respond if not ready - let health check timeout
           break;
 
         case 'request':
@@ -576,7 +585,7 @@ class BridgeProcess {
       }
     } catch (error) {
       logger.error('Failed to handle message:', error);
-      this.sendError(socket, error as Error);
+      this.sendError(socket, error as Error, messageId);
     }
   }
 
