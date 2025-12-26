@@ -263,7 +263,8 @@ export interface IMcpClient {
   // Connection management
   close(): Promise<void>;
 
-  // Server information (single call returns all info - avoids multiple IPC roundtrips)
+  // Server information (capabilities, instructions, version etc.)
+  // single call returns all info to avoid multiple IPC roundtrips)
   getServerInfo(): Promise<ServerInfo>;
 
   // MCP operations
