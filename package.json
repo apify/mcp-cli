@@ -33,6 +33,7 @@
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:e2e": "./test/e2e/run.sh",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

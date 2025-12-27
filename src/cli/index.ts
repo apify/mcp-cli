@@ -21,6 +21,7 @@ import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
 import * as utilities from './commands/utilities.js';
 import * as auth from './commands/auth.js';
+import { clean } from './commands/clean.js';
 import type { OutputMode } from '../lib/index.js';
 import { findTarget, extractOptions, hasCommandAfterTarget, getVerboseFromEnv, getJsonFromEnv } from './parser.js';
 import packageJson from '../../package.json' with { type: 'json' };
@@ -96,6 +97,28 @@ async function main(): Promise<void> {
   ) {
     const program = createProgram();
     await program.parseAsync(process.argv);
+    return;
+  }
+
+  // Handle --clean option (global command, no target needed)
+  const cleanArg = args.find((arg) => arg === '--clean' || arg.startsWith('--clean='));
+  if (cleanArg) {
+    const options = extractOptions(args);
+    if (options.verbose) setVerbose(true);
+
+    // Parse --clean value: --clean or --clean=all,sessions,profiles,logs
+    const cleanValue = cleanArg.includes('=') ? cleanArg.split('=')[1] : '';
+    const cleanTypes = cleanValue ? cleanValue.split(',').map((s) => s.trim()) : [];
+
+    await clean({
+      outputMode: options.json ? 'json' : 'human',
+      sessions: cleanTypes.includes('sessions'),
+      profiles: cleanTypes.includes('profiles'),
+      logs: cleanTypes.includes('logs'),
+      all: cleanTypes.includes('all'),
+    });
+
+    await closeFileLogger();
     return;
   }
 

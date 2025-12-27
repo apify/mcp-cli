@@ -61,6 +61,7 @@ mcpc @test shell
 ```bash
 mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--verbose] [--schema <file>]
      [--schema-mode <mode>] [--timeout <seconds>] [--no-cache] [--insecure]
+     [--clean|--clean=sessions,logs,profiles,all]
      <target> <command...>
 
 # Lists all active sessions and saved authentication profiles

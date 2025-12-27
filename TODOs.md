@@ -2,36 +2,8 @@
 # TODOs
 
 
-- add "mcpc --reset-all/clean-all/clean:a,b,c" ? command to clean up sessions, kill bridges, etc. It should keep shell-history and logs though.
-  - add command to restart bridge process
-  
-
-## E2E tests
-- add end-to-end tests e.g. under `test/e2e` - one bash script per test suite , organized in directories, and one master script that runs them all or selected ones (per directory) in parallel
-- Invariants:
-  - --verbose only adds extra info to stderr, never to stdout
-  - --json always returns single JSON object to stdout on success (exit code = 0), or an object or nothing at all on error (exit code != 0)
-- We'll need a testing server with all the available features and configurable, for testing.
-- Things to test:
-  - handling of errors, invalid params, names, etc.
-  - pagination
-  - env vars...
-  - stdio + filesystem operations,
-  - sessions
-  - for all commands, tests --verbose doesn't print anything extra to stdout, --json returns json
-  - that on session close we send HTTP DELETE https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
-  - Test session failover - e.g. kill the bridge process, and try to access the session again (should be restarted)
-  - Test server session aborting - if session is aborted by server, bridge process should exit and set session status to "expired"
-  - Test auth profiles work long-term and sessions too
-- Can we track test coverage also this way?
-- Text copy can change, but the core texts needs to be shown in both text and JSON mode
-
-## Cosmetic
-(once tests are in place, this should be easy)
-
-- rename "connect --session" to just "session". If you use it and session is dead, just reconnect it and print warning.
-  Better to do some work than none. Add "restart" command to explicitely restart session (no warning then)
-
+- rename "connect --session" to just "session". And if you use it and session is dead, just reconnect it and print warning.
+  Better to do some work than none.
 
 - nit: consistent good server and session info, on server/session info, print also auth info
   - [Using session: apify-docs] => change to show server + transport + version? + auth info!!!
@@ -55,6 +27,7 @@
 - Better error handling:
   - "mcpc https://mcp.sentry.dev/mcp" with an unknown sever => should hint to use "login"
   - Handle MCP errors by failing the command tool, e.g. invalid tool name..
+
 
 
 ## Security
@@ -81,3 +54,27 @@
 - nit: cooler OAuth web pages "Authentication successful!" - show mcpc info
 
 - more shortcuts, e.g. --profile => -p
+
+
+
+
+## E2E test scenarios
+- add end-to-end tests e.g. under `test/e2e` - one bash script per test suite , organized in directories, and one master script that runs them all or selected ones (per directory) in parallel
+- Invariants:
+  - --verbose only adds extra info to stderr, never to stdout
+  - --json always returns single JSON object to stdout on success (exit code = 0), or an object or nothing at all on error (exit code != 0)
+- We'll need a testing server with all the available features and configurable, for testing.
+- Things to test:
+  - handling of errors, invalid params, names, etc.
+  - pagination
+  - env vars...
+  - stdio + filesystem operations,
+  - sessions
+  - for all commands, tests --verbose doesn't print anything extra to stdout, --json returns json
+  - that on session close we send HTTP DELETE https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
+  - Test session failover - e.g. kill the bridge process, and try to access the session again (should be restarted)
+  - Test server session aborting - if session is aborted by server, bridge process should exit and set session status to "expired"
+  - Test auth profiles work long-term and sessions too
+- Can we track test coverage also this way?
+- Text copy can change, but the core texts needs to be shown in both text and JSON mode
+
