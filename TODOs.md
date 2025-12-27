@@ -1,6 +1,19 @@
 
 # TODOs
 
+
+## Bugs
+- Seems calling invalid/unknown MCP command in shell (perhaps also normally) causes the bridge to be flagged as expired
+
+
+- reconnection doesn't work
+mcpc @apify session                                                                                                        1 ✘
+error: missing required argument 'name'
+
+
+
+## Next
+
 - nit: consistent good server and session info, on server/session info, print also auth info
   - [Using session: apify-docs] => change to show server + transport + version? + auth info!!!
     Active MCP sessions:
@@ -18,6 +31,12 @@
     ├── server/
     │   └── index.ts              # Configurable test MCP server
     │
+
+Cool example:
+ * ▐▛███▜▌ *   Claude Code v2.0.75
+* ▝▜█████▛▘ *  Opus 4.5 · Claude Team
+ *  ▘▘ ▝▝  *   ~/Projects/mcpc
+
 
 
 - Better error handling:
@@ -37,7 +56,6 @@
 
 ## Later
 
-- bug: "history" file in shell doesn't seem to work
 - nit: Colorize output, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
   -  warnings could be orange, errors red
 - - docs: add Claude Skills file to /docs, maybe also man page?

@@ -3,7 +3,7 @@
  * Provides REPL-style interface with command history and tab completion
  */
 
-import input from '@inquirer/input';
+import * as readline from 'readline';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { fileExists, getMcpcHome } from '../lib/utils.js';
@@ -302,27 +302,51 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
 }
 
 /**
- * Main shell loop
+ * Main shell loop using readline for proper history support
  */
 async function shellLoop(ctx: ShellContext): Promise<void> {
-  while (ctx.running) {
-    try {
-      const prompt = chalk.cyan(`mcpc(${ctx.target})> `);
-      const line = await input({ message: prompt });
+  // readline expects history in reverse order (most recent first)
+  const historyReversed = ctx.history.slice(-HISTORY_MAX_COMMANDS).reverse();
 
-      addToHistory(ctx, line);
-      await executeCommand(ctx, line);
-    } catch (error) {
-      // Handle Ctrl+C or Ctrl+D
-      if (error instanceof Error && error.message.includes('User force closed')) {
-        ctx.running = false;
-        console.log(''); // New line after ^C
-        console.log(chalk.dim('Goodbye!'));
-      } else {
-        throw error;
-      }
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    history: historyReversed,
+    historySize: HISTORY_MAX_COMMANDS,
+    prompt: chalk.cyan(`mcpc(${ctx.target})> `),
+    terminal: true,
+  });
+
+  // Handle line input
+  rl.on('line', async (line: string) => {
+    addToHistory(ctx, line);
+    await executeCommand(ctx, line);
+    if (ctx.running) {
+      rl.prompt();
+    } else {
+      rl.close();
     }
-  }
+  });
+
+  // Handle Ctrl+C
+  rl.on('SIGINT', () => {
+    console.log(''); // New line after ^C
+    rl.prompt();
+  });
+
+  // Handle Ctrl+D or close
+  rl.on('close', () => {
+    ctx.running = false;
+    console.log(chalk.dim('Goodbye!'));
+  });
+
+  // Start prompting
+  rl.prompt();
+
+  // Wait for shell to finish
+  await new Promise<void>((resolve) => {
+    rl.on('close', resolve);
+  });
 }
 
 /**
