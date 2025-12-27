@@ -136,7 +136,7 @@ function createProgram(): Command {
 
   program
     .name('mcpc')
-    .description('Command-line client for the Model Context Protocol (MCP).')
+    .description('Universal command-line client for the Model Context Protocol (MCP).')
     .usage('[options] <target> [command]')
     .version(packageJson.version, '-v, --version', 'Output the version number')
     .helpOption('-h, --help', 'Display general help')
@@ -147,7 +147,10 @@ function createProgram(): Command {
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--profile <name>', 'Authentication profile to use (default: "default")')
     .option('--schema <file>', 'Validate against expected tool/prompt schema')
-    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), or ignore')
+    .option(
+      '--schema-mode <mode>',
+      'Schema validation mode: strict, compatible (default), or ignore'
+    )
     .option('--insecure', 'Disable SSL certificate validation');
 
   // Add examples to help
@@ -155,9 +158,10 @@ function createProgram(): Command {
     'after',
     `
 Where <target> can be:
-  @<name>                       Named session (e.g., @apify)
-  <config-entry>                Entry from MCP config file specified in --config
-  <url>                         Remote MCP server URL (e.g., mcp.apify.com)
+  <url>                  Remote MCP server URL (e.g., mcp.apify.com)
+  <config-entry>         Entry from MCP config file specified in --config
+  @<name>                Named session (e.g., @apify)
+
 
 Examples:
   $ mcpc                                                           # List sessions and auth profiles
@@ -165,7 +169,7 @@ Examples:
   $ mcpc mcp.apify.com                                             # Show server info
   $ mcpc --json mcp.apify.com tools-list                           # List tools in JSON mode
   $ mcpc mcp.apify.com connect --session @apify                    # Create persistent session
-  $ mcpc @apify tools-call search-actors --args query="crawler"    # Call tool
+  $ mcpc @apify tools-call search-actors --args query="crawler"    # Call tool with arguments
 `
   );
 

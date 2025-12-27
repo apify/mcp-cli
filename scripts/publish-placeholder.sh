@@ -39,7 +39,7 @@ cat > "$TEMP_DIR/README.md" << 'EOF'
 
 **🚧 Under Active Development**
 
-Command-line client for the Model Context Protocol (MCP).
+Universal command-line client for the Model Context Protocol (MCP).
 
 ## Status
 

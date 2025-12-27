@@ -1,7 +1,7 @@
 {
   "name": "mcpc",
   "version": "0.1.0",
-  "description": "Command-line client for the Model Context Protocol (MCP)",
+  "description": "Universal command-line client for the Model Context Protocol (MCP).",
   "type": "module",
   "keywords": [
     "mcp",

@@ -80,3 +80,5 @@ This new design will be more consistent with how MCP works.
 - Impelled shell completions (e.g. "mcpc @a...")
 - nit: Nicer OAuth flow finish web page, add Apify example there.
 - nit: cooler OAuth web pages "Authentication successful!" - show mcpc info
+
+- more shortcuts, e.g. --profile => -p
