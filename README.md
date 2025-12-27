@@ -210,7 +210,7 @@ This allows you to:
 - Manage credentials independently from sessions
 
 **Key concepts:**
-- **Authentication profile**: Named set of OAuth credentials for a specific server (stored in `~/.mcpc/auth-profiles.json` + OS keychain)
+- **Authentication profile**: Named set of OAuth credentials for a specific server (stored in `~/.mcpc/profiles.json` + OS keychain)
 - **Session**: Active connection to a server that may reference an authentication profile (stored in `~/.mcpc/sessions.json`)
 - **Default profile**: When `--profile` is not specified, `mcpc` uses the authentication profile named `default`
 
@@ -315,7 +315,7 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
 
 ### Authentication profiles storage format
 
-By default, authentication profiles are stored in the `~/.mcpc/auth-profiles.json` file with the following structure:
+By default, authentication profiles are stored in the `~/.mcpc/profiles.json` file with the following structure:
 
 ```json
 {
@@ -369,7 +369,7 @@ Instead of forcing every command to reconnect and reinitialize (which is slow an
 `mcpc` saves its state to `~/.mcpc/` directory (unless overridden by `MCPC_HOME_DIR`), in the following files:
 
 - `~/.mcpc/sessions.json` - Active sessions with references to authentication profiles (file-locked for concurrent access)
-- `~/.mcpc/auth-profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
+- `~/.mcpc/profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
 - `~/.mcpc/bridges/` - Unix domain socket files for each bridge process
 - `~/.mcpc/logs/bridge-*.log` - Log files for each bridge process
 - OS keychain - Sensitive credentials (OAuth tokens, bearer tokens, client secrets)
@@ -645,7 +645,7 @@ MCP enables arbitrary tool execution and data access; treat servers like you tre
 - OAuth refresh tokens are stored in the OS keychain (access tokens are kept in memory only)
 - OAuth client credentials (client_id, client_secret from dynamic registration) are stored in the keychain
 - All HTTP headers from `--header` flags are stored per-session in the keychain (as JSON)
-- The `~/.mcpc/auth-profiles.json` file only contains metadata (server URL, scopes, timestamps) - never tokens
+- The `~/.mcpc/profiles.json` file only contains metadata (server URL, scopes, timestamps) - never tokens
 
 **Keychain entries:**
 - OAuth tokens: `mcpc:auth:<serverUrl>:<profileName>:oauth-tokens`
@@ -681,7 +681,7 @@ This architecture ensures:
 ### File permissions
 
 - `~/.mcpc/sessions.json` is set to `0600` (user-only read/write)
-- `~/.mcpc/auth-profiles.json` is set to `0600` (user-only read/write)
+- `~/.mcpc/profiles.json` is set to `0600` (user-only read/write)
 - Bridge sockets in `~/.mcpc/bridges/` are created with `0700` permissions
 - Log files in `~/.mcpc/logs/` are created with `0600` permissions
 

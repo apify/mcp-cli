@@ -43,9 +43,7 @@ Visual examples:
 
 - implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
 - > # TODO: automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
-
-- Rename auth-profiles.json to just profiles.json, for consistency
-
+  
 ## Security
 - Double-check the MCP security guidelines
 - OAuth issuer - maybe save it and double-check it to ensure domain is not spoofed?

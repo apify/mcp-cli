@@ -131,7 +131,7 @@ async function cleanSessions(): Promise<number> {
  */
 async function cleanProfiles(): Promise<number> {
   const mcpcHome = getMcpcHome();
-  const profilesFile = join(mcpcHome, 'auth-profiles.json');
+  const profilesFile = join(mcpcHome, 'profiles.json');
 
   if (!(await fileExists(profilesFile))) {
     return 0;
@@ -139,7 +139,7 @@ async function cleanProfiles(): Promise<number> {
 
   try {
     await unlink(profilesFile);
-    logger.debug('Removed auth-profiles.json');
+    logger.debug('Removed profiles.json');
     // TODO: Also clean keychain entries for OAuth tokens
     return 1;
   } catch {

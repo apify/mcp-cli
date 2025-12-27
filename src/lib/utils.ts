@@ -63,10 +63,10 @@ export function getLogsDir(): string {
 }
 
 /**
- * Get the auth profiles file path (~/.mcpc/auth-profiles.json)
+ * Get the auth profiles file path (~/.mcpc/profiles.json)
  */
 export function getAuthProfilesFilePath(): string {
-  return join(getMcpcHome(), 'auth-profiles.json');
+  return join(getMcpcHome(), 'profiles.json');
 }
 
 /**

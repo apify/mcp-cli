@@ -118,7 +118,7 @@ export interface SessionsStorage {
 }
 
 /**
- * Authentication profile data stored in auth-profiles.json
+ * Authentication profile data stored in ~/.mcpc/profiles.json
  * Only OAuth authentication is supported for profiles
  * NOTE: Tokens are stored securely in OS keychain, not in this file
  */
@@ -136,7 +136,7 @@ export interface AuthProfile {
 }
 
 /**
- * Auth profiles storage structure (auth-profiles.json)
+ * Auth profiles storage structure (~/.mcpc/profiles.json)
  */
 export interface AuthProfilesStorage {
   profiles: Record<string, Record<string, AuthProfile>>; // serverUrl -> profileName -> AuthProfile

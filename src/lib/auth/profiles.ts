@@ -1,6 +1,6 @@
 /**
  * Authentication profiles management
- * Provides functions to read and manage auth profiles stored in ~/.mcpc/auth-profiles.json
+ * Provides functions to read and manage auth profiles stored in ~/.mcpc/profiles.json
  * Uses file locking to prevent concurrent access issues
  */
 

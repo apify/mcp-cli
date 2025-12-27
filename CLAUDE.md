@@ -373,7 +373,7 @@ Environment variable substitution supported: `${VAR_NAME}`
 - Default profile name is `default` when `--profile` is not specified
 
 **Storage:**
-- `~/.mcpc/auth-profiles.json` - Profile metadata (serverUrl, authType, scopes, expiry)
+- `~/.mcpc/profiles.json` - Auth profile metadata (serverUrl, authType, scopes, expiry)
 - OS keychain - Sensitive credentials (OAuth tokens, refresh tokens, client secrets, bearer tokens)
 
 **Bearer Token Handling:**
@@ -415,11 +415,11 @@ On failure, the error message includes instructions on how to login. This ensure
 4. CLI opens browser to authorization URL with PKCE challenge
 5. User authenticates, browser redirects to callback with authorization code
 6. CLI exchanges code for tokens using PKCE verifier
-7. Tokens saved to OS keychain, metadata saved to `auth-profiles.json`
+7. Tokens saved to OS keychain, metadata saved to `profiles.json`
 8. Profile can now be used by multiple sessions
 
 **Implementation Modules:**
-- `src/lib/auth/auth-profiles.ts` - Manage auth-profiles.json (CRUD operations)
+- `src/lib/auth/auth-profiles.ts` - Manage profiles.json (CRUD operations)
 - `src/lib/auth/keychain.ts` - OS keychain wrapper (save/load/delete tokens)
 - `src/lib/auth/oauth-provider.ts` - Implements `OAuthClientProvider` from MCP SDK
 - `src/lib/auth/oauth-flow.ts` - Orchestrates interactive OAuth flow
@@ -440,7 +440,7 @@ On failure, the error message includes instructions on how to login. This ensure
   }
 }
 
-// auth-profiles.json
+// profiles.json
 {
   "profiles": {
     "https://mcp.apify.com": {
@@ -467,7 +467,7 @@ On failure, the error message includes instructions on how to login. This ensure
 All state files are stored in `~/.mcpc/` directory (unless overridden by `MCPC_HOME_DIR` environment variable):
 
 - `~/.mcpc/sessions.json` - Active sessions with references to auth profiles (file-locked for concurrent access)
-- `~/.mcpc/auth-profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
+- `~/.mcpc/profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
 - `~/.mcpc/bridges/` - Unix domain socket files for bridge processes
 - `~/.mcpc/history` - Interactive shell command history (last 1000 commands)
 - `~/.mcpc/logs/bridge-<session>.log` - Bridge process logs (max 10MB, 5 files)
