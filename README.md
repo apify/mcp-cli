@@ -28,7 +28,7 @@ Note that `mcpc` is deterministic and does not use any LLM on its own; that's fo
 ## Install
 
 ```bash
-npm install -g mcpc
+npm install -g @apify/mcpc
 ```
 
 ## Quickstart
@@ -965,13 +965,9 @@ Later...
 - Session may have expired. Create new session: `mcpc <target> session @<session-name>`
 - List existing sessions: `mcpc`
 
-**"Package not found"**
-- Ensure package is installed: `npm list -g <package>` or `npm list <package>`
-- Try with full path: `mcpc /path/to/package/bin/server resources-list`
-
 **"Authentication failed"**
 - List saved profiles: `mcpc`
-- Re-authenticate: `mcpc <server> login --profile <name>`
+- Re-authenticate: `mcpc <server> login [--profile <name>]`
 - For bearer tokens: provide `--header "Authorization: Bearer ${TOKEN}"` again
 
 ### Debug mode
