@@ -2,7 +2,7 @@
  * Tests for CLI output formatting
  */
 
-import { extractSingleTextContent } from '../../src/cli/tool-result.js';
+import { extractSingleTextContent } from '../../../src/cli/tool-result.js';
 
 describe('extractSingleTextContent', () => {
   it('should return text for single text content item', () => {

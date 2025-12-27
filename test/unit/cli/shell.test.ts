@@ -2,7 +2,7 @@
  * Tests for shell command parsing
  */
 
-import { parseShellCommand } from '../../src/cli/shell-parser.js';
+import { parseShellCommand } from '../../../src/cli/shell-parser.js';
 
 describe('parseShellCommand', () => {
   it('returns empty command for empty string', () => {

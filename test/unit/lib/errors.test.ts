@@ -11,7 +11,7 @@ import {
   isMcpError,
   toMcpError,
   formatError,
-} from '../../src/lib/errors';
+} from '../../../src/lib/errors';
 
 describe('McpError', () => {
   it('should create an error with message and code', () => {

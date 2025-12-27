@@ -5,8 +5,6 @@
 - add "mcpc --reset-all/clean-all/clean:a,b,c" ? command to clean up sessions, kill bridges, etc. It should keep shell-history and logs though.
   - add command to restart bridge process
   
-- "mcpc" - quickly probe the bridge for status and print it: expired (already known), crashed (if pid is not running), live (pid running, not expired)
-
 
 ## E2E tests
 - add end-to-end tests e.g. under `test/e2e` - one bash script per test suite , organized in directories, and one master script that runs them all or selected ones (per directory) in parallel
@@ -40,9 +38,22 @@
     Active MCP sessions:
     @fs → npx (stdio) --- show also args instead of just "npx"
   - print PID of bridge process
+  
+    Xxx/
+    ├── run.sh                    # Master runner (parallel by suite)
+    ├── lib/
+    │   ├── common.sh             # Assertions, temp dirs, cleanup
+    │   ├── server.sh             # Start/stop test server helpers
+    │   └── mcpc.sh               # Wrapper to invoke mcpc with coverage
+    ├── fixtures/
+    │   └── configs/              # Test config files
+    ├── server/
+    │   └── index.ts              # Configurable test MCP server
+    │
+
 
 - Better error handling:
-  - "mcpc https://mcp.sentry.dev/mcp" => should hint to use "login"
+  - "mcpc https://mcp.sentry.dev/mcp" with an unknown sever => should hint to use "login"
   - Handle MCP errors by failing the command tool, e.g. invalid tool name..
 
 
@@ -53,6 +64,7 @@
 
 ## Later
 
+- bug: "history" file in shell doesn't seem to work
 - nit: Colorize output, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
   -  warnings could be orange, errors red
 - - docs: add Claude Skills file to /docs, maybe also man page?

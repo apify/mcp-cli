@@ -4,8 +4,8 @@
 
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { loadConfig, getServerConfig, validateServerConfig, listServers } from '../../src/lib/config';
-import { ClientError } from '../../src/lib/errors';
+import { loadConfig, getServerConfig, validateServerConfig, listServers } from '../../../src/lib/config';
+import { ClientError } from '../../../src/lib/errors';
 
 const TEST_DIR = join(process.cwd(), 'test-tmp-config');
 

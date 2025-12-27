@@ -2,8 +2,8 @@
  * Tests for argument parsing utilities
  */
 
-import { parseCommandArgs, loadArgsFromFile, getVerboseFromEnv, getJsonFromEnv } from '../../src/cli/parser.js';
-import { ClientError } from '../../src/lib/errors.js';
+import { parseCommandArgs, loadArgsFromFile, getVerboseFromEnv, getJsonFromEnv } from '../../../src/cli/parser.js';
+import { ClientError } from '../../../src/lib/errors.js';
 import { join } from 'path';
 
 describe('parseCommandArgs', () => {
@@ -230,7 +230,7 @@ describe('parseCommandArgs', () => {
 });
 
 describe('loadArgsFromFile', () => {
-  const testDataDir = join(__dirname, '..', 'data');
+  const testDataDir = join(__dirname, '..', '..', 'fixtures');
 
   it('should load arguments from valid JSON file', () => {
     const filePath = join(testDataDir, 'tool-args.json');
@@ -246,7 +246,7 @@ describe('loadArgsFromFile', () => {
   });
 
   it('should resolve relative paths', () => {
-    const filePath = 'test/data/tool-args.json';
+    const filePath = 'test/fixtures/tool-args.json';
     const result = loadArgsFromFile(filePath);
     expect(result).toEqual({
       query: 'hello world',

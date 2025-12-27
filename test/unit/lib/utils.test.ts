@@ -23,8 +23,8 @@ import {
   truncate,
   isProcessAlive,
   generateRequestId,
-} from '../../src/lib/utils.js';
-import { DEFAULT_AUTH_PROFILE } from '../../src/lib/auth/oauth-utils.js';
+} from '../../../src/lib/utils.js';
+import { DEFAULT_AUTH_PROFILE } from '../../../src/lib/auth/oauth-utils.js';
 
 describe('expandHome', () => {
   it('should expand ~ to home directory', () => {

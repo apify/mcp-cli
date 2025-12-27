@@ -19,15 +19,15 @@ export default {
     'node_modules/(?!(chalk|cli-table3|#ansi-styles|#supports-color)/)',
   ],
   testMatch: [
-    '**/test/**/*.test.ts',
-    '**/test/**/*.spec.ts',
+    '**/test/unit/**/*.test.ts',
+    '**/test/unit/**/*.spec.ts',
   ],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
     '!src/**/index.ts',
   ],
-  coverageDirectory: 'coverage',
+  coverageDirectory: 'test/coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   coverageThreshold: {
     global: {

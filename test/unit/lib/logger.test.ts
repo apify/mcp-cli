@@ -12,7 +12,7 @@ import {
   error,
   Logger,
   createLogger,
-} from '../../src/lib/logger';
+} from '../../../src/lib/logger';
 
 describe('Verbose mode', () => {
   beforeEach(() => {

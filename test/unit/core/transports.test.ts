@@ -2,8 +2,8 @@
  * Unit tests for MCP transports
  */
 
-import { createTransportFromConfig } from '../../src/core/transports';
-import { ClientError } from '../../src/lib/errors';
+import { createTransportFromConfig } from '../../../src/core/transports';
+import { ClientError } from '../../../src/lib/errors';
 
 // Mock the SDK transports
 jest.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({

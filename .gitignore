@@ -10,7 +10,7 @@ dist/
 *.tsbuildinfo
 
 # Test coverage
-coverage/
+test/coverage/
 
 # Logs
 *.log
