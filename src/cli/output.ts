@@ -113,29 +113,35 @@ function formatToolAnnotations(annotations: Tool['annotations']): string | null 
 
 /**
  * Format a list of tools as Markdown
+ * First shows a quick summary with annotations, then full descriptions
  */
 export function formatTools(tools: Tool[]): string {
   const lines: string[] = [];
 
-  lines.push(`# Tools`);
+  lines.push(`Available tools (${tools.length})`);
+  lines.push('');
+
+  // First: quick summary list with annotations
+  for (const tool of tools) {
+    const annotationsStr = formatToolAnnotations(tool.annotations);
+    const suffix = annotationsStr ? ` ${chalk.gray(`[${annotationsStr}]`)}` : '';
+    lines.push(`- \`${tool.name}\`${suffix}`);
+  }
+  lines.push('');
+
+  // Then: full descriptions
+  lines.push('Tool details:');
   lines.push('');
   for (const tool of tools) {
     // Use title from annotations if available, otherwise use name
     const title = tool.annotations?.title || tool.name;
-    lines.push(`## \`${tool.name}\`${title !== tool.name ? ` - ${title}` : ''}`);
-
-    // Show annotations hints
-    const annotationsStr = formatToolAnnotations(tool.annotations);
-    if (annotationsStr) {
-      lines.push(chalk.gray(`[${annotationsStr}]`));
-    }
+    const titleSuffix = title !== tool.name ? ` - ${title}` : '';
 
     if (tool.description) {
-      lines.push(tool.description);
+      lines.push(`## \`${tool.name}\`${titleSuffix}: ${tool.description}`);
     } else {
-      lines.push(chalk.gray('(no description)'));
+      lines.push(`## \`${tool.name}\`${titleSuffix}: ${chalk.gray('(no description)')}`);
     }
-    lines.push('');
   }
 
   return lines.join('\n');

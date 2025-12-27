@@ -25,6 +25,7 @@
   - Handle MCP errors by failing the command tool, e.g. invalid tool name..
 
 
+
 - implement resources-subscribe/resources-unsubscribe command properly
 - > # TODO: automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
 
@@ -51,7 +52,7 @@
 - Impelled shell completions (e.g. "mcpc @a...")
 - nit: Nicer OAuth flow finish web page, add Apify example there.
 - nit: cooler OAuth web pages "Authentication successful!" - show mcpc info
-
+- audit that on every command, we print next steps as examples
 - more shortcuts, e.g. --profile => -p
 
 
