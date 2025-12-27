@@ -17,7 +17,7 @@ import type {
   LoggingLevel,
 } from '@modelcontextprotocol/sdk/types.js';
 import { createNoOpLogger, type Logger } from '../lib/logger.js';
-import { ServerError, NetworkError } from '../lib/errors.js';
+import { ServerError, NetworkError, isAbortError } from '../lib/errors.js';
 import type { IMcpClient, ServerInfo } from '../lib/types.js';
 
 /**
@@ -46,7 +46,6 @@ export class McpClient implements IMcpClient {
   private client: SDKClient;
   private logger: Logger;
   private negotiatedProtocolVersion?: string;
-  private isClosing = false;
 
   constructor(clientInfo: Implementation, options: McpClientOptions = {}) {
     this.logger = options.logger || createNoOpLogger();
@@ -58,9 +57,9 @@ export class McpClient implements IMcpClient {
 
     // Set up error handling
     this.client.onerror = (error) => {
-      // Ignore abort errors during intentional close
-      if (this.isClosing && error instanceof Error && error.message.includes('AbortError')) {
-        this.logger.debug('Client aborted during close (expected)');
+      // Ignore abort errors - these occur when connection is closed intentionally
+      if (isAbortError(error)) {
+        this.logger.debug('Client aborted (expected during close)');
         return;
       }
       this.logger.error('Client error:', error);
@@ -76,9 +75,9 @@ export class McpClient implements IMcpClient {
 
       // Set up transport error handlers
       transport.onerror = (error) => {
-        // Ignore abort errors during intentional close
-        if (this.isClosing && error instanceof Error && error.message.includes('AbortError')) {
-          this.logger.debug('Transport aborted during close (expected)');
+        // Ignore abort errors - these occur when connection is closed intentionally
+        if (isAbortError(error)) {
+          this.logger.debug('Transport aborted (expected during close)');
           return;
         }
         this.logger.error('Transport error:', error);
@@ -101,7 +100,7 @@ export class McpClient implements IMcpClient {
       const serverVersion = this.client.getServerVersion();
       const serverCapabilities = this.client.getServerCapabilities();
 
-      this.logger.info(
+      this.logger.debug(
         `Connected to ${serverVersion?.name || 'unknown'} v${serverVersion?.version || 'unknown'}`
       );
       this.logger.debug('Server capabilities:', serverCapabilities);
@@ -120,7 +119,6 @@ export class McpClient implements IMcpClient {
   async close(): Promise<void> {
     try {
       this.logger.debug('Closing connection...');
-      this.isClosing = true;
       await this.client.close();
       this.logger.debug('Connection closed');
     } catch (error) {

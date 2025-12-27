@@ -29,6 +29,9 @@
   - Handle MCP errors by failing the command tool, e.g. invalid tool name..
 
 
+- implement resources-subscribe/resources-unsubscribe command properly
+- > # TODO: automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
+
 
 ## Security
 - Double-check the MCP security guidelines

@@ -90,6 +90,28 @@ export function isMcpError(error: unknown): error is McpError {
 }
 
 /**
+ * Check if an error is an AbortError (DOMException or Error with AbortError name/message)
+ * These occur when HTTP connections or SSE streams are closed intentionally
+ */
+export function isAbortError(error: unknown): boolean {
+  if (!error) return false;
+
+  // Check for DOMException with name 'AbortError'
+  if (error instanceof Error) {
+    if (error.name === 'AbortError') return true;
+    if (error.message.includes('AbortError')) return true;
+    if (error.message.includes('aborted')) return true;
+  }
+
+  // Check for object with name property (DOMException-like)
+  if (typeof error === 'object' && 'name' in error && (error as { name: string }).name === 'AbortError') {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Convert any error to an McpError
  * Unknown errors become ClientError with code 1
  */

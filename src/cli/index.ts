@@ -189,9 +189,8 @@ Where <target> can be:
 Examples:
   $ mcpc                                                           # List sessions and auth profiles
   $ mcpc mcp.apify.com login                                       # Login to MCP server using OAuth
-  $ mcpc mcp.apify.com                                             # Show server info
-  $ mcpc --json mcp.apify.com tools-list                           # List tools in JSON mode
-  $ mcpc mcp.apify.com connect --session @apify                    # Create persistent session
+  $ mcpc mcp.apify.com tools-list                                  # List server tools
+  $ mcpc mcp.apify.com session @apify                              # Create or reconnect persistent session
   $ mcpc @apify tools-call search-actors --args query="crawler"    # Call tool with arguments
 `
   );
@@ -242,13 +241,13 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
       await sessions.closeSession(target, getOptionsFromCommand(command));
     });
 
-  // Connect command: mcpc <target> connect --session @<name>
+  // Session command: mcpc <target> session @<name>
+  // Creates a new session or reconnects if session exists but bridge is dead
   program
-    .command('connect')
-    .description('Connect to an MCP server and create a session')
-    .requiredOption('--session <name>', 'Session name (e.g., @apify)')
-    .action(async (options, command) => {
-      await sessions.connectSession(options.session, target, getOptionsFromCommand(command));
+    .command('session <name>')
+    .description('Create or reconnect a session to an MCP server')
+    .action(async (name, _options, command) => {
+      await sessions.connectSession(name, target, getOptionsFromCommand(command));
     });
 
   // Authentication commands

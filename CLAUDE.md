@@ -63,7 +63,7 @@ mcpc mcp.apify.com login
 mcpc mcp.apify.com
 
 # Create a persistent session
-mcpc mcp.apify.com connect --session @test
+mcpc mcp.apify.com session @test
 mcpc @test tools-call search-actors --args query="web crawler"
 mcpc @test shell
 
@@ -156,7 +156,7 @@ mcpc/
 - `mcpc @<session>` - Show session info, server capabilities, and authentication details
 - `mcpc <target> help` - Alias for `mcpc <target>`
 - `mcpc <target> <command>` - Execute MCP command
-- Session creation: `mcpc <target> connect --session @<session-name> [--profile <name>]`
+- Session creation: `mcpc <target> session @<session-name> [--profile <name>]`
 - Authentication: `mcpc <server> login [--profile <name>]` and `mcpc <server> logout [--profile <name>]`
 
 **Target Types:**
@@ -173,7 +173,7 @@ mcpc/
 
 ### Session Lifecycle
 
-1. User creates session: `mcpc mcp.apify.com connect --session @apify`
+1. User creates session: `mcpc mcp.apify.com session @apify`
 2. CLI creates entry in `sessions.json`, spawns bridge process
 3. Bridge creates Unix socket at `~/.mcpc/bridges/apify.sock`
 4. Bridge performs MCP initialization:
@@ -389,7 +389,7 @@ mcpc <server> login [--profile <name>]
 mcpc <server> logout [--profile <name>]
 
 # Create session with specific profile
-mcpc <server> connect --session @<name> --profile <profile>
+mcpc <server> session @<name> --profile <profile>
 ```
 
 **Authentication Behavior:**

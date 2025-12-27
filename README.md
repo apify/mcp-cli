@@ -50,8 +50,8 @@ mcpc mcp.apify.com shell
 # Use JSON mode for scripting
 mcpc --json mcp.apify.com tools-list
 
-# Create a persistent session
-mcpc mcp.apify.com connect --session @test
+# Create a persistent session (or reconnect if it exists but bridge is dead)
+mcpc mcp.apify.com session @test
 mcpc @test tools-call search-actors --args query="web crawler"
 mcpc @test shell
 ```
@@ -59,8 +59,9 @@ mcpc @test shell
 ## Usage
 
 ```bash
-mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--verbose] [--schema <file>]
-     [--schema-mode <mode>] [--timeout <seconds>] [--no-cache] [--insecure]
+mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--verbose]
+     [--schema <file>]
+     [--schema-mode <mode>] [--timeout <seconds>] [--insecure]
      [--clean|--clean=sessions,logs,profiles,all]
      <target> <command...>
 
@@ -83,7 +84,7 @@ mcpc <target> prompts-get <prompt-name> [--args key=val key2:=json ...] [--args-
 mcpc <target> resources
 mcpc <target> resources-list
 mcpc <target> resources-read <uri> [-o <file>] [--max-size <bytes>]
-mcpc <target> resources-subscribe <uri>     # TODO: automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
+mcpc <target> resources-subscribe <uri>
 mcpc <target> resources-unsubscribe <uri>
 mcpc <target> resources-templates-list
 
@@ -93,7 +94,7 @@ mcpc <target> logging-set-level <level>
 mcpc <target> shell
 
 # Persistent sessions
-mcpc <server> connect --session @<session-name> [--profile <name>]
+mcpc <server> session @<session-name> [--profile <name>]
 mcpc @<session-name> <command...>
 mcpc @<session-name> close
 
@@ -155,21 +156,7 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 - `--timeout <seconds>` - Request timeout in seconds (default: 300)
 - `--schema <file>` - Validate against expected tool/prompt schema
 - `--schema-mode <mode>` - Schema validation mode: `strict`, `compatible`, or `ignore` (default: `compatible`)
-- `--no-cache` - Disable prefetching and caching of server objects
 - `--insecure` - Disable SSL certificate validation (not recommended)
-
-## Caching
-
-When using a session, `mcpc` prefetches and caches the full list of server tools, prompts, and resources,
-to reduce the number of requests made to the server and simplify the use of CLI.
-This means that commands such as `tools-list` or `tools-schema` use the cached data rather than
-making a request to the server.
-The caching is done on the bridge process level, which keeps the connection session alive and automatically refreshes the local cache when
-the server sends a `notifications/tools/list_changed` or `notifications/resources/list_changed` notification.
-
-To disable caching, use the `--no-cache` flag - either when creating new session or on the specific MCP command.
-In that case, you'll need to explicitly run commands  like `tools-list` or `resources-list` to get the lists.
-When list operations return paginated results, `mcpc` automatically fetches all pages transparently.
 
 ## Authentication
 
@@ -196,7 +183,7 @@ All headers are stored securely in the OS keychain for the session, but **not** 
 mcpc --header "Authorization: Bearer ${APIFY_TOKEN}" https://mcp.apify.com tools-list
 
 # Create session with bearer token (saved to keychain for this session only)
-mcpc --header "Authorization: Bearer ${APIFY_TOKEN}" https://mcp.apify.com connect --session @apify
+mcpc --header "Authorization: Bearer ${APIFY_TOKEN}" https://mcp.apify.com session @apify
 
 # Use the session (token loaded from keychain automatically)
 mcpc @apify tools-list
@@ -279,13 +266,13 @@ On failure, the error message includes instructions on how to login and save the
 # With specific profile - always authenticated:
 # - Uses 'personal' if it exists
 # - Fails if it doesn't exist
-mcpc https://mcp.apify.com connect --session @apify1 --profile personal
+mcpc https://mcp.apify.com session @apify1 --profile personal
 
 # Without profile - opportunistic authentication:
 # - Uses 'default' if it exists
 # - Tries unauthenticated if 'default' doesn't exist
 # - Fails if the server requires authentication
-mcpc https://mcp.apify.com connect --session @apify2
+mcpc https://mcp.apify.com session @apify2
 
 # Public server - no authentication needed:
 mcpc https://mcp.apify.com\?tools=docs tools-list
@@ -303,8 +290,8 @@ mcpc https://mcp.apify.com login --profile personal
 mcpc https://mcp.apify.com login --profile work
 
 # Create sessions using the two different credentials
-mcpc https://mcp.apify.com connect --session @apify-personal --profile personal
-mcpc https://mcp.apify.com connect --session @apify-work --profile work
+mcpc https://mcp.apify.com session @apify-personal --profile personal
+mcpc https://mcp.apify.com session @apify-work --profile work
 
 # Both sessions work independently
 mcpc @apify-personal tools-list  # Uses personal account
@@ -393,10 +380,10 @@ Instead of forcing every command to reconnect and reinitialize (which is slow an
 
 ```bash
 # Create a persistent session (with default authentication profile, if available)
-mcpc https://mcp.apify.com connect --session @apify
+mcpc https://mcp.apify.com session @apify
 
 # Create session with specific authentication profile
-mcpc https://mcp.apify.com connect --session @apify --profile personal
+mcpc https://mcp.apify.com session @apify --profile personal
 
 # List all active sessions and saved authentication profiles
 mcpc
@@ -473,10 +460,10 @@ To remove the session from the list, you need to explicitly close it:
 mcpc @apify close
 ```
 
-or restart it afresh using the `connect` command as follows (the previous session state is lost!):
+or reconnect it using the `session` command (if the session exists but bridge is dead, it will be automatically reconnected):
 
 ```bash
-mcpc @apify connect
+mcpc https://mcp.apify.com session @apify
 ```
 
 ## Logging
@@ -528,7 +515,7 @@ You can point to an existing config file with `--config`:
 mcpc --config .vscode/mcp.json apify tools-list
 
 # Open a session to a server specified in the custom config file
-mcpc --config .vscode/mcp.json apify connect --session @my-apify
+mcpc --config .vscode/mcp.json apify session @my-apify
 ```
 
 **Example MCP config JSON file:**
@@ -578,7 +565,7 @@ When `--config` is provided, you can reference servers by name:
 mcpc --config .vscode/mcp.json filesystem resources-list
 
 # Create a named session from server in config
-mcpc --config .vscode/mcp.json filesystem connect --session @fs
+mcpc --config .vscode/mcp.json filesystem session @fs
 mcpc @fs tools-call search
 ```
 
@@ -897,7 +884,7 @@ The main `mcpc` command provides the user interface.
 
 ### Session lifecycle
 
-1. User: `mcpc https://mcp.apify.com connect --session @apify`
+1. User: `mcpc https://mcp.apify.com session @apify`
 2. CLI: Atomically creates session entry in `~/.mcpc/sessions.json`
 3. CLI: Spawns bridge process (`mcpc-bridge`)
 4. Bridge: Creates Unix socket at `~/.mcpc/bridges/apify.sock`
@@ -970,12 +957,12 @@ Later...
 ### Common issues
 
 **"Cannot connect to bridge"**
-- Bridge may have crashed. Try: `mcpc <server> connect --session @<session-name>`
+- Bridge may have crashed. Try: `mcpc <server> session @<session-name>`
 - Check bridge is running: `ps aux | grep -e 'mcpc-bridge' -e '[m]cpc/dist/bridge'`
 - Check socket exists: `ls ~/.mcpc/bridges/`
 
 **"Session not found"**
-- Session may have expired. Create new session: `mcpc <target> connect --session @<session-name>`
+- Session may have expired. Create new session: `mcpc <target> session @<session-name>`
 - List existing sessions: `mcpc`
 
 **"Package not found"**

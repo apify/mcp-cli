@@ -17,6 +17,7 @@ const logger = createLogger('sessions');
 
 /**
  * Connect to an MCP server and create a session
+ * If session already exists with dead bridge, reconnects it automatically
  */
 export async function connectSession(
   name: string,
@@ -38,11 +39,30 @@ export async function connectSession(
     }
 
     // Check if session already exists
-    if (await sessionExists(name)) {
-      throw new ClientError(
-        `Session already exists: ${name}\n` +
-        `Use "mcpc ${name} close" to close it first, or choose a different name.`
-      );
+    const existingSession = await import('../../lib/sessions.js').then((m) => m.getSession(name));
+    if (existingSession) {
+      const bridgeStatus = getBridgeStatus(existingSession);
+
+      if (bridgeStatus === 'live') {
+        // Session exists and bridge is running - just show server info
+        if (options.outputMode === 'human') {
+          console.log(formatSuccess(`Session ${name} is already active`));
+        }
+        await showServerInfo(name, { ...options, hideTarget: false });
+        return;
+      }
+
+      // Bridge is dead or expired - reconnect with warning
+      if (options.outputMode === 'human') {
+        console.log(chalk.yellow(`Session ${name} exists but bridge is ${bridgeStatus}, reconnecting...`));
+      }
+
+      // Clean up old bridge resources before reconnecting
+      try {
+        await stopBridge(name);
+      } catch {
+        // Bridge may already be stopped
+      }
     }
 
     // Resolve target to transport config
@@ -71,18 +91,34 @@ export async function connectSession(
       }
     }
 
-    // Create initial session record (without pid/socketPath - those come from startBridge)
-    const sessionData: Parameters<typeof saveSession>[1] = {
-      target: transportConfig.url || transportConfig.command || 'unknown',
-      transport: transportConfig.type,
-      createdAt: new Date().toISOString(),
-      headerCount: Object.keys(headers || {}).length,
-    };
-    if (options.profile) {
-      sessionData.profileName = options.profile;
+    // Create or update session record (without pid/socketPath - those come from startBridge)
+    const isReconnect = !!existingSession;
+    if (isReconnect) {
+      // Update existing session, preserving createdAt
+      const updateData: Parameters<typeof updateSession>[1] = {
+        target: transportConfig.url || transportConfig.command || 'unknown',
+        transport: transportConfig.type,
+        headerCount: Object.keys(headers || {}).length,
+      };
+      if (options.profile) {
+        updateData.profileName = options.profile;
+      }
+      await updateSession(name, updateData);
+      logger.debug(`Session record updated for reconnect: ${name}`);
+    } else {
+      // Create new session
+      const sessionData: Parameters<typeof saveSession>[1] = {
+        target: transportConfig.url || transportConfig.command || 'unknown',
+        transport: transportConfig.type,
+        createdAt: new Date().toISOString(),
+        headerCount: Object.keys(headers || {}).length,
+      };
+      if (options.profile) {
+        sessionData.profileName = options.profile;
+      }
+      await saveSession(name, sessionData);
+      logger.debug(`Initial session record created for: ${name}`);
     }
-    await saveSession(name, sessionData);
-    logger.debug(`Initial session record created for: ${name}`);
 
     // Start bridge process (handles spawning and IPC credential delivery)
     try {
@@ -104,23 +140,26 @@ export async function connectSession(
       await updateSession(name, { pid, socketPath });
       logger.debug(`Session ${name} updated with bridge PID: ${pid}`);
     } catch (error) {
-      // Clean up session record and headers on bridge start failure
+      // Clean up on bridge start failure
       logger.debug(`Bridge start failed, cleaning up session ${name}`);
-      try {
-        await deleteSession(name);
-      } catch {
-        // Ignore cleanup errors
-      }
-      try {
-        await removeKeychainSessionHeaders(name);
-      } catch {
-        // Ignore cleanup errors
+      if (!isReconnect) {
+        // Only delete session record for new sessions (not reconnects)
+        try {
+          await deleteSession(name);
+        } catch {
+          // Ignore cleanup errors
+        }
+        try {
+          await removeKeychainSessionHeaders(name);
+        } catch {
+          // Ignore cleanup errors
+        }
       }
       throw error;
     }
 
     // Success! Show server info like when running "mcpc <target>"
-    console.log(formatSuccess(`Session ${name} created`));
+    console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
 
     // Display server info via the new session
     await showServerInfo(name, {
