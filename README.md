@@ -1,7 +1,7 @@
-# mcpc: an MCP command-line client
+# mcpc: Universal MCP command-line client
 
-`mcpc` is a universal command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
-which maps MCP to intuitive CLI commands for shell access, scripts, and AI coding agents.
+`mcpc` is a CLI for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
+which maps MCP requests to intuitive commands for shell access, scripts, and AI coding agents.
 
 `mcpc` can connect to any MCP server over Streamable HTTP or stdio transports,
 securely login via OAuth credentials and store credentials,
@@ -759,33 +759,23 @@ mcpc(@apify)> tools-call search-actors --args query="tiktok scraper"
 mcpc(@apify)> exit
 ```
 
-## Implementation status
+## Claude Code skill
 
-**Note:** This README describes the target architecture. `mcpc` is under active development and not all features are currently implemented.
+For AI coding agents using [Claude Code](https://claude.ai/code), we provide a skill that teaches Claude how to use mcpc effectively.
 
-### What's implemented
+**Installation:**
+```bash
+mkdir -p ~/.claude/skills/mcpc
+cp claude-skill/SKILL.md ~/.claude/skills/mcpc/
+```
 
-**✅ Core functionality:**
-- MCP protocol client (wrapper around official SDK)
-- CLI structure with Commander.js
-- All MCP command handlers fully functional
-- Output formatting (human-readable and JSON modes)
-- Argument parsing (inline JSON, key=value, key:=json, `--args-file`)
-- Error handling with exit codes
-- Verbose logging
-- Bridge process with persistent sessions
-- Unix socket IPC between CLI and bridge
-- Session management with file locking
-- Environment variables (MCPC_HOME_DIR, MCPC_VERBOSE, MCPC_JSON)
-- Caching with TTL and notification-based invalidation
-- Server notification handling (`list_changed` events)
-- Per-session bridge logs with rotation
-- Interactive shell: REPL features (history, tab completion)
-- Config file: Full stdio transport support for local packages
-- **Authentication**: OAuth profiles, keychain storage (structure exists, flow not complete)
-- **Error recovery**: Bridge crash recovery, automatic reconnection
+Then restart Claude Code. The skill enables Claude to interact with MCP servers via mcpc commands instead of function calling, which is more efficient and uses fewer tokens.
 
-## Implementation details
+See [`claude-skill/README.md`](./claude-skill/README.md) for details.
+
+## Implementation
+
+`mcpc` is under active development and some things might not work 100% yet. You have been warned.
 
 ### Design principles
 
@@ -800,7 +790,7 @@ mcpc(@apify)> exit
 ### Architecture overview
 
 ```
-TODO: improve interaction diagram
+TODO: add interaction diagram
 mcpc ──> cli ├──> bridge (UNIX socket) ──> MCP server (stdio/HTTP)
              ├──> MCP server (stdio/HTTP)
 
@@ -814,7 +804,6 @@ mcpc (single package)
 │   ├── mcpc            # Main CLI executable
 │   └── mcpc-bridge     # Bridge process executable
 ```
-
 
 ### Core module (runtime-agnostic)
 
