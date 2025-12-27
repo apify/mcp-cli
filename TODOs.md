@@ -2,24 +2,9 @@
 # TODOs
 
 
-Now a bigger change. When running "mcpc mcp.apify.com connect --session @test10", we show just basic connection info. Instead, let's show
-the full server info and instructions, like when running just "mcpc mcp.apify.com" or "mcpc @test10"
-When we do this, we can stop prefetching the list of tools, as it's not needed, and show just capabilities, instructions, ... basically only info from the initial MCP handshake.
-With this in place, we can remove local caching of tool-list and similar commands altogether, and just enable SDK's autoRefresh feature.
-When user runs tools-list, we'll call the server to get up-to-date tool list, still handling cursors automatically.
-This new design will be more consistent with how MCP works.
-
-
-
-- Ensure we show tool annotations and tasks in text mode too
-
-
 - add "mcpc --reset-all/clean-all/clean:a,b,c" ? command to clean up sessions, kill bridges, etc. It should keep shell-history and logs though.
   - add command to restart bridge process
-
-- "mcpc @apify-docs connect" still doesn't work: it should restart the session, or do nothing if it's already connected.
--  "mcpc @apify-docs connect --session @apify-docs" should auto restart the session
-
+  
 - "mcpc" - quickly probe the bridge for status and print it: expired (already known), crashed (if pid is not running), live (pid running, not expired)
 
 
@@ -46,7 +31,9 @@ This new design will be more consistent with how MCP works.
 ## Cosmetic
 (once tests are in place, this should be easy)
 
-- rename "connect --session" to just "session"
+- rename "connect --session" to just "session". If you use it and session is dead, just reconnect it and print warning.
+  Better to do some work than none. Add "restart" command to explicitely restart session (no warning then)
+
 
 - nit: consistent good server and session info, on server/session info, print also auth info
   - [Using session: apify-docs] => change to show server + transport + version? + auth info!!!

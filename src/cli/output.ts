@@ -83,6 +83,35 @@ export function formatHuman(data: unknown): string {
 }
 
 /**
+ * Format tool annotations as a compact string
+ */
+function formatToolAnnotations(annotations: Tool['annotations']): string | null {
+  if (!annotations) return null;
+
+  const parts: string[] = [];
+
+  // Add title if different from name (will be shown separately)
+  // readOnlyHint and destructiveHint
+  if (annotations.readOnlyHint === true) {
+    parts.push('read-only');
+  } else if (annotations.destructiveHint === true) {
+    parts.push(chalk.red('destructive'));
+  }
+
+  // idempotentHint
+  if (annotations.idempotentHint === true) {
+    parts.push('idempotent');
+  }
+
+  // openWorldHint
+  if (annotations.openWorldHint === true) {
+    parts.push('open-world');
+  }
+
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
+/**
  * Format a list of tools as Markdown
  */
 export function formatTools(tools: Tool[]): string {
@@ -91,7 +120,16 @@ export function formatTools(tools: Tool[]): string {
   lines.push(`# Tools`);
   lines.push('');
   for (const tool of tools) {
-    lines.push(`## \`${tool.name}\``);
+    // Use title from annotations if available, otherwise use name
+    const title = tool.annotations?.title || tool.name;
+    lines.push(`## \`${tool.name}\`${title !== tool.name ? ` - ${title}` : ''}`);
+
+    // Show annotations hints
+    const annotationsStr = formatToolAnnotations(tool.annotations);
+    if (annotationsStr) {
+      lines.push(chalk.gray(`[${annotationsStr}]`));
+    }
+
     if (tool.description) {
       lines.push(tool.description);
     } else {
@@ -109,10 +147,33 @@ export function formatTools(tools: Tool[]): string {
 export function formatToolDetail(tool: Tool): string {
   const lines: string[] = [];
 
-  lines.push(`# Tool \`${tool.name}\``);
+  // Use title from annotations if available
+  const title = tool.annotations?.title || tool.name;
+  lines.push(`# Tool \`${tool.name}\`${title !== tool.name ? ` - ${title}` : ''}`);
   lines.push('');
 
-  // TODO: show annotations and other metadata
+  // Show annotations
+  if (tool.annotations) {
+    const annotationLines: string[] = [];
+    if (tool.annotations.readOnlyHint === true) {
+      annotationLines.push('- Read-only: yes');
+    }
+    if (tool.annotations.destructiveHint === true) {
+      annotationLines.push('- ' + chalk.red('Destructive: yes'));
+    }
+    if (tool.annotations.idempotentHint === true) {
+      annotationLines.push('- Idempotent: yes');
+    }
+    if (tool.annotations.openWorldHint === true) {
+      annotationLines.push('- Open-world: yes (can access external resources)');
+    }
+    if (annotationLines.length > 0) {
+      lines.push('## Annotations');
+      lines.push(...annotationLines);
+      lines.push('');
+    }
+  }
+
   if (tool.description) {
     lines.push('## Description');
     lines.push(tool.description);

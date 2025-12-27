@@ -824,16 +824,13 @@ mcpc (single package)
 
 ### Design principles
 
-- Make `mcpc` delightful to use for **both** AI agents and humans, interactively as well in scripts:
-  - Avoid unnecessary interaction loops to reduce room for error
-  - Keep functions orthogonal - there should be just one clear way to do things
-  - Do not ask for user input (except for `shell` and `login` commands)
-  - Be clear what's happening and what to do next, especially on errors
-  - Be concise to save tokens
-  - Use colors for easy readability
-- Keep strict consistency with MCP specification and object schemas
-- Minimal dependencies, cross-platform
-- No slop!
+- Delightful for humans and AI agents alike (interactive + scripting)
+- One clear way to do things (orthogonal commands, no surprises, saving tokens)
+- Do not ask for user input (except `shell` and `login`)
+- Be forgiving, always help users make forward progress (great errors + guidance).
+- JSON strictly consistency with the MCP specification
+- Minimal and portable (few deps, cross-platform)
+- No slop.
 
 ### Core module (runtime-agnostic)
 
