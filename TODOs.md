@@ -10,7 +10,6 @@ mcpc @apify session                                                             
 error: missing required argument 'name'
 
 
-
 ## Next
 
 - nit: consistent good server and session info, on server/session info, print also auth info

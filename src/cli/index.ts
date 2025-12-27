@@ -173,8 +173,7 @@ function createProgram(): Command {
     .option(
       '--schema-mode <mode>',
       'Schema validation mode: strict, compatible (default), or ignore'
-    )
-    .option('--insecure', 'Disable SSL certificate validation');
+    );
 
   // Add examples to help
   program.addHelpText(

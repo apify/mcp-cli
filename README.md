@@ -60,8 +60,7 @@ mcpc @test shell
 
 ```bash
 mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--verbose]
-     [--schema <file>]
-     [--schema-mode <mode>] [--timeout <seconds>] [--insecure]
+     [--schema <file>] [--schema-mode <mode>] [--timeout <seconds>] 
      [--clean|--clean=sessions,logs,profiles,all]
      <target> <command...>
 
@@ -156,7 +155,6 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 - `--timeout <seconds>` - Request timeout in seconds (default: 300)
 - `--schema <file>` - Validate against expected tool/prompt schema
 - `--schema-mode <mode>` - Schema validation mode: `strict`, `compatible`, or `ignore` (default: `compatible`)
-- `--insecure` - Disable SSL certificate validation (not recommended)
 
 ## Authentication
 
@@ -690,7 +688,6 @@ This architecture ensures:
 ### Network security
 
 - HTTPS enforced for remote servers (HTTP auto-upgraded)
-- Certificate validation enabled (use `--insecure` to disable, not recommended)
 - `Origin` header validation to prevent DNS rebinding attacks
 - Local servers bind to localhost (127.0.0.1) only
 - No credentials logged even in verbose mode
