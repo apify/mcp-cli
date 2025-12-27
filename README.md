@@ -20,7 +20,7 @@ Note that `mcpc` is deterministic and does not use any LLM on its own; that's fo
 - 🔌 **Universal MCP client** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
 - 🚀 **Zero setup** - Connect to remote servers instantly with just a URL.
-- 🔧 **Full protocol support** - Tools, resources, prompts, sampling, dynamic discovery, and async notifications.
+- 🔧 **Full protocol support** - Tools, resources, prompts, dynamic discovery, and async notifications.
 - 📊 **`--json` output** - Easy integration with `jq`, scripts, and other CLI tools.
 - 🤖 **AI-friendly** - Designed for code generation and automated workflows.
 - 🔒 **Secure** - OS keychain integration for credentials, encrypted auth storage.
@@ -82,8 +82,8 @@ mcpc <target> prompts-get <prompt-name> [--args key=val key2:=json ...] [--args-
 
 mcpc <target> resources
 mcpc <target> resources-list
-mcpc <target> resources-read <uri> [-o <file>] [--max-size <bytes>]
-mcpc <target> resources-subscribe <uri> # TODO
+mcpc <target> resources-read <uri>
+mcpc <target> resources-subscribe <uri>
 mcpc <target> resources-unsubscribe <uri>
 mcpc <target> resources-templates-list
 
@@ -466,7 +466,7 @@ mcpc https://mcp.apify.com session @apify
 
 ## Logging
 
-The background bridge process logs to `~/.mcpc/bridges/mcpc-@<session-name>.log`.
+The background bridge process logs to `~/.mcpc/logs/bridge-<session-name>.log`.
 The main `mcpc` process doesn't save log files, but you can use `--verbose` flag to print all logs to stderr.
 
 MCP servers can be instructed to adjust their [logging level](https://modelcontextprotocol.io/specification/latest/server/utilities/logging)
@@ -610,7 +610,7 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
   - **Tools**: Executable functions with JSON Schema-validated arguments.
   - **Resources**: Data sources identified by URIs (e.g., `file:///path/to/file`, `https://example.com/data`), with optional subscriptions for change notifications
   - **Prompts**: Reusable message templates with customizable arguments
-  - **Completion**: Provides access to Completion API for tools and resources, and offers completions in shell mode
+  - **Completion**: Provides access to Completion API for tools and resources
 - Supports server logging settings (`logging/setLevel`) and messages (`notifications/message`), and prints them to stderr or stdout based on verbosity level.
 - Handles server notifications: progress tracking, logging, and change notifications (`notifications/tools/list_changed`, `notifications/resources/list_changed`, `notifications/prompts/list_changed`)
 - Request multiplexing: supports up to 10 concurrent requests, queues up to 100 additional requests
@@ -728,9 +728,8 @@ mcpc @apify shell
 ```
 
 **Features:**
-- Command history (saved to `~/.mcpc/history`, last 1000 commands)
-- Tab completion for commands, tool names, and resource URIs
-- Multi-line editing with arrow keys
+- Command history with arrow key navigation (saved to `~/.mcpc/history`, last 1000 commands)
+- Real-time server notifications displayed during session
 - Prompt shows session name: `mcpc(@apify)> `
 
 **Shell-specific commands:**
@@ -854,18 +853,18 @@ Implemented as a separate executable (`mcpc-bridge`) that maintains persistent c
 The main `mcpc` command provides the user interface.
 
 **CLI responsibilities:**
-- Argument parsing (using `minimist` or similar)
+- Argument parsing using Commander.js
 - Output formatting (human-readable vs `--json`)
 - Bridge lifecycle: start/connect/stop
 - Communication with bridge via socket
-- Interactive shell (REPL using `@inquirer/prompts`)
+- Interactive shell (REPL using Node.js `readline`)
 - Configuration file loading (standard MCP JSON format)
 - Credential management (OS keychain via `keytar` package)
 
 **Shell implementation:**
-- Built on `@inquirer/prompts` for input handling
-- Command history using `~/.mcpc/history`
-- Tab completion using inquirer autocomplete and MCP completion API
+- Built on Node.js `readline` module for input handling with history support
+- Command history using `~/.mcpc/history` (last 1000 commands)
+- Real-time notification display during shell sessions
 - Graceful exit handling (cleanup on Ctrl+C/Ctrl+D)
 
 ### Session lifecycle

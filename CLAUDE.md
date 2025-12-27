@@ -21,7 +21,7 @@ After all, UNIX-compatible shell script is THE most universal coding language, f
 - Universal MCP client - Works with any MCP server over Streamable HTTP or stdio
 - Persistent sessions - Keep multiple server connections alive simultaneously
 - Zero setup - Connect to remote servers instantly with just a URL
-- Full protocol support - Tools, resources, prompts, sampling, dynamic discovery, and async notifications
+- Full protocol support - Tools, resources, prompts, dynamic discovery, and async notifications
 - `--json` output - Easy integration with `jq`, scripts, and other CLI tools
 - AI-friendly - Designed for code generation and automated workflows
 - Secure - OS keychain integration for credentials, encrypted auth storage
@@ -77,6 +77,9 @@ mcpc @apify tools-call search --args query=hello limit:=10
 
 # Set logging level
 mcpc @apify logging-set-level debug
+
+# Clean up stale data
+mcpc --clean=sessions,logs
 ```
 
 ## Design Principles
@@ -144,10 +147,9 @@ mcpc/
 - Argument parsing using Commander.js
 - Output formatting: human-readable (default, with colors/tables) vs `--json` mode
 - Bridge lifecycle: start/connect/stop, auto-restart on crash
-- Interactive shell using `@inquirer/prompts` with command history (`~/.mcpc/history`, last 1000 commands)
+- Interactive shell using Node.js `readline` with command history (`~/.mcpc/history`, last 1000 commands)
 - Configuration file loading (standard MCP JSON format, compatible with Claude Desktop)
 - Credential management via OS keychain (`keytar` package)
-- Tab completion for commands, tool names, and resource URIs
 
 **CLI Command Structure:**
 - All MCP commands use hyphenated format: `tools-list`, `tools-call`, `resources-read`, etc.
@@ -268,7 +270,6 @@ mcpc/
 - **Tools**: Executable functions with JSON Schema-validated arguments
 - **Resources**: Data sources with URIs (e.g., `file:///`, `https://`), optional subscriptions for change notifications
 - **Prompts**: Reusable message templates with customizable arguments
-- **Completion**: Provides access to Completion API for tools and resources
 - **Logging**: Server-side logging level control via `logging/setLevel` request
 
 **Notifications:**
@@ -418,11 +419,12 @@ On failure, the error message includes instructions on how to login. This ensure
 8. Profile can now be used by multiple sessions
 
 **Implementation Modules:**
-- `src/lib/auth/profiles.ts` - Manage auth-profiles.json (CRUD operations)
+- `src/lib/auth/auth-profiles.ts` - Manage auth-profiles.json (CRUD operations)
 - `src/lib/auth/keychain.ts` - OS keychain wrapper (save/load/delete tokens)
 - `src/lib/auth/oauth-provider.ts` - Implements `OAuthClientProvider` from MCP SDK
 - `src/lib/auth/oauth-flow.ts` - Orchestrates interactive OAuth flow
-- `src/lib/auth/bearer.ts` - Bearer token handling (session-scoped storage)
+- `src/lib/auth/oauth-token-manager.ts` - Token validation and refresh
+- `src/lib/auth/token-refresh.ts` - Token refresh logic with keychain persistence
 
 **Session-to-Profile Relationship:**
 ```json
@@ -476,10 +478,11 @@ All state files are stored in `~/.mcpc/` directory (unless overridden by `MCPC_H
 - `@modelcontextprotocol/sdk` - Official MCP SDK for client/server implementation
 - `commander` - Command-line argument parsing and CLI framework
 - `chalk` - Terminal string styling and colors
-- `cli-table3` - ASCII table formatting for human-readable output
-- `@inquirer/prompts` - Interactive shell (planned)
-- `keytar` - OS keychain integration (planned)
-- `proper-lockfile` - File locking for concurrent access (planned)
+- `keytar` - OS keychain integration for secure credential storage
+- `proper-lockfile` - File locking for concurrent session access
+- `@inquirer/input`, `@inquirer/select` - Interactive prompts for login flows
+- `ora` - Spinner animations for progress indication
+- `uuid` - Session ID generation
 
 **Minimal dependencies approach:** Core module uses native APIs (`fetch`, process APIs) to support both Node.js and Bun.
 
@@ -562,8 +565,8 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
   - `prompts-list`, `prompts-get`
   - `logging-set-level`
   - `ping` (with roundtrip timing)
-  - `connect`, `close`, `help` (session management)
-  - `login`, `logout` (authentication management - structure in place)
+  - `session`, `close`, `help` (session management)
+  - `login`, `logout` (authentication management)
 - **Bridge Process**: Persistent MCP connections with Unix domain socket IPC
 - **Session Management**: Complete `sessions.json` persistence with file locking
 - **IPC Layer**: Unix socket communication between CLI and bridge (BridgeClient, SessionClient)
@@ -592,8 +595,10 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
   - Integration with session management
 - **Keychain Integration**: OS keychain via `keytar` for secure credential storage
 
-### 🚧 In Progress / TODO
-- **Package Resolution**: Find and run local MCP packages (DEFERRED as nice-to-have)
+### 🚧 Deferred / Nice-to-have
+- **Package Resolution**: Find and run local MCP packages automatically
+- **Tab Completion**: Shell completions for commands, tool names, and resource URIs
+- **Resource File Output**: `-o <file>` flag for `resources-read` command
 
 ### 📋 Implementation Approach
 

@@ -41,9 +41,10 @@ Visual examples:
   - "mcpc https://mcp.sentry.dev/mcp" with an unknown sever => should hint to use "login"
   - Handle MCP errors by failing the command tool, e.g. invalid tool name..
 
-- implement resources-subscribe/resources-unsubscribe command properly
+- implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
 - > # TODO: automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
 
+- Rename auth-profiles.json to just profiles.json, for consistency
 
 ## Security
 - Double-check the MCP security guidelines
