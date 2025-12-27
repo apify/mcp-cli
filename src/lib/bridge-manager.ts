@@ -188,13 +188,13 @@ export async function stopBridge(sessionName: string): Promise<void> {
     } catch (error) {
       logger.warn('Error killing bridge process:', error);
     }
+
+    logger.info(`Bridge stopped for ${sessionName}`);
   }
 
   // Note: Session record and headers are NOT deleted here.
   // They are preserved for failover scenarios (bridge restart).
   // Full cleanup happens in closeSession().
-
-  logger.info(`Bridge stopped for session: ${sessionName}`);
 }
 
 /**
@@ -205,7 +205,7 @@ export async function stopBridge(sessionName: string): Promise<void> {
  * retrieved here and passed to startBridge() which sends them via IPC.
  */
 export async function restartBridge(sessionName: string): Promise<StartBridgeResult> {
-  logger.info(`Trying to restart bridge for ${sessionName}...`);
+  logger.debug(`Trying to restart bridge for ${sessionName}...`);
 
   const session = await getSession(sessionName);
 

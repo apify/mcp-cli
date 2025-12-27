@@ -166,7 +166,7 @@ export async function updateSession(
 
     await saveSessionsInternal(storage);
 
-    logger.info(`Session ${sessionName} updated`);
+    logger.debug(`Session ${sessionName} updated`);
   }, SESSIONS_DEFAULT_CONTENT);
 }
 

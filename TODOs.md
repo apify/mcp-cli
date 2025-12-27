@@ -2,28 +2,21 @@
 # TODOs
 
 
-- How about doing skipping "connect" keyword altogether?:
-  "mcpc mcp.apify.com [--session|session|connect] @test6" 
-  -> would establish session @test6, and print server info
-  -> consistent with "mcpc mcp.apify.com"
-
 - Ensure we show tool annotations and tasks in text mode too
 - Revise the caching - is it needed, why not use SDK autoRefresh? 
 
 - add "mcpc --reset-all/clean-all/clean:a,b,c" ? command to clean up sessions, kill bridges, etc. It should keep shell-history and logs though.
   - add command to restart bridge process
 
-
 - "mcpc @apify-docs connect" still doesn't work: it should restart the session, or do nothing if it's already connected.
 -  "mcpc @apify-docs connect --session @apify-docs" should auto restart the session
 
-
-- The bridge and socket management is flakey, we can do better - see TODOs there
-
 - "mcpc" - quickly probe the bridge for status and print it: expired (already known), crashed (if pid is not running), live (pid running, not expired)
 
+
 ## Cosmetic
-- nit: on server/session info, print also auth info
+
+- nit: consistent good server and session info, on server/session info, print also auth info
   - [Using session: apify-docs] => change to show server + transport + version? + auth info!!!
     Active MCP sessions:
     @fs → npx (stdio) --- show also args instead of just "npx"
@@ -75,3 +68,5 @@
   - Explain this is useful for AI sandboxing!
 - Impelled shell completions (e.g. "mcpc @a...")
 - nit: Nicer OAuth flow finish web page, add Apify example there.
+
+- do we really need --session? It's only used only in one command, why not skip it altogether ...
