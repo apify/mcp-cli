@@ -7,7 +7,7 @@
 
 import { createServer, type Server as NetServer, type Socket } from 'net';
 import { unlink } from 'fs/promises';
-import { createMcpClient } from '../core/index.js';
+import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
 import type { McpClient } from '../core/index.js';
 import type { TransportConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
 import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
@@ -18,6 +18,7 @@ import type { AuthCredentials } from '../lib/types.js';
 import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { OAuthClientMetadata, OAuthClientInformationMixed, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
+import type { Tool, Resource, Prompt } from '@modelcontextprotocol/sdk/types.js';
 import packageJson from '../../package.json' with { type: 'json' };
 
 // Keepalive ping interval in milliseconds (30 seconds)
@@ -362,7 +363,7 @@ class BridgeProcess {
     // Get transport config with fresh auth token if using auth profile
     const transport = await this.updateTransportAuth();
 
-    const clientConfig = {
+    const clientConfig: CreateMcpClientOptions = {
       clientInfo: { name: 'mcpc', version: packageJson.version },
       transport,
       capabilities: {
@@ -374,24 +375,24 @@ class BridgeProcess {
       listChanged: {
         tools: {
           autoRefresh: true, // Let SDK handle automatic refresh
-          onChanged: () => {
-            logger.debug('Tools list changed');
+          onChanged: (error: Error | null, tools: Tool[] | null) => {
+            logger.debug('Tools list changed', { error, count: tools?.length });
             // Broadcast notification to all connected clients
             this.broadcastNotification('tools/list_changed');
           },
         },
         resources: {
           autoRefresh: true,
-          onChanged: () => {
-            logger.debug('Resources list changed');
+          onChanged: (error: Error | null, resources: Resource[] | null) => {
+            logger.debug('Resources list changed', { error, count: resources?.length });
             // Broadcast notification to all connected clients
             this.broadcastNotification('resources/list_changed');
           },
         },
         prompts: {
           autoRefresh: true,
-          onChanged: () => {
-            logger.debug('Prompts list changed');
+          onChanged: (error: Error | null, prompts: Prompt[] | null) => {
+            logger.debug('Prompts list changed', { error, count: prompts?.length });
             // Broadcast notification to all connected clients
             this.broadcastNotification('prompts/list_changed');
           },
