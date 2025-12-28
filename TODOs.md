@@ -15,6 +15,7 @@ mcpc @apify session                                                             
 error: missing required argument 'name'
 
 
+
 ## Next
 
 - serverUrl in profiles => canonicalName
@@ -26,6 +27,8 @@ error: missing required argument 'name'
     Active MCP sessions:
     @fs → npx (stdio) --- show also args instead of just "npx"
   - print PID of bridge process
+
+- If session command fails, suggest the user to check the bridge log file (print its location)
 
 - rename headerCount to transportHeaderCount
 

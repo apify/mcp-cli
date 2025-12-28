@@ -314,9 +314,22 @@ class BridgeProcess {
         // Signal that MCP client is ready (unblocks pending requests)
         this.mcpClientReadyResolver();
       } catch (error) {
-        // Signal that MCP connection failed (rejects pending requests)
+        // Signal that MCP connection failed (rejects pending requests with actual error)
+        // Don't exit immediately - stay alive briefly so CLI can receive the error
+        logger.error('MCP connection failed, will stay alive briefly for CLI to receive error:', error);
         this.mcpClientReadyRejecter(error as Error);
-        throw error;
+
+        // Set up signal handlers so we can be killed
+        this.setupSignalHandlers();
+
+        // Stay alive for 10 seconds to allow CLI to connect and get the error
+        // Then shutdown gracefully
+        setTimeout(() => {
+          logger.info('Shutting down after MCP connection failure');
+          this.shutdown().catch(() => process.exit(1));
+        }, 10_000);
+
+        return; // Don't continue with keepalive etc
       }
 
       // 6. Start keepalive ping

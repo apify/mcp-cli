@@ -330,28 +330,31 @@ async function sendAuthCredentialsToBridge(
 }
 
 /**
+ * Result of bridge health check
+ */
+interface BridgeHealthResult {
+  healthy: boolean;
+  error?: Error;
+}
+
+/**
  * Test if bridge is responsive by calling getServerInfo
  * This blocks until MCP client is connected, then returns server info
  *
  * @param socketPath - Path to bridge's Unix socket
- * @returns true if bridge responds, false on connection error
- * @throws Error if MCP connection failed (auth error, network error, etc.)
+ * @returns Health check result with error details if unhealthy
  */
-async function checkBridgeHealth(socketPath: string): Promise<boolean> {
+async function checkBridgeHealth(socketPath: string): Promise<BridgeHealthResult> {
   const client = new BridgeClient(socketPath);
   try {
     await client.connect();
     // getServerInfo blocks until MCP client is connected, then returns info
     // If MCP connection fails, the bridge will return an error via IPC
     await client.request('getServerInfo');
-    return true;
+    return { healthy: true };
   } catch (error) {
-    // NetworkError means bridge socket not reachable (process dead or not ready)
-    if (error instanceof NetworkError) {
-      return false;
-    }
-    // Other errors (auth, server errors) should be propagated to caller
-    throw error;
+    // Return error details so caller can provide informative message
+    return { healthy: false, error: error as Error };
   } finally {
     await client.close();
   }
@@ -397,17 +400,18 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
 
   if (processAlive) {
     // Process alive, try getServerInfo (blocks until MCP connected)
-    try {
-      const isHealthy = await checkBridgeHealth(socketPath);
-      if (isHealthy) {
-        logger.debug(`Bridge for ${sessionName} is healthy`);
-        return socketPath;
-      }
+    const result = await checkBridgeHealth(socketPath);
+    if (result.healthy) {
+      logger.debug(`Bridge for ${sessionName} is healthy`);
+      return socketPath;
+    }
+    // Not healthy - check if it's a connection issue vs MCP error
+    if (result.error instanceof NetworkError) {
       logger.warn(`Bridge process alive but socket not responding for ${sessionName}`);
-    } catch (error) {
-      // MCP connection error (auth, network, etc.) - propagate with context
+    } else if (result.error) {
+      // MCP connection error (auth, server error, etc.) - propagate
       throw new ClientError(
-        `Bridge for ${sessionName} failed to connect to MCP server: ${(error as Error).message}`
+        `Bridge for ${sessionName} failed to connect to MCP server: ${result.error.message}`
       );
     }
   } else {
@@ -418,23 +422,16 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   await restartBridge(sessionName);
 
   // Try getServerInfo on restarted bridge (blocks until MCP connected)
-  try {
-    const isHealthy = await checkBridgeHealth(socketPath);
-    if (isHealthy) {
-      logger.debug(`Bridge for ${sessionName} passed health check`);
-      return socketPath;
-    }
-    // Socket not responding after restart
-    throw new ClientError(`Bridge for ${sessionName} not responding after restart`);
-  } catch (error) {
-    // If it's already a ClientError, rethrow it
-    if (error instanceof ClientError) {
-      throw error;
-    }
-    // MCP connection error - provide helpful message
-    throw new ClientError(
-      `Bridge for ${sessionName} failed to connect to MCP server: ${(error as Error).message}. ` +
-      `Check logs at ~/.mcpc/logs/bridge-${sessionName}.log for details.`
-    );
+  const result = await checkBridgeHealth(socketPath);
+  if (result.healthy) {
+    logger.debug(`Bridge for ${sessionName} passed health check`);
+    return socketPath;
   }
+
+  // Not healthy after restart - provide detailed error
+  const errorMsg = result.error?.message || 'unknown error';
+  throw new ClientError(
+    `Bridge for ${sessionName} failed after restart: ${errorMsg}. ` +
+    `Check logs at ~/.mcpc/logs/bridge-${sessionName}.log for details.`
+  );
 }
