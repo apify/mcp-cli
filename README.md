@@ -1,7 +1,7 @@
 # mcpc: Universal MCP command-line client
 
 `mcpc` is a CLI for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
-which maps MCP requests to intuitive commands for shell access, scripts, and AI coding agents.
+which maps MCP operations to intuitive commands for interactive shell use, scripts, and AI coding agents.
 
 `mcpc` can connect to any MCP server over Streamable HTTP or stdio transports,
 securely login via OAuth credentials and store credentials,
@@ -11,16 +11,16 @@ It supports all major MCP features, including tools, resources, prompts, asynchr
 `mcpc` is handy for manual testing of MCP servers, scripting,
 and AI coding agents to use MCP in ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp),
 for better accuracy and lower token compared to traditional tool function calling.
-After all, UNIX-compatible shell script is THE most universal coding language, for both people and LLMs.
+After all, UNIX-compatible shell script is THE most universal coding language, for people and LLMs alike.
 
-Note that `mcpc` is deterministic and does not use any LLM on its own; that's for the higher layer to do.
+Note that `mcpc` is deterministic and does not use any LLM on its own; that's left for the higher layer.
 
 ## Table of contents
 
 TODO: Simplify README - there are too many top-level sections, and then show just the second level ones
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN "npm run build:toc" TO UPDATE -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Features](#features)
 - [Install](#install)
@@ -61,7 +61,11 @@ TODO: Simplify README - there are too many top-level sections, and then show jus
   - [Retry strategy](#retry-strategy)
 - [Interactive shell](#interactive-shell)
 - [Claude Code skill](#claude-code-skill)
-- [Implementation](#implementation)
+- [Troubleshooting](#troubleshooting)
+  - [Common issues](#common-issues)
+  - [Debug mode](#debug-mode)
+  - [Logs](#logs)
+- [Development](#development)
   - [Design principles](#design-principles)
   - [Architecture overview](#architecture-overview)
   - [Core module (runtime-agnostic)](#core-module-runtime-agnostic)
@@ -70,10 +74,6 @@ TODO: Simplify README - there are too many top-level sections, and then show jus
   - [Session lifecycle](#session-lifecycle)
   - [Error recovery](#error-recovery)
 - [Testing strategy](#testing-strategy)
-- [Troubleshooting](#troubleshooting)
-  - [Common issues](#common-issues)
-  - [Debug mode](#debug-mode)
-  - [Logs](#logs)
 - [Contributing](#contributing)
   - [Development setup](#development-setup)
   - [Release process](#release-process)
@@ -855,7 +855,49 @@ Then restart Claude Code. The skill enables Claude to interact with MCP servers 
 
 See [`claude-skill/README.md`](./claude-skill/README.md) for details.
 
-## Implementation
+
+## Troubleshooting
+
+### Common issues
+
+**"Cannot connect to bridge"**
+- Bridge may have crashed. Try: `mcpc <server> session @<session-name>`
+- Check bridge is running: `ps aux | grep -e 'mcpc-bridge' -e '[m]cpc/dist/bridge'`
+- Check socket exists: `ls ~/.mcpc/bridges/`
+
+**"Session not found"**
+- Session may have expired. Create new session: `mcpc <target> session @<session-name>`
+- List existing sessions: `mcpc`
+
+**"Authentication failed"**
+- List saved profiles: `mcpc`
+- Re-authenticate: `mcpc <server> login [--profile <name>]`
+- For bearer tokens: provide `--header "Authorization: Bearer ${TOKEN}"` again
+
+### Debug mode
+
+Enable detailed logging with `--verbose`:
+
+```bash
+mcpc --verbose @apify tools-list
+```
+
+This shows:
+- Protocol negotiation details
+- JSON-RPC request/response messages
+- Streaming events and reconnection attempts
+- Bridge communication (socket messages)
+- File locking operations
+- Prints server log messages with severity `debug`, `info`, and `notice` to standard output
+
+### Logs
+
+Bridge processes log to:
+- `~/.mcpc/logs/bridge-<session-name>.log`
+
+Log rotation: Keep last 10MB per session, max 5 files.
+
+## Development
 
 `mcpc` is under active development and some things might not work 100% yet. You have been warned.
 
@@ -863,9 +905,10 @@ See [`claude-skill/README.md`](./claude-skill/README.md) for details.
 
 - Delightful for humans and AI agents alike (interactive + scripting)
 - One clear way to do things (orthogonal commands, no surprises, saving tokens)
+- Avoid unnecessary interaction loops, provide sufficient context, yet be concise (save tokens)
 - Do not ask for user input (except `shell` and `login`)
 - Be forgiving, always help users make forward progress (great errors + guidance)
-- JSON strictly consistency with the MCP specification
+- JSON mode strictly consistent with the [MCP specification](https://modelcontextprotocol.io/specification/latest)
 - Minimal and portable (few deps, cross-platform)
 - No slop!
 
@@ -1022,47 +1065,6 @@ Later...
 **Test utilities:**
 - `examples/test-server/` - Reference MCP server for testing
 - `test/mock-keychain.ts` - Mock OS keychain for testing
-
-## Troubleshooting
-
-### Common issues
-
-**"Cannot connect to bridge"**
-- Bridge may have crashed. Try: `mcpc <server> session @<session-name>`
-- Check bridge is running: `ps aux | grep -e 'mcpc-bridge' -e '[m]cpc/dist/bridge'`
-- Check socket exists: `ls ~/.mcpc/bridges/`
-
-**"Session not found"**
-- Session may have expired. Create new session: `mcpc <target> session @<session-name>`
-- List existing sessions: `mcpc`
-
-**"Authentication failed"**
-- List saved profiles: `mcpc`
-- Re-authenticate: `mcpc <server> login [--profile <name>]`
-- For bearer tokens: provide `--header "Authorization: Bearer ${TOKEN}"` again
-
-### Debug mode
-
-Enable detailed logging with `--verbose`:
-
-```bash
-mcpc --verbose @apify tools-list
-```
-
-This shows:
-- Protocol negotiation details
-- JSON-RPC request/response messages
-- Streaming events and reconnection attempts
-- Bridge communication (socket messages)
-- File locking operations
-- Prints server log messages with severity `debug`, `info`, and `notice` to standard output
-
-### Logs
-
-Bridge processes log to:
-- `~/.mcpc/logs/bridge-<session-name>.log`
-
-Log rotation: Keep last 10MB per session, max 5 files.
 
 ## Contributing
 
