@@ -229,14 +229,15 @@ export async function consolidateSessions(cleanExpired: boolean): Promise<Consol
 
   await withFileLock(filePath, async () => {
     const storage = await loadSessionsInternal();
-    let someMissing = false;
+    let hasChanges = false;
 
     // Review each session
     for (const [name, session] of Object.entries(storage.sessions)) {
       if (!session) {
         logger.debug(`Missing record for session: ${name}`);
-        someMissing = true;
+        hasChanges = true;
         delete storage.sessions[name];
+        continue;
       }
 
       // If session expired → remove it
@@ -244,6 +245,7 @@ export async function consolidateSessions(cleanExpired: boolean): Promise<Consol
         logger.debug(`Removing expired session: ${name}`);
         delete storage.sessions[name];
         result.expiredSessions++;
+        hasChanges = true;
 
         // Delete headers from keychain (if any)
         try {
@@ -267,21 +269,25 @@ export async function consolidateSessions(cleanExpired: boolean): Promise<Consol
         continue;
       }
 
-      // Check bridge status
-      if (!session.pid) {
-        continue;
-      }
-      if (session.status !== 'dead' && !isProcessAlive(session.pid)) {
-        // Bridge is dead → clear pid and mark as dead
-        logger.debug(`Clearing dead bridge info for session: ${name} (PID: ${session.pid})`);
+      // Check bridge status - always remove pid if process is not alive
+      if (session.pid && !isProcessAlive(session.pid)) {
+        logger.debug(`Clearing dead bridge PID for session: ${name} (PID: ${session.pid})`);
         delete session.pid;
+        hasChanges = true;
+        if (session.status !== 'dead') {
+          session.status = 'dead';
+          result.deadBridges++;
+        }
+      } else if (!session.pid && session.status !== 'dead') {
+        // No pid but not marked dead yet
         session.status = 'dead';
         result.deadBridges++;
+        hasChanges = true;
       }
     }
 
     // Save updated sessions
-    if (someMissing || result.deadBridges > 0 || result.expiredSessions > 0) {
+    if (hasChanges) {
       await saveSessionsInternal(storage);
     }
 
