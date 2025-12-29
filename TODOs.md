@@ -5,11 +5,6 @@
 ## Bugs
 - Seems calling invalid/unknown MCP command in shell (perhaps also normally) causes the bridge to be flagged as expired
 
-- reconnection doesn't work
-mcpc @apify session                                                                                                        1 ✘
-error: missing required argument 'name'
-
-
 
 ## Next
 
@@ -23,10 +18,7 @@ error: missing required argument 'name'
     @fs → npx (stdio) --- show also args instead of just "npx"
   - print PID of bridge process
 
-add "mcpc @test kill / restart" ?
-
-- rename headerCount to transportHeaderCount
-
+  
 Visual examples:
 
     Xxx/
@@ -62,6 +54,8 @@ BIG: We need to decide whether to show Markdown-ish or not
 
 - implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
 - > # TODO: automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
+
+
   
 ## Security
 - Double-check the MCP security guidelines
@@ -69,6 +63,9 @@ BIG: We need to decide whether to show Markdown-ish or not
 - Independent review of OAuth implementation
 
 ## Later
+
+- Consider implementing "mcpc @apify session" to reconnect - maybe "restart" is better
+  add "mcpc @test kill / restart" ?
 
 - nit: Colorize output, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
   -  warnings could be orange, errors red
