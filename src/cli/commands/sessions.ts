@@ -272,7 +272,10 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
     } else {
       console.log('Authentication profiles:');
       for (const profile of profiles) {
-        console.log(`  ${profile.name} → ${getServerHost(profile.serverUrl)} (OAuth)`);
+        // Show user info if available (email preferred, fallback to name)
+        const userInfo = profile.userEmail || profile.userName;
+        const userSuffix = userInfo ? ` - ${userInfo}` : '';
+        console.log(`  ${profile.name} → ${getServerHost(profile.serverUrl)}${userSuffix}`);
       }
     }
   }

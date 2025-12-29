@@ -110,6 +110,7 @@ BIG: We need to decide whether to show Markdown-ish or not
   - Test auth - if no profile available and server requires OAuth, we need to fail with info what to do! e.g. "mcpc https://mcp.sentry.dev/mcp --verbose"
   - Test server session aborting - if session is aborted by server, bridge process should exit and set session status to "expired"
   - Test auth profiles work long-term and sessions too - basically when running some tests the next day they should use old saved auths and sessions
+  - Test "mcpc @test close" and "mcpc <server> session @test" in rapid succession, it should work and use different pid (check sessions.json)
 - Can we track test coverage also this way?
 - Text copy can change, but the core texts needs to be shown in both text and JSON mode
 - Testing servers we can use:

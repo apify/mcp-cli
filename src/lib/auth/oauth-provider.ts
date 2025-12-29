@@ -33,6 +33,37 @@ import { createLogger } from '../logger.js';
 const logger = createLogger('oauth-provider');
 
 /**
+ * OIDC ID token claims (subset we care about)
+ */
+interface IdTokenClaims {
+  sub?: string; // Subject (unique user identifier)
+  email?: string;
+  name?: string;
+  preferred_username?: string;
+}
+
+/**
+ * Decode JWT payload without verification (for display purposes only)
+ * ID tokens are JWTs with format: header.payload.signature
+ */
+function decodeJwtPayload(jwt: string): IdTokenClaims | undefined {
+  try {
+    const parts = jwt.split('.');
+    if (parts.length !== 3) {
+      return undefined;
+    }
+    // Decode base64url payload
+    const payload = parts[1]!;
+    const decoded = Buffer.from(payload, 'base64url').toString('utf-8');
+    return JSON.parse(decoded) as IdTokenClaims;
+  } catch {
+    // Ignore errors, this is best-effort
+    logger.debug('Failed to decode id_token payload');
+    return undefined;
+  }
+}
+
+/**
  * Options for creating an OAuthProvider
  */
 export interface OAuthProviderOptions {
@@ -241,6 +272,7 @@ export class OAuthProvider implements OAuthClientProvider {
 
   /**
    * Update auth profile metadata after saving tokens
+   * Extracts user info from OIDC id_token if available
    */
   private async updateProfileMetadata(tokens: OAuthTokens): Promise<void> {
     const now = new Date().toISOString();
@@ -263,6 +295,27 @@ export class OAuthProvider implements OAuthClientProvider {
 
     if (tokens.scope) {
       profile.scopes = tokens.scope.split(' ');
+    }
+
+    // Extract user info from OIDC id_token if present
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const idToken = (tokens as any).id_token as string | undefined;
+    if (idToken) {
+      const claims = decodeJwtPayload(idToken);
+      if (claims) {
+        logger.debug('Extracted user info from id_token');
+        if (claims.email) {
+          profile.userEmail = claims.email;
+        }
+        if (claims.name) {
+          profile.userName = claims.name;
+        } else if (claims.preferred_username) {
+          profile.userName = claims.preferred_username;
+        }
+        if (claims.sub) {
+          profile.userSubject = claims.sub;
+        }
+      }
     }
 
     await saveAuthProfile(profile);

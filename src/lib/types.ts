@@ -129,6 +129,10 @@ export interface AuthProfile {
   // OAuth metadata
   oauthIssuer: string;
   scopes?: string[];
+  // User info (from OIDC id_token, if available)
+  userEmail?: string;
+  userName?: string;
+  userSubject?: string; // 'sub' claim - unique user identifier
   // Timestamps (ISO 8601 strings)
   createdAt: string;
   authenticatedAt?: string; // Last time the token was successfully used for authentication

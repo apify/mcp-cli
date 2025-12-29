@@ -908,7 +908,7 @@ Log rotation: Keep last 10MB per session, max 5 files.
 - One clear way to do things (orthogonal commands, no surprises)
 - Do not ask for user input (except `shell` and `login`, no unexpected OAuth flows)
 - Be forgiving, always help users make progress (great errors + guidance)
-- JSON mode strictly consistent with the [MCP specification](https://modelcontextprotocol.io/specification/latest)
+- Be consistent with the [MCP specification](https://modelcontextprotocol.io/specification/latest), with `--json` strictly
 - Minimal and portable (few deps, cross-platform)
 - No slop!
 
