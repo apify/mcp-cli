@@ -307,7 +307,7 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
         if (session.transport === 'stdio') {
           authStr = chalk.dim('(stdio)');
         } else if (session.profileName) {
-          authStr = chalk.dim('(http, oauth: ') + chalk.blue(session.profileName) + chalk.dim(')');
+          authStr = chalk.dim('(http, oauth: ') + chalk.magenta(session.profileName) + chalk.dim(')');
         } else {
           authStr = chalk.dim('(http)');
         }
@@ -332,10 +332,19 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
     } else {
       console.log(chalk.bold('Authentication profiles:'));
       for (const profile of profiles) {
-        const nameStr = chalk.blue(profile.name.padEnd(12));
-        const hostStr = getServerHost(profile.serverUrl).padEnd(24);
+        const hostStr = getServerHost(profile.serverUrl);
+        const nameStr = chalk.magenta(profile.name);
         const userStr = profile.userEmail || profile.userName || '';
-        console.log(`  ${nameStr} ${hostStr} ${chalk.dim(userStr)}`);
+        const createdAgo = formatTimeAgo(profile.createdAt);
+
+        let line = `  ${hostStr} / ${nameStr}`;
+        if (userStr) {
+          line += chalk.dim(` (${userStr})`);
+        }
+        if (createdAgo) {
+          line += chalk.dim(`, ${createdAgo}`);
+        }
+        console.log(line);
       }
     }
 
