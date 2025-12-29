@@ -11,10 +11,20 @@
 
 BIG: We need to decide whether to show Markdown-ish or not
 
+- Do not use Markdown formatting
 
-- implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
-- > # TODO: automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
-  
+# MCP features
+
+- Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
+  automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
+- Add `--proxy [HOST:]PORT` feature to `connect` command to enable MCP proxy:
+  - `--proxy-bearer-token X` to require auth token for better security
+  - `--proxy-capabilities tools:TOOL_NAME,TOOL_NAME2,...,prompts[:...],...` to limit access to selected MCP features and tools
+    (what if tools have ":" or "," in their names?)
+    In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
+  - Explain this is useful for AI sandboxing!
+- Add support for MCP elicitations, and potentially for sampling (e.g. via shell interface?)
+ 
   
 ## Security
 - Double-check the MCP security guidelines
@@ -23,21 +33,12 @@ BIG: We need to decide whether to show Markdown-ish or not
 ## Later
 
 
-- Implement "mcpc @session restart" 
+- Implement "mcpc @session restart" .. and how about "mcpc <server> connect @session" ?
 
 - nit: Colorize output, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
   -  warnings could be orange, errors red
 - nit: Cooler OAuth flow finish web page with CSS animation, add Apify example there, show mcpc info. E.g. next step - check Apify rather than close
-
-- Add `--proxy [HOST:]PORT` feature to `connect` command to enable MCP proxy:
-  - `--proxy-bearer-token X` to require auth token for better security
-  - `--proxy-capabilities tools:TOOL_NAME,TOOL_NAME2,...,prompts[:...],...` to limit access to selected MCP features and tools
-    (what if tools have ":" or "," in their names?)
-    In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
-  - Explain this is useful for AI sandboxing!
-
 - For auth profiles, fetch the detailed user info via http, ensure the info is up-to-date
-- Add support for MCP elicitations, and potentially for sampling (e.g. via shell interface?)
 
 - audit that on every command, we print next steps as examples
 - add more shortcuts, e.g. --profile => -p

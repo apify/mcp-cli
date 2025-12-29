@@ -217,7 +217,7 @@ export interface CommandOptions {
   headers?: string[];
   timeout?: number;
   verbose?: boolean;
-  hideTarget?: boolean; // Suppress "[Using session: @name]" prefix (used in interactive shell)
+  hideTarget?: boolean; // Suppress session info prefix (used in interactive shell)
 }
 
 /**

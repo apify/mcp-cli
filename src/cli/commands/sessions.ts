@@ -3,7 +3,7 @@
  */
 
 import { OutputMode, isValidSessionName, validateProfileName, isProcessAlive, getServerHost } from '../../lib/index.js';
-import { formatOutput, formatSuccess, formatError } from '../output.js';
+import { formatOutput, formatSuccess, formatError, formatSessionLine } from '../output.js';
 import { listAuthProfiles } from '../../lib/auth/profiles.js';
 import {
   sessionExists,
@@ -182,7 +182,7 @@ export async function connectSession(
     // Display server info via the new session
     await showServerInfo(name, {
       ...options,
-      hideTarget: false, // Show session name prefix
+      hideTarget: false, // Show session info prefix
     });
   } catch (error) {
     if (options.outputMode === 'human') {
@@ -255,14 +255,6 @@ function formatTimeAgo(isoDate: string | undefined): string {
 }
 
 /**
- * Truncate string with ellipsis, if longer than +3 chars maxLen to avoid weird cutoffs
- */
-function truncateishStr(str: string, maxLen: number): string {
-  if (str.length <= maxLen + 3) return str;
-  return str.substring(0, maxLen - 1) + '…';
-}
-
-/**
  * List active sessions and authentication profiles
  * Consolidates session state first (cleans up dead bridges, removes expired sessions)
  */
@@ -299,34 +291,6 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
         const status = getBridgeStatus(session);
         const { dot, text } = formatBridgeStatus(status);
 
-        // Format session name (cyan)
-        const nameStr = chalk.cyan(session.name);
-
-        // Format target (show host for HTTP, command + args for stdio)
-        let target: string;
-        if (session.transport === 'http') {
-          target = getServerHost(session.target);
-        } else {
-          // For stdio: show command + truncated args
-          target = session.target;
-          const args = session.stdioArgs;
-          if (args && args.length > 0) {
-            const argsStr = args.join(' ');
-            target += ' ' + argsStr;
-          }
-        }
-        const targetStr = truncateishStr(target, 80);
-
-        // Format transport/auth column
-        let authStr: string;
-        if (session.transport === 'stdio') {
-          authStr = chalk.dim('(stdio)');
-        } else if (session.profileName) {
-          authStr = chalk.dim('(http, oauth: ') + chalk.magenta(session.profileName) + chalk.dim(')');
-        } else {
-          authStr = chalk.dim('(http)');
-        }
-
         // Format status with time ago info (only show if not live or last seen > 5 min ago)
         let statusStr = `${dot} ${text}`;
         if (session.lastSeenAt) {
@@ -340,7 +304,7 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
           }
         }
 
-        console.log(`  ${nameStr} → ${targetStr}  ${authStr}  ${statusStr}`);
+        console.log(`  ${formatSessionLine(session)} ${statusStr}`);
       }
     }
 

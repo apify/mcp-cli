@@ -194,7 +194,7 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
   // Build command options
   const options: CommandOptions = {
     outputMode: 'human' as OutputMode,
-    hideTarget: true, // Don't show "[Using session: @name]" in shell
+    hideTarget: true, // Don't show session info in shell
   };
 
   try {

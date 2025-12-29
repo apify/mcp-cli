@@ -326,7 +326,7 @@ export async function withMcpClient<T>(
 
     // Log target prefix (unless hidden)
     if (options.outputMode) {
-      logTarget(target, options.outputMode, options.hideTarget);
+      await logTarget(target, options.outputMode, options.hideTarget);
     }
 
     // Use session client (SessionClient implements IMcpClient interface)
@@ -372,7 +372,7 @@ export async function withMcpClient<T>(
 
     // Log target prefix (unless hidden)
     if (options.outputMode) {
-      logTarget(target, options.outputMode, options.hideTarget);
+      await logTarget(target, options.outputMode, options.hideTarget);
     }
 
     // Execute callback with connected client

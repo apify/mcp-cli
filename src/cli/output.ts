@@ -7,8 +7,10 @@
 
 import chalk from 'chalk';
 import type { OutputMode } from '../lib/index.js';
-import type { Tool, Resource, Prompt } from '../lib/types.js';
+import type { Tool, Resource, Prompt, SessionData } from '../lib/types.js';
 import { extractSingleTextContent } from './tool-result.js';
+import { isValidSessionName, getServerHost } from '../lib/utils.js';
+import { getSession } from '../lib/sessions.js';
 
 // Re-export for external use
 export { extractSingleTextContent } from './tool-result.js';
@@ -359,13 +361,69 @@ export function formatInfo(message: string): string {
 }
 
 /**
+ * Truncate string with ellipsis if significantly longer than maxLen
+ * Allows +3 chars slack to avoid weird cutoffs
+ */
+function truncateWithEllipsis(str: string, maxLen: number): string {
+  if (str.length <= maxLen + 3) return str;
+  return str.substring(0, maxLen - 1) + '…';
+}
+
+/**
+ * Format a session line for display (without status)
+ * Returns: "@name → target (transport)" with colors applied
+ */
+export function formatSessionLine(session: SessionData): string {
+  // Format session name (cyan)
+  const nameStr = chalk.cyan(session.name);
+
+  // Format target (show host for HTTP, command + args for stdio)
+  let target: string;
+  if (session.transport === 'http') {
+    target = getServerHost(session.target);
+  } else {
+    // For stdio: show command + args
+    target = session.target;
+    if (session.stdioArgs && session.stdioArgs.length > 0) {
+      target += ' ' + session.stdioArgs.join(' ');
+    }
+  }
+  const targetStr = truncateWithEllipsis(target, 80);
+
+  // Format transport/auth info
+  let authStr: string;
+  if (session.transport === 'stdio') {
+    authStr = chalk.dim('(stdio)');
+  } else if (session.profileName) {
+    authStr = chalk.dim('(http, oauth: ') + chalk.magenta(session.profileName) + chalk.dim(')');
+  } else {
+    authStr = chalk.dim('(http)');
+  }
+
+  return `${nameStr} → ${targetStr} ${authStr}`;
+}
+
+/**
  * Log target prefix (only in human mode)
+ * For sessions, shows formatted info like: @name → server (transport, auth)
  * @param hide - If true, suppress the output (useful in interactive shell)
  */
-export function logTarget(target: string, outputMode: OutputMode, hide = false): void {
-  if (outputMode === 'human' && !hide) {
-    console.log(chalk.blue(`[Using session: ${target}]`));
+export async function logTarget(target: string, outputMode: OutputMode, hide = false): Promise<void> {
+  if (outputMode !== 'human' || hide) {
+    return;
   }
+
+  // For session targets, show rich info
+  if (isValidSessionName(target)) {
+    const session = await getSession(target);
+    if (session) {
+      console.log(`[MCP session: ${formatSessionLine(session)}]`);
+      return;
+    }
+  }
+
+  // Fallback for non-session targets or if session not found
+  console.log(chalk.dim(`Target: ${target}`));
 }
 
 /**
