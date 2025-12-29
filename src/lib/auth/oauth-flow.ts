@@ -231,6 +231,12 @@ export async function performOAuthFlow(
   // Normalize server URL
   const normalizedServerUrl = normalizeServerUrl(serverUrl);
 
+  // Warn about OAuth over plain HTTP (except localhost)
+  const parsedUrl = new URL(normalizedServerUrl);
+  if (parsedUrl.protocol === 'http:' && parsedUrl.hostname !== 'localhost' && parsedUrl.hostname !== '127.0.0.1') {
+    console.warn('\nWarning: OAuth over plain HTTP is insecure. Only use for local development.\n');
+  }
+
   // Find available port for callback server
   const port = await findAvailablePort(8000);
   const redirectUrl = `http://localhost:${port}/callback`;
