@@ -1,67 +1,74 @@
 #!/bin/bash
 # Test: Session lifecycle (connect, use, close)
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../lib/common.sh"
+source "$(dirname "$0")/../lib/framework.sh"
+test_init "sessions/lifecycle"
 
-setup_test
-trap cleanup_test EXIT
+# Start test server
+start_test_server
 
-# Test 1: Connect to test server
-begin_test "connect creates session"
-run_mcpc "$TEST_SERVER_URL" session "$TEST_SESSION"
-assert_success $EXIT_CODE "connect should succeed"
+# Generate unique session name for this test
+SESSION=$(session_name "lifecycle")
+
+# Test: connect creates session
+test_case "connect creates session"
+run_mcpc "$TEST_SERVER_URL" session "$SESSION"
+assert_success "connect should succeed"
 assert_contains "$STDOUT" "created"
-pass
+_SESSIONS_CREATED+=("$SESSION")
+test_pass
 
-# Test 2: Session appears in list
-begin_test "session appears in list"
+# Test: session appears in list
+test_case "session appears in list"
 run_mcpc_json
-assert_success $EXIT_CODE
-assert_json "$STDOUT" ".sessions[] | select(.name == \"$TEST_SESSION\")"
-pass
+assert_success
+assert_json "$STDOUT" ".sessions[] | select(.name == \"$SESSION\")"
+test_pass
 
-# Test 3: Session status is live
-begin_test "session status is live"
+# Test: session status is live
+test_case "session status is live"
 run_mcpc_json
-session_status=$(echo "$STDOUT" | jq -r ".sessions[] | select(.name == \"$TEST_SESSION\") | .bridgeStatus")
+session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .bridgeStatus")
 assert_eq "$session_status" "live" "session should be live"
-pass
+test_pass
 
-# Test 4: Can list tools via session
-begin_test "tools-list works via session"
-run_mcpc "$TEST_SESSION" tools-list
-assert_success $EXIT_CODE
+# Test: can list tools via session
+test_case "tools-list works via session"
+run_mcpc "$SESSION" tools-list
+assert_success
 assert_contains "$STDOUT" "echo"
-pass
+test_pass
 
-# Test 5: Can call tool via session
-begin_test "tools-call works via session"
-run_mcpc "$TEST_SESSION" tools-call echo --args message="hello world"
-assert_success $EXIT_CODE
+# Test: can call tool via session
+test_case "tools-call works via session"
+run_mcpc "$SESSION" tools-call echo --args message="hello world"
+assert_success
 assert_contains "$STDOUT" "hello world"
-pass
+test_pass
 
-# Test 6: Close session
-begin_test "close removes session"
-run_mcpc "$TEST_SESSION" close
-assert_success $EXIT_CODE
+# Test: close session
+test_case "close removes session"
+run_mcpc "$SESSION" close
+assert_success
 assert_contains "$STDOUT" "closed"
-pass
+test_pass
 
-# Test 7: Session no longer in list
-begin_test "session removed from list after close"
+# Test: session no longer in list
+test_case "session removed from list after close"
 run_mcpc_json
-# Session should not exist
-if echo "$STDOUT" | jq -e ".sessions[] | select(.name == \"$TEST_SESSION\")" >/dev/null 2>&1; then
-  fail "session should not exist after close"
+if echo "$STDOUT" | jq -e ".sessions[] | select(.name == \"$SESSION\")" >/dev/null 2>&1; then
+  test_fail "session should not exist after close"
+  exit 1
 fi
-pass
+test_pass
 
-# Test 8: Using closed session fails
-begin_test "using closed session fails"
-run_mcpc "$TEST_SESSION" tools-list
-assert_failure $EXIT_CODE
-pass
+# Test: using closed session fails
+test_case "using closed session fails"
+run_mcpc "$SESSION" tools-list
+assert_failure
+test_pass
 
-print_summary
+# Remove from cleanup list since we already closed it
+_SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION}")
+
+test_done

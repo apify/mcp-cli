@@ -912,6 +912,7 @@ Log rotation: Keep last 10MB per session, max 5 files.
 - Be forgiving, always help users make progress (great errors + guidance)
 - Be consistent with the [MCP specification](https://modelcontextprotocol.io/specification/latest), with `--json` strictly
 - Minimal and portable (few deps, cross-platform)
+- Keep backwards compatibility as much as possible
 - No slop!
 
 ### Architecture overview

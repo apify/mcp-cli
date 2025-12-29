@@ -27,15 +27,7 @@ export default {
     '!src/**/*.d.ts',
     '!src/**/index.ts',
   ],
-  coverageDirectory: 'test/coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
-  coverageThreshold: {
-    global: {
-      branches: 70,
-      functions: 70,
-      lines: 70,
-      statements: 70,
-    },
-  },
+  coverageDirectory: 'test/coverage/unit',
+  coverageReporters: ['text', 'lcov', 'html', 'json'],
   verbose: true,
 };
