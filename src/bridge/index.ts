@@ -441,7 +441,8 @@ class BridgeProcess {
     // Check for session expiration indicators:
     // - HTTP 404 (session not found)
     // - Specific error messages indicating session is no longer valid
-    // TODO: we could use a more robust check for expiration error, this seems flakey - ideally check the real HTTP status code
+    // TODO: we could use a more robust check for expiration error,
+    //  this seems flakey - ideally check the real HTTP status code
     const errorMessage = error.message.toLowerCase();
     const isExpired =
       errorMessage.includes('404') ||

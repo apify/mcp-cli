@@ -1,11 +1,6 @@
 
 # TODOs
 
-Will the named pipe used for bridge communication work on win32?
-Why do we pass `socketPath` betwAlrigeen places, when it really just has constant value per session?
-
-`socketPath` should contain pid to ensure uniqueness, e.g. `@apify-1234.sock`. It's always the bridge process which creates it so
-this can work I believe.
 
 ## Bugs
 - Seems calling invalid/unknown MCP command in shell (perhaps also normally) causes the bridge to be flagged as expired
@@ -51,12 +46,14 @@ Visual examples:
  *  ▘▘ ▝▝  *   ~/Projects/mcpc
 
 MCP sessions:
-  @test1 [dead] → https://mcp.apify.com (http)
-  @test-new [live] → https://mcp.apify.com (http)
+  @test [live] → https://mcp.apify.com (http)
+  @test2 [live] → https://mcp.apify.com (http)
 
 Authentication profiles:
   default → https://mcp.apify.com (OAuth)
+  profile2 → https://mcp.apify.com (OAuth)
 
+BIG: We need to decide whether to show Markdown-ish or not
 
 
 - Better error handling:
@@ -108,8 +105,12 @@ Authentication profiles:
   - for all commands, tests --verbose doesn't print anything extra to stdout, --json returns json
   - that on session close we send HTTP DELETE https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
   - Test session failover - e.g. kill the bridge process, and try to access the session again (should be restarted)
+  - Test auth - if no profile available and server requires OAuth, we need to fail with info what to do! e.g. "mcpc https://mcp.sentry.dev/mcp --verbose"
   - Test server session aborting - if session is aborted by server, bridge process should exit and set session status to "expired"
   - Test auth profiles work long-term and sessions too - basically when running some tests the next day they should use old saved auths and sessions
 - Can we track test coverage also this way?
 - Text copy can change, but the core texts needs to be shown in both text and JSON mode
-
+- Testing servers we can use:
+  - https://mcp.sentry.dev/mcp (login)
+  - https://mcp.apify.com (login)
+  - https://mcp.apify.com/tools=docs (anonymous)

@@ -16,6 +16,7 @@ import {
   getAuthServerKey,
   isValidSessionName,
   isValidProfileName,
+  validateProfileName,
   isValidResourceUri,
   sleep,
   parseJson,
@@ -285,6 +286,19 @@ describe('isValidProfileName', () => {
     expect(isValidProfileName('test ')).toBe(false); // trailing space
     expect(isValidProfileName(' test')).toBe(false); // leading space
     expect(isValidProfileName('a'.repeat(65))).toBe(false); // too long
+  });
+});
+
+describe('validateProfileName', () => {
+  it('should not throw for valid profile names', () => {
+    expect(() => validateProfileName('default')).not.toThrow();
+    expect(() => validateProfileName('personal')).not.toThrow();
+  });
+
+  it('should throw for invalid profile names', () => {
+    expect(() => validateProfileName('')).toThrow('Invalid profile name');
+    expect(() => validateProfileName('@test')).toThrow('Invalid profile name');
+    expect(() => validateProfileName('test profile')).toThrow('Invalid profile name');
   });
 });
 

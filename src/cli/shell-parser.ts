@@ -5,7 +5,6 @@
 
 /**
  * Parse a shell command line into command and arguments
- * TODO: move this to shell.ts
  */
 export function parseShellCommand(line: string): { command: string; args: string[] } {
   const trimmed = line.trim();
