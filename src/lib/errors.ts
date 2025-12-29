@@ -90,10 +90,13 @@ export function isMcpError(error: unknown): error is McpError {
 }
 
 /**
- * Check if an error is an AbortError (DOMException or Error with AbortError name/message)
- * These occur when HTTP connections or SSE streams are closed intentionally
+ * Check if an error is a shutdown-related error that should be ignored
+ * This includes:
+ * - AbortError (DOMException) - when HTTP connections or SSE streams are closed
+ * - "Not connected" errors - when SDK tries to send after connection closed
+ * - "Failed to send an error response" - when cleanup races with pending responses
  */
-export function isAbortError(error: unknown): boolean {
+export function isShutdownError(error: unknown): boolean {
   if (!error) return false;
 
   // Check for DOMException with name 'AbortError'
@@ -101,6 +104,9 @@ export function isAbortError(error: unknown): boolean {
     if (error.name === 'AbortError') return true;
     if (error.message.includes('AbortError')) return true;
     if (error.message.includes('aborted')) return true;
+    // Check for shutdown-related errors that occur when connection is already closed
+    if (error.message.includes('Not connected')) return true;
+    if (error.message.includes('Failed to send an error response')) return true;
   }
 
   // Check for object with name property (DOMException-like)

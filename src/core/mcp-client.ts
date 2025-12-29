@@ -17,7 +17,7 @@ import type {
   LoggingLevel,
 } from '@modelcontextprotocol/sdk/types.js';
 import { createNoOpLogger, type Logger } from '../lib/logger.js';
-import { ServerError, NetworkError, isAbortError } from '../lib/errors.js';
+import { ServerError, NetworkError, isShutdownError } from '../lib/errors.js';
 import type { IMcpClient, ServerInfo } from '../lib/types.js';
 
 /**
@@ -58,7 +58,7 @@ export class McpClient implements IMcpClient {
     // Set up error handling
     this.client.onerror = (error) => {
       // Ignore abort errors - these occur when connection is closed intentionally
-      if (isAbortError(error)) {
+      if (isShutdownError(error)) {
         this.logger.debug('Client aborted (expected during close)');
         return;
       }
@@ -76,7 +76,7 @@ export class McpClient implements IMcpClient {
       // Set up transport error handlers
       transport.onerror = (error) => {
         // Ignore abort errors - these occur when connection is closed intentionally
-        if (isAbortError(error)) {
+        if (isShutdownError(error)) {
           this.logger.debug('Transport aborted (expected during close)');
           return;
         }
@@ -115,19 +115,19 @@ export class McpClient implements IMcpClient {
 
   /**
    * Close the connection to the server
+   * Fire-and-forget: starts close but doesn't wait for stdio process to exit
    */
+  // eslint-disable-next-line @typescript-eslint/require-await
   async close(): Promise<void> {
-    try {
-      this.logger.debug('Closing connection...');
-      await this.client.close();
-      this.logger.debug('Connection closed');
-    } catch (error) {
-      this.logger.error('Error closing connection:', error);
-      throw new NetworkError(
-        `Failed to close connection: ${(error as Error).message}`,
-        { originalError: error }
-      );
-    }
+    this.logger.debug('Closing connection...');
+
+    // Fire-and-forget close - don't wait for stdio child process
+    // The OS will clean up when our process exits
+    this.client.close().catch((error) => {
+      this.logger.debug('Error during close (ignored):', error);
+    });
+
+    this.logger.debug('Connection closed');
   }
 
   /**
