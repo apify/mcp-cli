@@ -212,17 +212,48 @@ function getBridgeStatus(session: { status?: string; pid?: number }): 'live' | '
 }
 
 /**
- * Format bridge status for display
+ * Format bridge status for display with dot indicator
  */
-function formatBridgeStatus(status: 'live' | 'dead' | 'expired'): string {
+function formatBridgeStatus(status: 'live' | 'dead' | 'expired'): { dot: string; text: string } {
   switch (status) {
     case 'live':
-      return chalk.green('[live]');
+      return { dot: chalk.green('●'), text: chalk.green('live') };
     case 'dead':
-      return chalk.yellow('[dead]');
+      return { dot: chalk.yellow('○'), text: chalk.yellow('dead') };
     case 'expired':
-      return chalk.red('[expired]');
+      return { dot: chalk.red('○'), text: chalk.red('expired') };
   }
+}
+
+/**
+ * Format time ago in human-friendly way
+ */
+function formatTimeAgo(isoDate: string | undefined): string {
+  if (!isoDate) return '';
+
+  const date = new Date(isoDate);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  return `${Math.floor(diffDays / 30)} months ago`;
+}
+
+/**
+ * Truncate string with ellipsis
+ */
+function truncateStr(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str;
+  return str.substring(0, maxLen - 1) + '…';
 }
 
 /**
@@ -255,29 +286,59 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
   } else {
     // Display sessions
     if (sessions.length === 0) {
-      console.log('No active MCP sessions.');
+      console.log(chalk.dim('No active MCP sessions.'));
     } else {
-      console.log('MCP sessions:');
+      console.log(chalk.bold('MCP sessions:'));
       for (const session of sessions) {
         const status = getBridgeStatus(session);
-        const statusStr = formatBridgeStatus(status);
-        console.log(`  ${session.name} ${statusStr} → ${session.target} (${session.transport})`);
+        const { dot, text } = formatBridgeStatus(status);
+
+        // Format session name (cyan)
+        const nameStr = chalk.cyan(session.name);
+
+        // Format target (show host for HTTP, truncate command for stdio)
+        const target = session.transport === 'http'
+          ? getServerHost(session.target)
+          : session.target;
+        const targetStr = truncateStr(target, 36);
+
+        // Format transport/auth column
+        let authStr: string;
+        if (session.transport === 'stdio') {
+          authStr = chalk.dim('(stdio)');
+        } else if (session.profileName) {
+          authStr = chalk.dim('(http, oauth: ') + chalk.blue(session.profileName) + chalk.dim(')');
+        } else {
+          authStr = chalk.dim('(http)');
+        }
+
+        // Format status with optional time ago for dead/expired
+        let statusStr = `${dot} ${text}`;
+        if (status !== 'live' && session.lastSeenAt) {
+          const timeAgo = formatTimeAgo(session.lastSeenAt);
+          if (timeAgo) {
+            statusStr += chalk.dim(`, ${timeAgo}`);
+          }
+        }
+
+        console.log(`  ${nameStr} → ${targetStr}  ${authStr}  ${statusStr}`);
       }
     }
 
     // Display auth profiles
     console.log('');
     if (profiles.length === 0) {
-      console.log('No authentication profiles.');
+      console.log(chalk.dim('No authentication profiles.'));
     } else {
-      console.log('Authentication profiles:');
+      console.log(chalk.bold('Authentication profiles:'));
       for (const profile of profiles) {
-        // Show user info if available (email preferred, fallback to name)
-        const userInfo = profile.userEmail || profile.userName;
-        const userSuffix = userInfo ? ` - ${userInfo}` : '';
-        console.log(`  ${profile.name} → ${getServerHost(profile.serverUrl)}${userSuffix}`);
+        const nameStr = chalk.blue(profile.name.padEnd(12));
+        const hostStr = getServerHost(profile.serverUrl).padEnd(24);
+        const userStr = profile.userEmail || profile.userName || '';
+        console.log(`  ${nameStr} ${hostStr} ${chalk.dim(userStr)}`);
       }
     }
+
   }
 }
 
