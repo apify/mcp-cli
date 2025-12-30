@@ -15,7 +15,7 @@ After all, UNIX-compatible shell script is THE most universal coding language, f
 
 Note that `mcpc` does not use LLMs on its own; that's left for the higher layer.
 
-**Features**
+**Key features**
 
 - 🔌 **Universal MCP client** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.

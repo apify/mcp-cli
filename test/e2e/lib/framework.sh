@@ -2,15 +2,17 @@
 # End-to-end (E2E) testing framework for mcpc
 #
 # Features:
-# - Per-test isolation (each test gets unique home dir, session names)
-# - Parallel execution support
+# - Shared home directory by default (tests file locking and concurrency)
+# - Optional isolated home directory (--isolated flag)
+# - Parallel execution support with unique session names
 # - Two commands: mcpc (direct) and xmcpc (with invariant checks)
 # - Automatic keychain cleanup
 # - Structured logging
 #
 # Usage in test files:
-#   source "$(dirname "$0")/../lib/framework.sh"
-#   test_init "my-test-name"
+#   source "$(dirname "$0")/../../lib/framework.sh"
+#   test_init "my-test-name"              # Uses shared home directory
+#   test_init "my-test-name" --isolated   # Uses isolated home directory
 #
 #   test_case "description"
 #   run_mcpc @session tools-list
@@ -19,6 +21,9 @@
 #   test_pass
 #
 #   test_done
+#
+# Environment variables:
+#   E2E_ISOLATED_ALL=1  - Force all tests to use isolated home (for troubleshooting)
 
 set -euo pipefail
 
@@ -36,6 +41,13 @@ export E2E_RUN_ID="${E2E_RUN_ID:-$(date +%Y%m%d-%H%M%S)-$$}"
 # Base directory for all test runs
 export E2E_RUNS_DIR="${E2E_RUNS_DIR:-$PROJECT_ROOT/test/runs}"
 
+# Force all tests to use isolated home directories (for troubleshooting)
+E2E_ISOLATED_ALL="${E2E_ISOLATED_ALL:-0}"
+
+# Shared home directory for this test run (set by run.sh)
+# Falls back to run directory if not set
+E2E_SHARED_HOME="${E2E_SHARED_HOME:-$E2E_RUNS_DIR/$E2E_RUN_ID/_shared_home}"
+
 # Colors
 _RED='\033[0;31m'
 _GREEN='\033[0;32m'
@@ -51,6 +63,7 @@ _TEST_CASES_RUN=0
 _TEST_CASES_PASSED=0
 _TEST_CASES_FAILED=0
 _CURRENT_CASE=""
+_TEST_ISOLATED=0  # Whether this test uses isolated home directory
 declare -a _SESSIONS_CREATED=()  # Explicit array declaration
 
 # ============================================================================
@@ -58,20 +71,49 @@ declare -a _SESSIONS_CREATED=()  # Explicit array declaration
 # ============================================================================
 
 # Initialize test environment
-# Usage: test_init "test-name"
+# Usage: test_init "test-name" [--isolated]
+# Options:
+#   --isolated  Use isolated home directory (for tests that manipulate files directly)
 test_init() {
   _TEST_NAME="$1"
+  shift
+
+  # Parse options
+  _TEST_ISOLATED=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --isolated)
+        _TEST_ISOLATED=1
+        shift
+        ;;
+      *)
+        echo "Unknown option to test_init: $1" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  # Force isolated mode if E2E_ISOLATED_ALL is set
+  if [[ "$E2E_ISOLATED_ALL" == "1" || "$E2E_ISOLATED_ALL" == "true" ]]; then
+    _TEST_ISOLATED=1
+  fi
 
   # Create unique run directory for this test (for logs and artifacts)
   _TEST_RUN_DIR="$E2E_RUNS_DIR/$E2E_RUN_ID/$_TEST_NAME"
   mkdir -p "$_TEST_RUN_DIR"
 
-  # Generate short unique ID for this test (used in session names and home dir)
+  # Generate short unique ID for this test (used in session names)
   # This keeps Unix socket paths under the 104 char limit
   _TEST_SHORT_ID="$(echo "$E2E_RUN_ID-$_TEST_NAME" | md5sum 2>/dev/null | cut -c1-8 || md5 -q -s "$E2E_RUN_ID-$_TEST_NAME" | cut -c1-8)"
 
-  # Set up isolated mcpc home directory in /tmp (short path for Unix sockets)
-  export MCPC_HOME_DIR="/tmp/mcpc-e2e-$_TEST_SHORT_ID"
+  # Set up mcpc home directory
+  if [[ $_TEST_ISOLATED -eq 1 ]]; then
+    # Isolated: each test gets its own home directory in the run dir
+    export MCPC_HOME_DIR="$_TEST_RUN_DIR/_home"
+  else
+    # Shared: all tests in this run share the same home directory
+    export MCPC_HOME_DIR="$E2E_SHARED_HOME"
+  fi
   mkdir -p "$MCPC_HOME_DIR"
 
   # Create logs directory
@@ -85,9 +127,11 @@ test_init() {
   trap '_test_cleanup' EXIT
 
   # Log test start
+  local home_mode="shared"
+  [[ $_TEST_ISOLATED -eq 1 ]] && home_mode="isolated"
   echo "# Test: $_TEST_NAME"
   echo "# Run dir: $_TEST_RUN_DIR"
-  echo "# Home dir: $MCPC_HOME_DIR"
+  echo "# Home dir: $MCPC_HOME_DIR ($home_mode)"
   echo ""
 }
 
@@ -105,10 +149,7 @@ _test_cleanup() {
   # Clean up keychain entries for our sessions
   _cleanup_keychain
 
-  # Clean up temp mcpc home directory
-  if [[ -n "$MCPC_HOME_DIR" && "$MCPC_HOME_DIR" == /tmp/mcpc-e2e-* ]]; then
-    rm -rf "$MCPC_HOME_DIR" 2>/dev/null || true
-  fi
+  # Note: Home directories are now inside run dir, cleaned up by run.sh
 
   return $exit_code
 }

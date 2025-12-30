@@ -58,6 +58,19 @@
 
 ## E2E test scenarios
 
+
+Now, each E2E test runs with its own home directory, for isolation of the tests, and they can run in parallel (--parallel option).
+But given that auth profiles are pre-defined in the tests, the only potentially conflicting place is sessions, but each test is supposed to use 
+unique session name, so that should be okay too. So I'm thinking, we could actually use a single home dir for most of the tests
+(with some special exceptions where we directly manipulate the home dir files), and that way we'll also test that mcpc
+synchronizes access to shared files well. If something goes wrong, we can use --parallel=1 to run the tests sequentially
+to find a root cause of problems. Is this reasonable strategy?
+
+the pote confliexcting place are sessions
+
+
+(most?) tests use it's own session
+
 - Implement e2e test scenarios:
   - handling of errors, invalid params, names, etc.
   - pagination

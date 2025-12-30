@@ -91,12 +91,13 @@ End-to-end tests verify mcpc behavior from the command line, testing real MCP co
 ./test/e2e/run.sh basic/help.test.sh
 
 # Options
-./test/e2e/run.sh -p 1          # Run sequentially (parallel=1)
-./test/e2e/run.sh -c            # Collect code coverage
-./test/e2e/run.sh -v            # Verbose - show output as tests run
-./test/e2e/run.sh -k            # Keep test run directory after tests
-./test/e2e/run.sh -l            # List available tests
-./test/e2e/run.sh -h            # Show help
+./test/e2e/run.sh -p, --parallel N   # Max parallel tests (default: 8)
+./test/e2e/run.sh -i, --isolated     # Isolated home dirs for all tests (troubleshooting)
+./test/e2e/run.sh -c, --coverage     # Collect code coverage
+./test/e2e/run.sh -v, --verbose      # Verbose - show output as tests run
+./test/e2e/run.sh -k, --keep         # Keep test run directory after tests
+./test/e2e/run.sh -l, --list         # List available tests
+./test/e2e/run.sh -h, --help         # Show help
 ```
 
 ### E2E coverage
@@ -134,11 +135,23 @@ Merged coverage is saved to `test/coverage/merged/`:
 
 ### Test isolation
 
-Each test runs in complete isolation:
-- **Unique home directory**: Each test gets its own `MCPC_HOME_DIR` in `/tmp`
+By default, tests share a common home directory per test run to exercise file locking and concurrent access:
+- **Shared home directory**: Tests share `MCPC_HOME_DIR` to test file synchronization
 - **Unique session names**: Generated using `session_name "suffix"` to avoid conflicts
-- **Automatic cleanup**: Sessions are closed and temp directories removed on exit
-- **Parallel-safe**: Tests can run concurrently without interference
+- **Automatic cleanup**: Sessions are closed and shared home cleaned after test run
+- **Parallel-safe**: Tests run concurrently thanks to file locking in mcpc
+
+For tests that directly manipulate home directory files, use isolated mode:
+```bash
+# In test file:
+test_init "suite/test-name" --isolated   # This test gets its own home directory
+```
+
+To force all tests to use isolated home directories (for troubleshooting):
+```bash
+./test/e2e/run.sh --isolated             # All tests get their own home directories
+./test/e2e/run.sh --isolated -p 1        # Isolated + sequential for debugging
+```
 
 ### Test invariants
 

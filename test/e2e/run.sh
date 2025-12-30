@@ -9,6 +9,7 @@
 #
 # Options:
 #   -p, --parallel N   Max parallel tests (default: 8)
+#   -i, --isolated     Force all tests to use isolated home directories
 #   -c, --coverage     Collect code coverage
 #   -k, --keep         Keep test run directory after tests
 #   -v, --verbose      Show test output as it runs
@@ -22,6 +23,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Default options
 PARALLEL=8
+ISOLATED_ALL=false
 COVERAGE=false
 KEEP_RUNS=false
 VERBOSE=false
@@ -42,6 +44,10 @@ while [[ $# -gt 0 ]]; do
     -p|--parallel)
       PARALLEL="$2"
       shift 2
+      ;;
+    -i|--isolated)
+      ISOLATED_ALL=true
+      shift
       ;;
     -c|--coverage)
       COVERAGE=true
@@ -64,6 +70,7 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "Options:"
       echo "  -p, --parallel N   Max parallel tests (default: 8)"
+      echo "  -i, --isolated     Force all tests to use isolated home directories"
       echo "  -c, --coverage     Collect code coverage"
       echo "  -k, --keep         Keep test run directory after tests"
       echo "  -v, --verbose      Show test output as it runs"
@@ -177,10 +184,25 @@ echo "Run ID:    $E2E_RUN_ID"
 echo "Run dir:   $RUN_DIR"
 echo "Tests:     ${#TESTS[@]}"
 echo "Parallel:  $PARALLEL"
+if [[ "$ISOLATED_ALL" == "true" ]]; then
+  echo "Home dirs: isolated (per-test)"
+else
+  echo "Home dir:  $RUN_DIR/_shared_home"
+fi
 if [[ "$COVERAGE" == "true" ]]; then
   echo "Coverage:  enabled"
 fi
 echo ""
+
+# Set up isolated mode environment variable
+if [[ "$ISOLATED_ALL" == "true" ]]; then
+  export E2E_ISOLATED_ALL=1
+fi
+
+# Shared home directory is inside the run directory
+E2E_SHARED_HOME="$RUN_DIR/_shared_home"
+mkdir -p "$E2E_SHARED_HOME"
+export E2E_SHARED_HOME
 
 # Set up coverage collection if enabled
 if [[ "$COVERAGE" == "true" ]]; then
@@ -219,7 +241,7 @@ run_test() {
 }
 
 export -f run_test test_name
-export SCRIPT_DIR SUITES_DIR RESULTS_DIR E2E_RUN_ID E2E_RUNS_DIR PROJECT_ROOT NODE_V8_COVERAGE
+export SCRIPT_DIR SUITES_DIR RESULTS_DIR E2E_RUN_ID E2E_RUNS_DIR E2E_SHARED_HOME E2E_ISOLATED_ALL PROJECT_ROOT NODE_V8_COVERAGE
 
 # Run tests
 echo -e "${BLUE}Running tests...${NC}"
@@ -332,7 +354,7 @@ if [[ "$COVERAGE" == "true" ]]; then
   echo "LCOV data:       $COVERAGE_DIR/lcov.info"
 fi
 
-# Cleanup or preserve
+# Cleanup or preserve run directory
 if [[ "$KEEP_RUNS" != "true" && $FAILED -eq 0 ]]; then
   rm -rf "$RUN_DIR"
   echo ""
