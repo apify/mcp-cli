@@ -44,4 +44,21 @@ pkg_version=$(node -p "require('$PROJECT_ROOT/package.json').version")
 assert_eq "$STDOUT" "$pkg_version" "version should match package.json"
 test_pass
 
+# Test: --version with --json returns JSON
+test_case "--version --json returns JSON"
+run_mcpc --version --json
+assert_success
+assert_json_valid "$STDOUT"
+assert_json "$STDOUT" '.version'
+test_pass
+
+# Test: --version JSON matches text version
+test_case "--version JSON matches text version"
+run_mcpc --version
+text_version="$STDOUT"
+run_mcpc --version --json
+json_version=$(echo "$STDOUT" | jq -r '.version')
+assert_eq "$json_version" "$text_version" "JSON version should match text version"
+test_pass
+
 test_done

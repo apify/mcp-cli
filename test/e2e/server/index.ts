@@ -10,6 +10,8 @@
  *
  * Control endpoints (for test manipulation):
  *   GET  /health - health check
+ *   GET  /control/get-deleted-sessions - list session IDs that received DELETE
+ *   GET  /control/get-active-sessions - list active MCP session IDs
  *   POST /control/fail-next?count=N - fail next N MCP requests
  *   POST /control/expire-session - expire current session
  *   POST /control/reset - reset all control state
@@ -37,6 +39,7 @@ const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true';
 // Control state (manipulated via /control/* endpoints)
 let failNextCount = 0;
 let sessionExpired = false;
+const deletedSessions: string[] = [];
 
 // Test data
 const TOOLS = [
@@ -394,13 +397,30 @@ async function main() {
 
     // Control endpoints
     if (url.pathname.startsWith('/control/')) {
+      const action = url.pathname.slice('/control/'.length);
+
+      // GET endpoints
+      if (req.method === 'GET') {
+        if (action === 'get-deleted-sessions') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ deletedSessions }));
+          return;
+        }
+        if (action === 'get-active-sessions') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ activeSessions: Array.from(transports.keys()) }));
+          return;
+        }
+        res.writeHead(404);
+        res.end('Unknown control action');
+        return;
+      }
+
       if (req.method !== 'POST') {
         res.writeHead(405);
         res.end('Method not allowed');
         return;
       }
-
-      const action = url.pathname.slice('/control/'.length);
 
       switch (action) {
         case 'fail-next': {
@@ -420,6 +440,7 @@ async function main() {
         case 'reset':
           failNextCount = 0;
           sessionExpired = false;
+          deletedSessions.length = 0;
           res.writeHead(200);
           res.end('State reset');
           return;
@@ -475,6 +496,7 @@ async function main() {
           const oldTransport = transports.get(sessionId)!;
           await oldTransport.close();
           transports.delete(sessionId);
+          deletedSessions.push(sessionId);
         }
         res.writeHead(200);
         res.end();

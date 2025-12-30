@@ -57,9 +57,10 @@ if [[ -n "$STDOUT" ]]; then
 fi
 test_pass
 
-# Test: xmcpc invariant check works (use session list, not --help)
+# Test: xmcpc invariant check works (use --version which is deterministic)
+# Note: Session list is non-deterministic in parallel test runs
 test_case "xmcpc validates invariants automatically"
-run_xmcpc
+run_xmcpc --version
 assert_success
 test_pass
 

@@ -64,6 +64,7 @@ _TEST_CASES_PASSED=0
 _TEST_CASES_FAILED=0
 _CURRENT_CASE=""
 _TEST_ISOLATED=0  # Whether this test uses isolated home directory
+_TEST_ISOLATED_HOME=""  # Path to isolated home dir (for cleanup)
 declare -a _SESSIONS_CREATED=()  # Explicit array declaration
 
 # ============================================================================
@@ -107,9 +108,11 @@ test_init() {
   _TEST_SHORT_ID="$(echo "$E2E_RUN_ID-$_TEST_NAME" | md5sum 2>/dev/null | cut -c1-8 || md5 -q -s "$E2E_RUN_ID-$_TEST_NAME" | cut -c1-8)"
 
   # Set up mcpc home directory
+  # Use /tmp to keep socket paths short (Unix sockets limited to ~104 bytes)
   if [[ $_TEST_ISOLATED -eq 1 ]]; then
-    # Isolated: each test gets its own home directory in the run dir
-    export MCPC_HOME_DIR="$_TEST_RUN_DIR/_home"
+    # Isolated: each test gets its own home directory
+    export MCPC_HOME_DIR="/tmp/mcpc-e2e-$_TEST_SHORT_ID"
+    _TEST_ISOLATED_HOME="$MCPC_HOME_DIR"  # Track for cleanup
   else
     # Shared: all tests in this run share the same home directory
     export MCPC_HOME_DIR="$E2E_SHARED_HOME"
@@ -146,7 +149,10 @@ _test_cleanup() {
   # Clean up keychain entries for our sessions
   _cleanup_keychain
 
-  # Note: Home directories are now inside run dir, cleaned up by run.sh
+  # Clean up isolated home directory (it's in /tmp)
+  if [[ -n "${_TEST_ISOLATED_HOME:-}" && -d "$_TEST_ISOLATED_HOME" ]]; then
+    rm -rf "$_TEST_ISOLATED_HOME"
+  fi
 
   return $exit_code
 }
@@ -169,12 +175,27 @@ MCPC="node $PROJECT_ROOT/dist/cli/index.js"
 
 # Run mcpc and capture output
 # Sets: STDOUT, STDERR, EXIT_CODE
+# Note: Automatically adds --header for test server connections to satisfy auth requirement
 run_mcpc() {
   local stdout_file="$TEST_TMP/stdout.$$.$RANDOM"
   local stderr_file="$TEST_TMP/stderr.$$.$RANDOM"
 
+  # Build command args, adding test header if connecting to test server
+  local -a args=()
+  local first_arg="${1:-}"
+  if [[ -n "${TEST_SERVER_URL:-}" && "$first_arg" == "$TEST_SERVER_URL" ]]; then
+    # Add dummy header to satisfy auth credential requirement
+    args=("$first_arg" "--header" "X-Test: true")
+    shift
+    for arg in "$@"; do
+      args+=("$arg")
+    done
+  else
+    args=("$@")
+  fi
+
   set +e
-  $MCPC "$@" >"$stdout_file" 2>"$stderr_file"
+  $MCPC ${args[@]+"${args[@]}"} >"$stdout_file" 2>"$stderr_file"
   EXIT_CODE=$?
   set -e
 
@@ -221,18 +242,19 @@ run_xmcpc() {
   done
 
   # Run all 4 variants for invariant checking
-  run_mcpc "${bare_args[@]}"
+  # Use ${bare_args[@]+"${bare_args[@]}"} to handle empty array with nounset
+  run_mcpc ${bare_args[@]+"${bare_args[@]}"}
   local bare_stdout="$STDOUT"
 
-  run_mcpc --verbose "${bare_args[@]}"
+  run_mcpc --verbose ${bare_args[@]+"${bare_args[@]}"}
   local verbose_stdout="$STDOUT"
 
-  run_mcpc --json "${bare_args[@]}"
+  run_mcpc --json ${bare_args[@]+"${bare_args[@]}"}
   local json_stdout="$STDOUT"
   local json_stderr="$STDERR"
   local json_exit="$EXIT_CODE"
 
-  run_mcpc --json --verbose "${bare_args[@]}"
+  run_mcpc --json --verbose ${bare_args[@]+"${bare_args[@]}"}
   local json_verbose_stdout="$STDOUT"
   local json_verbose_stderr="$STDERR"
 
@@ -531,8 +553,6 @@ _TEST_SERVER_PID=""
 # Usage: start_test_server [env_vars...]
 # Example: start_test_server PAGINATION_SIZE=2 LATENCY_MS=100
 start_test_server() {
-  local env_vars=("$@")
-
   # Find a free port if not specified
   if [[ "$TEST_SERVER_PORT" == "0" ]]; then
     TEST_SERVER_PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("",0)); print(s.getsockname()[1]); s.close()')
@@ -540,7 +560,7 @@ start_test_server() {
 
   # Build environment
   local env_str="PORT=$TEST_SERVER_PORT"
-  for var in "${env_vars[@]}"; do
+  for var in "$@"; do
     env_str+=" $var"
   done
 
@@ -565,6 +585,84 @@ start_test_server() {
 
   export TEST_SERVER_URL="http://localhost:$TEST_SERVER_PORT"
   echo "# Test server started at $TEST_SERVER_URL (PID: $_TEST_SERVER_PID)"
+
+  # Create a dummy auth profile for the test server
+  # mcpc requires auth profiles for HTTP servers, so we create a minimal one
+  _create_test_auth_profile "localhost:$TEST_SERVER_PORT"
+}
+
+# Create a dummy auth profile for a host (internal helper)
+# This is needed because mcpc requires auth profiles for all HTTP servers
+# Uses atomic symlink creation for cross-platform locking
+_create_test_auth_profile() {
+  local host="$1"
+  local profiles_file="$MCPC_HOME_DIR/profiles.json"
+  local lock_file="$MCPC_HOME_DIR/profiles.lock"
+
+  # Ensure mcpc home dir exists
+  mkdir -p "$MCPC_HOME_DIR"
+
+  # Acquire lock using atomic symlink (works on macOS and Linux)
+  local max_wait=50
+  local waited=0
+  while ! ln -s $$ "$lock_file" 2>/dev/null; do
+    sleep 0.1
+    ((waited++)) || true
+    if [[ $waited -ge $max_wait ]]; then
+      # Stale lock - remove and retry
+      rm -f "$lock_file"
+      waited=0
+    fi
+  done
+
+  # Ensure lock is released on function exit
+  trap 'rm -f "$lock_file"' RETURN
+
+  # Create or update profiles.json with a dummy profile for this host
+  if [[ -f "$profiles_file" && -s "$profiles_file" ]]; then
+    # File exists and is non-empty - add profile for this host using jq
+    local updated
+    if updated=$(jq --arg host "$host" '.profiles[$host] = {"default": {"name": "default", "serverUrl": ("http://" + $host), "authType": "oauth", "oauthIssuer": "https://test.example.com", "createdAt": "2025-01-01T00:00:00Z"}}' "$profiles_file" 2>/dev/null); then
+      # Write to temp file then atomically rename
+      local temp_file="$profiles_file.$$.tmp"
+      echo "$updated" > "$temp_file"
+      mv "$temp_file" "$profiles_file"
+    else
+      # JSON parse error - recreate file
+      cat > "$profiles_file" << EOF
+{
+  "profiles": {
+    "$host": {
+      "default": {
+        "name": "default",
+        "serverUrl": "http://$host",
+        "authType": "oauth",
+        "oauthIssuer": "https://test.example.com",
+        "createdAt": "2025-01-01T00:00:00Z"
+      }
+    }
+  }
+}
+EOF
+    fi
+  else
+    # Create new profiles file
+    cat > "$profiles_file" << EOF
+{
+  "profiles": {
+    "$host": {
+      "default": {
+        "name": "default",
+        "serverUrl": "http://$host",
+        "authType": "oauth",
+        "oauthIssuer": "https://test.example.com",
+        "createdAt": "2025-01-01T00:00:00Z"
+      }
+    }
+  }
+}
+EOF
+  fi
 }
 
 # Stop test server

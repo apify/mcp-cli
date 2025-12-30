@@ -199,10 +199,13 @@ if [[ "$ISOLATED_ALL" == "true" ]]; then
   export E2E_ISOLATED_ALL=1
 fi
 
-# Shared home directory is inside the run directory
-E2E_SHARED_HOME="$RUN_DIR/_shared_home"
+# Shared home directory uses /tmp to keep socket paths short
+# (Unix socket paths are limited to ~104 bytes)
+E2E_SHARED_HOME="/tmp/mcpc-e2e-$E2E_RUN_ID"
 mkdir -p "$E2E_SHARED_HOME"
 export E2E_SHARED_HOME
+# Create a symlink in run directory for easy access
+ln -sf "$E2E_SHARED_HOME" "$RUN_DIR/_shared_home"
 
 # Set up coverage collection if enabled
 if [[ "$COVERAGE" == "true" ]]; then
@@ -364,11 +367,13 @@ find "$RUN_DIR" -type d -name "tmp" -empty -delete 2>/dev/null || true
 # Cleanup or preserve run directory
 if [[ "$KEEP_RUNS" != "true" && $FAILED -eq 0 ]]; then
   rm -rf "$RUN_DIR"
+  rm -rf "$E2E_SHARED_HOME"
   echo ""
   echo -e "${DIM}Test run directory cleaned up${NC}"
 else
   echo ""
   echo "Test run directory: $RUN_DIR"
+  echo "Shared home: $E2E_SHARED_HOME"
 
   # Clean up old runs (keep last 10)
   cd "$E2E_RUNS_DIR"
