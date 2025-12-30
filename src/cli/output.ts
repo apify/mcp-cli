@@ -151,8 +151,116 @@ function formatToolAnnotations(annotations: Tool['annotations']): string | null 
 }
 
 /**
- * Format a list of tools as Markdown
- * First shows a quick summary with annotations, then full descriptions
+ * Convert a JSON Schema type definition to a simplified type string
+ * e.g., { type: 'string' } -> 'string'
+ *       { type: 'array', items: { type: 'number' } } -> 'array<number>'
+ *       { type: ['string', 'null'] } -> 'string | null'
+ */
+function formatSchemaType(schema: Record<string, unknown>): string {
+  if (!schema || typeof schema !== 'object') {
+    return 'any';
+  }
+
+  const schemaType = schema.type;
+
+  // Handle union types (e.g., ['string', 'null'])
+  if (Array.isArray(schemaType)) {
+    return schemaType.join(' | ');
+  }
+
+  // Handle array type with items
+  if (schemaType === 'array' && schema.items) {
+    const items = schema.items as Record<string, unknown>;
+    const itemType = formatSchemaType(items);
+    return `array<${itemType}>`;
+  }
+
+  // Handle object type with properties (nested object)
+  if (schemaType === 'object' && schema.properties) {
+    return 'object';
+  }
+
+  // Handle enum
+  if (schema.enum && Array.isArray(schema.enum)) {
+    const enumValues = schema.enum as unknown[];
+    if (enumValues.length <= 5) {
+      return enumValues.map((v) => JSON.stringify(v)).join(' | ');
+    }
+    return `enum(${enumValues.length} values)`;
+  }
+
+  // Handle oneOf/anyOf
+  if (schema.oneOf && Array.isArray(schema.oneOf)) {
+    const types = (schema.oneOf as Record<string, unknown>[]).map(formatSchemaType);
+    return types.join(' | ');
+  }
+  if (schema.anyOf && Array.isArray(schema.anyOf)) {
+    const types = (schema.anyOf as Record<string, unknown>[]).map(formatSchemaType);
+    return types.join(' | ');
+  }
+
+  // Simple type
+  if (typeof schemaType === 'string') {
+    return schemaType;
+  }
+
+  return 'any';
+}
+
+/**
+ * Format a JSON Schema as simplified human-readable args
+ * Returns lines like:
+ *   path: string [required]
+ *   tail: number - If provided, returns only the last N lines
+ */
+function formatSimplifiedArgs(
+  schema: Record<string, unknown>,
+  indent: string = '    '
+): string[] {
+  const lines: string[] = [];
+
+  if (!schema || typeof schema !== 'object') {
+    lines.push(`${indent}(none)`);
+    return lines;
+  }
+
+  const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
+  const required = (schema.required as string[]) || [];
+
+  if (!properties || Object.keys(properties).length === 0) {
+    lines.push(`${indent}(none)`);
+    return lines;
+  }
+
+  for (const [name, propSchema] of Object.entries(properties)) {
+    const typeStr = formatSchemaType(propSchema);
+    const isRequired = required.includes(name);
+    const description = propSchema.description as string | undefined;
+    const defaultValue = propSchema.default;
+
+    // Build the line: name: type [required] - description (default: value)
+    let line = `${indent}${chalk.cyan(name)}: ${chalk.yellow(typeStr)}`;
+
+    if (isRequired) {
+      line += ` ${chalk.red('[required]')}`;
+    }
+
+    if (description) {
+      line += ` ${chalk.dim('-')} ${description}`;
+    }
+
+    if (defaultValue !== undefined) {
+      line += chalk.dim(` (default: ${JSON.stringify(defaultValue)})`);
+    }
+
+    lines.push(line);
+  }
+
+  return lines;
+}
+
+/**
+ * Format a list of tools with simplified args display
  */
 export function formatTools(tools: Tool[]): string {
   const lines: string[] = [];
@@ -160,26 +268,30 @@ export function formatTools(tools: Tool[]): string {
   lines.push(chalk.bold(`Available tools (${tools.length}):`));
   lines.push('');
 
-  // First: quick summary list with annotations
   for (const tool of tools) {
+    // Tool header: name [annotations]
     const annotationsStr = formatToolAnnotations(tool.annotations);
-    const suffix = annotationsStr ? ` ${chalk.gray(`[${annotationsStr}]`)}` : '';
-    lines.push(`- \`${tool.name}\`${suffix}`);
-  }
-  lines.push('');
+    const annotationsSuffix = annotationsStr ? ` ${chalk.gray(`[${annotationsStr}]`)}` : '';
+    lines.push(`${chalk.bold('Tool:')} ${tool.name}${annotationsSuffix}`);
 
-  // Then: full descriptions
-  lines.push(chalk.bold('Tool details:'));
-  lines.push('');
-  for (const tool of tools) {
-    // Use title from annotations if available, otherwise use name
-    const title = tool.annotations?.title || tool.name;
-    const titleSuffix = title !== tool.name ? ` - ${title}` : '';
+    // Input args
+    lines.push(`  ${chalk.bold('Input:')}`);
+    const inputArgs = formatSimplifiedArgs(tool.inputSchema as Record<string, unknown>, '    ');
+    lines.push(...inputArgs);
 
+    // Output schema (if present)
+    if ('outputSchema' in tool && tool.outputSchema) {
+      lines.push(`  ${chalk.bold('Output:')}`);
+      const outputArgs = formatSimplifiedArgs(tool.outputSchema as Record<string, unknown>, '    ');
+      lines.push(...outputArgs);
+    }
+
+    // Description
+    lines.push(`  ${chalk.bold('Description:')}`);
     if (tool.description) {
-      lines.push(`## \`${tool.name}\`${titleSuffix}: ${tool.description}`);
+      lines.push(`    ${tool.description}`);
     } else {
-      lines.push(`## \`${tool.name}\`${titleSuffix}: ${chalk.gray('(no description)')}`);
+      lines.push(`    ${chalk.gray('(no description)')}`);
     }
     lines.push('');
   }
@@ -188,56 +300,34 @@ export function formatTools(tools: Tool[]): string {
 }
 
 /**
- * Format a single tool with details
+ * Format a single tool with details (simplified args display)
  */
 export function formatToolDetail(tool: Tool): string {
   const lines: string[] = [];
 
-  // Use title from annotations if available
-  const title = tool.annotations?.title || tool.name;
-  lines.push(`# Tool \`${tool.name}\`${title !== tool.name ? ` - ${title}` : ''}`);
-  lines.push('');
+  // Tool header: name [annotations]
+  const annotationsStr = formatToolAnnotations(tool.annotations);
+  const annotationsSuffix = annotationsStr ? ` ${chalk.gray(`[${annotationsStr}]`)}` : '';
+  lines.push(`${chalk.bold('Tool:')} ${tool.name}${annotationsSuffix}`);
 
-  // Show annotations
-  if (tool.annotations) {
-    const annotationLines: string[] = [];
-    if (tool.annotations.readOnlyHint === true) {
-      annotationLines.push('- Read-only: yes');
-    }
-    if (tool.annotations.destructiveHint === true) {
-      annotationLines.push('- ' + chalk.red('Destructive: yes'));
-    }
-    if (tool.annotations.idempotentHint === true) {
-      annotationLines.push('- Idempotent: yes');
-    }
-    if (tool.annotations.openWorldHint === true) {
-      annotationLines.push('- Open-world: yes (can access external resources)');
-    }
-    if (annotationLines.length > 0) {
-      lines.push('## Annotations');
-      lines.push(...annotationLines);
-      lines.push('');
-    }
-  }
+  // Input args
+  lines.push(`  ${chalk.bold('Input:')}`);
+  const inputArgs = formatSimplifiedArgs(tool.inputSchema as Record<string, unknown>, '    ');
+  lines.push(...inputArgs);
 
-  if (tool.description) {
-    lines.push('## Description');
-    lines.push(tool.description);
-    lines.push('');
-  }
-
-  lines.push('## Input schema');
-  lines.push('```json');
-  lines.push(JSON.stringify(tool.inputSchema, null, 2));
-  lines.push('```');
-
-  // Add output schema if present
+  // Output schema (if present)
   if ('outputSchema' in tool && tool.outputSchema) {
-    lines.push('');
-    lines.push('## Output schema');
-    lines.push('```json');
-    lines.push(JSON.stringify(tool.outputSchema, null, 2));
-    lines.push('```');
+    lines.push(`  ${chalk.bold('Output:')}`);
+    const outputArgs = formatSimplifiedArgs(tool.outputSchema as Record<string, unknown>, '    ');
+    lines.push(...outputArgs);
+  }
+
+  // Description
+  lines.push(`  ${chalk.bold('Description:')}`);
+  if (tool.description) {
+    lines.push(`    ${tool.description}`);
+  } else {
+    lines.push(`    ${chalk.gray('(no description)')}`);
   }
 
   return lines.join('\n');
