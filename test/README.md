@@ -156,7 +156,7 @@ To force all tests to use isolated home directories (for troubleshooting):
 ### Test invariants
 
 The framework enforces these invariants via `run_xmcpc`:
-- `--verbose` only adds to stderr, never changes stdout
+- `--verbose` only adds to stderr, never changes stdout (checked for both bare and `--json` modes)
 - `--json` always returns valid JSON (on success to stdout, otherwise to stderr)
 
 ### Writing a new test
@@ -211,9 +211,22 @@ test_done                     # Print summary and exit
 #### Running commands
 
 ```bash
-run_mcpc <args>               # Run mcpc, sets $STDOUT, $STDERR, $EXIT_CODE
-run_xmcpc <args>              # Same as above, but with invariant checks (--verbose, --json)
+run_xmcpc <args>              # Preferred: run with invariant checks
+run_mcpc <args>               # Use only for special cases (see below)
 ```
+
+**Always prefer `run_xmcpc`** - it runs the caller's exact command and returns those results,
+but also runs all 4 combinations of `--json`/`--verbose` to verify invariants:
+1. bare args
+2. `--verbose` args
+3. `--json` args
+4. `--json --verbose` args
+
+Use `run_mcpc` only when:
+- Command has side effects and cannot be called multiple times (e.g., `session`, `close`)
+- Command doesn't support `--json` output (e.g., `--help`)
+- CLI argument errors handled by Commander.js (plain text, not JSON)
+- Output contains non-deterministic data (e.g., temp file names, timestamps)
 
 #### Session helpers
 

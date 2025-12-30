@@ -19,14 +19,14 @@ test_pass
 
 # Test: session shows stdio transport
 test_case "session shows stdio transport"
-run_mcpc --json
+run_xmcpc --json
 transport=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .transport")
 assert_eq "$transport" "stdio" "transport should be stdio"
 test_pass
 
 # Test: list tools via stdio session
 test_case "tools-list works via stdio session"
-run_mcpc "$SESSION" tools-list
+run_xmcpc "$SESSION" tools-list
 assert_success
 assert_contains "$STDOUT" "read_file"
 test_pass
@@ -36,14 +36,14 @@ test_case "create test file"
 echo "Hello from E2E test!" > "$TEST_TMP/test.txt"
 test_pass
 
-# Test: read file via MCP
+# Test: read file via MCP (read-only tool, safe for run_xmcpc)
 test_case "read file via MCP"
-run_mcpc "$SESSION" tools-call read_file --args path="$TEST_TMP/test.txt"
+run_xmcpc "$SESSION" tools-call read_file --args path="$TEST_TMP/test.txt"
 assert_success
 assert_contains "$STDOUT" "Hello from E2E test"
 test_pass
 
-# Test: list directory via MCP
+# Test: list directory via MCP (output includes temp files with random names, use run_mcpc)
 test_case "list directory via MCP"
 run_mcpc "$SESSION" tools-call list_directory --args path="$TEST_TMP"
 assert_success

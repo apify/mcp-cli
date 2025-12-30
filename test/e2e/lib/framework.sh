@@ -198,70 +198,104 @@ run_mcpc() {
 
 # Run mcpc with extended invariant checks (xmcpc)
 # Checks:
-# 1. --verbose only adds to stderr, not stdout
+# 1. --verbose only adds to stderr, not stdout (for both bare and --json)
 # 2. --json on success: valid JSON to stdout, nothing to stderr
 # 3. --json on error: valid JSON to stderr, nothing to stdout
+#
+# Runs the caller's exact command and returns those results.
+# Additionally runs all 4 combinations of --json/--verbose to verify invariants.
 run_xmcpc() {
-  local args=("$@")
+  # Run caller's exact command first
+  run_mcpc "$@"
+  local caller_stdout="$STDOUT"
+  local caller_stderr="$STDERR"
+  local caller_exit="$EXIT_CODE"
 
-  # First, run normally to get baseline
-  run_mcpc "${args[@]}"
-  local normal_stdout="$STDOUT"
-  local normal_stderr="$STDERR"
-  local normal_exit="$EXIT_CODE"
+  # Strip --json and --verbose from args to get bare args
+  local bare_args=()
+  for arg in "$@"; do
+    case "$arg" in
+      --json|-j|--verbose|-v) ;;
+      *) bare_args+=("$arg") ;;
+    esac
+  done
 
-  # Check --verbose invariant: stdout should be identical
-  run_mcpc --verbose "${args[@]}"
-  if [[ "$STDOUT" != "$normal_stdout" ]]; then
+  # Run all 4 variants for invariant checking
+  run_mcpc "${bare_args[@]}"
+  local bare_stdout="$STDOUT"
+
+  run_mcpc --verbose "${bare_args[@]}"
+  local verbose_stdout="$STDOUT"
+
+  run_mcpc --json "${bare_args[@]}"
+  local json_stdout="$STDOUT"
+  local json_stderr="$STDERR"
+  local json_exit="$EXIT_CODE"
+
+  run_mcpc --json --verbose "${bare_args[@]}"
+  local json_verbose_stdout="$STDOUT"
+  local json_verbose_stderr="$STDERR"
+
+  # Check --verbose invariant: stdout should be identical with or without --verbose
+  if [[ "$verbose_stdout" != "$bare_stdout" ]]; then
     echo "INVARIANT VIOLATION: --verbose changed stdout" >&2
-    echo "--- normal stdout ---" >&2
-    echo "$normal_stdout" >&2
+    echo "--- bare stdout ---" >&2
+    echo "$bare_stdout" >&2
     echo "--- verbose stdout ---" >&2
-    echo "$STDOUT" >&2
+    echo "$verbose_stdout" >&2
+    EXIT_CODE=99
+    return 1
+  fi
+
+  if [[ "$json_verbose_stdout" != "$json_stdout" ]]; then
+    echo "INVARIANT VIOLATION: --verbose changed stdout (with --json)" >&2
+    echo "--- json stdout ---" >&2
+    echo "$json_stdout" >&2
+    echo "--- json verbose stdout ---" >&2
+    echo "$json_verbose_stdout" >&2
     EXIT_CODE=99
     return 1
   fi
 
   # Check --json invariants
-  run_mcpc --json "${args[@]}"
-  if [[ $EXIT_CODE -eq 0 ]]; then
+  if [[ $json_exit -eq 0 ]]; then
     # On success: valid JSON to stdout, stderr should be empty
-    if ! echo "$STDOUT" | jq . >/dev/null 2>&1; then
+    if ! echo "$json_stdout" | jq . >/dev/null 2>&1; then
       echo "INVARIANT VIOLATION: --json success did not return valid JSON to stdout" >&2
       echo "--- stdout ---" >&2
-      echo "$STDOUT" >&2
+      echo "$json_stdout" >&2
       EXIT_CODE=99
       return 1
     fi
-    if [[ -n "$STDERR" ]]; then
+    if [[ -n "$json_stderr" ]]; then
       echo "INVARIANT VIOLATION: --json success should not output to stderr" >&2
       echo "--- stderr ---" >&2
-      echo "$STDERR" >&2
+      echo "$json_stderr" >&2
       EXIT_CODE=99
       return 1
     fi
   else
     # On error: valid JSON to stderr, stdout should be empty
-    if ! echo "$STDERR" | jq . >/dev/null 2>&1; then
+    if ! echo "$json_stderr" | jq . >/dev/null 2>&1; then
       echo "INVARIANT VIOLATION: --json error did not return valid JSON to stderr" >&2
       echo "--- stderr ---" >&2
-      echo "$STDERR" >&2
+      echo "$json_stderr" >&2
       EXIT_CODE=99
       return 1
     fi
-    if [[ -n "$STDOUT" ]]; then
+    if [[ -n "$json_stdout" ]]; then
       echo "INVARIANT VIOLATION: --json error should not output to stdout" >&2
       echo "--- stdout ---" >&2
-      echo "$STDOUT" >&2
+      echo "$json_stdout" >&2
       EXIT_CODE=99
       return 1
     fi
   fi
 
-  # Restore original results
-  STDOUT="$normal_stdout"
-  STDERR="$normal_stderr"
-  EXIT_CODE="$normal_exit"
+  # Return caller's exact results
+  STDOUT="$caller_stdout"
+  STDERR="$caller_stderr"
+  EXIT_CODE="$caller_exit"
 }
 
 # ============================================================================

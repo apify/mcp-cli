@@ -6,24 +6,24 @@ test_init "basic/errors"
 
 # Test: invalid session name (special characters)
 test_case "invalid session name - special characters"
-run_mcpc "@test/invalid" tools-list
+run_xmcpc "@test/invalid" tools-list
 assert_failure
 test_pass
 
 # Test: non-existent session
 test_case "non-existent session"
-run_mcpc @nonexistent-session-$RANDOM tools-list
+run_xmcpc @nonexistent-session-$RANDOM tools-list
 assert_failure
 assert_contains "$STDERR" "not found"
 test_pass
 
-# Test: invalid command
+# Test: invalid command (Commander.js handles this with plain text, not JSON)
 test_case "invalid command"
 run_mcpc @test invalid-command-$RANDOM
 assert_failure
 test_pass
 
-# Test: missing required argument for session command
+# Test: missing required argument for session command (Commander.js handles this)
 test_case "missing required argument for session"
 run_mcpc example.com session
 assert_failure
@@ -31,25 +31,15 @@ test_pass
 
 # Test: invalid URL scheme
 test_case "invalid URL scheme"
-run_mcpc "ftp://example.com" tools-list
+run_xmcpc "ftp://example.com" tools-list
 assert_failure
 test_pass
 
-# Test: empty target shows help
+# Test: empty target shows help (special case: help output doesn't support --json)
 test_case "empty target shows help"
 run_mcpc ""
 # Empty string should be treated as no target
 assert_success
-test_pass
-
-# Test: --json errors have proper structure
-test_case "--json errors have proper structure"
-run_mcpc @nonexistent-$RANDOM tools-list --json
-assert_failure
-if [[ -n "$STDOUT" ]]; then
-  assert_json_valid "$STDOUT"
-  assert_json "$STDOUT" '.error'
-fi
 test_pass
 
 test_done

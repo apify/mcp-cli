@@ -20,21 +20,21 @@ test_pass
 
 # Test: session appears in list
 test_case "session appears in list"
-run_mcpc --json
+run_xmcpc --json
 assert_success
 assert_json "$STDOUT" ".sessions[] | select(.name == \"$SESSION\")"
 test_pass
 
 # Test: session status is live
 test_case "session status is live"
-run_mcpc --json
+run_xmcpc --json
 session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .bridgeStatus")
 assert_eq "$session_status" "live" "session should be live"
 test_pass
 
 # Test: can list tools via session
 test_case "tools-list works via session"
-run_mcpc "$SESSION" tools-list
+run_xmcpc "$SESSION" tools-list
 assert_success
 assert_contains "$STDOUT" "echo"
 test_pass
@@ -55,7 +55,7 @@ test_pass
 
 # Test: session no longer in list
 test_case "session removed from list after close"
-run_mcpc --json
+run_xmcpc --json
 if echo "$STDOUT" | jq -e ".sessions[] | select(.name == \"$SESSION\")" >/dev/null 2>&1; then
   test_fail "session should not exist after close"
   exit 1
@@ -64,7 +64,7 @@ test_pass
 
 # Test: using closed session fails
 test_case "using closed session fails"
-run_mcpc "$SESSION" tools-list
+run_xmcpc "$SESSION" tools-list
 assert_failure
 test_pass
 

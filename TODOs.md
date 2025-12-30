@@ -60,16 +60,17 @@
 ## E2E test scenarios
 
 Let's add more e2e test scenarios:
+  - test "mcpc --version" works, with both --json (returns JSON) and without (returns text)
   - more test for handling of errors, invalid params, names, etc.
   - test mcpc list operations handle MCP server responses with pagination
-  - test env vars...
-  - sessions lifecycle
   - test expired session (create fake record in session.json) - ensure attempts to use it will fail with the right error
-  - that on session close we send HTTP DELETE https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
+  - Test that on graceful session close we send HTTP DELETE to the server (see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management)
   - Test session failover - e.g. kill the bridge process, and try to access the session again - should be restarted, work, and have same MCP-Session-Id
-  - Test auth - if no profile available and server requires OAuth, we need to fail with info what to do! e.g. "mcpc https://mcp.sentry.dev/mcp --verbose"
-  - Test server session aborting - if session is aborted by server, bridge process should exit and set session status to "expired"
-  - Test auth profiles work long-term and sessions too - basically when running some tests the next day they should use old saved auths and sessions
+  - Test auth - if no profile available and server requires OAuth, we need to fail with info what to do! e.g. "mcpc https://mcp.sentry.dev/mcp" must suggest running "mcpc https://mcp.sentry.dev/mcp login" in both human mode and in error message in --json mode 
+  - Test server session aborting - if session is rejected by server, bridge process should exit and set session status to "expired"
   - Test "mcpc @test close" and "mcpc <server> session @test" in rapid succession, it should work and use different pid (check sessions.json)
   - Ensure calling invalid/unknown MCP command in shell and normally doesn't causes the bridge to be flagged as expired or dead
-  
+  - test env vars work as specified in README
+
+
+- Test auth profiles work long-term and sessions too - basically when running some tests the next day they should use old saved auths and sessions
