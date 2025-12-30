@@ -147,7 +147,7 @@ export async function connectSession(
     try {
       const bridgeOptions: StartBridgeOptions = {
         sessionName: name,
-        target: transportConfig,
+        transportConfig,
         verbose: options.verbose || false,
       };
       if (headers) {

@@ -34,7 +34,7 @@ describe('createMcpClient', () => {
   it('should create a client with stdio transport', async () => {
     const client = await createMcpClient({
       clientInfo: { name: 'test-client', version: '1.0.0' },
-      transport: {
+      transportConfig: {
         type: 'stdio',
         command: 'node',
         args: ['server.js'],
@@ -47,7 +47,7 @@ describe('createMcpClient', () => {
   it('should create a client with http transport', async () => {
     const client = await createMcpClient({
       clientInfo: { name: 'test-client', version: '1.0.0' },
-      transport: {
+      transportConfig: {
         type: 'http',
         url: 'https://mcp.example.com',
       },
@@ -59,7 +59,7 @@ describe('createMcpClient', () => {
   it('should not auto-connect if autoConnect is false', async () => {
     const client = await createMcpClient({
       clientInfo: { name: 'test-client', version: '1.0.0' },
-      transport: {
+      transportConfig: {
         type: 'http',
         url: 'https://mcp.example.com',
       },
@@ -76,7 +76,7 @@ describe('createMcpClient', () => {
 
     const client = await createMcpClient({
       clientInfo: { name: 'test-client', version: '1.0.0' },
-      transport: {
+      transportConfig: {
         type: 'http',
         url: 'https://mcp.example.com',
       },

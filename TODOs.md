@@ -60,6 +60,9 @@ Let's add more e2e test scenarios:
 
 - test env var substitution works for config files (unit +e2e)
 
+- test that all headers for HTTP server do not leak in process list (e.g. use --header to pass 
+  something, and ensure it's not present in "ps aux")
+
 - Testing servers we can use:
   - https://mcp.apify.com (for testing real OAuth login, we can create various accounts, both OAuth and API tokens)
   - https://mcp.apify.com/tools=docs (anonymous, no auth needed)

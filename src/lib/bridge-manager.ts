@@ -40,7 +40,7 @@ function getBridgeExecutable(): string {
 
 export interface StartBridgeOptions {
   sessionName: string;
-  target: TransportConfig;
+  transportConfig: TransportConfig;
   verbose?: boolean;
   profileName?: string; // Auth profile name for token refresh
   headers?: Record<string, string>; // Headers to send via IPC (caller stores in keychain)
@@ -66,7 +66,7 @@ export interface StartBridgeResult {
  * @returns Bridge process PID
  */
 export async function startBridge(options: StartBridgeOptions): Promise<StartBridgeResult> {
-  const { sessionName, target, verbose, profileName, headers } = options;
+  const { sessionName, transportConfig, verbose, profileName, headers } = options;
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
 
@@ -83,7 +83,7 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
 
   // Create a sanitized transport config without any headers
   // Headers will be sent to the bridge via IPC instead
-  const sanitizedTarget: TransportConfig = { ...target };
+  const sanitizedTarget: TransportConfig = { ...transportConfig };
   if (sanitizedTarget.type === 'http') {
     delete sanitizedTarget.headers;
   }
@@ -146,7 +146,7 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
   if (profileName || headers) {
     await sendAuthCredentialsToBridge(
       socketPath,
-      target.url || target.command || '',
+      transportConfig.url || transportConfig.command || '',
       profileName,
       headers
     );
@@ -221,13 +221,13 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
 
   // Determine target from session data
   // For stdio transport, include args if present (they contain the actual command parameters)
-  let target: TransportConfig;
+  let transportConfig: TransportConfig;
   if (session.transport === 'http') {
-    target = { type: 'http', url: session.target };
+    transportConfig = { type: 'http', url: session.target };
   } else {
-    target = { type: 'stdio', command: session.target };
+    transportConfig = { type: 'stdio', command: session.target };
     if (session.stdioArgs && session.stdioArgs.length > 0) {
-      target.args = session.stdioArgs;
+      transportConfig.args = session.stdioArgs;
     }
   }
 
@@ -248,7 +248,7 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   // Start a new bridge, preserving auth profile
   const bridgeOptions: StartBridgeOptions = {
     sessionName,
-    target,
+    transportConfig,
   };
   if (headers) {
     bridgeOptions.headers = headers;

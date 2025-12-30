@@ -69,15 +69,15 @@ export { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 export type TransportType = 'stdio' | 'http';
 
 /**
- * Configuration for a transport connection
+ * Configuration for a connection to MCP server
  */
 export interface TransportConfig {
   type: TransportType;
-  url?: string; // For HTTP transport
+  url?: string; // For http transport
+  headers?: Record<string, string>; // For http transport
   command?: string; // For stdio transport
   args?: string[]; // For stdio transport
-  env?: Record<string, string>; // Environment variables for stdio
-  headers?: Record<string, string>; // HTTP headers
+  env?: Record<string, string>; // Environment variables for stdio transport
   timeoutMs?: number; // Timeout in milliseconds
 }
 

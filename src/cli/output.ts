@@ -9,7 +9,7 @@ import chalk from 'chalk';
 import type { OutputMode, TransportConfig } from '../lib/index.js';
 import type { Tool, Resource, Prompt, SessionData, ServerDetails } from '../lib/types.js';
 import { extractSingleTextContent } from './tool-result.js';
-import { isValidSessionName, getServerHost } from '../lib/utils.js';
+import { isValidSessionName } from '../lib/utils.js';
 import { getSession } from '../lib/sessions.js';
 
 // Re-export for external use

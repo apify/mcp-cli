@@ -29,7 +29,7 @@ const logger = createLogger('bridge');
 
 interface BridgeOptions {
   sessionName: string;
-  target: TransportConfig;
+  transportConfig: TransportConfig;
   verbose?: boolean;
   profileName?: string; // Auth profile name for token refresh
 }
@@ -182,7 +182,7 @@ class BridgeProcess {
    * 2. HTTP headers (static headers from --header flags)
    */
   private async updateTransportAuth(): Promise<TransportConfig> {
-    const config = { ...this.options.target };
+    const config = { ...this.options.transportConfig };
 
     // Only update auth for HTTP transport
     if (config.type !== 'http') {
@@ -357,21 +357,21 @@ class BridgeProcess {
     logger.debug(`  headers: ${this.headers ? Object.keys(this.headers).length : 0}`);
 
     // Get transport config
-    let transport: TransportConfig;
+    let transportConfig: TransportConfig;
     if (this.authProvider) {
       // TODO: feels like this code should (is?) be handled by updateTransportAuth
       // If we have an authProvider, DON'T add Authorization header to transport
       // Let the SDK's authProvider handle token refresh automatically
       // Only add non-OAuth headers (from --header flags) to transport
-      transport = { ...this.options.target };
-      if (transport.type === 'http' && this.headers) {
-        transport.headers = { ...transport.headers, ...this.headers };
+      transportConfig = { ...this.options.transportConfig };
+      if (transportConfig.type === 'http' && this.headers) {
+        transportConfig.headers = { ...transportConfig.headers, ...this.headers };
         logger.debug(`Added ${Object.keys(this.headers).length} non-OAuth headers to transport`);
       }
     } else {
       // No authProvider - use updateTransportAuth for static headers
       logger.debug('No authProvider - using updateTransportAuth for headers');
-      transport = await this.updateTransportAuth();
+      transportConfig = await this.updateTransportAuth();
     }
 
     logger.debug('Building MCP client config...');
@@ -382,7 +382,7 @@ class BridgeProcess {
 
     const clientConfig: CreateMcpClientOptions = {
       clientInfo: { name: 'mcpc', version: packageJson.version },
-      transport,
+      transportConfig,
       capabilities: {
         roots: { listChanged: true },
         sampling: {},
@@ -913,11 +913,9 @@ async function main(): Promise<void> {
   }
 
   try {
-    const target = JSON.parse(transportConfigJson) as TransportConfig;
-
     const bridgeOptions: BridgeOptions = {
       sessionName,
-      target,
+      transportConfig: JSON.parse(transportConfigJson) as TransportConfig,
       verbose,
     };
     if (profileName) {

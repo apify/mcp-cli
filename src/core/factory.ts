@@ -29,7 +29,7 @@ export interface CreateMcpClientOptions {
   /**
    * Transport configuration
    */
-  transport: TransportConfig;
+  transportConfig: TransportConfig;
 
   /**
    * Client capabilities to advertise
@@ -95,7 +95,7 @@ export async function createMcpClient(options: CreateMcpClientOptions): Promise<
 
   factoryLogger.debug('Creating MCP client', {
     clientName: options.clientInfo.name,
-    transportType: options.transport.type,
+    transportType: options.transportConfig.type,
     hasAuthProvider: !!options.authProvider,
   });
 
@@ -113,7 +113,7 @@ export async function createMcpClient(options: CreateMcpClientOptions): Promise<
   if (autoConnect) {
     factoryLogger.debug('Creating transport with authProvider:', !!options.authProvider);
     const transport = createTransportFromConfig(
-      options.transport,
+      options.transportConfig,
       options.authProvider ? { authProvider: options.authProvider } : {}
     );
     await client.connect(transport);
@@ -137,21 +137,21 @@ export async function createStdioClient(
   args?: string[],
   env?: Record<string, string>
 ): Promise<McpClient> {
-  const transport: TransportConfig = {
+  const transportConfig: TransportConfig = {
     type: 'stdio',
     command,
   };
 
   if (args !== undefined) {
-    transport.args = args;
+    transportConfig.args = args;
   }
   if (env !== undefined) {
-    transport.env = env;
+    transportConfig.env = env;
   }
 
   return createMcpClient({
     clientInfo,
-    transport,
+    transportConfig,
   });
 }
 
@@ -170,20 +170,20 @@ export async function createHttpClient(
   headers?: Record<string, string>,
   timeoutMs?: number
 ): Promise<McpClient> {
-  const transport: TransportConfig = {
+  const transportConfig: TransportConfig = {
     type: 'http',
     url,
   };
 
   if (headers) {
-    transport.headers = headers;
+    transportConfig.headers = headers;
   }
   if (timeoutMs) {
-    transport.timeoutMs = timeoutMs;
+    transportConfig.timeoutMs = timeoutMs;
   }
 
   return createMcpClient({
     clientInfo,
-    transport,
+    transportConfig,
   });
 }

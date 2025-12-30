@@ -344,7 +344,7 @@ export async function withMcpClient<T>(
   // Create and connect client
   const clientConfig: Parameters<typeof createMcpClient>[0] = {
     clientInfo: { name: 'mcpc', version: packageJson.version },
-    transport: transportConfig,
+    transportConfig: transportConfig,
     capabilities: {
       // Declare client capabilities
       roots: { listChanged: true },
