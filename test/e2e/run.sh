@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Default options
-PARALLEL=8
+PARALLEL=10
 ISOLATED_ALL=false
 COVERAGE=false
 KEEP_RUNS=false

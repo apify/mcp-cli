@@ -484,10 +484,11 @@ export function formatSessionLine(session: SessionData): string {
   // Format session name (cyan)
   const nameStr = chalk.cyan(session.name);
 
-  // Format target (show host for HTTP, command + args for stdio)
+  // Format target
   let target: string;
   if (session.transport === 'http') {
-    target = getServerHost(session.target);
+    // For http: show full URL as there might be different MCP servers on different paths
+    target = session.target; // getServerHost(session.target);
   } else {
     // For stdio: show command + args
     target = session.target;
@@ -548,19 +549,19 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
       targetStr += ' ' + tc.args.join(' ');
     }
     targetStr = truncateWithEllipsis(targetStr, 80);
-    console.log(`[${targetStr} ${chalk.dim('(stdio)')}]\n`);
+    console.log(`[→ ${targetStr} ${chalk.dim('(stdio)')}]\n`);
     return;
   }
 
-  // HTTP transport: show host with auth info
-  const hostStr = tc?.url ? getServerHost(tc.url) : getServerHost(target);
+  // HTTP transport: show server URL with auth info
+  const serverStr = tc?.url || target; // tc?.url ? getServerHost(tc.url) : getServerHost(target);
   let authStr: string;
   if (options.profileName) {
     authStr = chalk.dim('(http, oauth: ') + chalk.magenta(options.profileName) + chalk.dim(')');
   } else {
     authStr = chalk.dim('(http)');
   }
-  console.log(`[${hostStr} ${authStr}]\n`);
+  console.log(`[→ ${serverStr} ${authStr}]\n`);
 }
 
 /**

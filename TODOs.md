@@ -2,8 +2,9 @@
 # TODOs
 
 ## Bugs
-...
-
+- IMPORTANT: on profile clean, delete the keychain data, otherwise OAuth login might fail next
+  time, for the same client_id !!! Plus when user runs --clean=profiles, print warning if some 
+  sessions were using them
 
 ## Next
 
@@ -11,7 +12,6 @@
 -  - nit: in README, explain the MCP commands better in a standlone section, with details how they work
 
 - Expand --help to use same text as in README, add link to README
-- Do not use Markdown formatting on output
 
 # MCP features
 
@@ -22,10 +22,7 @@
   - `--proxy-capabilities tools:TOOL_NAME,TOOL_NAME2,...,prompts[:...],...` to limit access to selected MCP features and tools
     (what if tools have ":" or "," in their names?)
     In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
-  - Explain this is useful for AI sandboxing!
-
-- Later: Add support for MCP elicitations, and potentially for sampling (e.g. via shell interface?)
-
+  Explain this is useful for AI sandboxing!
 
   
 ## Security
@@ -34,15 +31,10 @@
 
 ## Later
 
-
-- When running "mcpc --cleanwefwef" it succeeds, we should fail on invalid args (update design 
+- When running "mcpc --cleanwefwef" it succeeds, we should fail on invalid args (update design
   principles)
 
-- When user runs --clean=profiles, print warning if some sessions were using them
-
-- nit: Colorize output, e.g. JSONs in one color. MCP provided data like descriptions and instructions in orange.
-  -  warnings could be orange, errors red
-
+- Add support for MCP elicitations, and potentially for sampling (e.g. via shell interface?)
 
 - Implement "mcpc @session restart" .. and maybe also "mcpc <server> connect @session" ?
 
@@ -56,8 +48,6 @@
 
 
 
-
-
 ## E2E test scenarios
 
 Let's add more e2e test scenarios:
@@ -67,3 +57,11 @@ Let's add more e2e test scenarios:
 - Test auth profiles work long-term and sessions too - basically when running some tests the 
   next day they should use old saved auths and sessions.
   We could have some special dir for long-term testing...
+
+- test env var substitution works for config files (unit +e2e)
+
+- Testing servers we can use:
+  - https://mcp.apify.com (for testing real OAuth login, we can create various accounts, both OAuth and API tokens)
+  - https://mcp.apify.com/tools=docs (anonymous, no auth needed)
+  - https://mcp.sentry.dev/mcp (for testing if no auth profile available)
+  - ideally get some on non-standard port, maybe localhost

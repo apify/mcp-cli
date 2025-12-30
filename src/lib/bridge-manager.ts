@@ -220,10 +220,16 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   }
 
   // Determine target from session data
-  const target: TransportConfig =
-    session.transport === 'http'
-      ? { type: 'http', url: session.target }
-      : { type: 'stdio', command: session.target };
+  // For stdio transport, include args if present (they contain the actual command parameters)
+  let target: TransportConfig;
+  if (session.transport === 'http') {
+    target = { type: 'http', url: session.target };
+  } else {
+    target = { type: 'stdio', command: session.target };
+    if (session.stdioArgs && session.stdioArgs.length > 0) {
+      target.args = session.stdioArgs;
+    }
+  }
 
   // Retrieve transport headers from keychain for failover, and check their number
   let headers: Record<string, string> | undefined;
