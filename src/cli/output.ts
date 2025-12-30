@@ -16,6 +16,40 @@ import { getSession } from '../lib/sessions.js';
 export { extractSingleTextContent } from './tool-result.js';
 
 /**
+ * Convert HSL to RGB hex color
+ */
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100;
+  l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+/**
+ * Apply subtle rainbow gradient to a string (red to magenta)
+ */
+export function rainbow(text: string): string {
+  const len = text.length;
+  if (len === 0) return text;
+
+  // Interpolate hue from 0 (red) to 300 (magenta)
+  // Use moderate saturation (70%) and lightness (55%) for subtlety
+  return text
+    .split('')
+    .map((char, i) => {
+      const hue = (i / (len - 1)) * 300; // 0 to 300
+      const hex = hslToHex(hue, 70, 55);
+      return chalk.hex(hex)(char);
+    })
+    .join('');
+}
+
+/**
  * Format output based on the specified mode
  */
 export function formatOutput(data: unknown, mode: OutputMode = 'human'): string {

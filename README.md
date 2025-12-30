@@ -1,4 +1,4 @@
-# mcpc: Universal MCP command-line client
+# `mcpc`: Universal MCP command-line client
 
 `mcpc` is a CLI for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
 which maps MCP operations to intuitive commands for interactive shell use, scripts, and AI coding agents.
@@ -113,9 +113,9 @@ mcpc @test shell
 ## Usage
 
 ```bash
-mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--verbose]
+mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--version]
      [--schema <file>] [--schema-mode <mode>] [--timeout <seconds>] 
-     [--clean|--clean=sessions,logs,profiles,all]
+     [--verbose] [--clean|--clean=sessions,logs,profiles,all]
      <target> <command...>
 
 # Lists all active sessions and saved authentication profiles

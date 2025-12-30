@@ -13,7 +13,7 @@
 import { Command } from 'commander';
 import { setVerbose, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatError } from '../lib/index.js';
-import { formatJsonError } from './output.js';
+import { formatJsonError, rainbow } from './output.js';
 import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
 import * as prompts from './commands/prompts.js';
@@ -169,8 +169,15 @@ function createProgram(): Command {
 
   program
     .name('mcpc')
-    .description('Universal command-line client for the Model Context Protocol (MCP).')
-    .usage('[options] <target> [command]')
+    .description(
+      `${rainbow('Universal')} command-line client for the Model Context Protocol (MCP).`
+    )
+    .usage(
+      '[--json] [--config <file>] [-H|--header "K: V"] [-v|--verbose]\n' +
+        '            [--schema <file>] [--schema-mode <mode>] [--timeout <seconds>] \n' +
+        '            [--clean|--clean=sessions,logs,profiles,all]\n' +
+        '            <target> <command...>'
+    )
     .version(packageJson.version, '-v, --version', 'Output the version number')
     .helpOption('-h, --help', 'Display general help')
     .option('-j, --json', 'Output in JSON format')
@@ -184,10 +191,7 @@ function createProgram(): Command {
       '--schema-mode <mode>',
       'Schema validation mode: strict, compatible (default), or ignore'
     )
-    .option(
-      '--clean[=types]',
-      'Clean up mcpc data: --clean or --clean=sessions,logs,profiles,all'
-    );
+    .option('--clean[=types]', 'Clean up mcpc data: --clean or --clean=sessions,logs,profiles,all');
 
   // Add examples to help
   program.addHelpText(
@@ -200,11 +204,11 @@ Where <target> can be:
 
 
 Examples:
-  $ mcpc                                                           # List sessions and auth profiles
-  $ mcpc mcp.apify.com login                                       # Login to MCP server using OAuth
-  $ mcpc mcp.apify.com tools-list                                  # List server tools
-  $ mcpc mcp.apify.com session @apify                              # Create or reconnect persistent session
-  $ mcpc @apify tools-call search-actors --args query="crawler"    # Call tool with arguments
+  $ mcpc                                                            # List sessions and auth profiles
+  $ mcpc mcp.apify.com login                                        # Login to MCP server using OAuth
+  $ mcpc mcp.apify.com tools-list                                   # List server tools
+  $ mcpc mcp.apify.com session @apify                               # Create or reconnect persistent session
+  $ mcpc @apify tools-call search-actors --args keywords="crawler"  # Call tool with arguments
 
 Documentation: https://github.com/apify/mcpc/tree/v${packageJson.version}
 `
