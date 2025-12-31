@@ -84,9 +84,7 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
   // Create a sanitized transport config without any headers
   // Headers will be sent to the bridge via IPC instead
   const sanitizedTarget: ServerConfig = { ...transportConfig };
-  if (sanitizedTarget.transportType === 'http') {
-    delete sanitizedTarget.headers;
-  }
+  delete sanitizedTarget.headers; // Only exists for http, no-op for stdio
 
   // Prepare bridge arguments (with sanitized config - no headers)
   const bridgeExecutable = getBridgeExecutable();

@@ -122,62 +122,52 @@ export function createTransportFromConfig(
   config: ServerConfig,
   options: CreateTransportOptions = {}
 ): Transport {
-  switch (config.transportType) {
-    case 'stdio': {
-      if (!config.command) {
-        throw new ClientError('stdio transport requires a command');
-      }
+  // Stdio transport
+  if (config.command) {
+    const stdioConfig: StdioServerParameters = {
+      command: config.command,
+    };
 
-      const stdioConfig: StdioServerParameters = {
-        command: config.command,
-      };
-
-      if (config.args !== undefined) {
-        stdioConfig.args = config.args;
-      }
-      if (config.env !== undefined) {
-        stdioConfig.env = config.env;
-      }
-
-      return createStdioTransport(stdioConfig);
+    if (config.args !== undefined) {
+      stdioConfig.args = config.args;
+    }
+    if (config.env !== undefined) {
+      stdioConfig.env = config.env;
     }
 
-    case 'http': {
-      if (!config.url) {
-        throw new ClientError('http transport requires a URL');
-      }
-
-      const logger = createLogger('TransportFactory');
-      const transportOptions: StreamableHTTPClientTransportOptions = {};
-
-      // Set auth provider for automatic token refresh (takes priority over static headers)
-      if (options.authProvider) {
-        transportOptions.authProvider = options.authProvider;
-        logger.debug('Setting authProvider on transport options');
-        logger.debug(`  authProvider type: ${options.authProvider.constructor.name}`);
-        logger.debug(`  authProvider has tokens method: ${typeof options.authProvider.tokens === 'function'}`);
-      } else {
-        logger.debug('No authProvider provided for HTTP transport');
-      }
-
-      if (config.headers !== undefined) {
-        transportOptions.requestInit = {
-          headers: config.headers,
-        };
-      }
-
-      if (config.timeout !== undefined) {
-        transportOptions.requestInit = {
-          ...transportOptions.requestInit,
-          signal: AbortSignal.timeout(config.timeout * 1000),
-        };
-      }
-
-      return createStreamableHttpTransport(config.url, transportOptions);
-    }
-
-    default:
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new ClientError(`Unknown transport type: ${config.transportType}`);
+    return createStdioTransport(stdioConfig);
   }
+
+  // HTTP transport
+  if (config.url) {
+    const logger = createLogger('TransportFactory');
+    const transportOptions: StreamableHTTPClientTransportOptions = {};
+
+    // Set auth provider for automatic token refresh (takes priority over static headers)
+    if (options.authProvider) {
+      transportOptions.authProvider = options.authProvider;
+      logger.debug('Setting authProvider on transport options');
+      logger.debug(`  authProvider type: ${options.authProvider.constructor.name}`);
+      logger.debug(`  authProvider has tokens method: ${typeof options.authProvider.tokens === 'function'}`);
+    } else {
+      logger.debug('No authProvider provided for HTTP transport');
+    }
+
+    if (config.headers !== undefined) {
+      transportOptions.requestInit = {
+        headers: config.headers,
+      };
+    }
+
+    if (config.timeout !== undefined) {
+      transportOptions.requestInit = {
+        ...transportOptions.requestInit,
+        signal: AbortSignal.timeout(config.timeout * 1000),
+      };
+    }
+
+    return createStreamableHttpTransport(config.url, transportOptions);
+  }
+
+  throw new ClientError('Invalid ServerConfig: must have either url or command');
 }

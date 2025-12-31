@@ -520,9 +520,9 @@ export function formatSessionLine(session: SessionData): string {
 
   // Format target
   let target: string;
-  if (session.transportConfig.transportType === 'http') {
+  if (session.transportConfig.url) {
     // For http: show full URL as there might be different MCP servers on different paths
-    target = session.transportConfig.url || 'unknown';
+    target = session.transportConfig.url;
   } else {
     // For stdio: show command + args
     target = session.transportConfig.command || 'unknown';
@@ -534,7 +534,7 @@ export function formatSessionLine(session: SessionData): string {
 
   // Format transport/auth info
   let authStr: string;
-  if (session.transportConfig.transportType === 'stdio') {
+  if (session.transportConfig.command) {
     authStr = chalk.dim('(stdio)');
   } else if (session.profileName) {
     authStr = chalk.dim('(http, oauth: ') + chalk.magenta(session.profileName) + chalk.dim(')');
@@ -576,7 +576,7 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
 
   // For direct connections, use transportConfig if available
   const tc = options.transportConfig;
-  if (tc?.transportType === 'stdio' && tc.command) {
+  if (tc?.command) {
     // Stdio transport: show command + args
     let targetStr = tc.command;
     if (tc.args && tc.args.length > 0) {

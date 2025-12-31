@@ -6,7 +6,7 @@ import type { ClientCapabilities, ListChangedHandlers } from '@modelcontextproto
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import { McpClient, type McpClientOptions } from './mcp-client.js';
 import { createTransportFromConfig } from './transports.js';
-import type { ServerConfig } from '../lib/types.js';
+import { type ServerConfig } from '../lib/types.js';
 import { createLogger } from '../lib/logger.js';
 
 /**
@@ -95,7 +95,7 @@ export async function createMcpClient(options: CreateMcpClientOptions): Promise<
 
   factoryLogger.debug('Creating MCP client', {
     clientName: options.clientInfo.name,
-    transportType: options.transportConfig.transportType,
+    transportType: options.transportConfig.command ? 'stdio' : 'http',
     hasAuthProvider: !!options.authProvider,
   });
 

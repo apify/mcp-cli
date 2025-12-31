@@ -17,13 +17,13 @@ assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass
 
-# Test: session shows stdio transport
+# Test: session shows stdio transport (has command field, no url field)
 # Note: Use run_mcpc because session list is non-deterministic in parallel tests
 # (timestamps change, other tests create sessions). Invariant tested separately.
 test_case "session shows stdio transport"
 run_mcpc --json
-transport=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .transportConfig.type")
-assert_eq "$transport" "stdio" "transport should be stdio"
+command=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .transportConfig.command")
+assert_not_empty "$command" "command should be present for stdio transport"
 test_pass
 
 # Test: list tools via stdio session

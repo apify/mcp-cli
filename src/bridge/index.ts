@@ -185,7 +185,7 @@ class BridgeProcess {
     const config = { ...this.options.transportConfig };
 
     // Only update auth for HTTP transport
-    if (config.transportType !== 'http') {
+    if (!config.url) {
       return config;
     }
 
@@ -364,7 +364,7 @@ class BridgeProcess {
       // Let the SDK's authProvider handle token refresh automatically
       // Only add non-OAuth headers (from --header flags) to transport
       transportConfig = { ...this.options.transportConfig };
-      if (transportConfig.transportType === 'http' && this.headers) {
+      if (this.headers) {
         transportConfig.headers = { ...transportConfig.headers, ...this.headers };
         logger.debug(`Added ${Object.keys(this.headers).length} non-OAuth headers to transport`);
       }

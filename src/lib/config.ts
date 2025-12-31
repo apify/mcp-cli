@@ -5,7 +5,7 @@
 
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import type { McpConfig, McpServerConfig } from './types.js';
+import type { McpConfig, ServerConfig } from './types.js';
 import { ClientError } from './errors.js';
 import { createLogger } from './logger.js';
 import { normalizeServerUrl } from './utils.js';
@@ -69,7 +69,7 @@ export function loadConfig(configPath: string): McpConfig {
  * @returns Server configuration with environment variables substituted
  * @throws ClientError if server name not found
  */
-export function getServerConfig(config: McpConfig, serverName: string): McpServerConfig {
+export function getServerConfig(config: McpConfig, serverName: string): ServerConfig {
   const serverConfig = config.mcpServers[serverName];
 
   if (!serverConfig) {
@@ -95,8 +95,8 @@ export function getServerConfig(config: McpConfig, serverName: string): McpServe
  * @param config - Server configuration
  * @returns Configuration with environment variables substituted
  */
-function substituteEnvVars(config: McpServerConfig): McpServerConfig {
-  const result: McpServerConfig = {};
+function substituteEnvVars(config: ServerConfig): ServerConfig {
+  const result: ServerConfig = {};
 
   if (config.url !== undefined) {
     // Substitute environment variables and normalize URL
@@ -184,7 +184,7 @@ export function listServers(config: McpConfig): string[] {
  * @returns True if valid
  * @throws ClientError if invalid
  */
-export function validateServerConfig(config: McpServerConfig): boolean {
+export function validateServerConfig(config: ServerConfig): boolean {
   // Must have either url (HTTP) or command (stdio)
   const hasUrl = config.url !== undefined;
   const hasCommand = config.command !== undefined;

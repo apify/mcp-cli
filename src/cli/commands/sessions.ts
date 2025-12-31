@@ -77,7 +77,7 @@ export async function connectSession(
 
     // For HTTP targets, resolve auth profile (with helpful errors if none available)
     let profileName: string | undefined;
-    if (transportConfig.transportType === 'http' && transportConfig.url) {
+    if (transportConfig.url) {
       profileName = await resolveAuthProfile(
         transportConfig.url,
         target,
@@ -91,7 +91,7 @@ export async function connectSession(
     // because it comes from the OAuth profile and may expire.
     // The bridge will get fresh tokens via the profile mechanism instead.
     let headers: Record<string, string> | undefined;
-    if (transportConfig.transportType === 'http' && Object.keys(transportConfig.headers || {}).length > 0) {
+    if (Object.keys(transportConfig.headers || {}).length > 0) {
       headers = { ...transportConfig.headers };
 
       // Remove OAuth-derived Authorization header - it will be handled via the profile

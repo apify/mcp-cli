@@ -70,9 +70,9 @@ export type TransportType = 'stdio' | 'http';
 
 /**
  * Configuration for a connection to MCP server
+ * Used both for config file format and internal representation
  */
 export interface ServerConfig {
-  transportType: TransportType;
   url?: string; // For http transport
   headers?: Record<string, string>; // For http transport
   command?: string; // For stdio transport
@@ -226,19 +226,7 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
  * Configuration file format (compatible with Claude Desktop)
  */
 export interface McpConfig {
-  mcpServers: Record<string, McpServerConfig>;
-}
-
-/**
- * Individual server configuration in MCP JSON config file
- */
-export interface McpServerConfig {
-  url?: string; // For http servers
-  headers?: Record<string, string>; // For http servers
-  command?: string; // For stdio servers
-  args?: string[]; // For stdio servers
-  env?: Record<string, string>; // For stdio servers
-  timeout?: number; // For both stdio and http servers, in seconds
+  mcpServers: Record<string, ServerConfig>;
 }
 
 /**

@@ -202,7 +202,6 @@ export async function resolveTarget(
       };
 
       const transportConfig: ServerConfig = {
-        transportType: 'http',
         url: serverConfig.url,
       };
 
@@ -221,7 +220,6 @@ export async function resolveTarget(
     } else if (serverConfig.command) {
       // Stdio server
       const transportConfig: ServerConfig = {
-        transportType: 'stdio',
         command: serverConfig.command,
       };
 
@@ -260,7 +258,6 @@ export async function resolveTarget(
   const headers = parseHeaderFlags(options.headers);
 
   const config: ServerConfig = {
-    transportType: 'http',
     url,
   };
 
@@ -341,7 +338,7 @@ export async function withMcpClient<T>(
 
   // For HTTP transports, resolve auth profile and create authProvider
   let profileName: string | undefined;
-  if (transportConfig.transportType === 'http' && transportConfig.url) {
+  if (transportConfig.url) {
     profileName = await resolveAuthProfile(transportConfig.url, target, options.profile);
     const authProvider = await createAuthProviderForServer(transportConfig.url, profileName);
     if (authProvider) {
