@@ -64,18 +64,13 @@ export type {
 export { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 
 /**
- * Transport types supported by mcpc
- */
-export type TransportType = 'stdio' | 'http';
-
-/**
  * Configuration for a connection to MCP server
  * Used both for config file format and internal representation
  */
 export interface ServerConfig {
-  url?: string; // For http transport
+  url?: string; // Mandatory tor http transport
   headers?: Record<string, string>; // For http transport
-  command?: string; // For stdio transport
+  command?: string; // Mandatory for stdio transport
   args?: string[]; // For stdio transport
   env?: Record<string, string>; // Environment variables for stdio transport
   timeout?: number; // Connection timeout in seconds
@@ -94,7 +89,7 @@ export type SessionStatus = 'active' | 'expired' | 'dead';
  */
 export interface SessionData {
   name: string;
-  transportConfig: ServerConfig; // Transport configuration (header values redacted to "<redacted>")
+  serverConfig: ServerConfig; // Transport configuration (header values redacted to "<redacted>")
   profileName?: string; // Name of auth profile (for OAuth servers)
   pid?: number; // Bridge process PID
   protocolVersion?: string; // Negotiated MCP version

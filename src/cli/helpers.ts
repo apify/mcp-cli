@@ -152,7 +152,7 @@ export async function resolveAuthProfile(
 }
 
 /**
- * Resolve a target string to transport configuration
+ * Resolve a target string to server configuration
  *
  * Target types:
  * - @<name> - Named session (looks up in sessions.json)
@@ -182,60 +182,19 @@ export async function resolveTarget(
   // Config file entry - check this first to avoid treating config names as URLs
   if (options.config) {
     logger.debug(`Loading config file: ${options.config}`);
-
-    // Load and parse config file
-    const config = loadConfig(options.config);
-
-    // Get server configuration by name
-    const serverConfig = getServerConfig(config, target);
-
-    // Validate server configuration
+    const mcpConfig = loadConfig(options.config);
+    const serverConfig = getServerConfig(mcpConfig, target);
     validateServerConfig(serverConfig);
 
-    // Convert to TransportConfig
-    if (serverConfig.url) {
-      // HTTP/HTTPS server - merge config headers with CLI --header flags (CLI takes precedence)
-      // Note: Auth is handled via authProvider in withMcpClient, not via headers
-      const headers: Record<string, string> = {
-        ...serverConfig.headers,
-        ...parseHeaderFlags(options.headers),
-      };
+    // Merge CLI options with config file (CLI takes precedence)
+    const cliHeaders = parseHeaderFlags(options.headers);
+    const mergedHeaders = { ...serverConfig.headers, ...cliHeaders };
 
-      const transportConfig: ServerConfig = {
-        url: serverConfig.url,
-      };
-
-      if (Object.keys(headers).length > 0) {
-        transportConfig.headers = headers;
-      }
-
-      // Timeout: CLI flag > config file > default
-      if (options.timeout) {
-        transportConfig.timeout = options.timeout;
-      } else if (serverConfig.timeout) {
-        transportConfig.timeout = serverConfig.timeout;
-      }
-
-      return transportConfig;
-    } else if (serverConfig.command) {
-      // Stdio server
-      const transportConfig: ServerConfig = {
-        command: serverConfig.command,
-      };
-
-      if (serverConfig.args !== undefined) {
-        transportConfig.args = serverConfig.args;
-      }
-
-      if (serverConfig.env !== undefined) {
-        transportConfig.env = serverConfig.env;
-      }
-
-      return transportConfig;
-    }
-
-    // Should never reach here due to validateServerConfig
-    throw new ClientError(`Invalid server configuration for: ${target}`);
+    return {
+      ...serverConfig,
+      ...(Object.keys(mergedHeaders).length > 0 && { headers: mergedHeaders }),
+      ...(options.timeout && { timeout: options.timeout }),
+    };
   }
 
   // Try to parse as URL (will default to https:// if no scheme provided)
@@ -243,7 +202,6 @@ export async function resolveTarget(
   try {
     url = normalizeServerUrl(target);
   } catch (error) {
-    // Not a valid URL, throw error with helpful message
     throw new ClientError(
       `Failed to resolve target: ${target}\n` +
         `Target must be one of:\n` +
@@ -254,23 +212,14 @@ export async function resolveTarget(
     );
   }
 
-  // Parse --header flags (auth is handled via authProvider in withMcpClient)
+  // Build server config from URL and CLI options
   const headers = parseHeaderFlags(options.headers);
 
-  const config: ServerConfig = {
+  return {
     url,
+    ...(Object.keys(headers).length > 0 && { headers }),
+    ...(options.timeout && { timeout: options.timeout }),
   };
-
-  if (Object.keys(headers).length > 0) {
-    config.headers = headers;
-  }
-
-  // Only include timeout if it's provided
-  if (options.timeout) {
-    config.timeout = options.timeout;
-  }
-
-  return config;
 }
 
 /**
@@ -315,14 +264,14 @@ export async function withMcpClient<T>(
   }
 
   // Regular direct connection
-  const transportConfig = await resolveTarget(target, options);
+  const serverConfig = await resolveTarget(target, options);
 
-  logger.debug('Resolved target:', { target, transportConfig });
+  logger.debug('Resolved target:', { target, serverConfig });
 
   // Create and connect client
   const clientConfig: Parameters<typeof createMcpClient>[0] = {
     clientInfo: { name: 'mcpc', version: packageJson.version },
-    transportConfig: transportConfig,
+    serverConfig,
     capabilities: {
       // Declare client capabilities
       roots: { listChanged: true },
@@ -338,9 +287,9 @@ export async function withMcpClient<T>(
 
   // For HTTP transports, resolve auth profile and create authProvider
   let profileName: string | undefined;
-  if (transportConfig.url) {
-    profileName = await resolveAuthProfile(transportConfig.url, target, options.profile);
-    const authProvider = await createAuthProviderForServer(transportConfig.url, profileName);
+  if (serverConfig.url) {
+    profileName = await resolveAuthProfile(serverConfig.url, target, options.profile);
+    const authProvider = await createAuthProviderForServer(serverConfig.url, profileName);
     if (authProvider) {
       clientConfig.authProvider = authProvider;
       logger.debug(`Using auth profile: ${profileName}`);
@@ -358,7 +307,7 @@ export async function withMcpClient<T>(
         outputMode: options.outputMode,
         hide: options.hideTarget,
         profileName,
-        transportConfig,
+        serverConfig: serverConfig,
       });
     }
 

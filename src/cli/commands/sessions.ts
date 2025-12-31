@@ -73,13 +73,13 @@ export async function connectSession(
     }
 
     // Resolve target to transport config
-    const transportConfig = await resolveTarget(target, options);
+    const serverConfig = await resolveTarget(target, options);
 
     // For HTTP targets, resolve auth profile (with helpful errors if none available)
     let profileName: string | undefined;
-    if (transportConfig.url) {
+    if (serverConfig.url) {
       profileName = await resolveAuthProfile(
-        transportConfig.url,
+        serverConfig.url,
         target,
         options.profile,
         { sessionName: name }
@@ -91,8 +91,8 @@ export async function connectSession(
     // because it comes from the OAuth profile and may expire.
     // The bridge will get fresh tokens via the profile mechanism instead.
     let headers: Record<string, string> | undefined;
-    if (Object.keys(transportConfig.headers || {}).length > 0) {
-      headers = { ...transportConfig.headers };
+    if (Object.keys(serverConfig.headers || {}).length > 0) {
+      headers = { ...serverConfig.headers };
 
       // Remove OAuth-derived Authorization header - it will be handled via the profile
       if (profileName && headers.Authorization?.startsWith('Bearer ')) {
@@ -110,16 +110,16 @@ export async function connectSession(
     }
 
     // Create or update session record (without pid - that comes from startBridge)
-    // Store transportConfig with headers redacted (actual values in keychain)
+    // Store serverConfig with headers redacted (actual values in keychain)
     const isReconnect = !!existingSession;
-    const { headers: _originalHeaders, ...baseTransportConfig } = transportConfig;
+    const { headers: _originalHeaders, ...baseTransportConfig } = serverConfig;
     const sessionTransportConfig: ServerConfig = {
       ...baseTransportConfig,
       ...(headers && Object.keys(headers).length > 0 && { headers: redactHeaders(headers) }),
     };
 
     const sessionUpdate: Parameters<typeof updateSession>[1] = {
-      transportConfig: sessionTransportConfig,
+      serverConfig: sessionTransportConfig,
       ...(profileName && { profileName }),
     };
 
@@ -127,7 +127,7 @@ export async function connectSession(
       await updateSession(name, sessionUpdate);
       logger.debug(`Session record updated for reconnect: ${name}`);
     } else {
-      await saveSession(name, { transportConfig: sessionTransportConfig, createdAt: new Date().toISOString(), ...sessionUpdate });
+      await saveSession(name, { serverConfig: sessionTransportConfig, createdAt: new Date().toISOString(), ...sessionUpdate });
       logger.debug(`Initial session record created for: ${name}`);
     }
 
@@ -135,7 +135,7 @@ export async function connectSession(
     try {
       const bridgeOptions: StartBridgeOptions = {
         sessionName: name,
-        transportConfig,
+        serverConfig: serverConfig,
         verbose: options.verbose || false,
       };
       if (headers) {

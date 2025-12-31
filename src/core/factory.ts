@@ -29,7 +29,7 @@ export interface CreateMcpClientOptions {
   /**
    * Transport configuration
    */
-  transportConfig: ServerConfig;
+  serverConfig: ServerConfig;
 
   /**
    * Client capabilities to advertise
@@ -95,7 +95,7 @@ export async function createMcpClient(options: CreateMcpClientOptions): Promise<
 
   factoryLogger.debug('Creating MCP client', {
     clientName: options.clientInfo.name,
-    transportType: options.transportConfig.command ? 'stdio' : 'http',
+    transportType: options.serverConfig.command ? 'stdio' : 'http',
     hasAuthProvider: !!options.authProvider,
   });
 
@@ -113,7 +113,7 @@ export async function createMcpClient(options: CreateMcpClientOptions): Promise<
   if (autoConnect) {
     factoryLogger.debug('Creating transport with authProvider:', !!options.authProvider);
     const transport = createTransportFromConfig(
-      options.transportConfig,
+      options.serverConfig,
       options.authProvider ? { authProvider: options.authProvider } : {}
     );
     await client.connect(transport);

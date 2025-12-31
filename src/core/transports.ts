@@ -49,12 +49,12 @@ export function createStdioTransport(config: StdioServerParameters): Transport {
 
   // Suppress server stderr unless in verbose mode
   // Server stderr typically contains startup messages that clutter output
-  const transportConfig: StdioServerParameters = {
+  const params: StdioServerParameters = {
     ...config,
     stderr: getVerbose() ? 'inherit' : 'ignore',
   };
 
-  return new StdioClientTransport(transportConfig);
+  return new StdioClientTransport(params);
 }
 
 /**

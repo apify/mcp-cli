@@ -22,7 +22,7 @@ test_pass
 # (timestamps change, other tests create sessions). Invariant tested separately.
 test_case "session shows stdio transport"
 run_mcpc --json
-command=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .transportConfig.command")
+command=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .serverConfig.command")
 assert_not_empty "$command" "command should be present for stdio transport"
 test_pass
 

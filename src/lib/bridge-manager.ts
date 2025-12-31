@@ -40,7 +40,7 @@ function getBridgeExecutable(): string {
 
 export interface StartBridgeOptions {
   sessionName: string;
-  transportConfig: ServerConfig;
+  serverConfig: ServerConfig;
   verbose?: boolean;
   profileName?: string; // Auth profile name for token refresh
   headers?: Record<string, string>; // Headers to send via IPC (caller stores in keychain)
@@ -66,7 +66,7 @@ export interface StartBridgeResult {
  * @returns Bridge process PID
  */
 export async function startBridge(options: StartBridgeOptions): Promise<StartBridgeResult> {
-  const { sessionName, transportConfig, verbose, profileName, headers } = options;
+  const { sessionName, serverConfig, verbose, profileName, headers } = options;
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
 
@@ -83,7 +83,7 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
 
   // Create a sanitized transport config without any headers
   // Headers will be sent to the bridge via IPC instead
-  const sanitizedTarget: ServerConfig = { ...transportConfig };
+  const sanitizedTarget: ServerConfig = { ...serverConfig };
   delete sanitizedTarget.headers; // Only exists for http, no-op for stdio
 
   // Prepare bridge arguments (with sanitized config - no headers)
@@ -144,7 +144,7 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
   if (profileName || headers) {
     await sendAuthCredentialsToBridge(
       socketPath,
-      transportConfig.url || transportConfig.command || '',
+      serverConfig.url || serverConfig.command || '',
       profileName,
       headers
     );
@@ -218,12 +218,12 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   }
 
   // Build transport config from session data (exclude redacted headers)
-  const transportConfig: ServerConfig = { ...session.transportConfig };
-  delete transportConfig.headers;
+  const serverConfig: ServerConfig = { ...session.serverConfig };
+  delete serverConfig.headers;
 
   // Retrieve transport headers from keychain for failover, and cross-check them
   let headers: Record<string, string> | undefined;
-  const expectedHeaderKeys = session.transportConfig.headers ? Object.keys(session.transportConfig.headers) : [];
+  const expectedHeaderKeys = session.serverConfig.headers ? Object.keys(session.serverConfig.headers) : [];
   if (expectedHeaderKeys.length > 0) {
     headers = await readKeychainSessionHeaders(sessionName);
     const retrievedHeaderKeys = new Set(Object.keys(headers || {}));
@@ -240,7 +240,7 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   // Start a new bridge, preserving auth profile
   const bridgeOptions: StartBridgeOptions = {
     sessionName,
-    transportConfig,
+    serverConfig: serverConfig,
   };
   if (headers) {
     bridgeOptions.headers = headers;

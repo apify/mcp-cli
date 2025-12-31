@@ -55,7 +55,7 @@ Let's add more e2e test scenarios:
 - test env var substitution works for config files (unit +e2e)
 
 - test that all headers for HTTP server do not leak in process list (e.g. use --header to pass 
-  something, and ensure it's not present in "ps aux")
+  something, and ensure it's not present in "ps aux"), and that <redacted> works
 
 
 - Testing servers we can use:

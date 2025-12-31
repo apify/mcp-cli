@@ -29,7 +29,7 @@ const logger = createLogger('bridge');
 
 interface BridgeOptions {
   sessionName: string;
-  transportConfig: ServerConfig;
+  serverConfig: ServerConfig;
   verbose?: boolean;
   profileName?: string; // Auth profile name for token refresh
 }
@@ -182,7 +182,7 @@ class BridgeProcess {
    * 2. HTTP headers (static headers from --header flags)
    */
   private async updateTransportAuth(): Promise<ServerConfig> {
-    const config = { ...this.options.transportConfig };
+    const config = { ...this.options.serverConfig };
 
     // Only update auth for HTTP transport
     if (!config.url) {
@@ -357,21 +357,21 @@ class BridgeProcess {
     logger.debug(`  headers: ${this.headers ? Object.keys(this.headers).length : 0}`);
 
     // Get transport config
-    let transportConfig: ServerConfig;
+    let serverConfig: ServerConfig;
     if (this.authProvider) {
       // TODO: feels like this code should (is?) be handled by updateTransportAuth
       // If we have an authProvider, DON'T add Authorization header to transport
       // Let the SDK's authProvider handle token refresh automatically
       // Only add non-OAuth headers (from --header flags) to transport
-      transportConfig = { ...this.options.transportConfig };
+      serverConfig = { ...this.options.serverConfig };
       if (this.headers) {
-        transportConfig.headers = { ...transportConfig.headers, ...this.headers };
+        serverConfig.headers = { ...serverConfig.headers, ...this.headers };
         logger.debug(`Added ${Object.keys(this.headers).length} non-OAuth headers to transport`);
       }
     } else {
       // No authProvider - use updateTransportAuth for static headers
       logger.debug('No authProvider - using updateTransportAuth for headers');
-      transportConfig = await this.updateTransportAuth();
+      serverConfig = await this.updateTransportAuth();
     }
 
     logger.debug('Building MCP client config...');
@@ -382,7 +382,7 @@ class BridgeProcess {
 
     const clientConfig: CreateMcpClientOptions = {
       clientInfo: { name: 'mcpc', version: packageJson.version },
-      transportConfig,
+      serverConfig,
       capabilities: {
         roots: { listChanged: true },
         sampling: {},
@@ -915,7 +915,7 @@ async function main(): Promise<void> {
   try {
     const bridgeOptions: BridgeOptions = {
       sessionName,
-      transportConfig: JSON.parse(transportConfigJson) as ServerConfig,
+      serverConfig: JSON.parse(transportConfigJson) as ServerConfig,
       verbose,
     };
     if (profileName) {

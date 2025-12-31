@@ -520,21 +520,21 @@ export function formatSessionLine(session: SessionData): string {
 
   // Format target
   let target: string;
-  if (session.transportConfig.url) {
+  if (session.serverConfig.url) {
     // For http: show full URL as there might be different MCP servers on different paths
-    target = session.transportConfig.url;
+    target = session.serverConfig.url;
   } else {
     // For stdio: show command + args
-    target = session.transportConfig.command || 'unknown';
-    if (session.transportConfig.args && session.transportConfig.args.length > 0) {
-      target += ' ' + session.transportConfig.args.join(' ');
+    target = session.serverConfig.command || 'unknown';
+    if (session.serverConfig.args && session.serverConfig.args.length > 0) {
+      target += ' ' + session.serverConfig.args.join(' ');
     }
   }
   const targetStr = truncateWithEllipsis(target, 80);
 
   // Format transport/auth info
   let authStr: string;
-  if (session.transportConfig.command) {
+  if (session.serverConfig.command) {
     authStr = chalk.dim('(stdio)');
   } else if (session.profileName) {
     authStr = chalk.dim('(http, oauth: ') + chalk.magenta(session.profileName) + chalk.dim(')');
@@ -552,7 +552,7 @@ export interface LogTargetOptions {
   outputMode: OutputMode;
   hide?: boolean | undefined;
   profileName?: string | undefined; // Auth profile being used (for http targets)
-  transportConfig?: ServerConfig | undefined; // Resolved transport config (for non-session targets)
+  serverConfig?: ServerConfig | undefined; // Resolved transport config (for non-session targets)
 }
 
 /**
@@ -575,7 +575,7 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
   }
 
   // For direct connections, use transportConfig if available
-  const tc = options.transportConfig;
+  const tc = options.serverConfig;
   if (tc?.command) {
     // Stdio transport: show command + args
     let targetStr = tc.command;
