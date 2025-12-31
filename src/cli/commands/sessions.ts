@@ -165,7 +165,9 @@ export async function connectSession(
     }
 
     // Success! Show server info like when running "mcpc <target>"
-    console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
+    if (options.outputMode === 'human') {
+      console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
+    }
 
     // Display server info via the new session
     await showServerDetails(name, {

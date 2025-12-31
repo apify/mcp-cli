@@ -2,7 +2,7 @@
 # TODOs
 
 ## Bugs
-- 
+
 
 ## Next
 
@@ -11,7 +11,7 @@
 
 - Expand --help to use same text as in README, add link to README
 
-# MCP features
+## MCP features
 
 - Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
   automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
@@ -66,3 +66,4 @@ Let's add more e2e test scenarios:
   - https://mcp.apify.com/tools=docs (anonymous, no auth needed)
   - https://mcp.sentry.dev/mcp (for testing if no auth profile available)
   - ideally get some on non-standard port, maybe localhost
+

@@ -64,4 +64,24 @@ run_xmcpc --version
 assert_success
 test_pass
 
+# Test: session creation with --json returns only valid JSON to stdout
+test_case "session create --json returns only valid JSON"
+SESSION=$(session_name "json-test")
+run_mcpc --config "$(create_fs_config "$TEST_TMP")" fs session "$SESSION" --json
+assert_success
+_SESSIONS_CREATED+=("$SESSION")
+assert_json_valid "$STDOUT" "session create --json should return only valid JSON to stdout"
+test_pass
+
+# Test: session close with --json returns only valid JSON to stdout
+test_case "session close --json returns only valid JSON"
+run_mcpc "$SESSION" close --json
+assert_success
+_SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION}")
+assert_json_valid "$STDOUT" "session close --json should return only valid JSON to stdout"
+# Verify JSON structure
+assert_json "$STDOUT" '.sessionName' "should have sessionName field"
+assert_json "$STDOUT" '.closed' "should have closed field"
+test_pass
+
 test_done
