@@ -7,6 +7,7 @@
 import type {
   Tool,
   Resource,
+  ResourceTemplate,
   Prompt,
   PromptArgument,
   Implementation,
@@ -36,6 +37,7 @@ import type {
 export type {
   Tool,
   Resource,
+  ResourceTemplate,
   Prompt,
   PromptArgument,
   Implementation,

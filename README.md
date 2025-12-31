@@ -469,6 +469,7 @@ mcpc --json @apify tools-call search-actors --args query="tiktok scraper" \
 #### Human-readable (default)
 
 Default output is formatted for human and AI readability with plain text, colors, and Markdown-like formatting.
+The text is formatted in Markdown-compatible format for AIs with colors for easy human readability.
 
 #### JSON mode
 

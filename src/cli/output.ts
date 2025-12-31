@@ -7,7 +7,7 @@
 
 import chalk from 'chalk';
 import type { OutputMode, ServerConfig } from '../lib/index.js';
-import type { Tool, Resource, Prompt, SessionData, ServerDetails } from '../lib/types.js';
+import type { Tool, Resource, ResourceTemplate, Prompt, SessionData, ServerDetails } from '../lib/types.js';
 import { extractSingleTextContent } from './tool-result.js';
 import { isValidSessionName } from '../lib/utils.js';
 import { getSession } from '../lib/sessions.js';
@@ -129,6 +129,9 @@ export function formatHuman(data: unknown): string {
     if (first && typeof first === 'object') {
       if ('name' in first && 'inputSchema' in first) {
         return formatTools(data as Tool[]);
+      }
+      if ('uriTemplate' in first) {
+        return formatResourceTemplates(data as ResourceTemplate[]);
       }
       if ('uri' in first) {
         return formatResources(data as Resource[]);
@@ -385,32 +388,120 @@ export function formatToolDetail(tool: Tool): string {
 }
 
 /**
- * Format a list of resources as Markdown
+ * Format a list of resources with Markdown-like display
  */
 export function formatResources(resources: Resource[]): string {
   const lines: string[] = [];
 
-  lines.push(chalk.bold(`Resources (${resources.length}):`));
-  lines.push('');
+  // Header with resource count
+  lines.push(chalk.bold(`Available resources (${resources.length}):`));
 
+  // Summary list of resources
+  const bullet = chalk.dim('*');
   for (const resource of resources) {
-    lines.push(`## \`${resource.uri}\``);
+    lines.push(`${bullet} ${inBackticks(resource.uri)}`);
+  }
 
-    const details: string[] = [];
-    if (resource.name) {
-      details.push(`**Name:** ${resource.name}`);
-    }
-    if (resource.description) {
-      details.push(`**Description:** ${resource.description}`);
-    }
-    if (resource.mimeType) {
-      details.push(`**MIME Type:** ${resource.mimeType}`);
-    }
-
-    if (details.length > 0) {
-      lines.push(details.join('  \n'));
-    }
+  // Detailed view for each resource with separators
+  for (const resource of resources) {
     lines.push('');
+    lines.push(chalk.dim('---'));
+    lines.push(formatResourceDetail(resource));
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a single resource with details (Markdown-like display)
+ */
+export function formatResourceDetail(resource: Resource): string {
+  const lines: string[] = [];
+
+  // Resource header: Resource: `uri`
+  lines.push(`${chalk.bold('Resource:')} ${inBackticks(resource.uri)}`);
+
+  // Name (if different from URI)
+  if (resource.name) {
+    lines.push(`${chalk.bold('Name:')} ${resource.name}`);
+  }
+
+  // MIME type
+  if (resource.mimeType) {
+    lines.push(`${chalk.bold('MIME type:')} ${chalk.yellow(resource.mimeType)}`);
+  }
+
+  // Description in code block
+  lines.push('');
+  lines.push(chalk.bold('Description:'));
+  if (resource.description) {
+    lines.push(chalk.gray('````'));
+    lines.push(resource.description);
+    lines.push(chalk.gray('````'));
+  } else {
+    lines.push(chalk.gray('````'));
+    lines.push(chalk.gray('(no description)'));
+    lines.push(chalk.gray('````'));
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a list of resource templates with Markdown-like display
+ */
+export function formatResourceTemplates(templates: ResourceTemplate[]): string {
+  const lines: string[] = [];
+
+  // Header with template count
+  lines.push(chalk.bold(`Available resource templates (${templates.length}):`));
+
+  // Summary list of templates
+  const bullet = chalk.dim('*');
+  for (const template of templates) {
+    lines.push(`${bullet} ${inBackticks(template.uriTemplate)}`);
+  }
+
+  // Detailed view for each template with separators
+  for (const template of templates) {
+    lines.push('');
+    lines.push(chalk.dim('---'));
+    lines.push(formatResourceTemplateDetail(template));
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a single resource template with details (Markdown-like display)
+ */
+export function formatResourceTemplateDetail(template: ResourceTemplate): string {
+  const lines: string[] = [];
+
+  // Template header: Template: `uriTemplate`
+  lines.push(`${chalk.bold('Template:')} ${inBackticks(template.uriTemplate)}`);
+
+  // Name (if present)
+  if (template.name) {
+    lines.push(`${chalk.bold('Name:')} ${template.name}`);
+  }
+
+  // MIME type
+  if (template.mimeType) {
+    lines.push(`${chalk.bold('MIME type:')} ${chalk.yellow(template.mimeType)}`);
+  }
+
+  // Description in code block
+  lines.push('');
+  lines.push(chalk.bold('Description:'));
+  if (template.description) {
+    lines.push(chalk.gray('````'));
+    lines.push(template.description);
+    lines.push(chalk.gray('````'));
+  } else {
+    lines.push(chalk.gray('````'));
+    lines.push(chalk.gray('(no description)'));
+    lines.push(chalk.gray('````'));
   }
 
   return lines.join('\n');
