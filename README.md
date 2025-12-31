@@ -13,11 +13,11 @@ and AI coding agents to use MCP in ["code mode"](https://www.anthropic.com/engin
 for better accuracy and lower token compared to traditional tool function calling.
 After all, UNIX-compatible shell script is THE most universal coding language, for people and LLMs alike.
 
-Note that `mcpc` does not use LLMs on its own; that's job for the higher layer.
+Note that `mcpc` does not use LLMs on its own; that's a job for the higher layer.
 
 **Key features**
 
-- 🔌 **Compatible** - Works with any MCP server over Streamable HTTP or stdio.
+- 🔌 **Super compatible** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
 - 🚀 **Zero setup** - Connect to remote servers instantly with just a URL.
 - 🔧 **Full protocol support** - Tools, resources, prompts, dynamic discovery, and async notifications.
@@ -93,69 +93,55 @@ npm install -g @apify/mcpc
 # List all active sessions and saved authentication profiles
 mcpc
 
-# Interact with a local MCP server package (stdio) referenced from config file
-mcpc --config ~/.vscode/mcp.json filesystem tools-list
-
 # Login to remote MCP server and save OAuth credentials for future use
 mcpc mcp.apify.com login
 
-# Show information about a remote MCP server and open interactive shell
+# Show information about a remote MCP server
 mcpc mcp.apify.com
-mcpc mcp.apify.com shell
 
-# Enable JSON mode for scripting
-mcpc --json mcp.apify.com tools-list
+# Use JSON mode for scripting
+mcpc mcp.apify.com tools-list --json
 
 # Create and use persistent MCP session
 mcpc mcp.apify.com session @test
 mcpc @test tools-call search-actors --args keywords="web crawler"
 mcpc @test shell
+
+# Interact with a local MCP server package (stdio) referenced from config file
+mcpc --config ~/.vscode/mcp.json filesystem tools-list
 ```
 
 ## Usage
 
 ```bash
-mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--version] [--schema-mode <mode>]
-     [--verbose] [--timeout <seconds>] [--clean|--clean=sessions,logs,profiles,all]
-     <target> <command...>
+Usage: mcpc [options] [target] [command]
 
-# Lists all active sessions and saved authentication profiles
-mcpc
+Options:
+  -v, --version           Output the version number
+  -j, --json              Output in JSON format for scripting
+  --verbose               Enable verbose logging
+  -c, --config <file>     Path to MCP config JSON file (e.g. ".vscode/mcp.json")
+  -H, --header <header>   Add HTTP header (can be repeated)
+  --timeout <seconds>     Request timeout in seconds (default: 300)
+  --profile <name>        Authentication profile to use (default: "default")
+  --schema <file>         Validate against expected tool/prompt schema
+  --schema-mode <mode>    Schema validation mode: "strict", "compatible" (default), or "ignore"
+  --clean[=types]         Clean up mcpc data (types: "sessions,logs,profiles,all")
+  -h, --help              Display general help
 
-# Shows server or session info, instructions, and capabilities         
-mcpc <target>
+Targets:
+  <server-url>            Remote MCP server URL (e.g. "mcp.apify.com")
+  <config-entry>          Entry from MCP config file specified in --config (e.g. "fs")
+  @<session>              Named persistent session (e.g. "@apify")
 
-# MCP commands
-mcpc <target> tools
-mcpc <target> tools-list
-mcpc <target> tools-get <tool-name> [--schema <file>]
-mcpc <target> tools-call <tool-name> [--args key=val key2:=json ...] [--args-file <file>] [--schema <file>]
-
-mcpc <target> prompts
-mcpc <target> prompts-list
-mcpc <target> prompts-get <prompt-name> [--args key=val key2:=json ...] [--args-file <file>] [--schema <file>]
-
-mcpc <target> resources
-mcpc <target> resources-list
-mcpc <target> resources-read <uri>
-mcpc <target> resources-subscribe <uri>
-mcpc <target> resources-unsubscribe <uri>
-mcpc <target> resources-templates-list
-
-mcpc <target> logging-set-level <level>
-
-# Interactive MCP shell
-mcpc <target> shell
-
-# Persistent sessions
-mcpc <server> session @<session-name> [--profile <name>]
-mcpc @<session-name> <command...>
-mcpc @<session-name> restart
-mcpc @<session-name> close
-
-# Saved OAuth profiles for remote MCP servers
-mcpc <server> login [--profile <name>]
-mcpc <server> logout [--profile <name>]
+Commands:
+  help                    Show server info, instructions, and capabilities
+  shell                   Open interactive shell to run MCP commands)
+  login                   Create OAuth profile with credentials to access remote server
+  logout                  Remove OAuth profile
+  session @<session>      Create a named persistent session
+  restart @<session>      Kill and restart a session  
+  close @<session>        Close a session
 ```
 
 where `<target>` can be one of (in this order of precedence):
@@ -201,16 +187,6 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 - Key=value pairs: After `--args`, all `key=value` or `key:=json` pairs are consumed until next flag
 - `=` assigns as string, `:=` parses as JSON
 - Stdin is automatically detected when input is piped (not interactive terminal)
-
-### Global flags
-
-- `--json` - Input and output in JSON format for scripting
-- `--config <file>` - Use MCP config JSON file (e.g., `.vscode/mcp.json`)
-- `-H, --header "Key: Value"` - Add HTTP header (can be repeated)
-- `-v, --verbose` - Enable verbose logging (shows protocol details)
-- `--timeout <seconds>` - Request timeout in seconds (default: 300)
-- `--schema <file>` - Validate against expected tool/prompt schema
-- `--schema-mode <mode>` - Schema validation mode: `strict`, `compatible`, or `ignore` (default: `compatible`)
 
 ## Authentication
 
@@ -815,8 +791,6 @@ This architecture ensures:
 - No credentials logged even in verbose mode
 - `MCP-Protocol-Version` and `MCP-Session-Id` headers handled per MCP spec
 
-**Note:** Origin header validation for DNS rebinding protection is a server-side responsibility per the MCP spec.
-
 ## Error handling
 
 `mcpc` provides clear error messages for common issues:
@@ -941,7 +915,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, architecture ove
 
 ## Authors
 
-Built by [Jan Curn](https://x.com/jancurn), [Apify](https://apify.com), and contributors welcome.
+Built by [Jan Curn](https://x.com/jancurn) / [Apify](https://apify.com).
 
 ## License
 

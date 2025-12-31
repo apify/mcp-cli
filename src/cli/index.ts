@@ -13,7 +13,7 @@
 import { Command } from 'commander';
 import { setVerbose, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatError } from '../lib/index.js';
-import { formatJsonError, rainbow } from './output.js';
+import { formatJson, formatJsonError, rainbow } from './output.js';
 import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
 import * as prompts from './commands/prompts.js';
@@ -102,7 +102,7 @@ async function main(): Promise<void> {
   if (args.includes('--version') || args.includes('-v')) {
     const options = extractOptions(args);
     if (options.json) {
-      console.log(JSON.stringify({ version: packageJson.version }, null, 2));
+      console.log(formatJson({ version: packageJson.version }));
     } else {
       console.log(packageJson.version);
     }

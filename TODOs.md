@@ -7,6 +7,8 @@
   - in README, explain the MCP commands better in a standalone section, with details how they work
   - Expand --help to use same text as in README, add link to README
 
+- We support "prompts", "tools" etc commands ... do we need to?
+
 ## MCP features
 
 - Add `--proxy [HOST:]PORT` feature to `connect` command to enable MCP proxy:
