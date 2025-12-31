@@ -38,6 +38,13 @@ export interface McpClientOptions extends ClientOptions {
 }
 
 /**
+ * Transport with session termination capability (e.g., StreamableHTTPClientTransport)
+ */
+interface TransportWithTermination extends Transport {
+  terminateSession?: () => Promise<void>;
+}
+
+/**
  * MCP Client wrapper class
  * Provides a convenient interface to the MCP SDK Client with error handling and logging
  * Implements IMcpClient interface for compatibility with SessionClient
@@ -46,6 +53,7 @@ export class McpClient implements IMcpClient {
   private client: SDKClient;
   private logger: Logger;
   private negotiatedProtocolVersion?: string;
+  private transport?: TransportWithTermination;
 
   constructor(clientInfo: Implementation, options: McpClientOptions = {}) {
     this.logger = options.logger || createNoOpLogger();
@@ -72,6 +80,9 @@ export class McpClient implements IMcpClient {
   async connect(transport: Transport): Promise<void> {
     try {
       this.logger.debug('Connecting to MCP server...');
+
+      // Store transport for later use (e.g., terminateSession on close)
+      this.transport = transport as TransportWithTermination;
 
       // Set up transport error handlers
       transport.onerror = (error) => {
@@ -115,19 +126,37 @@ export class McpClient implements IMcpClient {
 
   /**
    * Close the connection to the server
-   * Fire-and-forget: starts close but doesn't wait for stdio process to exit
+   * For HTTP transport, sends DELETE request to terminate session before closing
    */
-  // eslint-disable-next-line @typescript-eslint/require-await
   async close(): Promise<void> {
     this.logger.debug('Closing connection...');
 
-    // Fire-and-forget close - don't wait for stdio child process
-    // The OS will clean up when our process exits
-    this.client.close().catch((error) => {
-      this.logger.debug('Error during close (ignored):', error);
-    });
+    try {
+      // For HTTP transport, terminate the session first (sends HTTP DELETE)
+      // This is separate from close() in the SDK - terminateSession() sends the DELETE,
+      // while close() just cleans up the client without notifying the server
+      if (this.transport?.terminateSession) {
+        this.logger.debug('Terminating session (sending DELETE)...');
+        try {
+          await Promise.race([
+            this.transport.terminateSession(),
+            new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+          ]);
+          this.logger.debug('Session terminated');
+        } catch (error) {
+          this.logger.debug('Error terminating session:', error);
+        }
+      }
 
-    this.logger.debug('Connection closed');
+      // Now close the client
+      await Promise.race([
+        this.client.close(),
+        new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+      ]);
+      this.logger.debug('Connection closed');
+    } catch (error) {
+      this.logger.debug('Error during close (ignored):', error);
+    }
   }
 
   /**

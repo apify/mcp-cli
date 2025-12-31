@@ -20,15 +20,17 @@ test_pass
 
 # Test: session appears in list
 test_case "session appears in list"
-run_xmcpc --json
+# Use run_mcpc (not run_xmcpc) because session list can change between runs
+# when other tests run in parallel with shared home
+run_mcpc --json
 assert_success
 assert_json "$STDOUT" ".sessions[] | select(.name == \"$SESSION\")"
 test_pass
 
 # Test: session status is live
 test_case "session status is live"
-run_xmcpc --json
-session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .bridgeStatus")
+run_mcpc --json
+session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .status")
 assert_eq "$session_status" "live" "session should be live"
 test_pass
 
@@ -55,7 +57,7 @@ test_pass
 
 # Test: session no longer in list
 test_case "session removed from list after close"
-run_xmcpc --json
+run_mcpc --json
 if echo "$STDOUT" | jq -e ".sessions[] | select(.name == \"$SESSION\")" >/dev/null 2>&1; then
   test_fail "session should not exist after close"
   exit 1

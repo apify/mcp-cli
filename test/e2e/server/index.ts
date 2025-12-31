@@ -475,6 +475,19 @@ async function main() {
       // Handle MCP requests via StreamableHTTPServerTransport
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
+      // Handle DELETE first (session termination) - must check before regular session lookup
+      if (req.method === 'DELETE') {
+        if (sessionId && transports.has(sessionId)) {
+          const oldTransport = transports.get(sessionId)!;
+          await oldTransport.close();
+          transports.delete(sessionId);
+          deletedSessions.push(sessionId);
+        }
+        res.writeHead(200);
+        res.end();
+        return;
+      }
+
       let transport: StreamableHTTPServerTransport;
 
       if (sessionId && transports.has(sessionId)) {
@@ -491,17 +504,6 @@ async function main() {
         // Connect to MCP server
         // Type assertion needed due to exactOptionalPropertyTypes incompatibility with MCP SDK
         await mcpServer.connect(transport as Parameters<typeof mcpServer.connect>[0]);
-      } else if (req.method === 'DELETE') {
-        // Session termination
-        if (sessionId && transports.has(sessionId)) {
-          const oldTransport = transports.get(sessionId)!;
-          await oldTransport.close();
-          transports.delete(sessionId);
-          deletedSessions.push(sessionId);
-        }
-        res.writeHead(200);
-        res.end();
-        return;
       } else {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid request' }));

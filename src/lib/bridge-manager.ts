@@ -174,7 +174,7 @@ export async function stopBridge(sessionName: string): Promise<void> {
       logger.debug(`Killing bridge process: ${session.pid}`);
       process.kill(session.pid, 'SIGTERM');
 
-      // Wait a bit for graceful shutdown
+      // Wait for graceful shutdown (gives time for HTTP DELETE to be sent)
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Force kill if still alive
