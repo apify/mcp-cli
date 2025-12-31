@@ -324,6 +324,24 @@ if [[ ${#FAILED_TESTS[@]} -gt 0 ]]; then
   done
 fi
 
+# Check for setup requirements (tests that were skipped due to missing configuration)
+SETUP_FILES=()
+while IFS= read -r -d '' setup_file; do
+  SETUP_FILES+=("$setup_file")
+done < <(find "$RUN_DIR" -name ".setup_required" -print0 2>/dev/null)
+
+if [[ ${#SETUP_FILES[@]} -gt 0 ]]; then
+  echo ""
+  echo -e "${YELLOW}════════════════════════════════════════${NC}"
+  echo -e "${YELLOW}Setup Required${NC}"
+  echo -e "${YELLOW}════════════════════════════════════════${NC}"
+  echo ""
+  # Show first setup message (they should all be similar for OAuth tests)
+  cat "${SETUP_FILES[0]}"
+  echo ""
+  echo -e "${YELLOW}Some tests were skipped. Run the commands above to enable them.${NC}"
+fi
+
 # Generate coverage report if enabled
 if [[ "$COVERAGE" == "true" ]]; then
   echo ""

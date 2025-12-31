@@ -90,7 +90,8 @@ locally:
 - `mcpc mcp.apify.com login --profile e2e-test2`
 
 To do that, you'll need to [create a free Apify account](http://console.apify.com/sign-up) - you 
-can use the same one for both profiles.
+can use the same one for both profiles. The test runner should not take any destructive action
+in your Apify account.
 
 ### Running tests
 
