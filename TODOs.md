@@ -4,14 +4,14 @@
 ## Next
 
 - Simplify README - there are too many top-level sections, and then show just the second level ones
--  - nit: in README, explain the MCP commands better in a standlone section, with details how they work
-
-- Expand --help to use same text as in README, add link to README
+  - in README, explain the MCP commands better in a standalone section, with details how they work
+  - Expand --help to use same text as in README, add link to README
 
 ## MCP features
 
 - Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
-  automatically update the -o file on changes, without it just keep track of changed files in bridge process' cache, and report in resources-list
+  automatically update the -o file on changes, without it just keep track of changed files in 
+  bridge process' cache, and report in resources-list/resources-read operation
 - Add `--proxy [HOST:]PORT` feature to `connect` command to enable MCP proxy:
   - `--proxy-bearer-token X` for proxy to require auth token for better security
   - `--proxy-capabilities tools:TOOL_NAME,TOOL_NAME2,...,prompts[:...],...` to limit access to selected MCP features and tools
@@ -19,6 +19,7 @@
     In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
   Explain this is useful for AI sandboxing!
 - Add support for asynchronous tasks
+- Add support for client roots, need to figure how exactly
 
 ## Later
 

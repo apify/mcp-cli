@@ -212,6 +212,8 @@ export interface CommandOptions {
   timeout?: number;
   verbose?: boolean;
   hideTarget?: boolean; // Suppress session info prefix (used in interactive shell)
+  schema?: string; // Path to expected schema file for validation
+  schemaMode?: 'strict' | 'compatible' | 'ignore'; // Schema validation mode
 }
 
 /**

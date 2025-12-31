@@ -17,7 +17,7 @@ Note that `mcpc` does not use LLMs on its own; that's job for the higher layer.
 
 **Key features**
 
-- 🔌 **Universal MCP client** - Works with any MCP server over Streamable HTTP or stdio.
+- 🔌 **Compatible** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
 - 🚀 **Zero setup** - Connect to remote servers instantly with just a URL.
 - 🔧 **Full protocol support** - Tools, resources, prompts, dynamic discovery, and async notifications.
@@ -115,9 +115,8 @@ mcpc @test shell
 ## Usage
 
 ```bash
-mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--version]
-     [--schema <file>] [--schema-mode <mode>] [--timeout <seconds>] 
-     [--verbose] [--clean|--clean=sessions,logs,profiles,all]
+mcpc [--json] [--config <file>] [-H|--header "K: V"] [-v|--version] [--schema-mode <mode>]
+     [--verbose] [--timeout <seconds>] [--clean|--clean=sessions,logs,profiles,all]
      <target> <command...>
 
 # Lists all active sessions and saved authentication profiles
@@ -129,12 +128,12 @@ mcpc <target>
 # MCP commands
 mcpc <target> tools
 mcpc <target> tools-list
-mcpc <target> tools-schema <tool-name>
-mcpc <target> tools-call <tool-name> [--args key=val key2:=json ...] [--args-file <file>]
+mcpc <target> tools-schema <tool-name> [--schema <file>]
+mcpc <target> tools-call <tool-name> [--args key=val key2:=json ...] [--args-file <file>] [--schema <file>]
 
 mcpc <target> prompts
 mcpc <target> prompts-list
-mcpc <target> prompts-get <prompt-name> [--args key=val key2:=json ...] [--args-file <file>]
+mcpc <target> prompts-get <prompt-name> [--args key=val key2:=json ...] [--args-file <file>] [--schema <file>]
 
 mcpc <target> resources
 mcpc <target> resources-list
@@ -524,8 +523,11 @@ mcpc @apify tools-call search-actors \
 
 The `--schema-mode <mode>` parameter determines how `mcpc` validates the schema:
 
-- `compatible` (default) - Backwards compatible (new optional fields OK, required fields and types must match)
-- `strict` - Exact schema match required (all fields, types must be identical)
+- `compatible` (default) - Backwards compatible (new optional fields OK, types of required 
+  fields and passed arguments must match, descriptions are ignored). For tools, the output schema
+  is ignored.
+- `strict` - Exact schema match required (all fields, their types and descriptions must be 
+  identical). For tools, the output schema must match exactly.
 - `ignore` - Skip schema validation altogether
 
 ### Session failover
@@ -708,6 +710,8 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 
 ## MCP protocol notes
 
+TODO: explain in detail how MCP concepts work in mcpc
+
 **Protocol initialization:**
 - `mcpc` follows the MCP initialization handshake: sends `initialize` request with protocol version and capabilities, receives server capabilities and instructions, then sends `initialized` notification
 - Protocol version negotiation: client proposes latest supported version (currently `2025-11-25`), server responds with version to use
@@ -722,10 +726,12 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 **Protocol features:**
 - `mcpc` supports all MCP primitives in both Streamable HTTP and stdio transports:
   - **Instructions**: Fetches and stores MCP server-provided `instructions`
-  - **Tools**: Executable functions with JSON Schema-validated arguments.
+  - **Tools**: Executable functions with JSON Schema-validated arguments. 
   - **Resources**: Data sources identified by URIs (e.g., `file:///path/to/file`, `https://example.com/data`), with optional subscriptions for change notifications
   - **Prompts**: Reusable message templates with customizable arguments
   - **Completion**: Provides access to Completion API for tools and resources
+  - **Asynchronous tasks**: Not implemented yet
+  - **Roots**: Not implemented yet
 - Supports server logging settings (`logging/setLevel`) and messages (`notifications/message`), and prints them to stderr or stdout based on verbosity level.
 - Handles server notifications: progress tracking, logging, and change notifications (`notifications/tools/list_changed`, `notifications/resources/list_changed`, `notifications/prompts/list_changed`)
 - Request multiplexing: supports up to 10 concurrent requests, queues up to 100 additional requests

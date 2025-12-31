@@ -462,7 +462,8 @@ export async function showServerDetails(
         formatOutput(
           {
             // mcpc-specific additions
-            // TODO: I think we should prefix them with "mcpc" or "x-"
+            // TODO: Perhaps we should prefix these with "mcpc", or "x-", or use "_meta"
+            //  (see https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/draft/basic/index.mdx#_meta)
             target,
             availableCommands,
             // MCP specs fields

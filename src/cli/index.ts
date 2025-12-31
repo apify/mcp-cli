@@ -36,6 +36,8 @@ interface HandlerOptions {
   timeout?: number;
   verbose?: boolean;
   profile?: string;
+  schema?: string;
+  schemaMode?: 'strict' | 'compatible' | 'ignore';
 }
 
 /**
@@ -67,6 +69,14 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
   if (opts.profile) options.profile = opts.profile;
   if (verbose) options.verbose = verbose;
+  if (opts.schema) options.schema = opts.schema;
+  if (opts.schemaMode) {
+    const mode = opts.schemaMode as string;
+    if (mode !== 'strict' && mode !== 'compatible' && mode !== 'ignore') {
+      throw new Error(`Invalid schema mode: ${mode}. Must be 'strict', 'compatible', or 'ignore'.`);
+    }
+    options.schemaMode = mode;
+  }
 
   return options;
 }

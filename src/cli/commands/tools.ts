@@ -2,11 +2,18 @@
  * Tools command handlers
  */
 
-import { formatOutput, formatToolDetail, formatSuccess } from '../output.js';
+import { formatOutput, formatToolDetail, formatSuccess, formatWarning } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import type { CommandOptions } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs, loadArgsFromFile } from '../parser.js';
+import {
+  loadSchemaFromFile,
+  validateToolSchema,
+  formatValidationError,
+  type ToolSchema,
+  type SchemaMode,
+} from '../../lib/schema-validator.js';
 
 
 /**
@@ -33,13 +40,39 @@ export async function listTools(target: string, options: CommandOptions): Promis
  * Get information about a specific tool
  */
 export async function getTool(target: string, name: string, options: CommandOptions): Promise<void> {
+  // Load expected schema if provided
+  let expectedSchema: ToolSchema | undefined;
+  if (options.schema) {
+    expectedSchema = (await loadSchemaFromFile(options.schema)) as ToolSchema;
+  }
+
   await withMcpClient(target, options, async (client) => {
     // List all tools and find the matching one
+    // TODO: It is wasteful to always re-fetch the full list (applies also to prompts),
+    //  especially considering that MCP SDK client caches these.
+    //  We should use SDK's or our own cache on bridge to make this more efficient
     const result = await client.listTools();
     const tool = result.tools.find((t) => t.name === name);
 
     if (!tool) {
       throw new ClientError(`Tool not found: ${name}`);
+    }
+
+    // Validate schema if provided
+    if (expectedSchema) {
+      const schemaMode: SchemaMode = options.schemaMode || 'compatible';
+      const validation = validateToolSchema(tool as ToolSchema, expectedSchema, schemaMode);
+
+      if (!validation.valid) {
+        throw new ClientError(formatValidationError(validation, `tool "${name}"`));
+      }
+
+      // Show warnings in human mode
+      if (validation.warnings.length > 0 && options.outputMode === 'human') {
+        for (const warning of validation.warnings) {
+          console.log(formatWarning(`Schema warning: ${warning}`));
+        }
+      }
     }
 
     if (options.outputMode === 'human') {
@@ -74,7 +107,37 @@ export async function callTool(
     parsedArgs = parseCommandArgs(options.args);
   }
 
+  // Load expected schema if provided
+  let expectedSchema: ToolSchema | undefined;
+  if (options.schema) {
+    expectedSchema = (await loadSchemaFromFile(options.schema)) as ToolSchema;
+  }
+
   await withMcpClient(target, options, async (client) => {
+    // Validate schema if provided (skip entirely in ignore mode)
+    const schemaMode: SchemaMode = options.schemaMode || 'compatible';
+    if (expectedSchema && schemaMode !== 'ignore') {
+      const result = await client.listTools();
+      const actualTool = result.tools.find((t) => t.name === name);
+
+      if (!actualTool) {
+        throw new ClientError(`Tool not found: ${name}`);
+      }
+
+      const validation = validateToolSchema(actualTool as ToolSchema, expectedSchema, schemaMode, parsedArgs);
+
+      if (!validation.valid) {
+        throw new ClientError(formatValidationError(validation, `tool "${name}"`));
+      }
+
+      // Show warnings in human mode
+      if (validation.warnings.length > 0 && options.outputMode === 'human') {
+        for (const warning of validation.warnings) {
+          console.log(formatWarning(`Schema warning: ${warning}`));
+        }
+      }
+    }
+
     const result = await client.callTool(name, parsedArgs);
 
     if (options.outputMode === 'human') {
