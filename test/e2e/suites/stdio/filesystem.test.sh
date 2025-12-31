@@ -7,6 +7,74 @@ test_init "stdio/filesystem"
 # Create a config file for the filesystem server
 CONFIG=$(create_fs_config "$TEST_TMP")
 
+# =============================================================================
+# Test: One-shot commands (direct connection, no session)
+# =============================================================================
+
+test_case "one-shot: server info via stdio"
+run_mcpc --config "$CONFIG" fs
+assert_success
+assert_contains "$STDOUT" "Capabilities:"
+test_pass
+
+test_case "one-shot: ping via stdio"
+run_mcpc --config "$CONFIG" fs ping
+assert_success
+assert_contains "$STDOUT" "Ping successful"
+test_pass
+
+test_case "one-shot: ping --json via stdio"
+run_mcpc --json --config "$CONFIG" fs ping
+assert_success
+assert_json_valid "$STDOUT"
+assert_json "$STDOUT" '.durationMs'
+test_pass
+
+test_case "one-shot: tools-list via stdio"
+run_xmcpc --config "$CONFIG" fs tools-list
+assert_success
+assert_contains "$STDOUT" "read_file"
+assert_contains "$STDOUT" "write_file"
+test_pass
+
+test_case "one-shot: tools-list --json via stdio"
+run_mcpc --json --config "$CONFIG" fs tools-list
+assert_success
+assert_json_valid "$STDOUT"
+assert_json "$STDOUT" '. | type == "array"'
+assert_json "$STDOUT" '. | length > 0'
+test_pass
+
+# Note: Filesystem server doesn't support resources or prompts,
+# so we skip those one-shot tests here. They are tested in basic/resources.test.sh
+# and basic/prompts.test.sh using the test server which supports all MCP features.
+
+test_case "one-shot: help via stdio"
+run_mcpc --config "$CONFIG" fs help
+assert_success
+assert_contains "$STDOUT" "Available commands:"
+test_pass
+
+# Create test file for one-shot tool call
+echo "One-shot test content" > "$TEST_TMP/oneshot.txt"
+
+test_case "one-shot: tools-call read_file via stdio"
+run_xmcpc --config "$CONFIG" fs tools-call read_file --args path="$TEST_TMP/oneshot.txt"
+assert_success
+assert_contains "$STDOUT" "One-shot test content"
+test_pass
+
+test_case "one-shot: tools-call --json via stdio"
+run_mcpc --json --config "$CONFIG" fs tools-call read_file --args path="$TEST_TMP/oneshot.txt"
+assert_success
+assert_json_valid "$STDOUT"
+assert_json "$STDOUT" '.content'
+test_pass
+
+# =============================================================================
+# Test: Session-based commands
+# =============================================================================
+
 # Generate unique session name
 SESSION=$(session_name "fs")
 

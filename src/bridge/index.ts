@@ -163,7 +163,7 @@ class BridgeProcess {
     // Store headers if provided (used when no OAuth refresh token available)
     if (credentials.headers) {
       this.headers = credentials.headers;
-      logger.debug(`Stored ${Object.keys(this.headers).length} headers in memory`);
+      logger.debug(`Stored headers "${Object.keys(this.headers).join(', ')}" in memory`);
     }
 
     // Signal that auth credentials have been received (unblocks startup)
@@ -354,7 +354,7 @@ class BridgeProcess {
     logger.debug('Connecting to MCP server...');
     logger.debug(`  authProvider: ${this.authProvider ? 'present' : 'NOT SET'}`);
     logger.debug(`  tokenManager: ${this.tokenManager ? 'present' : 'NOT SET'}`);
-    logger.debug(`  headers: ${this.headers ? Object.keys(this.headers).length : 0}`);
+    logger.debug(`  headers: ${this.headers ? Object.keys(this.headers).join(', ') : 'none'}`);
 
     // Get transport config
     let serverConfig: ServerConfig;
@@ -366,7 +366,7 @@ class BridgeProcess {
       serverConfig = { ...this.options.serverConfig };
       if (this.headers) {
         serverConfig.headers = { ...serverConfig.headers, ...this.headers };
-        logger.debug(`Added ${Object.keys(this.headers).length} non-OAuth headers to transport`);
+        logger.debug(`Added non-OAuth headers "${Object.keys(this.headers).join(', ')}" to transport`);
       }
     } else {
       // No authProvider - use updateTransportAuth for static headers

@@ -145,6 +145,82 @@ _SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION2}")
 test_pass
 
 # =============================================================================
+# Test: Verbose output doesn't leak secrets
+# =============================================================================
+
+test_case "verbose session creation doesn't leak secrets"
+SESSION3=$(session_name "sec-verb")
+VERBOSE_SECRET="verbose-secret-$(date +%s)"
+
+# Create session with verbose mode
+run_mcpc --verbose "$TEST_SERVER_URL" session "$SESSION3" --header "Authorization: Bearer $VERBOSE_SECRET"
+assert_success
+_SESSIONS_CREATED+=("$SESSION3")
+
+# Combine stdout and stderr for security check
+ALL_OUTPUT="$STDOUT$STDERR"
+
+# Check that secret is NOT in verbose output
+if echo "$ALL_OUTPUT" | grep -q "$VERBOSE_SECRET"; then
+  test_fail "Secret header value found in verbose session creation output!"
+fi
+
+# Bearer token patterns should not appear
+if echo "$ALL_OUTPUT" | grep -iE "Bearer [A-Za-z0-9_-]{10,}" | grep -q "$VERBOSE_SECRET"; then
+  test_fail "Bearer token pattern with secret found in verbose output!"
+fi
+
+test_pass
+
+test_case "verbose command doesn't leak secrets"
+# Run a command with verbose mode
+run_mcpc --verbose "$SESSION3" ping
+assert_success
+
+ALL_OUTPUT="$STDOUT$STDERR"
+
+# Check that secret is NOT in verbose output
+if echo "$ALL_OUTPUT" | grep -q "$VERBOSE_SECRET"; then
+  test_fail "Secret header value found in verbose command output!"
+fi
+
+# Authorization header with secret should not appear
+if echo "$ALL_OUTPUT" | grep -iE "Authorization:\s*Bearer\s+$VERBOSE_SECRET" >/dev/null 2>&1; then
+  test_fail "Authorization header with secret found in verbose output!"
+fi
+
+test_pass
+
+test_case "bridge log doesn't leak secrets"
+# Check the bridge log file
+BRIDGE_LOG="$MCPC_HOME_DIR/logs/bridge-$SESSION3.log"
+
+if [[ -f "$BRIDGE_LOG" ]]; then
+  LOG_CONTENT=$(cat "$BRIDGE_LOG")
+
+  # Check that secret is NOT in bridge log
+  if echo "$LOG_CONTENT" | grep -q "$VERBOSE_SECRET"; then
+    test_fail "Secret header value found in bridge log!"
+  fi
+
+  # Bearer token with secret should not appear
+  if echo "$LOG_CONTENT" | grep -iE "Bearer.*$VERBOSE_SECRET" >/dev/null 2>&1; then
+    test_fail "Bearer token with secret found in bridge log!"
+  fi
+
+  # Authorization header with secret should not appear
+  if echo "$LOG_CONTENT" | grep -iE "Authorization:.*$VERBOSE_SECRET" >/dev/null 2>&1; then
+    test_fail "Authorization header with secret found in bridge log!"
+  fi
+fi
+
+test_pass
+
+# Clean up verbose test session
+run_mcpc "$SESSION3" close >/dev/null 2>&1
+_SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION3}")
+
+# =============================================================================
 # Test: Headers work after bridge restart (retrieved from keychain)
 # =============================================================================
 

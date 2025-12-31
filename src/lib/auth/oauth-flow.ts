@@ -11,6 +11,7 @@ import { OAuthProvider } from './oauth-provider.js';
 import { normalizeServerUrl } from '../utils.js';
 import { ClientError } from '../errors.js';
 import { createLogger } from '../logger.js';
+import { removeKeychainOAuthClientInfo } from './keychain.js';
 import type { AuthProfile } from '../types.js';
 
 const logger = createLogger('oauth-flow');
@@ -242,6 +243,12 @@ export async function performOAuthFlow(
   const redirectUrl = `http://localhost:${port}/callback`;
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);
+
+  // Delete existing OAuth client info from keychain before re-authenticating
+  // This ensures we get a fresh client-id with the correct redirect URI
+  // (old client-id might have been registered with different redirect URI)
+  logger.debug(`Removing existing OAuth client info for ${profileName} @ ${normalizedServerUrl}`);
+  await removeKeychainOAuthClientInfo(normalizedServerUrl, profileName);
 
   // Create OAuth provider in auth flow mode with forceReauth=true
   // This allows users to change scope or switch accounts
