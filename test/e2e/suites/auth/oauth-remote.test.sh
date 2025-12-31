@@ -25,6 +25,10 @@ check_profile_exists() {
   fi
 
   # Check if profile exists for this server
+  # Try both with and without https:// prefix (profiles use bare hostname)
+  if jq -e ".profiles[\"$REMOTE_SERVER\"][\"$profile\"]" "$profiles_file" >/dev/null 2>&1; then
+    return 0
+  fi
   if jq -e ".profiles[\"https://$REMOTE_SERVER\"][\"$profile\"]" "$profiles_file" >/dev/null 2>&1; then
     return 0
   fi
@@ -80,6 +84,20 @@ fi
 test_pass
 
 # =============================================================================
+# Setup: Copy user's OAuth profiles to test environment
+# =============================================================================
+# The test framework uses an isolated MCPC_HOME_DIR, but OAuth profiles are
+# stored in the user's ~/.mcpc directory. Copy them so mcpc can use them.
+# (OAuth tokens are stored in the system keychain, which is accessible globally)
+
+test_case "setup: copy OAuth profiles to test environment"
+USER_PROFILES="$HOME/.mcpc/profiles.json"
+if [[ -f "$USER_PROFILES" ]]; then
+  cp "$USER_PROFILES" "$MCPC_HOME_DIR/profiles.json"
+fi
+test_pass
+
+# =============================================================================
 # Test: Direct connection with OAuth profile
 # =============================================================================
 
@@ -90,18 +108,21 @@ assert_contains "$STDOUT" "Apify"
 test_pass
 
 test_case "tools-list with OAuth returns tools"
-run_xmcpc "$REMOTE_SERVER" tools-list --profile "$PROFILE1"
+# Note: Using run_mcpc instead of run_xmcpc because remote server output
+# may vary between calls (non-deterministic ordering, dynamic data)
+run_mcpc "$REMOTE_SERVER" tools-list --profile "$PROFILE1"
 assert_success
 # Apify MCP server should have some tools
 assert_not_empty "$STDOUT"
 test_pass
 
-test_case "tools-list --json returns valid JSON with tools array"
+test_case "tools-list --json returns valid JSON array"
 run_mcpc --json "$REMOTE_SERVER" tools-list --profile "$PROFILE1"
 assert_success
 assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '.tools'
-assert_json "$STDOUT" '.tools | length > 0'
+# JSON output is a direct array of tools
+assert_json "$STDOUT" '. | type == "array"'
+assert_json "$STDOUT" '. | length > 0'
 test_pass
 
 # =============================================================================
@@ -116,13 +137,13 @@ _SESSIONS_CREATED+=("$SESSION1")
 test_pass
 
 test_case "session tools-list works"
-run_xmcpc "$SESSION1" tools-list
+run_mcpc "$SESSION1" tools-list
 assert_success
 assert_not_empty "$STDOUT"
 test_pass
 
 test_case "session ping works"
-run_xmcpc "$SESSION1" ping
+run_mcpc "$SESSION1" ping
 assert_success
 test_pass
 
@@ -145,11 +166,11 @@ test_pass
 
 test_case "both sessions work independently"
 # Session 1
-run_xmcpc "$SESSION1" ping
+run_mcpc "$SESSION1" ping
 assert_success
 
 # Session 2
-run_xmcpc "$SESSION2" ping
+run_mcpc "$SESSION2" ping
 assert_success
 test_pass
 
@@ -177,18 +198,15 @@ test_pass
 # Test: Session shows profile information
 # =============================================================================
 
-test_case "session info shows profile name"
-run_mcpc --json "$SESSION1"
+test_case "sessions list shows profile name"
+run_mcpc --json
 assert_success
 assert_json_valid "$STDOUT"
-# The session should reference the profile
-profile_name=$(echo "$STDOUT" | jq -r '.profileName // empty')
+# The session should reference the profile in the sessions list
+profile_name=$(echo "$STDOUT" | jq -r ".sessions[] | select(.name == \"$SESSION1\") | .profileName")
 if [[ "$profile_name" != "$PROFILE1" ]]; then
-  # Profile might be shown differently, just check it's there somewhere
-  if ! echo "$STDOUT" | grep -q "$PROFILE1"; then
-    test_fail "Profile name $PROFILE1 not found in session info"
-    exit 1
-  fi
+  test_fail "Profile name $PROFILE1 not found for session $SESSION1 (got: $profile_name)"
+  exit 1
 fi
 test_pass
 

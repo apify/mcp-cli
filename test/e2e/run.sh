@@ -22,12 +22,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Default options
-PARALLEL=10
+PARALLEL=16
 ISOLATED_ALL=false
 COVERAGE=false
 KEEP_RUNS=false
 VERBOSE=false
 LIST_ONLY=false
+SKIP_BUILD=false
 PATTERNS=()
 
 # Colors
@@ -65,13 +66,18 @@ while [[ $# -gt 0 ]]; do
       LIST_ONLY=true
       shift
       ;;
+    -b|--no-build)
+      SKIP_BUILD=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: $0 [options] [pattern...]"
       echo ""
       echo "Options:"
-      echo "  -p, --parallel N   Max parallel tests (default: 8)"
+      echo "  -p, --parallel N   Max parallel tests (default: 16)"
       echo "  -i, --isolated     Force all tests to use isolated home directories"
       echo "  -c, --coverage     Collect code coverage"
+      echo "  -b, --no-build     Skip building mcpc (assumes dist/ is up to date)"
       echo "  -k, --keep         Keep test run directory after tests"
       echo "  -v, --verbose      Show test output as it runs"
       echo "  -l, --list         List available tests without running"
@@ -213,15 +219,19 @@ if [[ "$COVERAGE" == "true" ]]; then
   mkdir -p "$NODE_V8_COVERAGE"
 fi
 
-# Build mcpc first
-echo -e "${DIM}Building mcpc...${NC}"
-cd "$PROJECT_ROOT"
-if ! npm run build >/dev/null 2>&1; then
-  echo -e "${RED}Build failed${NC}" >&2
-  npm run build
-  exit 1
+# Build mcpc first (unless skipped)
+if [[ "$SKIP_BUILD" == "true" ]]; then
+  echo -e "${DIM}Skipping build (--no-build)${NC}"
+else
+  echo -e "${DIM}Building mcpc...${NC}"
+  cd "$PROJECT_ROOT"
+  if ! npm run build >/dev/null 2>&1; then
+    echo -e "${RED}Build failed${NC}" >&2
+    npm run build
+    exit 1
+  fi
+  echo -e "${GREEN}Build complete${NC}"
 fi
-echo -e "${GREEN}Build complete${NC}"
 echo ""
 
 # Function to run a single test

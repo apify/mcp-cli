@@ -38,16 +38,6 @@
 
 ## E2E test scenarios
 
-Let's add more tests (some e2e, some unit, some both):
-- Test that output from "mcpc @test --json" is consistent with MCP server handshake "results" (see https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle) - additional properties are fine
-- Test that output from "mcpc @test tools-list --json" and "mcpc @test tools-schema xxx --json" 
-  are consistent with MCP tool schema. And same for prompts and resources!
-- Add unit tests to ensure that human output for tools, resources, and prompts contain all the 
-  important information. Add a simple e2e test that the output works also end to end.
-- test env var substitution works for config files (unit +e2e)
-- test that all headers for HTTP server do not leak in process list (e.g. use --header to pass 
-  something, and ensure it's not present in "ps aux"), and that <redacted> works
-
 Later
 - Test auth profiles work long-term and sessions too - basically when running some tests the
   next day they should use old saved auths and sessions.

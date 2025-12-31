@@ -107,9 +107,10 @@ in your Apify account.
 ./test/e2e/run.sh basic/help.test.sh
 
 # Options
-./test/e2e/run.sh -p, --parallel N   # Max parallel tests (default: 8)
+./test/e2e/run.sh -p, --parallel N   # Max parallel tests (default: 16)
 ./test/e2e/run.sh -i, --isolated     # Isolated home dirs for all tests (troubleshooting)
 ./test/e2e/run.sh -c, --coverage     # Collect code coverage
+./test/e2e/run.sh -b, --no-build     # Skip building mcpc (assumes dist/ is up to date)
 ./test/e2e/run.sh -v, --verbose      # Verbose - show output as tests run
 ./test/e2e/run.sh -k, --keep         # Keep test run directory after tests
 ./test/e2e/run.sh -l, --list         # List available tests
