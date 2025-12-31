@@ -27,8 +27,9 @@ assert_contains "$STDOUT" "read_file"
 test_pass
 
 # Test: capture bridge PID
+# Note: Use run_mcpc because session list is non-deterministic in parallel tests
 test_case "capture bridge PID"
-run_xmcpc --json
+run_mcpc --json
 original_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
 assert_not_empty "$original_pid" "should have bridge PID"
 test_pass
@@ -65,7 +66,7 @@ test_pass
 
 # Test: verify new PID is different
 test_case "bridge has new PID after restart"
-run_xmcpc --json
+run_mcpc --json
 new_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
 assert_not_empty "$new_pid" "should have new bridge PID"
 if [[ "$new_pid" == "$original_pid" ]]; then
@@ -84,7 +85,7 @@ test_pass
 
 # Test: kill bridge again and verify it restarts again
 test_case "bridge restarts multiple times"
-run_xmcpc --json
+run_mcpc --json
 second_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
 kill "$second_pid"
 sleep 1
@@ -95,7 +96,7 @@ assert_success
 assert_contains "$STDOUT" "read_file"
 
 # Verify PID changed again
-run_xmcpc --json
+run_mcpc --json
 third_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
 if [[ "$third_pid" == "$second_pid" ]]; then
   test_fail "third PID ($third_pid) should be different from second ($second_pid)"
