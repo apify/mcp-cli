@@ -49,17 +49,17 @@ Note that `mcpc` does not invoke LLMs itself; that's the job of the higher layer
 - [Interaction](#interaction)
   - [Interactive shell](#interactive-shell)
   - [Scripting](#scripting)
-    - [Schema validation](#schema-validation)
+  - [Schema validation](#schema-validation)
   - [AI agents](#ai-agents)
-    - [Code mode](#code-mode)
     - [Claude Code skill](#claude-code-skill)
-    - [Sandboxing](#sandboxing)
+    - [Sandboxing AI access](#sandboxing-ai-access)
+    - [Proxy server for AI isolation](#proxy-server-for-ai-isolation)
 - [Configuration](#configuration)
   - [MCP server config file](#mcp-server-config-file)
   - [Saved state](#saved-state)
   - [Environment variables](#environment-variables)
   - [Cleanup](#cleanup)
-- [MCP protocol support](#mcp-protocol-support)
+- [MCP support](#mcp-support)
   - [Transport](#transport)
   - [Authorization](#authorization)
   - [Session lifecycle](#session-lifecycle)
@@ -227,7 +227,7 @@ The `tools-call` and `prompts-get` commands accept arguments as positional param
 
 ```bash
 # Key:=value pairs (auto-parsed: tries JSON, falls back to string)
-mcpc <target> tools-call <tool-name> query:=hello count:=10 enabled:=true
+mcpc <target> tools-call <tool-name> query:="hello world" count:=10 enabled:=true
 mcpc <target> tools-call <tool-name> config:='{"key":"value"}' items:='[1,2,3]'
 
 # Force string type with JSON quotes
@@ -250,6 +250,33 @@ cat args.json | mcpc <target> tools-call <tool-name>
   - `id:='"123"'` → string `"123"` (JSON string literal)
 - Inline JSON: If first argument starts with `{` or `[`, it's parsed as a JSON object/array
 - Stdin: When no positional args are provided and input is piped, reads JSON from stdin
+
+**Using shell variables:**
+
+When using shell variables that may contain spaces, use double quotes around the entire argument:
+
+```bash
+# Variable with spaces - use double quotes
+QUERY="hello world"
+mcpc @server tools-call search "query:=${QUERY}"
+
+# Multiple variables
+CITY="New York"
+TYPE="restaurants"
+mcpc @server tools-call search "query:=${CITY} ${TYPE}"
+
+# For complex inputs, consider using JSON via stdin
+echo "{\"query\": \"${QUERY}\", \"limit\": 10}" | mcpc @server tools-call search
+```
+
+**Common pitfall:** Don't put spaces around `:=` - it won't work:
+```bash
+# Wrong - spaces around :=
+mcpc @server tools-call search query := "hello world"
+
+# Correct - no spaces around :=
+mcpc @server tools-call search "query:=hello world"
+```
 
 ### JSON mode
 
@@ -517,9 +544,9 @@ Schema modes (`--schema-mode`):
 
 ### AI agents
 
-`mcpc` is designed for MCP "[code mode](https://www.anthropic.com/engineering/code-execution-with-mcp)" -
-AI agents that write and execute code rather than using function calling.
-This approach is more accurate and uses fewer tokens.
+`mcpc` is designed for MCP "[code mode](https://blog.cloudflare.com/code-mode/)" -
+AI agents that write and execute code rather than use tool function calling.
+This approach is [more accurate](https://www.anthropic.com/engineering/code-execution-with-mcp) and uses fewer tokens.
 
 AI agent can discover and use tools via shell commands
 
@@ -552,7 +579,64 @@ Authentication profiles provide a security boundary for AI agents:
 3. **AI uses session**: The agent can only use `@ai-session` - it cannot create new profiles or sessions
 
 This ensures AI agents operate only with pre-authorized credentials, preventing unauthorized access to MCP servers.
-The human controls which servers the AI can access and with what permissions (OAuth scopes)
+The human controls which servers the AI can access and with what permissions (OAuth scopes).
+
+#### Proxy server for AI isolation
+
+For stronger isolation, `mcpc` can expose a session as a local proxy MCP server.
+The proxy forwards all MCP requests to the upstream server but **never exposes the original authentication tokens**.
+This is useful when you want to give an AI agent MCP access without revealing your credentials.
+
+```bash
+# Human creates authenticated session with proxy server on localhost:8080
+mcpc mcp.apify.com connect @ai-proxy --proxy 8080
+
+# Optionally protect proxy with bearer token (stored in OS keychain)
+mcpc mcp.apify.com connect @ai-proxy --proxy 8080 --proxy-bearer-token secret123
+
+# AI agent connects to proxy as if it were a regular MCP server
+# The agent has NO access to the original OAuth tokens
+mcpc http://localhost:8080 tools-list
+mcpc http://localhost:8080 tools-call search-actors query:="web scraper"
+
+# Or create a new session from the proxy for convenience
+mcpc http://localhost:8080 connect @sandboxed
+mcpc @sandboxed tools-call search-actors query:="web scraper"
+```
+
+**Proxy options for `connect` command:**
+
+| Option | Description                                                        |
+|--------|--------------------------------------------------------------------|
+| `--proxy [host:]port` | Start proxy MCP server. Default host: `127.0.0.1` (localhost only) |
+| `--proxy-bearer-token <token>` | Require bearer token for proxy authentication                      |
+
+**Security model:**
+
+- **Localhost by default**: `--proxy 8080` binds to `127.0.0.1` only, preventing network access
+- **Tokens hidden**: Original OAuth/bearer tokens are never exposed to proxy clients
+- **Optional auth**: Use `--proxy-bearer-token` to add another layer of security
+- **Explicit opt-in**: Proxy only starts when `--proxy` flag is provided
+
+**Binding to network interfaces:**
+
+```bash
+# Localhost only (default, most secure)
+mcpc mcp.apify.com connect @ai-proxy --proxy 8080
+
+# Bind to all interfaces (allows network access - use with caution!)
+mcpc mcp.apify.com connect @ai-proxy --proxy 0.0.0.0:8080
+
+# Bind to specific interface
+mcpc mcp.apify.com connect @ai-proxy --proxy 192.168.1.100:8080
+```
+
+When listing sessions, proxy info is displayed:
+
+```bash
+mcpc
+# @ai-proxy → https://mcp.apify.com (HTTP, OAuth: default, proxy: 127.0.0.1:8080)
+```
 
 ## Configuration
 

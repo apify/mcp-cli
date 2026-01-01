@@ -222,21 +222,21 @@ function createProgram(): Command {
     'after',
     `
 Targets:
-  @<session>              Named persistent session (e.g. "@apify")
-  <config-entry>          Entry in MCP config file specified by --config (e.g. "fs")
-  <server-url>            Remote MCP server URL (e.g. "mcp.apify.com")
+  @<session>             Named persistent session (e.g. "@apify")
+  <config-entry>         Entry in MCP config file specified by --config (e.g. "fs")
+  <server-url>           Remote MCP server URL (e.g. "mcp.apify.com")
 
 Management commands (<target> missing):
-  login                   Create OAuth profile with credentials to access remote server
-  logout                  Remove OAuth profile for remote server
-  connect @<session>      Connect to server and create named persistent session
-  restart @<session>      Kill and restart a session
-  close @<session>        Close a session
+  login                  Create OAuth profile with credentials to access remote server
+  logout                 Remove OAuth profile for remote server
+  connect @<session>     Connect to server and create named persistent session
+  restart @<session>     Kill and restart a session
+  close @<session>       Close a session
 
 MCP commands (<target> provided):
-  help                    Show server info ("help" can be omitted)
-  shell                   Open interactive shell
-  tools-list
+  help                   Show server info ("help" can be omitted)
+  shell                  Open interactive shell
+  tools-list             Send "tools/list" MCP request...
   tools-get <tool-name>
   tools-call <tool-name> [<args-json> | arg1:=val1 arg2:=val2 ...]
   prompts-list
