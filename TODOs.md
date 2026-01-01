@@ -3,8 +3,8 @@
 
 ## Next
 
-- We support "prompts", "tools" etc commands ... let's not do that, design principle is one way to do things
-- Rename "session" command to "connect"
+- Rename "mcpc <target> session @test" command to "mcpc <target> connect @test"
+
 - Pass `--timeout` to both connection and command timeout (if MCP supports this). Ensure we obey both --timeout and timeout from config.
 
 - `--schema-mode` - we need to check the outputSchema more. In strict mode, any even tiny outputSchema change should fail (incl. description).

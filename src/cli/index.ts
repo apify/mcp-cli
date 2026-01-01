@@ -204,43 +204,54 @@ function createProgram(): Command {
     .description(
       `${rainbow('Universal')} command-line client for the Model Context Protocol (MCP).`
     )
-    .usage(
-      '[--json] [--config <file>] [-H|--header "K: V"] [-v|--verbose]\n' +
-        '            [--schema <file>] [--schema-mode <mode>] [--timeout <seconds>] \n' +
-        '            [--clean|--clean=sessions,logs,profiles,all]\n' +
-        '            <target> <command...>'
-    )
+    .usage('[options] <target> [command]')
     .version(packageJson.version, '-v, --version', 'Output the version number')
     .helpOption('-h, --help', 'Display general help')
-    .option('-j, --json', 'Output in JSON format')
+    .option('-j, --json', 'Output in JSON format for scripting')
     .option('--verbose', 'Enable verbose logging')
-    .option('-c, --config <file>', 'Path to MCP config JSON file')
+    .option('-c, --config <file>', 'Path to MCP config JSON file (e.g. ".vscode/mcp.json")')
     .option('-H, --header <header>', 'Add HTTP header (can be repeated)')
-    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--profile <name>', 'Authentication profile to use (default: "default")')
-    .option('--schema <file>', 'Validate against expected tool/prompt schema')
+    .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option(
       '--schema-mode <mode>',
-      'Schema validation mode: strict, compatible (default), or ignore'
+      'Schema validation mode: strict, compatible (default), ignore'
     )
-    .option('--clean[=types]', 'Clean up mcpc data: --clean or --clean=sessions,logs,profiles,all');
+    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--clean[=types]', 'Clean up mcpc data (types: sessions, logs, profiles, all)');
 
-  // Add examples to help
+  // Add help text to match README
   program.addHelpText(
     'after',
     `
-Where <target> can be:
-  <url>                  Remote MCP server URL (e.g., mcp.apify.com)
-  <config-entry>         Entry from MCP config file specified in --config
-  @<name>                Named session (e.g., @apify)
+Targets:
+  @<session>              Named persistent session (e.g. "@apify")
+  <config-entry>          Entry in MCP config file specified by --config (e.g. "fs")
+  <server-url>            Remote MCP server URL (e.g. "mcp.apify.com")
 
+Management commands (without <target>):
+  login                   Create OAuth profile with credentials to access remote server
+  logout                  Remove OAuth profile for remote server
+  session @<session>      Connect to server and create named persistent session
+  restart @<session>      Kill and restart a session
+  close @<session>        Close a session
 
-Examples:
-  $ mcpc                                                            # List sessions and auth profiles
-  $ mcpc mcp.apify.com login                                        # Login to MCP server using OAuth
-  $ mcpc mcp.apify.com tools-list                                   # List server tools
-  $ mcpc mcp.apify.com session @apify                               # Create or reconnect persistent session
-  $ mcpc @apify tools-call search-actors --args keywords="crawler"  # Call tool with arguments
+MCP commands (<target> provided):
+  help                    Show server info ("help" can be omitted)
+  shell                   Open interactive shell
+  tools-list
+  tools-get <tool-name>
+  tools-call <tool-name> [<args-json> | arg1:=val1 arg2:=val2 ...]
+  prompts-list
+  prompts-get <prompt-name> [<args-json> | arg1:=val1 arg2:=val2 ...]
+  resources
+  resources-list
+  resources-read <uri>
+  resources-subscribe <uri>
+  resources-unsubscribe <uri>
+  resources-templates-list
+  logging-set-level <level>
+  ping
 
 Documentation: https://github.com/apify/mcpc/tree/v${packageJson.version}`
   );
