@@ -10,7 +10,7 @@
   (what if tools have ":" or "," in their names?)
   In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
 - Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
-  automatically updateUpa the -o file on changes, without it just keep track of changed files in
+  automatically update the -o file on changes, without it just keep track of changed files in
   bridge process' cache, and report in resources-list/resources-read operation
 
 

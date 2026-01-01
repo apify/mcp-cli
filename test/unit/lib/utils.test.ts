@@ -176,6 +176,27 @@ describe('normalizeServerUrl', () => {
     expect(normalizeServerUrl('EXAMPLE.COM/path')).toBe('https://example.com/path');
   });
 
+  it('should add http:// to localhost/127.0.0.1 URLs without scheme', () => {
+    // localhost defaults to http:// (common for local dev/proxy servers)
+    expect(normalizeServerUrl('localhost')).toBe('http://localhost');
+    expect(normalizeServerUrl('localhost:8080')).toBe('http://localhost:8080');
+    expect(normalizeServerUrl('localhost/path')).toBe('http://localhost/path');
+    expect(normalizeServerUrl('LOCALHOST:3000')).toBe('http://localhost:3000');
+    // 127.0.0.1 also defaults to http://
+    expect(normalizeServerUrl('127.0.0.1')).toBe('http://127.0.0.1');
+    expect(normalizeServerUrl('127.0.0.1:8080')).toBe('http://127.0.0.1:8080');
+    expect(normalizeServerUrl('127.0.0.1/mcp')).toBe('http://127.0.0.1/mcp');
+  });
+
+  it('should respect explicit scheme for localhost URLs', () => {
+    // If user explicitly specifies https://, respect it
+    expect(normalizeServerUrl('https://localhost')).toBe('https://localhost');
+    expect(normalizeServerUrl('https://localhost:8443')).toBe('https://localhost:8443');
+    expect(normalizeServerUrl('https://127.0.0.1:8443')).toBe('https://127.0.0.1:8443');
+    // And http:// for remote servers
+    expect(normalizeServerUrl('http://example.com')).toBe('http://example.com');
+  });
+
   it('should throw error for URLs with invalid scheme', () => {
     expect(() => normalizeServerUrl('ftp://example.com')).toThrow('Invalid MCP server URL');
     expect(() => normalizeServerUrl('file:///path')).toThrow('Invalid MCP server URL');

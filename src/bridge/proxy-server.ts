@@ -65,6 +65,7 @@ export class ProxyServer {
           tools: {},
           resources: {},
           prompts: {},
+          logging: {},
         },
       }
     );

@@ -34,52 +34,13 @@ Note that `mcpc` does not invoke LLMs itself; that's the job of the higher layer
 - [Install](#install)
 - [Quickstart](#quickstart)
 - [Usage](#usage)
-  - [Management commands](#management-commands)
-  - [Targets](#targets)
-  - [MCP commands](#mcp-commands)
-    - [Command arguments](#command-arguments)
-  - [JSON mode](#json-mode)
 - [Sessions](#sessions)
-  - [Session failover](#session-failover)
 - [Authentication](#authentication)
-  - [Anonymous access](#anonymous-access)
-  - [Bearer token authentication](#bearer-token-authentication)
-  - [OAuth profiles](#oauth-profiles)
-  - [Authentication precedence](#authentication-precedence)
 - [Interaction](#interaction)
-  - [Interactive shell](#interactive-shell)
-  - [Scripting](#scripting)
-  - [Schema validation](#schema-validation)
-  - [AI agents](#ai-agents)
-    - [Claude Code skill](#claude-code-skill)
-    - [Sandboxing AI access](#sandboxing-ai-access)
-    - [Proxy server for AI isolation](#proxy-server-for-ai-isolation)
 - [Configuration](#configuration)
-  - [MCP server config file](#mcp-server-config-file)
-  - [Saved state](#saved-state)
-  - [Environment variables](#environment-variables)
-  - [Cleanup](#cleanup)
 - [MCP support](#mcp-support)
-  - [Transport](#transport)
-  - [Authorization](#authorization)
-  - [Session lifecycle](#session-lifecycle)
-  - [MCP feature support](#mcp-feature-support)
-    - [Server instructions](#server-instructions)
-    - [Tools](#tools)
-    - [Prompts](#prompts)
-    - [Resources](#resources)
-    - [List change notifications](#list-change-notifications)
-    - [Server logs](#server-logs)
-    - [Pagination](#pagination)
-    - [Ping](#ping)
 - [Security](#security)
-  - [Credential protection](#credential-protection)
-  - [Network security](#network-security)
 - [Error handling](#error-handling)
-  - [Exit codes](#exit-codes)
-  - [Verbose mode](#verbose-mode)
-  - [Logs](#logs)
-  - [Troubleshooting](#troubleshooting)
 - [Development](#development)
 - [License](#license)
 
@@ -118,7 +79,7 @@ mcpc --config ~/.vscode/mcp.json filesystem tools-list
 
 ## Usage
 
-<!-- TODO: generate this automatically from "mcpc --help" (skip "Documentation:" link and below) -->
+<!-- Generate this automatically from "mcpc --help" (skip "Documentation:" link and below) -->
 
 ```
 Usage: mcpc [options] <target> [command]
@@ -131,29 +92,32 @@ Options:
   -H, --header <header>  HTTP header for remote MCP server (can be repeated)
   -v, --version          Output the version number
   --verbose              Enable debug logging
-  --profile <name>       OAuth authentication profile to use (default: "default")
+  --profile <name>       OAuth authentication profile to use (default:
+                         "default")
   --schema <file>        Validate tool/prompt schema against expected schema
-  --schema-mode <mode>   Schema validation mode: strict, compatible (default), ignore
+  --schema-mode <mode>   Schema validation mode: strict, compatible (default),
+                         ignore
   --timeout <seconds>    Request timeout in seconds (default: 300)
-  --clean[=types]        Clean up mcpc data (types: sessions, logs, profiles, all)
+  --clean[=types]        Clean up mcpc data (types: sessions, logs, profiles,
+                         all)
   -h, --help             Display general help
 
 Targets:
-  @<session>              Named persistent session (e.g. "@apify")
-  <config-entry>          Entry in MCP config file specified by --config (e.g. "fs")
-  <server-url>            Remote MCP server URL (e.g. "mcp.apify.com")
+  @<session>             Named persistent session (e.g. "@apify")
+  <config-entry>         Entry in MCP config file specified by --config (e.g. "fs")
+  <server-url>           Remote MCP server URL (e.g. "mcp.apify.com")
 
 Management commands (<target> missing):
-  login                   Create OAuth profile with credentials to access remote server
-  logout                  Remove OAuth profile for remote server
-  connect @<session>      Connect to server and create named persistent session
-  restart @<session>      Kill and restart a session
-  close @<session>        Close a session
+  login                  Create OAuth profile with credentials to access remote server
+  logout                 Remove OAuth profile for remote server
+  connect @<session>     Connect to server and create named persistent session
+  restart @<session>     Kill and restart a session
+  close @<session>       Close a session
 
 MCP commands (<target> provided):
-  help                    Show server info ("help" can be omitted)
-  shell                   Open interactive shell
-  tools-list
+  help                   Show server info ("help" can be omitted)
+  shell                  Open interactive shell
+  tools-list             Send "tools/list" MCP request...
   tools-get <tool-name>
   tools-call <tool-name> [<args-json> | arg1:=val1 arg2:=val2 ...]
   prompts-list
@@ -197,6 +161,11 @@ To connect to an MCP server, you need to specify a `<target>`, which can be one 
 
 `mcpc` automatically selects the transport protocol based on the server (stdio or Streamable HTTP),
 connects, and enables you to interact with it.
+
+**URL handling:**
+- URLs without a scheme (e.g. `mcp.apify.com`) default to `https://`
+- `localhost` and `127.0.0.1` addresses without a scheme default to `http://` (for local dev/proxy servers)
+- To override the default, specify the scheme explicitly (e.g. `http://example.com`)
 
 ### MCP commands
 
@@ -596,11 +565,12 @@ mcpc mcp.apify.com connect @ai-proxy --proxy 8080 --proxy-bearer-token secret123
 
 # AI agent connects to proxy as if it were a regular MCP server
 # The agent has NO access to the original OAuth tokens
-mcpc http://localhost:8080 tools-list
-mcpc http://localhost:8080 tools-call search-actors query:="web scraper"
+# Note: localhost/127.0.0.1 URLs default to http:// (no scheme needed)
+mcpc localhost:8080 tools-list
+mcpc 127.0.0.1:8080 tools-call search-actors query:="web scraper"
 
 # Or create a new session from the proxy for convenience
-mcpc http://localhost:8080 connect @sandboxed
+mcpc localhost:8080 connect @sandboxed
 mcpc @sandboxed tools-call search-actors query:="web scraper"
 ```
 

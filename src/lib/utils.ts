@@ -155,16 +155,22 @@ export function isValidHttpUrl(str: string): boolean {
 }
 
 /**
- * Normalize an MCP server URL by adding https:// if no scheme is present
+ * Normalize an MCP server URL by adding a scheme if not present
+ * - localhost/127.0.0.1 addresses default to http:// (common for local dev/proxy)
+ * - All other addresses default to https://
  * Also converts hostname to lowercase and removes username, password, and hash
  * Returns the normalized URL or throws an error if invalid
  */
 export function normalizeServerUrl(str: string): string {
   let urlString = str;
 
-  // Add https:// if no scheme is present
+  // Add scheme if not present
   if (!str.includes('://')) {
-    urlString = `https://${str}`;
+    // Extract hostname (before any port or path)
+    const hostPart = (str.split(/[:/]/)[0] || '').toLowerCase();
+    const isLocalhost = hostPart === 'localhost' || hostPart === '127.0.0.1';
+    // Default to http:// for localhost, https:// for everything else
+    urlString = isLocalhost ? `http://${str}` : `https://${str}`;
   }
 
   // Validate URL
