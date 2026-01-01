@@ -36,7 +36,7 @@ test_pass
 # Test: session status reflects expiration
 test_case "session status shows expiration"
 run_mcpc --json
-# The session should either show as dead/expired or be automatically cleaned up
+# The session should either show as crashed/expired or be automatically cleaned up
 # depending on implementation
 test_pass
 

@@ -17,11 +17,11 @@ Note that `mcpc` does not invoke LLMs itself; that's the job of the higher layer
 
 **Key features**
 
-- 🔌 **Highly compatible** - Works with any MCP server over Streamable HTTP or stdio.
+- 🌎 **Highly compatible** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
 - 🚀 **Zero setup** - Connect to remote servers instantly with just a URL.
 - 🔧 **Strong MCP support** - Instructions, tools, resources, prompts, dynamic discovery.
-- 📊 **JSON output** - Easy integration with `jq`, scripts, and other CLI tools.
+- 🔌 **JSON output** - Easy integration with `jq`, scripts, and other CLI tools.
 - 🤖 **AI-friendly** - Designed for both function calling and code mode with sandboxing.
 - 🔒 **Secure** - Full OAuth 2.1 support, OS keychain for credentials storage.
 
@@ -34,53 +34,14 @@ Note that `mcpc` does not invoke LLMs itself; that's the job of the higher layer
 - [Install](#install)
 - [Quickstart](#quickstart)
 - [Usage](#usage)
-  - [Management commands](#management-commands)
-  - [Targets](#targets)
-  - [MCP commands](#mcp-commands)
-    - [Command arguments](#command-arguments)
-  - [Interactive shell](#interactive-shell)
-  - [JSON mode](#json-mode)
 - [Sessions](#sessions)
-  - [Session lifecycle](#session-lifecycle)
 - [Authentication](#authentication)
-  - [Anonymous access](#anonymous-access)
-  - [Bearer token authentication](#bearer-token-authentication)
-  - [OAuth profiles](#oauth-profiles)
-  - [Authentication precedence](#authentication-precedence)
-    - [Proxy MCP server](#proxy-mcp-server)
+- [MCP proxy](#mcp-proxy)
 - [Automation](#automation)
-  - [Scripting](#scripting)
-  - [Schema validation](#schema-validation)
-  - [AI agents](#ai-agents)
-    - [Sandboxing AI access](#sandboxing-ai-access)
-    - [Agent skills](#agent-skills)
 - [MCP support](#mcp-support)
-  - [Transport](#transport)
-  - [Authorization](#authorization)
-  - [MCP session](#mcp-session)
-  - [MCP feature support](#mcp-feature-support)
-    - [Server instructions](#server-instructions)
-    - [Tools](#tools)
-    - [Prompts](#prompts)
-    - [Resources](#resources)
-    - [List change notifications](#list-change-notifications)
-    - [Server logs](#server-logs)
-    - [Pagination](#pagination)
-    - [Ping](#ping)
 - [Configuration](#configuration)
-  - [MCP server config file](#mcp-server-config-file)
-  - [Saved state](#saved-state)
-  - [Environment variables](#environment-variables)
-  - [Cleanup](#cleanup)
 - [Security](#security)
-  - [Credential protection](#credential-protection)
-  - [Network security](#network-security)
-  - [AI security](#ai-security)
-- [Error handling](#error-handling)
-  - [Exit codes](#exit-codes)
-  - [Verbose mode](#verbose-mode)
-  - [Logs](#logs)
-  - [Troubleshooting](#troubleshooting)
+- [Errors](#errors)
 - [Development](#development)
 - [License](#license)
 
@@ -354,7 +315,7 @@ Still, sessions can fail due to network disconnects, bridge process crash, or se
 | State            | Meaning                                                                                       |
 |------------------|-----------------------------------------------------------------------------------------------|
 | 🟢 **`live`**    | Bridge process is running; server might or might not be operational                           |
-| 🟡 **`dead`**    | Bridge process crashed or was killed; will auto-restart on next use                           |
+| 🟡 **`crashed`** | Bridge process crashed or was killed; will auto-restart on next use                           |
 | 🔴 **`expired`** | Server rejected the session (auth failed, session ID invalid); requires `close` and reconnect |
 
 Here's how `mcpc` handles various bridge process and server connection states:
@@ -366,13 +327,13 @@ Here's how `mcpc` handles various bridge process and server connection states:
     or authentication permanently failed (HTTP 401 or 403),
     the bridge process will flag the session as 🔴 **`expired`** and **terminate** to avoid wasting resources.
     Any future attempt to use the session (`mcpc @my-session ...`) will fail.
-- If the **bridge process crashes**, `mcpc` will mark the session as 🟡 **`dead`** on first use.
+- If the **bridge process crashes**, `mcpc` will mark the session as 🟡 **`crashed`** on first use.
   Next time you run `mcpc @my-session ...`, it will attempt to restart the bridge process.
   - If bridge **restart succeeds**, everything starts again (see above).
-  - If bridge **restart fails**, `mcpc @my-session ...` returns error, and session remains marked 🟡 **`dead`**.
+  - If bridge **restart fails**, `mcpc @my-session ...` returns error, and session remains marked 🟡 **`crashed`**.
 
 Note that `mcpc` never automatically removes sessions from the list.
-Instead, it keeps them flagged as 🟡 **`dead`** or 🔴 **`expired`**,
+Instead, it keeps them flagged as 🟡 **`crashed`** or 🔴 **`expired`**,
 and any future attempts to use them will fail.
 
 To **remove the session from the list**, you need to explicitly close it:
@@ -524,7 +485,7 @@ mcpc mcp.apify.com\?tools=docs tools-list
 ```
 
 
-#### Proxy MCP server
+## MCP proxy
 
 For stronger isolation, `mcpc` can expose an MCP session under new local proxy MCP server using the `--proxy` option.
 The proxy forwards all MCP requests to the upstream server but **never exposes the original authentication tokens** to the client.
@@ -657,7 +618,7 @@ To ensure AI coding agents don't perform destructive actions or leak credentials
 it's always a good idea to run them in a code sandbox
 with limited access to your resources.
 
-The [proxy MCP server](#proxy-mcp-server) feature provides a security boundary for AI agents:
+The [proxy MCP server](#mcp-proxy) feature provides a security boundary for AI agents:
 
 1. **Human creates authentication profile**: `mcpc mcp.apify.com login --profile ai-access`
 2. **Human creates session**: `mcpc mcp.apify.com connect @ai-sandbox --profile ai-access --proxy 8080`
@@ -1019,7 +980,7 @@ MCP enables arbitrary tool execution and data access - treat servers like you tr
 
 See [](#sandboxing-ai-access) for details.
 
-## Error handling
+## Errors
 
 `mcpc` provides clear error messages for common issues:
 
@@ -1072,8 +1033,8 @@ The main `mcpc` process doesn't save log files, but supports [verbose mode](#ver
 
 ## Development
 
-`mcpc` was built by [Jan Curn](https://x.com/jancurn) from [Apify](https://apify.com) over the 
-2025 Xmas holidays.
+`mcpc` was built by [Jan Curn](https://x.com/jancurn) of [Apify](https://apify.com) in late nights of the 
+Xmas holidays of 2025, in North Beach, San Francisco.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, architecture overview, and contribution guidelines.
 

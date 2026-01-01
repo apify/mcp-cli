@@ -26,7 +26,7 @@ const logger = createLogger('sessions');
 
 /**
  * Creates a new session, starts a bridge process, and instructs it to connect an MCP server.
- * If session already exists with dead bridge, reconnects it automatically
+ * If session already exists with crashed bridge, reconnects it automatically
  */
 export async function connectSession(
   name: string,
@@ -82,7 +82,7 @@ export async function connectSession(
         return;
       }
 
-      // Bridge is dead or expired - reconnect with warning
+      // Bridge has crashed or expired - reconnect with warning
       if (options.outputMode === 'human') {
         console.log(chalk.yellow(`Session ${name} exists but bridge is ${bridgeStatus}, reconnecting...`));
       }
@@ -230,12 +230,12 @@ export async function connectSession(
 /**
  * Determine bridge status for a session
  */
-function getBridgeStatus(session: { status?: string; pid?: number }): 'live' | 'dead' | 'expired' {
+function getBridgeStatus(session: { status?: string; pid?: number }): 'live' | 'crashed' | 'expired' {
   if (session.status === 'expired') {
     return 'expired';
   }
   if (!session.pid || !isProcessAlive(session.pid)) {
-    return 'dead';
+    return 'crashed';
   }
   return 'live';
 }
@@ -243,12 +243,12 @@ function getBridgeStatus(session: { status?: string; pid?: number }): 'live' | '
 /**
  * Format bridge status for display with dot indicator
  */
-function formatBridgeStatus(status: 'live' | 'dead' | 'expired'): { dot: string; text: string } {
+function formatBridgeStatus(status: 'live' | 'crashed' | 'expired'): { dot: string; text: string } {
   switch (status) {
     case 'live':
       return { dot: chalk.green('●'), text: chalk.green('live') };
-    case 'dead':
-      return { dot: chalk.yellow('○'), text: chalk.yellow('dead') };
+    case 'crashed':
+      return { dot: chalk.yellow('○'), text: chalk.yellow('crashed') };
     case 'expired':
       return { dot: chalk.red('○'), text: chalk.red('expired') };
   }
@@ -279,10 +279,10 @@ function formatTimeAgo(isoDate: string | undefined): string {
 
 /**
  * List active sessions and authentication profiles
- * Consolidates session state first (cleans up dead bridges, removes expired sessions)
+ * Consolidates session state first (cleans up crashed bridges, removes expired sessions)
  */
 export async function listSessionsAndAuthProfiles(options: { outputMode: OutputMode }): Promise<void> {
-  // Consolidate sessions first (cleans up dead bridges, removes expired sessions)
+  // Consolidate sessions first (cleans up crashed bridges, removes expired sessions)
   const consolidateResult = await consolidateSessions(false);
   const sessions = Object.values(consolidateResult.sessions);
 

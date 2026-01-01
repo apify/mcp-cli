@@ -309,7 +309,7 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     });
 
   // Connect command: mcpc <target> connect @<name>
-  // Creates a new session or reconnects if session exists but bridge is dead
+  // Creates a new session or reconnects if session exists but bridge has crashed
   program
     .command('connect <name>')
     .description('Create or reconnect a named session to an MCP server')

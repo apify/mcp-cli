@@ -24,14 +24,14 @@ cat > "$MCPC_HOME_DIR/sessions.json" << 'EOF'
 }
 EOF
 
-# Test: session with dead bridge PID shows as dead (before using it)
-test_case "session with dead bridge shows as dead"
+# Test: session with crashed bridge PID shows as crashed (before using it)
+test_case "session with crashed bridge shows as crashed"
 run_mcpc --json
 assert_success
-# The fake session should show as dead since PID 99999 doesn't exist
+# The fake session should show as crashed since PID 99999 doesn't exist
 # Note: JSON uses "status" field, not "bridgeStatus"
 session_status=$(echo "$STDOUT" | jq -r '.sessions[] | select(.name == "@fake-session") | .status')
-assert_eq "$session_status" "dead" "fake session should show as dead"
+assert_eq "$session_status" "crashed" "fake session should show as crashed"
 test_pass
 
 # Test: fake session record - using a session that doesn't exist

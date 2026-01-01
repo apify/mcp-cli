@@ -211,8 +211,8 @@ export async function sessionExists(sessionName: string): Promise<boolean> {
  * Result of session consolidation
  */
 export interface ConsolidateSessionsResult {
-  /** Number of sessions with dead bridges that were updated */
-  deadBridges: number;
+  /** Number of sessions with crashed bridges that were updated */
+  crashedBridges: number;
   /** Number of expired sessions that were removed */
   expiredSessions: number;
   /** Updated sessions map (for use by caller) */
@@ -220,14 +220,14 @@ export interface ConsolidateSessionsResult {
 }
 
 /**
- * Consolidate sessions: flag them as 'dead' if not alive, remove expired or invalid ones.
+ * Consolidate sessions: flag them as 'crashed' if not alive, remove expired or invalid ones.
  * This function runs on every "mcpc" command, so it must be efficient, so it uses one lock for all sessions.
  *
  * @returns Counts of what was cleaned up, plus the updated sessions
  */
 export async function consolidateSessions(cleanExpired: boolean): Promise<ConsolidateSessionsResult> {
   const result: ConsolidateSessionsResult = {
-    deadBridges: 0,
+    crashedBridges: 0,
     expiredSessions: 0,
     sessions: {},
   };
@@ -287,17 +287,17 @@ export async function consolidateSessions(cleanExpired: boolean): Promise<Consol
 
       // Check bridge status - always remove pid if process is not alive
       if (session.pid && !isProcessAlive(session.pid)) {
-        logger.debug(`Clearing dead bridge PID for session: ${name} (PID: ${session.pid})`);
+        logger.debug(`Clearing crashed bridge PID for session: ${name} (PID: ${session.pid})`);
         delete session.pid;
         hasChanges = true;
-        if (session.status !== 'dead') {
-          session.status = 'dead';
-          result.deadBridges++;
+        if (session.status !== 'crashed') {
+          session.status = 'crashed';
+          result.crashedBridges++;
         }
-      } else if (!session.pid && session.status !== 'dead') {
-        // No pid but not marked dead yet
-        session.status = 'dead';
-        result.deadBridges++;
+      } else if (!session.pid && session.status !== 'crashed') {
+        // No pid but not marked crashed yet
+        session.status = 'crashed';
+        result.crashedBridges++;
         hasChanges = true;
       }
     }

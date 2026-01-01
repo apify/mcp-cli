@@ -36,22 +36,22 @@ test_case "kill bridge process"
 kill "$bridge_pid" 2>/dev/null || true
 sleep 1
 
-# Verify it's dead
+# Verify it's no longer running
 if kill -0 "$bridge_pid" 2>/dev/null; then
-  test_fail "bridge should be dead"
+  test_fail "bridge should not be running"
   exit 1
 fi
 test_pass
 
-# Test: session shows as dead
-test_case "session shows as dead after bridge kill"
+# Test: session shows as crashed
+test_case "session shows as crashed after bridge kill"
 run_mcpc --json
 session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .status")
-assert_eq "$session_status" "dead" "session should show as dead"
+assert_eq "$session_status" "crashed" "session should show as crashed"
 test_pass
 
 # Test: using session triggers automatic restart
-test_case "using dead session triggers restart"
+test_case "using crashed session triggers restart"
 run_xmcpc "$SESSION" tools-list
 assert_success "session should auto-restart and work"
 assert_contains "$STDOUT" "echo"

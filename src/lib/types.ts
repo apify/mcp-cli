@@ -92,9 +92,9 @@ export interface ProxyConfig {
  * Session status
  * - active: Session is healthy and can be used
  * - expired: Server indicated session is no longer valid (e.g., 404 response)
- * - dead: Bridge process is dead, session might or might not be usable. Bridge will be restarted on next command.
+ * - crashed: Bridge process crashed, session might or might not be usable. Bridge will be restarted on next command.
  */
-export type SessionStatus = 'active' | 'expired' | 'dead';
+export type SessionStatus = 'active' | 'expired' | 'crashed';
 
 /**
  * Session data stored in sessions.json

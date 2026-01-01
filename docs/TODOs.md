@@ -1,14 +1,12 @@
 
 # TODOs
 
-## Next
 
 
 ## MCP features
 
-- `--proxy-capabilities tools:TOOL_NAME,TOOL_NAME2,...,prompts[:...],...` to limit access to selected MCP features and tools
-  (what if tools have ":" or "," in their names?)
-  In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
+- `--capabilities '{"tools":...,"prompts":...}"` to limit access to selected MCP features and tools,
+  for both proxy and normal session, for simplicity.
 - Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
   automatically update the -o file on changes, without it just keep track of changed files in
   bridge process' cache, and report in resources-list/resources-read operation

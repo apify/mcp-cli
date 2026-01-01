@@ -180,7 +180,7 @@ mcpc/
 
 **Session States:**
 - 🟢 **live** - Bridge process running; server might or might not be responding
-- 🟡 **dead** - Bridge process crashed or killed; auto-restarts on next use
+- 🟡 **crashed** - Bridge process crashed or killed; auto-restarts on next use
 - 🔴 **expired** - Server rejected session (auth failed, session ID invalid); requires `close` and reconnect
 
 ### Transport Implementation
@@ -432,7 +432,7 @@ On failure, the error message includes instructions on how to login. This ensure
 - `src/lib/auth/token-refresh.ts` - Token refresh logic with keychain persistence
 
 **Session-to-Profile Relationship:**
-```json
+```jsonc
 // sessions.json
 {
   "apify-personal": {

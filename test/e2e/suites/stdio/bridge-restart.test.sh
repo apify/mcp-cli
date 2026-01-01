@@ -56,7 +56,7 @@ test_pass
 # Test: session auto-restarts bridge and works
 test_case "session auto-restarts bridge and works"
 # This is the key test - after killing the bridge, using the session should:
-# 1. Detect the dead bridge
+# 1. Detect the crashed bridge
 # 2. Restart it with the correct command + args (including stdioArgs)
 # 3. Successfully complete the command
 run_xmcpc "$SESSION" tools-list
