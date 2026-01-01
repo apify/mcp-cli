@@ -631,11 +631,11 @@ mcpc mcp.apify.com connect @ai-proxy --proxy 0.0.0.0:8080
 mcpc mcp.apify.com connect @ai-proxy --proxy 192.168.1.100:8080
 ```
 
-When listing sessions, proxy info is displayed:
+When listing sessions, proxy info is displayed prominently:
 
 ```bash
 mcpc
-# @ai-proxy → https://mcp.apify.com (HTTP, OAuth: default, proxy: 127.0.0.1:8080)
+# @ai-proxy → https://mcp.apify.com (HTTP, OAuth: default) [proxy: 127.0.0.1:8080]
 ```
 
 ## Configuration
