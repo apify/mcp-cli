@@ -37,10 +37,9 @@ Note that `mcpc` does not invoke LLMs itself; that's the job of the higher layer
   - [Management commands](#management-commands)
   - [Targets](#targets)
   - [MCP commands](#mcp-commands)
-    - [MCP command arguments](#mcp-command-arguments)
+    - [Command arguments](#command-arguments)
   - [JSON mode](#json-mode)
 - [Sessions](#sessions)
-  - [Session management](#session-management)
   - [Session failover](#session-failover)
 - [Authentication](#authentication)
   - [Anonymous access](#anonymous-access)
@@ -125,13 +124,13 @@ Usage: mcpc [options] <target> [command]
 Options:
   -v, --version           Output the version number
   -j, --json              Output in JSON format for scripting
-  --verbose               Enable verbose logging
   -c, --config <file>     Path to MCP config JSON file (e.g. ".vscode/mcp.json")
   -H, --header <header>   Add HTTP header (can be repeated)
-  --timeout <seconds>     Request timeout in seconds (default: 300)
+  --verbose               Enable verbose logging  
   --profile <name>        Authentication profile to use (default: "default")
   --schema <file>         Validate tool/prompt schema against expected schema
   --schema-mode <mode>    Schema validation mode: strict, compatible (default), ignore
+  --timeout <seconds>     Request timeout in seconds (default: 300)
   --clean[=types]         Clean up mcpc data (types: sessions, logs, profiles, all)
   -h, --help              Display general help
 
