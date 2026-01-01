@@ -21,11 +21,12 @@
 - nit: Cooler OAuth flow finish web page with CSS animation, add Apify example there, show mcpc info. E.g. next step - check Apify rather than close
 - security: For auth profiles, fetch the detailed user info via http, save to profiles.json and show in 'mcpc', ensure the info is up-to-date
 - later: Add unique Session.id and Profile.id and use it for OS keychain keys, to truly enable using multiple independent mcpc profiles. Use cry
-- nit: Implement typing completions (e.g. "mcpc @a...") - not sure if that's even possible
+- nit: Implement typing completions (e.g. "mcpc @ap...") - not sure if that's even possible
 - later: maybe add --no-color option to disable chalk
 
 ## E2E test scenarios
 
+- On "npm run release", make the two skippable OAuth e2e tests mandatory
 - Test that "mcpc <remote-server> --json --header "X-Test: Blah" redacts the header in --verbose
 
 - Test auth profiles work long-term and sessions too - basically when running some tests the

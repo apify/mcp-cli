@@ -59,7 +59,7 @@ export class ProxyServer {
     // Create MCP server that forwards to upstream client
     this.mcpServer = new MCPServer(
       {
-        name: `mcpc-proxy-${sessionName}`,
+        name: `mcpc-proxy${sessionName}`,
         version: 'yolo',
       },
       {

@@ -177,3 +177,8 @@ mcpc --config .vscode/mcp.json filesystem resources-list
 # Verbose output shows protocol details
 mcpc --verbose @s tools-call my-tool
 ```
+
+## Example script
+
+See [`docs/examples/company-lookup.sh`](../examples/company-lookup.sh) for a complete example
+of an AI-generated script that validates prerequisites and calls MCP tools.

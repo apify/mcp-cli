@@ -587,6 +587,8 @@ for tool in $(mcpc --json @server tools-list | jq -r '.[].name'); do
 done
 ```
 
+For a complete example script, see [`docs/examples/company-lookup.sh`](./docs/examples/company-lookup.sh).
+
 ### Schema validation
 
 Validate tool/prompt schemas to detect breaking changes early:
@@ -1050,8 +1052,8 @@ The main `mcpc` process doesn't save log files, but supports [verbose mode](#ver
 
 ## Development
 
-`mcpc` was built by [Jan Curn](https://x.com/jancurn) of [Apify](https://apify.com) with the help of Claude Code during the late nights of Xmas 
-2025 in North Beach, San Francisco.
+The initial version of `mcpc` was developed by [Jan Curn](https://x.com/jancurn) of [Apify](https://apify.com)
+with the help of Claude Code, during late nights over Christmas 2025 in North Beach, San Francisco.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, architecture overview, and contribution guidelines.
 
