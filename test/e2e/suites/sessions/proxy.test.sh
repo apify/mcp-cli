@@ -90,4 +90,97 @@ health_response=$(curl -s --max-time 2 "http://127.0.0.1:$PROXY_PORT/health" 2>/
 assert_eq "$health_response" "CURL_FAILED" "proxy should be unavailable after close"
 test_pass
 
+# ========================================
+# Bearer token authentication tests
+# ========================================
+
+SESSION_AUTH=$(session_name "proxy-auth")
+PROXY_PORT_AUTH=$((8200 + RANDOM % 100))
+BEARER_TOKEN="test-secret-token-12345"
+
+# Test: create session with proxy and bearer token
+test_case "connect with --proxy-bearer-token"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION_AUTH" --proxy "$PROXY_PORT_AUTH" --proxy-bearer-token "$BEARER_TOKEN"
+assert_success "connect with --proxy-bearer-token should succeed"
+_SESSIONS_CREATED+=("$SESSION_AUTH")
+test_pass
+
+sleep 1
+
+# Test: health endpoint works without auth (health is public)
+test_case "proxy health endpoint works without auth"
+health_response=$(curl -s "http://127.0.0.1:$PROXY_PORT_AUTH/health" 2>/dev/null || echo "CURL_FAILED")
+assert_contains "$health_response" "ok" "health endpoint should work without auth"
+test_pass
+
+# Test: MCP request without auth returns 401
+test_case "proxy rejects unauthenticated MCP requests"
+response=$(curl -s -w "\n%{http_code}" -X POST "http://127.0.0.1:$PROXY_PORT_AUTH/" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","method":"ping","id":1}' 2>/dev/null)
+http_code=$(echo "$response" | tail -1)
+assert_eq "$http_code" "401" "should return 401 for unauthenticated request"
+test_pass
+
+# Test: MCP request with wrong token returns 403
+test_case "proxy rejects wrong bearer token"
+response=$(curl -s -w "\n%{http_code}" -X POST "http://127.0.0.1:$PROXY_PORT_AUTH/" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Authorization: Bearer wrong-token" \
+  -d '{"jsonrpc":"2.0","method":"ping","id":1}' 2>/dev/null)
+http_code=$(echo "$response" | tail -1)
+assert_eq "$http_code" "403" "should return 403 for wrong token"
+test_pass
+
+# Test: MCP request with correct token succeeds
+test_case "proxy accepts correct bearer token"
+response=$(curl -s -w "\n%{http_code}" -X POST "http://127.0.0.1:$PROXY_PORT_AUTH/" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Authorization: Bearer $BEARER_TOKEN" \
+  -d '{"jsonrpc":"2.0","method":"ping","id":1}' 2>/dev/null)
+http_code=$(echo "$response" | tail -1)
+# Should be 200 (success) or 202 (accepted for streaming)
+if [[ "$http_code" != "200" && "$http_code" != "202" ]]; then
+  test_fail "expected 200 or 202, got $http_code"
+  exit 1
+fi
+test_pass
+
+# Test: bearer token not leaked in --verbose output
+test_case "bearer token not leaked in verbose output"
+run_mcpc --verbose "$SESSION_AUTH" tools-list
+assert_success
+# Check that the actual token value doesn't appear in stdout or stderr
+if echo "$STDOUT" | grep -q "$BEARER_TOKEN"; then
+  test_fail "bearer token leaked in stdout"
+  exit 1
+fi
+if echo "$STDERR" | grep -q "$BEARER_TOKEN"; then
+  test_fail "bearer token leaked in stderr"
+  exit 1
+fi
+test_pass
+
+# Test: bearer token not leaked in bridge logs
+test_case "bearer token not leaked in bridge logs"
+# Find the bridge log file for this session
+BRIDGE_LOG="$MCPC_HOME_DIR/logs/bridge-$SESSION_AUTH.log"
+if [[ -f "$BRIDGE_LOG" ]]; then
+  if grep -q "$BEARER_TOKEN" "$BRIDGE_LOG"; then
+    test_fail "bearer token leaked in bridge log"
+    exit 1
+  fi
+fi
+test_pass
+
+# Test: close auth session
+test_case "close auth session"
+run_mcpc "$SESSION_AUTH" close
+assert_success
+_SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION_AUTH}")
+test_pass
+
 test_done
