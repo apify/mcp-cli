@@ -322,14 +322,14 @@ mcpc @apify close
 
 ### Session failover
 
-The sessions are persistent: metadata is save in `~/.mcpc/sessions.json` file,
+The sessions are persistent: metadata is saved in `~/.mcpc/sessions.json` file,
 [authentication tokens](#authentication) in OS keychain.
 The `mcpc` bridge process keeps the session alive by sending periodic [ping messages](#ping) to the MCP server.
-Still, sessions can still fail due to network disconnects, bridge process crash, or server dropping it.
+Still, sessions can fail due to network disconnects, bridge process crash, or server dropping it.
 Here's how `mcpc` handles these situations:
 
 - While the **bridge process is running**: 
-  - If **server postively responds** to pings, the session is marked 🟢 **`alive`**, and everything is fine.
+  - If **server positively responds** to pings, the session is marked 🟢 **`alive`**, and everything is fine.
   - If **server stops responding**, the bridge will keep trying to reconnect in the background.
   - If **server negatively responds** to indicate `MCP-Session-Id` is no longer valid
     or authentication permanently failed (HTTP 401 or 403),
@@ -350,7 +350,7 @@ To **remove the session from the list**, you need to explicitly close it:
 mcpc @apify close
 ```
 
-You can restart session anytime, which kills the bridge process
+You can restart a session anytime, which kills the bridge process
 and opens new connection with new `MCP-Session-Id`, by running:
 
 ```bash
@@ -545,7 +545,7 @@ Schema modes (`--schema-mode`):
 ### AI agents
 
 `mcpc` is designed for MCP "[code mode](https://blog.cloudflare.com/code-mode/)" -
-AI agents that write and execute code rather than use tool function calling.
+AI agents that write and execute code rather than using tool function calling.
 This approach is [more accurate](https://www.anthropic.com/engineering/code-execution-with-mcp) and uses fewer tokens.
 
 AI agent can discover and use tools via shell commands

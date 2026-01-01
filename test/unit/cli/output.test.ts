@@ -14,6 +14,7 @@ jest.mock('chalk', () => ({
     gray: (s: string) => s,
     bold: (s: string) => s,
     green: (s: string) => s,
+    greenBright: (s: string) => s,
     blue: (s: string) => s,
     magenta: (s: string) => s,
     white: (s: string) => s,
@@ -25,6 +26,7 @@ jest.mock('chalk', () => ({
   gray: (s: string) => s,
   bold: (s: string) => s,
   green: (s: string) => s,
+  greenBright: (s: string) => s,
   blue: (s: string) => s,
   magenta: (s: string) => s,
   white: (s: string) => s,
@@ -47,9 +49,10 @@ import {
   formatResourceTemplateDetail,
   formatPrompts,
   formatPromptDetail,
+  formatSessionLine,
   logTarget,
 } from '../../../src/cli/output.js';
-import type { Tool, Resource, ResourceTemplate, Prompt, ServerDetails, ServerConfig } from '../../../src/lib/types.js';
+import type { Tool, Resource, ResourceTemplate, Prompt, ServerDetails, ServerConfig, SessionData } from '../../../src/lib/types.js';
 
 describe('extractSingleTextContent', () => {
   it('should return text for single text content item', () => {
@@ -900,6 +903,84 @@ describe('formatPromptDetail', () => {
     // Optional should NOT have [required]
     expect(output).toContain('`optional_arg`: string');
     expect(output).not.toMatch(/`optional_arg`.*\[required\]/);
+  });
+});
+
+describe('formatSessionLine', () => {
+  it('should format HTTP session with all fields', () => {
+    const session: SessionData = {
+      name: '@test',
+      server: { url: 'https://mcp.example.com' },
+      profileName: 'default',
+      protocolVersion: '2025-11-25',
+      createdAt: '2025-01-01T00:00:00Z',
+    };
+
+    const output = formatSessionLine(session);
+
+    expect(output).toContain('@test');
+    expect(output).toContain('https://mcp.example.com');
+    expect(output).toContain('HTTP');
+    expect(output).toContain('OAuth');
+    expect(output).toContain('default');
+    expect(output).toContain('MCP: 2025-11-25');
+  });
+
+  it('should format stdio session', () => {
+    const session: SessionData = {
+      name: '@fs',
+      server: {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
+      },
+      createdAt: '2025-01-01T00:00:00Z',
+    };
+
+    const output = formatSessionLine(session);
+
+    expect(output).toContain('@fs');
+    expect(output).toContain('npx');
+    expect(output).toContain('stdio');
+  });
+
+  it('should include proxy info when configured', () => {
+    const session: SessionData = {
+      name: '@proxy-test',
+      server: { url: 'https://mcp.example.com' },
+      proxyConfig: { host: '127.0.0.1', port: 8080 },
+      createdAt: '2025-01-01T00:00:00Z',
+    };
+
+    const output = formatSessionLine(session);
+
+    expect(output).toContain('@proxy-test');
+    expect(output).toContain('[proxy:');
+    expect(output).toContain('127.0.0.1:8080');
+  });
+
+  it('should include proxy with custom host', () => {
+    const session: SessionData = {
+      name: '@proxy-custom',
+      server: { url: 'https://mcp.example.com' },
+      proxyConfig: { host: '0.0.0.0', port: 3000 },
+      createdAt: '2025-01-01T00:00:00Z',
+    };
+
+    const output = formatSessionLine(session);
+
+    expect(output).toContain('0.0.0.0:3000');
+  });
+
+  it('should not include proxy info when not configured', () => {
+    const session: SessionData = {
+      name: '@simple',
+      server: { url: 'https://mcp.example.com' },
+      createdAt: '2025-01-01T00:00:00Z',
+    };
+
+    const output = formatSessionLine(session);
+
+    expect(output).not.toContain('[proxy:');
   });
 });
 

@@ -6,16 +6,9 @@
 
 ## MCP features
 
-- Add `--proxy [HOST:]PORT` feature to `connect` command, to make bridge launch a new MCP server, which will map commands 
-  and request 1:1 to the remote or local MCP server, but without having access to original authentication tokens. It will be like a layer of 
-  security.
-- Once this is done, we will add these enhancements:
-  - `--proxy-bearer-token X` for proxy to require auth token for more security
-  - `--proxy-capabilities tools:TOOL_NAME,TOOL_NAME2,...,prompts[:...],...` to limit access to selected MCP features and tools
-    (what if tools have ":" or "," in their names?)
-    In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
-  In README, explain how this is useful for AI sandboxing!
-
+- `--proxy-capabilities tools:TOOL_NAME,TOOL_NAME2,...,prompts[:...],...` to limit access to selected MCP features and tools
+  (what if tools have ":" or "," in their names?)
+  In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
 - Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
   automatically updateUpa the -o file on changes, without it just keep track of changed files in
   bridge process' cache, and report in resources-list/resources-read operation
