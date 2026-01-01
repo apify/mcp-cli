@@ -340,7 +340,7 @@ create_session() {
   local suffix="${2:-default}"
   local session=$(session_name "$suffix")
 
-  run_mcpc "$target" session "$session"
+  run_mcpc "$target" connect "$session"
   if [[ $EXIT_CODE -eq 0 ]]; then
     _SESSIONS_CREATED+=("$session")
   fi

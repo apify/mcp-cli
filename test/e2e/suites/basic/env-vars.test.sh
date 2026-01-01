@@ -19,7 +19,7 @@ cp "$MCPC_HOME_DIR/profiles.json" "$CUSTOM_HOME/profiles.json"
 
 # Create a session with custom home
 SESSION=$(session_name "env-home")
-MCPC_HOME_DIR="$CUSTOM_HOME" run_mcpc "$TEST_SERVER_URL" session "$SESSION"
+MCPC_HOME_DIR="$CUSTOM_HOME" run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
 assert_success
 
 # Verify sessions.json exists in custom home
@@ -79,7 +79,7 @@ test_pass
 # Test: MCPC_VERBOSE=1 enables verbose mode
 test_case "MCPC_VERBOSE=1 enables verbose output"
 SESSION2=$(session_name "env-verbose")
-run_mcpc "$TEST_SERVER_URL" session "$SESSION2"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION2"
 assert_success
 _SESSIONS_CREATED+=("$SESSION2")
 

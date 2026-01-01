@@ -19,7 +19,7 @@ test_pass
 test_case "--verbose doesn't change stdout for session list"
 # Create a session first so we have something to list
 INVARIANT_SESSION=$(session_name "invariant")
-run_mcpc --config "$(create_fs_config "$TEST_TMP")" fs session "$INVARIANT_SESSION" >/dev/null 2>&1
+run_mcpc --config "$(create_fs_config "$TEST_TMP")" fs connect "$INVARIANT_SESSION" >/dev/null 2>&1
 _SESSIONS_CREATED+=("$INVARIANT_SESSION")
 
 # Test the invariant - with isolated home, this is deterministic
@@ -33,7 +33,7 @@ test_pass
 test_case "--verbose doesn't change stdout for mcpc --json"
 # Create a session for this test
 INVARIANT_SESSION2=$(session_name "inv-json")
-run_mcpc --config "$(create_fs_config "$TEST_TMP")" fs session "$INVARIANT_SESSION2" >/dev/null 2>&1
+run_mcpc --config "$(create_fs_config "$TEST_TMP")" fs connect "$INVARIANT_SESSION2" >/dev/null 2>&1
 _SESSIONS_CREATED+=("$INVARIANT_SESSION2")
 
 # Test the invariant with JSON mode
@@ -84,7 +84,7 @@ test_pass
 # Test: session creation with --json returns only valid JSON to stdout
 test_case "session create --json returns only valid JSON"
 SESSION=$(session_name "json-test")
-run_mcpc --config "$(create_fs_config "$TEST_TMP")" fs session "$SESSION" --json
+run_mcpc --config "$(create_fs_config "$TEST_TMP")" fs connect "$SESSION" --json
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 assert_json_valid "$STDOUT" "session create --json should return only valid JSON to stdout"

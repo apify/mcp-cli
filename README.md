@@ -108,7 +108,7 @@ mcpc mcp.apify.com
 mcpc mcp.apify.com tools-list --json
 
 # Create and use persistent MCP session
-mcpc mcp.apify.com session @test
+mcpc mcp.apify.com connect @test
 mcpc @test tools-call search-actors keywords:="web crawler"
 mcpc @test shell
 
@@ -142,7 +142,7 @@ Targets:
 Management commands (without <target>):
   login                   Create OAuth profile with credentials to access remote server
   logout                  Remove OAuth profile for remote server
-  session @<session>      Connect to server and create named persistent session
+  connect @<session>      Connect to server and create named persistent session
   restart @<session>      Kill and restart a session  
   close @<session>        Close a session
   
@@ -210,7 +210,7 @@ mcpc mcp.apify.com\?tools=docs tools-list
 mcpc mcp.apify.com\?tools=docs tools-call search-apify-docs query:="What are Actors?"
 
 # Session
-mcpc mcp.apify.com\?tools=docs session @apify
+mcpc mcp.apify.com\?tools=docs connect @apify
 mcpc @apify tools-list
 mcpc @apify tools-call search-apify-docs query:="What are Actors?"
 ```
@@ -271,7 +271,7 @@ which then serve as unique reference in commands.
 
 ```bash
 # Create a persistent session
-mcpc mcp.apify.com\?tools=docs session @apify
+mcpc mcp.apify.com\?tools=docs connect @apify
 
 # List all sessions and OAuth profiles
 mcpc
@@ -341,7 +341,7 @@ For local servers (stdio) or remote servers (Streamable HTTP) which do not requi
 mcpc mcp.apify.com\?tools=docs tools-list
 
 # Session command
-mcpc mcp.apify.com\?tools=docs session @test
+mcpc mcp.apify.com\?tools=docs connect @test
 mcpc @test tools-list
 ```
 
@@ -357,7 +357,7 @@ running a one-shot command or connecting new session.
 mcpc --header "Authorization: Bearer ${APIFY_TOKEN}" https://mcp.apify.com tools-list
 
 # Create session with Bearer token (saved to keychain for this session only)
-mcpc --header "Authorization: Bearer ${APIFY_TOKEN}" https://mcp.apify.com session @apify
+mcpc --header "Authorization: Bearer ${APIFY_TOKEN}" https://mcp.apify.com connect @apify
 
 # Use the session (Bearer token is loaded from keychain automatically)
 mcpc @apify tools-list
@@ -393,8 +393,8 @@ mcpc mcp.apify.com login
 mcpc mcp.apify.com login --profile work
 
 # Create two sessions using the two different credentials
-mcpc https://mcp.apify.com session @apify-personal
-mcpc https://mcp.apify.com session @apify-work --profile work
+mcpc https://mcp.apify.com connect @apify-personal
+mcpc https://mcp.apify.com connect @apify-work --profile work
 
 # Both sessions now work independently
 mcpc @apify-personal tools-list  # Uses personal account
@@ -449,13 +449,13 @@ This flow ensures:
 # With specific profile - always authenticated:
 # - Uses 'work' if it exists
 # - Fails if it doesn't exist
-mcpc mcp.apify.com session @apify-work --profile work
+mcpc mcp.apify.com connect @apify-work --profile work
 
 # Without profile - opportunistic authentication:
 # - Uses 'default' if it exists
 # - Tries unauthenticated if 'default' doesn't exist
 # - Fails if the server requires authentication
-mcpc mcp.apify.com session @apify-personal
+mcpc mcp.apify.com connect @apify-personal
 
 # Public server - no authentication needed:
 mcpc mcp.apify.com\?tools=docs tools-list
@@ -593,7 +593,7 @@ You can point to an existing config file with `--config`:
 mcpc --config .vscode/mcp.json apify tools-list
 
 # Open a session to a server specified in the custom config file
-mcpc --config .vscode/mcp.json apify session @my-apify
+mcpc --config .vscode/mcp.json apify connect @my-apify
 ```
 
 **Example MCP config JSON file:**
@@ -643,7 +643,7 @@ When `--config` is provided, you can reference servers by name:
 mcpc --config .vscode/mcp.json filesystem tools-list
 
 # Create a named session from server in config
-mcpc --config .vscode/mcp.json filesystem session @fs
+mcpc --config .vscode/mcp.json filesystem connect @fs
 mcpc @fs tools-call search
 ```
 
@@ -962,7 +962,7 @@ The main `mcpc` process doesn't save log files, but supports [verbose mode](#ver
 
 **"Session not found"**
 - List existing sessions: `mcpc`
-- Create new session if expired: `mcpc @<session-name> close` and `mcpc <target> session @<session-name>`
+- Create new session if expired: `mcpc @<session-name> close` and `mcpc <target> connect @<session-name>`
 
 **"Authentication failed"**
 - List saved OAuth profiles: `mcpc`

@@ -12,7 +12,7 @@ SESSION=$(session_name "resilience")
 
 # Test: create session
 test_case "create session"
-run_mcpc "$TEST_SERVER_URL" session "$SESSION"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass

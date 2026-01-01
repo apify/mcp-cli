@@ -135,7 +135,7 @@ export async function resolveAuthProfile(
     // Profiles exist but no default - suggest using --profile
     const profileNames = serverProfiles.map(p => p.name).join(', ');
     const commandHint = context?.sessionName
-      ? `mcpc ${target} session ${context.sessionName} --profile <name>`
+      ? `mcpc ${target} connect ${context.sessionName} --profile <name>`
       : `mcpc ${target} <command> --profile <name>`;
     throw new ClientError(
       `No default authentication profile for ${host}.\n\n` +

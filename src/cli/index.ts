@@ -229,7 +229,7 @@ Targets:
 Management commands (without <target>):
   login                   Create OAuth profile with credentials to access remote server
   logout                  Remove OAuth profile for remote server
-  session @<session>      Connect to server and create named persistent session
+  connect @<session>      Connect to server and create named persistent session
   restart @<session>      Kill and restart a session
   close @<session>        Close a session
 
@@ -308,11 +308,11 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
       await sessions.restartSession(target, getOptionsFromCommand(command));
     });
 
-  // Session command: mcpc <target> session @<name>
+  // Connect command: mcpc <target> connect @<name>
   // Creates a new session or reconnects if session exists but bridge is dead
   program
-    .command('session <name>')
-    .description('Create or reconnect a session to an MCP server')
+    .command('connect <name>')
+    .description('Create or reconnect a named session to an MCP server')
     .action(async (name, _options, command) => {
       await sessions.connectSession(name, target, getOptionsFromCommand(command));
     });

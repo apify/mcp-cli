@@ -19,7 +19,7 @@ curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
 initial_sessions=$(curl -s "$TEST_SERVER_URL/control/get-active-sessions" | jq '.activeSessions | length')
 
 # Create mcpc session
-run_mcpc "$TEST_SERVER_URL" session "$SESSION"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 

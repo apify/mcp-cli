@@ -13,7 +13,7 @@ SESSION=$(session_name "res")
 
 # Create session for testing
 test_case "setup: create session"
-run_mcpc "$TEST_SERVER_URL" session "$SESSION"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass

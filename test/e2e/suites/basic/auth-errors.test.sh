@@ -26,7 +26,7 @@ test_pass
 # Test: auth error with session
 test_case "session without auth fails on first use"
 SESSION=$(session_name "auth-fail")
-run_mcpc "$TEST_SERVER_URL" session "$SESSION"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
 # Session creation might succeed (just stores config)
 # But using it should fail due to auth
 run_xmcpc "$SESSION" tools-list
@@ -83,7 +83,7 @@ test_pass
 
 test_case "OAuth server session creation without profile shows login hint"
 SESSION=$(session_name "oauth-noprof")
-run_mcpc "$OAUTH_SERVER" session "$SESSION"
+run_mcpc "$OAUTH_SERVER" connect "$SESSION"
 assert_failure
 # Should hint at login command
 assert_contains "$STDERR" "login"

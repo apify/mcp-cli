@@ -76,7 +76,7 @@ test_pass
 
 test_case "create session without authentication"
 SESSION=$(session_name "open")
-run_mcpc "$REMOTE_SERVER" session "$SESSION"
+run_mcpc "$REMOTE_SERVER" connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass

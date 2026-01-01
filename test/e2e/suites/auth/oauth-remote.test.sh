@@ -193,7 +193,7 @@ fi
 test_case "create session with OAuth profile (verbose)"
 SESSION1=$(session_name "oauth1")
 # Create session with verbose mode to check for credential leaks
-run_mcpc --verbose "$REMOTE_SERVER" session "$SESSION1" --profile "$PROFILE1"
+run_mcpc --verbose "$REMOTE_SERVER" connect "$SESSION1" --profile "$PROFILE1"
 assert_success
 _SESSIONS_CREATED+=("$SESSION1")
 
@@ -248,7 +248,7 @@ if [[ "$SINGLE_PROFILE_MODE" == "true" ]]; then
 else
   SESSION2=$(session_name "oauth2")
   # Create session with verbose mode to check for credential leaks
-  run_mcpc --verbose "$REMOTE_SERVER" session "$SESSION2" --profile "$PROFILE2"
+  run_mcpc --verbose "$REMOTE_SERVER" connect "$SESSION2" --profile "$PROFILE2"
   assert_success
   _SESSIONS_CREATED+=("$SESSION2")
 

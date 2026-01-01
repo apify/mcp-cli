@@ -12,7 +12,7 @@ SESSION=$(session_name "lifecycle")
 
 # Test: connect creates session
 test_case "connect creates session"
-run_mcpc "$TEST_SERVER_URL" session "$SESSION"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
 assert_success "connect should succeed"
 assert_contains "$STDOUT" "created"
 _SESSIONS_CREATED+=("$SESSION")

@@ -3,23 +3,23 @@
 
 ## Next
 
-- Rename "mcpc <target> session @test" command to "mcpc <target> connect @test"
-
-- Pass `--timeout` to both connection and command timeout (if MCP supports this). Ensure we obey both --timeout and timeout from config.
+- Ensure we pass `--timeout` to both connection and command timeout (if MCP supports this). Ensure we obey both --timeout and timeout from config 
+  in the right precedence, as mentioned in README.
 
 ## MCP features
 
 - Add `--proxy [HOST:]PORT` feature to `connect` command, to make bridge launch a new MCP server, which will map commands 
   and request 1:1 to the remote or local MCP server, but without having access to original authentication tokens. It will be like a layer of 
   security.
-- Once this is done, we could add these enhancements"
+- Once this is done, we will add these enhancements:
   - `--proxy-bearer-token X` for proxy to require auth token for more security
   - `--proxy-capabilities tools:TOOL_NAME,TOOL_NAME2,...,prompts[:...],...` to limit access to selected MCP features and tools
     (what if tools have ":" or "," in their names?)
     In theory, we could add limit of capabilities to normal sessions, but the LLM could still break out of it, so what's the point.
-  Explain this is useful for AI sandboxing!
+  In README, explain how this is useful for AI sandboxing!
+
 - Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
-  automatically update the -o file on changes, without it just keep track of changed files in
+  automatically updateUpa the -o file on changes, without it just keep track of changed files in
   bridge process' cache, and report in resources-list/resources-read operation
 
 
@@ -29,7 +29,7 @@
   just retype it dynamically to make it work.
 - nit: Cooler OAuth flow finish web page with CSS animation, add Apify example there, show mcpc info. E.g. next step - check Apify rather than close
 - security: For auth profiles, fetch the detailed user info via http, save to profiles.json and show in 'mcpc', ensure the info is up-to-date
-- later: Add unique Session.id and Profile.id and use it for OS keychain keys, to truly enable using multiple independent mcpc profiles
+- later: Add unique Session.id and Profile.id and use it for OS keychain keys, to truly enable using multiple independent mcpc profiles. Use cry
 - nit: Implement typing completions (e.g. "mcpc @a...") - not sure if that's even possible
 
 

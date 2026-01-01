@@ -22,7 +22,7 @@ test_case "secret header not visible in ps aux"
 SESSION=$(session_name "sec-hdr")
 
 # Create session with secret header
-run_mcpc "$TEST_SERVER_URL" session "$SESSION" --header "$SECRET_HEADER: Bearer $SECRET_VALUE"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION" --header "$SECRET_HEADER: Bearer $SECRET_VALUE"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
@@ -121,7 +121,7 @@ test_case "multiple headers all redacted"
 SESSION2=$(session_name "sec-multi")
 ANOTHER_SECRET="another-secret-$(date +%s)"
 
-run_mcpc "$TEST_SERVER_URL" session "$SESSION2" \
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION2" \
   --header "X-Api-Key: $SECRET_VALUE" \
   --header "X-Secret-Token: $ANOTHER_SECRET" \
   --header "X-Public: public-value"
@@ -155,7 +155,7 @@ SESSION3=$(session_name "sec-verb")
 VERBOSE_SECRET="verbose-secret-$(date +%s)"
 
 # Create session with verbose mode
-run_mcpc --verbose "$TEST_SERVER_URL" session "$SESSION3" --header "X-Api-Key: $VERBOSE_SECRET"
+run_mcpc --verbose "$TEST_SERVER_URL" connect "$SESSION3" --header "X-Api-Key: $VERBOSE_SECRET"
 assert_success
 _SESSIONS_CREATED+=("$SESSION3")
 

@@ -15,7 +15,7 @@ curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
 
 # Create session
 SESSION=$(session_name "close-delete")
-run_mcpc "$TEST_SERVER_URL" session "$SESSION"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
@@ -72,7 +72,7 @@ curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
 
 SESSION2=$(session_name "rapid")
 for i in 1 2 3; do
-  run_mcpc "$TEST_SERVER_URL" session "$SESSION2"
+  run_mcpc "$TEST_SERVER_URL" connect "$SESSION2"
   assert_success "iteration $i: create should succeed"
   run_mcpc "$SESSION2" close
   assert_success "iteration $i: close should succeed"

@@ -31,7 +31,7 @@ EOF
 
 # Test that we can connect using the config
 SESSION=$(session_name "env-url")
-run_mcpc --config "$CONFIG_FILE" env-test session "$SESSION"
+run_mcpc --config "$CONFIG_FILE" env-test connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
@@ -70,7 +70,7 @@ EOF
 
 # Test that we can connect using the config
 SESSION=$(session_name "env-hdr")
-run_mcpc --config "$CONFIG_FILE" header-test session "$SESSION"
+run_mcpc --config "$CONFIG_FILE" header-test connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
@@ -109,7 +109,7 @@ EOF
 
 # Should still connect (empty string is valid header value)
 SESSION=$(session_name "env-miss")
-run_mcpc --config "$CONFIG_FILE" missing-test session "$SESSION"
+run_mcpc --config "$CONFIG_FILE" missing-test connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
@@ -139,7 +139,7 @@ cat > "$CONFIG_FILE" <<EOF
 EOF
 
 SESSION=$(session_name "env-mult")
-run_mcpc --config "$CONFIG_FILE" multi-test session "$SESSION"
+run_mcpc --config "$CONFIG_FILE" multi-test connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 

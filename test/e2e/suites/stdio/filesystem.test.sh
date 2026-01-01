@@ -80,7 +80,7 @@ SESSION=$(session_name "fs")
 
 # Test: create session with stdio config
 test_case "create session with stdio config"
-run_mcpc --config "$CONFIG" fs session "$SESSION"
+run_mcpc --config "$CONFIG" fs connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass

@@ -12,7 +12,7 @@ SESSION=$(session_name "server-abort")
 
 # Test: create and verify session works
 test_case "create session and verify it works"
-run_mcpc "$TEST_SERVER_URL" session "$SESSION"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
@@ -53,7 +53,7 @@ _SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION}")
 
 # Create new session with same name
 SESSION2=$(session_name "server-abort-2")
-run_mcpc "$TEST_SERVER_URL" session "$SESSION2"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION2"
 assert_success
 _SESSIONS_CREATED+=("$SESSION2")
 
