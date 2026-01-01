@@ -151,6 +151,15 @@ export function validateToolSchema(
     }
   } else {
     // Compatible mode: focus on what matters for the call to succeed
+
+    // Description changes are just warnings in compatible mode
+    if (actual.description !== expected.description) {
+      result.warnings.push(
+        `Description changed: "${expected.description}" → "${actual.description}"`
+      );
+    }
+
+    // Validate inputSchema
     if (expected.inputSchema && actual.inputSchema) {
       const expectedRequired = expected.inputSchema.required || [];
       const actualRequired = actual.inputSchema.required || [];
@@ -228,6 +237,61 @@ export function validateToolSchema(
     } else if (expected.inputSchema && !actual.inputSchema) {
       result.errors.push('Input schema was removed');
       result.valid = false;
+    }
+
+    // Validate outputSchema in compatible mode
+    // For output, we care about what the caller expects to RECEIVE
+    // Breaking changes: removing fields, changing types of expected fields
+    // OK: adding new fields, making optional fields required (more guarantees)
+    if (expected.outputSchema && actual.outputSchema) {
+      const expectedRequired = expected.outputSchema.required || [];
+      const actualRequired = actual.outputSchema.required || [];
+      const expectedProps = expected.outputSchema.properties || {};
+      const actualProps = actual.outputSchema.properties || {};
+
+      // Check all expected properties still exist with compatible types
+      for (const [propName, expectedProp] of Object.entries(expectedProps)) {
+        if (!(propName in actualProps)) {
+          // Field removed from output - caller expects this field
+          result.errors.push(`Output field "${propName}" was removed (caller expects this field)`);
+          result.valid = false;
+        } else {
+          const actualProp = actualProps[propName] as Record<string, unknown> | undefined;
+          const expProp = expectedProp as Record<string, unknown>;
+          if (actualProp && expProp.type && actualProp.type !== expProp.type) {
+            result.errors.push(
+              `Output field "${propName}" type changed: expected ${JSON.stringify(expProp.type)}, got ${JSON.stringify(actualProp.type)}`
+            );
+            result.valid = false;
+          }
+        }
+      }
+
+      // Check if expected required fields became optional (warning - field still exists)
+      for (const field of expectedRequired) {
+        if (!actualRequired.includes(field) && field in actualProps) {
+          result.warnings.push(`Output field "${field}" changed from required to optional`);
+        }
+      }
+
+      // Info about new output fields (not an error - more data available)
+      for (const propName of Object.keys(actualProps)) {
+        if (!(propName in expectedProps)) {
+          result.warnings.push(`New output field "${propName}" added`);
+        }
+      }
+
+      // Info about optional→required changes (not breaking - more guarantees)
+      for (const field of actualRequired) {
+        if (!expectedRequired.includes(field) && field in expectedProps) {
+          result.warnings.push(`Output field "${field}" changed from optional to required`);
+        }
+      }
+    } else if (expected.outputSchema && !actual.outputSchema) {
+      result.errors.push('Output schema was removed');
+      result.valid = false;
+    } else if (!expected.outputSchema && actual.outputSchema) {
+      result.warnings.push('Output schema was added');
     }
   }
 

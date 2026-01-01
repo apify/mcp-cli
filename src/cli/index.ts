@@ -334,7 +334,7 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
       });
     });
 
-  // Tools commands (hyphenated)
+  // Tools commands (keep these short aliases undocumented, they serve just as fallback)
   program
     .command('tools')
     .description('List available tools (shorthand for tools-list)')
@@ -366,7 +366,7 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
       });
     });
 
-  // Resources commands (hyphenated)
+  // Resources commands (keep these short aliases undocumented, they serve just as fallback)
   program
     .command('resources')
     .description('List available resources (shorthand for resources-list)')
@@ -416,7 +416,7 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
       await resources.listResourceTemplates(target, getOptionsFromCommand(command));
     });
 
-  // Prompts commands (hyphenated)
+  // Prompts commands (keep these short aliases undocumented, they serve just as fallback)
   program
     .command('prompts')
     .description('List available prompts (shorthand for prompts-list)')
@@ -444,7 +444,9 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
   // Logging commands
   program
     .command('logging-set-level <level>')
-    .description('Set server logging level (debug, info, notice, warning, error, critical, alert, emergency)')
+    .description(
+      'Set server logging level (debug, info, notice, warning, error, critical, alert, emergency)'
+    )
     .action(async (level, _options, command) => {
       await logging.setLogLevel(target, level, getOptionsFromCommand(command));
     });

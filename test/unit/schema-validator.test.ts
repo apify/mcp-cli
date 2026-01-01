@@ -136,7 +136,7 @@ describe('schema-validator', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('ignores outputSchema in compatible mode', () => {
+    it('detects outputSchema type change in compatible mode', () => {
       const actual: ToolSchema = {
         ...baseSchema,
         outputSchema: {
@@ -152,15 +152,170 @@ describe('schema-validator', () => {
         },
       };
       const result = validateToolSchema(actual, expected, 'compatible');
-      expect(result.valid).toBe(true);
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((e) => e.includes('Output field') && e.includes('type changed'))).toBe(true);
     });
 
-    it('allows description mismatch in compatible mode', () => {
+    it('allows description mismatch in compatible mode with warning', () => {
       const actual: ToolSchema = { ...baseSchema, description: 'Actual description' };
       const expected: ToolSchema = { ...baseSchema, description: 'Expected description' };
       const result = validateToolSchema(actual, expected, 'compatible');
-      // Name matches, so should be valid (description not checked in compatible)
+      // Name matches, so should be valid (description produces warning, not error)
       expect(result.valid).toBe(true);
+      expect(result.warnings.some((w) => w.includes('Description changed'))).toBe(true);
+    });
+
+    describe('outputSchema validation in compatible mode', () => {
+      it('detects removed output field', () => {
+        const expected: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: {
+              result: { type: 'string' },
+              extra: { type: 'number' },
+            },
+          },
+        };
+        const actual: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: {
+              result: { type: 'string' },
+              // extra removed
+            },
+          },
+        };
+        const result = validateToolSchema(actual, expected, 'compatible');
+        expect(result.valid).toBe(false);
+        expect(result.errors.some((e) => e.includes('extra') && e.includes('removed'))).toBe(true);
+      });
+
+      it('warns about new output fields', () => {
+        const expected: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: {
+              result: { type: 'string' },
+            },
+          },
+        };
+        const actual: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: {
+              result: { type: 'string' },
+              newField: { type: 'number' },
+            },
+          },
+        };
+        const result = validateToolSchema(actual, expected, 'compatible');
+        expect(result.valid).toBe(true);
+        expect(result.warnings.some((w) => w.includes('newField') && w.includes('added'))).toBe(true);
+      });
+
+      it('warns when required output field becomes optional', () => {
+        const expected: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: {
+              result: { type: 'string' },
+            },
+            required: ['result'],
+          },
+        };
+        const actual: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: {
+              result: { type: 'string' },
+            },
+            required: [], // result no longer required
+          },
+        };
+        const result = validateToolSchema(actual, expected, 'compatible');
+        expect(result.valid).toBe(true);
+        expect(result.warnings.some((w) => w.includes('result') && w.includes('required to optional'))).toBe(true);
+      });
+
+      it('warns when optional output field becomes required (not breaking)', () => {
+        const expected: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: {
+              result: { type: 'string' },
+            },
+            required: [],
+          },
+        };
+        const actual: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: {
+              result: { type: 'string' },
+            },
+            required: ['result'], // result now required
+          },
+        };
+        const result = validateToolSchema(actual, expected, 'compatible');
+        expect(result.valid).toBe(true);
+        expect(result.warnings.some((w) => w.includes('result') && w.includes('optional to required'))).toBe(true);
+      });
+
+      it('fails when output schema is completely removed', () => {
+        const expected: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: { result: { type: 'string' } },
+          },
+        };
+        const actual: ToolSchema = {
+          ...baseSchema,
+          // outputSchema removed
+        };
+        const result = validateToolSchema(actual, expected, 'compatible');
+        expect(result.valid).toBe(false);
+        expect(result.errors.some((e) => e.includes('Output schema was removed'))).toBe(true);
+      });
+
+      it('warns when output schema is added', () => {
+        const expected: ToolSchema = {
+          ...baseSchema,
+          // no outputSchema
+        };
+        const actual: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: { result: { type: 'string' } },
+          },
+        };
+        const result = validateToolSchema(actual, expected, 'compatible');
+        expect(result.valid).toBe(true);
+        expect(result.warnings.some((w) => w.includes('Output schema was added'))).toBe(true);
+      });
+
+      it('passes when outputSchemas match exactly', () => {
+        const schemaWithOutput: ToolSchema = {
+          ...baseSchema,
+          outputSchema: {
+            type: 'object',
+            properties: { result: { type: 'string' } },
+            required: ['result'],
+          },
+        };
+        const result = validateToolSchema(schemaWithOutput, schemaWithOutput, 'compatible');
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
     });
 
     it('detects missing required field', () => {
