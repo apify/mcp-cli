@@ -43,7 +43,7 @@ test_pass
 
 # Test: can call tool via session
 test_case "tools-call works via session"
-run_mcpc "$SESSION" tools-call echo --args message="hello world"
+run_mcpc "$SESSION" tools-call echo 'message:=hello world'
 assert_success
 assert_contains "$STDOUT" "hello world"
 test_pass

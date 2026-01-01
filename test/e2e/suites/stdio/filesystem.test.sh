@@ -59,13 +59,13 @@ test_pass
 echo "One-shot test content" > "$TEST_TMP/oneshot.txt"
 
 test_case "one-shot: tools-call read_file via stdio"
-run_xmcpc --config "$CONFIG" fs tools-call read_file --args path="$TEST_TMP/oneshot.txt"
+run_xmcpc --config "$CONFIG" fs tools-call read_file "path:=$TEST_TMP/oneshot.txt"
 assert_success
 assert_contains "$STDOUT" "One-shot test content"
 test_pass
 
 test_case "one-shot: tools-call --json via stdio"
-run_mcpc --json --config "$CONFIG" fs tools-call read_file --args path="$TEST_TMP/oneshot.txt"
+run_mcpc --json --config "$CONFIG" fs tools-call read_file "path:=$TEST_TMP/oneshot.txt"
 assert_success
 assert_json_valid "$STDOUT"
 assert_json "$STDOUT" '.content'
@@ -108,21 +108,21 @@ test_pass
 
 # Test: read file via MCP (read-only tool, safe for run_xmcpc)
 test_case "read file via MCP"
-run_xmcpc "$SESSION" tools-call read_file --args path="$TEST_TMP/test.txt"
+run_xmcpc "$SESSION" tools-call read_file "path:=$TEST_TMP/test.txt"
 assert_success
 assert_contains "$STDOUT" "Hello from E2E test"
 test_pass
 
 # Test: list directory via MCP (output includes temp files with random names, use run_mcpc)
 test_case "list directory via MCP"
-run_mcpc "$SESSION" tools-call list_directory --args path="$TEST_TMP"
+run_mcpc "$SESSION" tools-call list_directory "path:=$TEST_TMP"
 assert_success
 assert_contains "$STDOUT" "test.txt"
 test_pass
 
 # Test: write file via MCP
 test_case "write file via MCP"
-run_mcpc "$SESSION" tools-call write_file --args path="$TEST_TMP/written.txt" content="Written via MCP"
+run_mcpc "$SESSION" tools-call write_file "path:=$TEST_TMP/written.txt" "content:=Written via MCP"
 assert_success
 test_pass
 

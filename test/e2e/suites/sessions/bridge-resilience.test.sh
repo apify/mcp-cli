@@ -36,7 +36,7 @@ test_pass
 # Test: calling tool with invalid arguments doesn't kill bridge
 test_case "invalid tool arguments doesn't kill bridge"
 # The 'add' tool expects numbers, pass strings
-run_xmcpc "$SESSION" tools-call add --args '{"a":"not-a-number","b":"also-not"}'
+run_xmcpc "$SESSION" tools-call add '{"a":"not-a-number","b":"also-not"}'
 # May or may not fail depending on server validation
 
 # Session should still work
@@ -95,7 +95,7 @@ test_pass
 
 # Test: calling tool that intentionally fails doesn't kill bridge
 test_case "tool that throws error doesn't kill bridge"
-run_xmcpc "$SESSION" tools-call fail --args '{"message":"intentional failure"}'
+run_xmcpc "$SESSION" tools-call fail '{"message":"intentional failure"}'
 assert_failure  # Tool failure is expected
 
 # Session should still work

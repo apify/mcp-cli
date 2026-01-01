@@ -3,13 +3,17 @@
 
 ## Next
 
-- Simplify README - there are too many top-level sections, and then show just the second level ones
-  - in README, explain the MCP commands better in a standalone section, with details how they work
-  - Expand --help to use same text as in README, add link to README
-
-- We support "prompts", "tools" etc commands ... do we need to?
-
+- We support "prompts", "tools" etc commands ... let's not do that, design principle is one way to do things
 - Rename "session" command to "connect"
+- Pass `--timeout` to both connection and command timeout (if MCP supports this). Ensure we obey both --timeout and timeout from config.
+
+- `--schema-mode` - we need to check the outputSchema more. In strict mode, any even tiny outputSchema change should fail (incl. description).
+  in `compatible`, we can ignore changes in descriptions, but we need to ensure the new outputSchema is superset of the expected outputSchema,
+  i.e. all required output fields are still required. Optional fields can disappear, that's fine. New fields can appear to, and it's okay.
+  Change of optional field to required field is also fine.
+  Basically only changes to expected outputSchema fields that could negatively affect the caller, in what they expect to receive, should be 
+  flagged as errors. Other changes are just warnings.
+
 
 ## MCP features
 
@@ -22,20 +26,14 @@
 - Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
   automatically update the -o file on changes, without it just keep track of changed files in
   bridge process' cache, and report in resources-list/resources-read operation
-- Add support for asynchronous tasks
-- Add support for client roots, need to figure how exactly
+
 
 ## Later
 
-- Check how we deal with connection and command timeouts, that --timeout and timeout from config 
-  file are obeyed
-
-- Consider adding support for MCP elicitations, and potentially for sampling (e.g. via shell 
-  interface?)
-
+- ux: Be even more forgiving with `args:=x`, when we know from tools/prompt schema the text is compatible with `x` even if the exact type is not - 
+  just retype it dynamically to make it work.
 - nit: Cooler OAuth flow finish web page with CSS animation, add Apify example there, show mcpc info. E.g. next step - check Apify rather than close
-- nit: For auth profiles, fetch the detailed user info via http, ensure the info is up-to-date
-- nit: add more shortcuts, e.g. --profile => -p
+- security: For auth profiles, fetch the detailed user info via http, save to profiles.json and show in 'mcpc', ensure the info is up-to-date
 - later: Add unique Session.id and Profile.id and use it for OS keychain keys, to truly enable using multiple independent mcpc profiles
 - nit: Implement typing completions (e.g. "mcpc @a...") - not sure if that's even possible
 
@@ -51,10 +49,23 @@
   We could have some special dir for long-term testing...
 
 
+Now a big change.
+I want to get rid of:
+--args ...
+--args-file ...
+
+And replace it with:
+- `mcpc <target> tools-call <tool-name> [<args-json> | arg1:=val arg2:=json ...]`
+- `mcpc <target> tools-call <tool-name> < file.txt`
+
+We'll only support `arg1:=val` syntax, not `arg1=val`, to avoid conflict with `--clean=x`.
+All JSON parseable values will parsed as respective types, or treated as string if not number, boolean, ...
+Another option is to provide full JSON string as ` <args-json>`.
+And third option is to support stdin for piping args - the piped object must be JSON.
+
+This means a big rewrite of parsing logic, adding/updating unit and e2e tests. For now, keep the README and command help intact.
 
 
-TODO: new variant:
-tools-call <tool-name> [<args-json> | arg1=val arg2:=json ... | <stdin>]
 
 
 When running "shell" command in shell, let's show some easter egg - we can rotate couple of funny messages,

@@ -6,7 +6,7 @@ import { formatOutput, formatToolDetail, formatSuccess, formatWarning } from '..
 import { ClientError } from '../../lib/errors.js';
 import type { CommandOptions } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
-import { parseCommandArgs, loadArgsFromFile } from '../parser.js';
+import { parseCommandArgs, hasStdinData, readStdinArgs } from '../parser.js';
 import {
   loadSchemaFromFile,
   validateToolSchema,
@@ -85,26 +85,30 @@ export async function getTool(target: string, name: string, options: CommandOpti
 
 /**
  * Call a tool with arguments
+ * Arguments can be provided via:
+ * 1. Positional args: key:=value pairs or inline JSON
+ * 2. Stdin: pipe JSON input (echo '{"key":"value"}' | mcpc ...)
  */
 export async function callTool(
   target: string,
   name: string,
   options: CommandOptions & {
     args?: string[];
-    argsFile?: string;
   }
 ): Promise<void> {
-  // Parse args from inline JSON, key=value pairs, key:=json pairs, or load from file
+  // Parse args from positional arguments or stdin
   let parsedArgs: Record<string, unknown>;
 
-  if (options.argsFile && options.args && options.args.length > 0) {
-    throw new ClientError('Cannot use both --args and --args-file');
-  }
-
-  if (options.argsFile) {
-    parsedArgs = loadArgsFromFile(options.argsFile);
-  } else {
+  // Prefer positional arguments; only read stdin if no args provided and stdin has data
+  if (options.args && options.args.length > 0) {
+    // Parse from positional arguments (key:=value pairs or inline JSON)
     parsedArgs = parseCommandArgs(options.args);
+  } else if (hasStdinData()) {
+    // Read arguments from stdin (piped JSON)
+    parsedArgs = await readStdinArgs();
+  } else {
+    // No arguments provided
+    parsedArgs = {};
   }
 
   // Load expected schema if provided

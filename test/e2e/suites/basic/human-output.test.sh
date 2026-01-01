@@ -166,7 +166,7 @@ test_pass
 # =============================================================================
 
 test_case "tools-call shows result"
-run_mcpc "$SESSION" tools-call echo --args message="Hello World"
+run_mcpc "$SESSION" tools-call echo 'message:=Hello World'
 assert_success
 assert_contains "$STDOUT" "Hello World"
 test_pass

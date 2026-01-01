@@ -2,7 +2,7 @@
  * Command-line argument parsing utilities
  * Pure functions with no external dependencies for easy testing
  */
-import { readFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
 import { ClientError, resolvePath } from '../lib/index.js';
 
 /**
@@ -53,9 +53,6 @@ const KNOWN_OPTIONS = [
   '--help',
   '--verbose',
   '--clean',
-  // Command-specific options
-  '--args',
-  '--args-file',
 ];
 
 // Valid --clean types
@@ -262,13 +259,26 @@ export function hasCommandAfterTarget(args: string[]): boolean {
 }
 
 /**
- * Parse command arguments from --args flag
- * Supports three formats:
- * 1. Inline JSON: --args '{"key":"value"}'
- * 2. Key=value pairs: --args key=value
- * 3. Key:=json pairs: --args key:=123 enabled:=true
+ * Auto-parse a value: try JSON.parse, if fails treat as string
+ * This allows natural CLI usage like: count:=10, enabled:=true, name:=hello
+ */
+function autoParseValue(value: string): unknown {
+  // Try to parse as JSON (handles numbers, booleans, null, arrays, objects)
+  try {
+    return JSON.parse(value);
+  } catch {
+    // Not valid JSON, treat as string
+    return value;
+  }
+}
+
+/**
+ * Parse command arguments (positional args after tool/prompt name)
+ * Supports two formats:
+ * 1. Inline JSON: '{"key":"value"}' or '[...]'
+ * 2. Key:=value pairs: key:=value (auto-parsed as JSON or string)
  *
- * @param args - Array of argument strings from --args flag
+ * @param args - Array of positional argument strings
  * @returns Parsed arguments as key-value object
  * @throws ClientError if arguments are invalid
  */
@@ -298,72 +308,80 @@ export function parseCommandArgs(args: string[] | undefined): Record<string, unk
     }
   }
 
-  // Parse key=value or key:=json pairs
+  // Parse key:=value pairs (only := syntax supported)
   const parsedArgs: Record<string, unknown> = {};
   for (const pair of args) {
-    if (pair.includes(':=')) {
-      // Split only at the first occurrence of :=
-      const colonEqualIndex = pair.indexOf(':=');
-      const key = pair.substring(0, colonEqualIndex);
-      const jsonValue = pair.substring(colonEqualIndex + 2);
-      if (!key || jsonValue === undefined || jsonValue === '') {
-        throw new ClientError(`Invalid argument format: ${pair}. Use key=value or key:=json`);
-      }
-      try {
-        parsedArgs[key] = JSON.parse(jsonValue);
-      } catch (error) {
-        throw new ClientError(`Invalid JSON value for ${key}: ${(error as Error).message}`);
-      }
-    } else if (pair.includes('=')) {
-      // Split only at the first occurrence of =
-      const equalIndex = pair.indexOf('=');
-      const key = pair.substring(0, equalIndex);
-      const value = pair.substring(equalIndex + 1);
-      if (!key || value === undefined) {
-        throw new ClientError(`Invalid argument format: ${pair}. Use key=value or key:=json`);
-      }
-      parsedArgs[key] = value;
-    } else {
-      throw new ClientError(`Invalid argument format: ${pair}. Use key=value, key:=json, or inline JSON`);
+    if (!pair.includes(':=')) {
+      throw new ClientError(
+        `Invalid argument format: "${pair}". Use key:=value pairs or inline JSON.\n` +
+        `Examples: name:=hello count:=10 enabled:=true '{"key":"value"}'`
+      );
     }
+
+    // Split only at the first occurrence of :=
+    const colonEqualIndex = pair.indexOf(':=');
+    const key = pair.substring(0, colonEqualIndex);
+    const rawValue = pair.substring(colonEqualIndex + 2);
+
+    if (!key) {
+      throw new ClientError(`Invalid argument: "${pair}" - missing key before :=`);
+    }
+
+    // Auto-parse: try JSON, fallback to string
+    parsedArgs[key] = autoParseValue(rawValue);
   }
 
   return parsedArgs;
 }
 
 /**
- * Load arguments from a JSON file
- *
- * @param filePath - Path to JSON file containing arguments
- * @returns Parsed arguments as key-value object
- * @throws ClientError if file cannot be read or contains invalid JSON
+ * Check if stdin has data available (non-TTY, piped input)
  */
-export function loadArgsFromFile(filePath: string): Record<string, unknown> {
-  const resolvedPath = resolvePath(filePath);
+export function hasStdinData(): boolean {
+  return !process.stdin.isTTY;
+}
 
-  let fileContent: string;
-  try {
-    fileContent = readFileSync(resolvedPath, 'utf-8');
-  } catch (error) {
-    const err = error as NodeJS.ErrnoException;
-    if (err.code === 'ENOENT') {
-      throw new ClientError(`Arguments file not found: ${filePath}`);
-    }
-    throw new ClientError(`Failed to read arguments file: ${err.message}`);
-  }
+/**
+ * Read and parse JSON from stdin
+ * Used when arguments are piped: echo '{"key":"value"}' | mcpc @server tools-call my-tool
+ *
+ * @returns Promise resolving to parsed arguments
+ * @throws ClientError if stdin cannot be read or contains invalid JSON
+ */
+export async function readStdinArgs(): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let data = '';
 
-  try {
-    const parsed: unknown = JSON.parse(fileContent);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw new ClientError('Arguments file must contain a JSON object');
-    }
-    return parsed as Record<string, unknown>;
-  } catch (error) {
-    if (error instanceof ClientError) {
-      throw error;
-    }
-    throw new ClientError(`Invalid JSON in arguments file: ${(error as Error).message}`);
-  }
+    process.stdin.setEncoding('utf-8');
+    process.stdin.on('data', (chunk: string) => {
+      data += chunk;
+    });
+
+    process.stdin.on('end', () => {
+      if (!data.trim()) {
+        resolve({});
+        return;
+      }
+
+      try {
+        const parsed: unknown = JSON.parse(data);
+        if (typeof parsed !== 'object' || parsed === null) {
+          reject(new ClientError('Stdin must contain a JSON object'));
+          return;
+        }
+        resolve(parsed as Record<string, unknown>);
+      } catch (error) {
+        reject(new ClientError(`Invalid JSON from stdin: ${(error as Error).message}`));
+      }
+    });
+
+    process.stdin.on('error', (error) => {
+      reject(new ClientError(`Failed to read stdin: ${error.message}`));
+    });
+
+    // Start reading
+    process.stdin.resume();
+  });
 }
 
 /**

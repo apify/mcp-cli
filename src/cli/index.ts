@@ -357,14 +357,11 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     });
 
   program
-    .command('tools-call <name>')
-    .description('Call a tool with arguments')
-    .option('--args [pairs...]', 'Tool arguments as key=val or key:=json pairs')
-    .option('--args-file <file>', 'Load arguments from JSON file')
-    .action(async (name, options, command) => {
+    .command('tools-call <name> [args...]')
+    .description('Call a tool with arguments (key:=value pairs or JSON)')
+    .action(async (name, args, _options, command) => {
       await tools.callTool(target, name, {
-        args: options.args,
-        argsFile: options.argsFile,
+        args,
         ...getOptionsFromCommand(command),
       });
     });
@@ -435,12 +432,11 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     });
 
   program
-    .command('prompts-get <name>')
-    .description('Get a prompt by name')
-    .option('--args [pairs...]', 'Prompt arguments as key=val or key:=json pairs')
-    .action(async (name, options, command) => {
+    .command('prompts-get <name> [args...]')
+    .description('Get a prompt by name with arguments (key:=value pairs or JSON)')
+    .action(async (name, args, _options, command) => {
       await prompts.getPrompt(target, name, {
-        args: options.args,
+        args,
         ...getOptionsFromCommand(command),
       });
     });

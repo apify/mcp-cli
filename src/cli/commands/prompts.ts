@@ -5,7 +5,7 @@
 import type { CommandOptions } from '../../lib/types.js';
 import { formatOutput, formatWarning } from '../output.js';
 import { withMcpClient } from '../helpers.js';
-import { parseCommandArgs } from '../parser.js';
+import { parseCommandArgs, hasStdinData, readStdinArgs } from '../parser.js';
 import { ClientError } from '../../lib/errors.js';
 import {
   loadSchemaFromFile,
@@ -37,6 +37,9 @@ export async function listPrompts(target: string, options: CommandOptions): Prom
 
 /**
  * Get a prompt by name
+ * Arguments can be provided via:
+ * 1. Positional args: key:=value pairs or inline JSON
+ * 2. Stdin: pipe JSON input (echo '{"key":"value"}' | mcpc ...)
  */
 export async function getPrompt(
   target: string,
@@ -45,8 +48,20 @@ export async function getPrompt(
     args?: string[];
   }
 ): Promise<void> {
-  // Parse args from inline JSON, key=value pairs, or key:=json pairs
-  const parsedArgs = parseCommandArgs(options.args);
+  // Parse args from positional arguments or stdin
+  let parsedArgs: Record<string, unknown>;
+
+  // Prefer positional arguments; only read stdin if no args provided and stdin has data
+  if (options.args && options.args.length > 0) {
+    // Parse from positional arguments (key:=value pairs or inline JSON)
+    parsedArgs = parseCommandArgs(options.args);
+  } else if (hasStdinData()) {
+    // Read arguments from stdin (piped JSON)
+    parsedArgs = await readStdinArgs();
+  } else {
+    // No arguments provided
+    parsedArgs = {};
+  }
 
   // Convert all args to strings for prompt API
   const promptArgs: Record<string, string> = {};

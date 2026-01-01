@@ -220,7 +220,7 @@ test_pass
 # =============================================================================
 
 test_case "prompts-get JSON has messages array"
-run_mcpc "$SESSION" prompts-get greeting --args name=Test --json
+run_mcpc "$SESSION" prompts-get greeting name:=Test --json
 assert_success
 assert_json_valid "$STDOUT"
 assert_json "$STDOUT" '.messages' "should have messages array"
@@ -228,7 +228,7 @@ assert_json "$STDOUT" '.messages[0]' "messages should not be empty"
 test_pass
 
 test_case "prompts-get JSON message has role and content"
-run_mcpc "$SESSION" prompts-get greeting --args name=Test --json
+run_mcpc "$SESSION" prompts-get greeting name:=Test --json
 assert_success
 # Per MCP spec, PromptMessage must have: role, content
 assert_json "$STDOUT" '.messages[0].role' "message should have role"
@@ -241,7 +241,7 @@ test_pass
 # =============================================================================
 
 test_case "tools-call JSON has content array"
-run_mcpc "$SESSION" tools-call echo --args message="test" --json
+run_mcpc "$SESSION" tools-call echo message:=test --json
 assert_success
 assert_json_valid "$STDOUT"
 assert_json "$STDOUT" '.content' "should have content array"
@@ -249,7 +249,7 @@ assert_json "$STDOUT" '.content[0]' "content should not be empty"
 test_pass
 
 test_case "tools-call JSON content item has type"
-run_mcpc "$SESSION" tools-call echo --args message="test" --json
+run_mcpc "$SESSION" tools-call echo message:=test --json
 assert_success
 # Per MCP spec, content items must have type
 assert_json "$STDOUT" '.content[0].type' "content item should have type"

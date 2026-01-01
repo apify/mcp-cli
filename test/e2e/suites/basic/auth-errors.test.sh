@@ -38,7 +38,7 @@ run_mcpc "$SESSION" close 2>/dev/null || true
 
 # Test: tools-call without auth fails
 test_case "tools-call without auth fails"
-run_xmcpc "$TEST_SERVER_URL" tools-call echo --args '{"message":"test"}'
+run_xmcpc "$TEST_SERVER_URL" tools-call echo '{"message":"test"}'
 assert_failure
 test_pass
 

@@ -42,12 +42,12 @@ test_pass
 # =============================================================================
 
 test_case "tools-call with valid schema passes"
-run_mcpc "$SESSION" tools-call echo --args message="test" --schema "$TEST_TMP/echo-schema.json"
+run_mcpc "$SESSION" tools-call echo message:=test --schema "$TEST_TMP/echo-schema.json"
 assert_success
 test_pass
 
 test_case "tools-call with valid schema (JSON mode)"
-run_mcpc --json "$SESSION" tools-call echo --args message="test" --schema "$TEST_TMP/echo-schema.json"
+run_mcpc --json "$SESSION" tools-call echo message:=test --schema "$TEST_TMP/echo-schema.json"
 assert_success
 assert_json_valid "$STDOUT"
 test_pass
@@ -66,19 +66,19 @@ test_pass
 # =============================================================================
 
 test_case "tools-call with --schema-mode=strict passes for exact match"
-run_mcpc "$SESSION" tools-call echo --args message="test" \
+run_mcpc "$SESSION" tools-call echo message:=test \
   --schema "$TEST_TMP/echo-schema.json" --schema-mode strict
 assert_success
 test_pass
 
 test_case "tools-call with --schema-mode=compatible passes"
-run_mcpc "$SESSION" tools-call echo --args message="test" \
+run_mcpc "$SESSION" tools-call echo message:=test \
   --schema "$TEST_TMP/echo-schema.json" --schema-mode compatible
 assert_success
 test_pass
 
 test_case "tools-call with --schema-mode=ignore passes"
-run_mcpc "$SESSION" tools-call echo --args message="test" \
+run_mcpc "$SESSION" tools-call echo message:=test \
   --schema "$TEST_TMP/echo-schema.json" --schema-mode ignore
 assert_success
 test_pass
@@ -88,13 +88,13 @@ test_pass
 # =============================================================================
 
 test_case "prompts-get with valid schema passes"
-run_mcpc "$SESSION" prompts-get greeting --args name=Test \
+run_mcpc "$SESSION" prompts-get greeting name:=Test \
   --schema "$TEST_TMP/greeting-schema.json"
 assert_success
 test_pass
 
 test_case "prompts-get with valid schema (JSON mode)"
-run_mcpc --json "$SESSION" prompts-get greeting --args name=Test \
+run_mcpc --json "$SESSION" prompts-get greeting name:=Test \
   --schema "$TEST_TMP/greeting-schema.json"
 assert_success
 assert_json_valid "$STDOUT"
@@ -121,14 +121,14 @@ EOF
 test_pass
 
 test_case "tools-call fails with mismatched tool name"
-run_mcpc "$SESSION" tools-call echo --args message="test" \
+run_mcpc "$SESSION" tools-call echo message:=test \
   --schema "$TEST_TMP/wrong-name-schema.json"
 assert_failure
 assert_contains "$STDERR" "name mismatch"
 test_pass
 
 test_case "tools-call failure shows JSON error with --json"
-run_mcpc --json "$SESSION" tools-call echo --args message="test" \
+run_mcpc --json "$SESSION" tools-call echo message:=test \
   --schema "$TEST_TMP/wrong-name-schema.json"
 assert_failure
 assert_json_valid "$STDERR"
@@ -169,7 +169,7 @@ test_pass
 # =============================================================================
 
 test_case "tools-call fails with nonexistent schema file"
-run_mcpc "$SESSION" tools-call echo --args message="test" \
+run_mcpc "$SESSION" tools-call echo message:=test \
   --schema "/nonexistent/schema.json"
 assert_failure
 assert_contains "$STDERR" "not found"
@@ -177,7 +177,7 @@ test_pass
 
 test_case "tools-call fails with invalid JSON schema file"
 echo "not valid json" > "$TEST_TMP/invalid-schema.json"
-run_mcpc "$SESSION" tools-call echo --args message="test" \
+run_mcpc "$SESSION" tools-call echo message:=test \
   --schema "$TEST_TMP/invalid-schema.json"
 assert_failure
 assert_contains "$STDERR" "Invalid JSON"
@@ -188,7 +188,7 @@ test_pass
 # =============================================================================
 
 test_case "invalid --schema-mode value fails"
-run_mcpc "$SESSION" tools-call echo --args message="test" \
+run_mcpc "$SESSION" tools-call echo message:=test \
   --schema "$TEST_TMP/echo-schema.json" --schema-mode invalid
 assert_failure
 assert_contains "$STDERR" "Invalid --schema-mode value"

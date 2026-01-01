@@ -79,34 +79,34 @@ test_pass
 # =============================================================================
 
 test_case "prompts-get greeting with required arg"
-run_xmcpc "$SESSION" prompts-get greeting --args name=Alice
+run_xmcpc "$SESSION" prompts-get greeting name:=Alice
 assert_success
 assert_contains "$STDOUT" "Alice"
 test_pass
 
 test_case "prompts-get greeting with style=formal"
-run_xmcpc "$SESSION" prompts-get greeting --args name=Bob style=formal
+run_xmcpc "$SESSION" prompts-get greeting name:=Bob style:=formal
 assert_success
 assert_contains "$STDOUT" "Good day"
 assert_contains "$STDOUT" "Bob"
 test_pass
 
 test_case "prompts-get greeting with style=casual"
-run_xmcpc "$SESSION" prompts-get greeting --args name=Charlie style=casual
+run_xmcpc "$SESSION" prompts-get greeting name:=Charlie style:=casual
 assert_success
 assert_contains "$STDOUT" "Hey"
 assert_contains "$STDOUT" "Charlie"
 test_pass
 
 test_case "prompts-get summarize with text"
-run_xmcpc "$SESSION" prompts-get summarize --args text="This is a long text that needs summarization." maxLength=50
+run_xmcpc "$SESSION" prompts-get summarize 'text:=This is a long text that needs summarization.' maxLength:=50
 assert_success
 assert_contains "$STDOUT" "summarize"
 assert_contains "$STDOUT" "50"
 test_pass
 
 test_case "prompts-get --json returns valid JSON"
-run_mcpc --json "$SESSION" prompts-get greeting --args name=Test
+run_mcpc --json "$SESSION" prompts-get greeting name:=Test
 assert_success
 assert_json_valid "$STDOUT"
 assert_json "$STDOUT" '.messages'
@@ -114,14 +114,14 @@ assert_json "$STDOUT" '.messages | length > 0'
 test_pass
 
 test_case "prompts-get --json contains message structure"
-run_mcpc --json "$SESSION" prompts-get greeting --args name=Test
+run_mcpc --json "$SESSION" prompts-get greeting name:=Test
 assert_success
 assert_json "$STDOUT" '.messages[0].role'
 assert_json "$STDOUT" '.messages[0].content'
 test_pass
 
 test_case "prompts-get unknown prompt fails"
-run_mcpc "$SESSION" prompts-get nonexistent --args foo=bar
+run_mcpc "$SESSION" prompts-get nonexistent foo:=bar
 assert_failure
 test_pass
 
@@ -130,7 +130,7 @@ test_pass
 # =============================================================================
 
 test_case "prompts-get with inline JSON args"
-run_xmcpc "$SESSION" prompts-get greeting --args '{"name":"JSONUser","style":"formal"}'
+run_xmcpc "$SESSION" prompts-get greeting '{"name":"JSONUser","style":"formal"}'
 assert_success
 assert_contains "$STDOUT" "JSONUser"
 assert_contains "$STDOUT" "Good day"

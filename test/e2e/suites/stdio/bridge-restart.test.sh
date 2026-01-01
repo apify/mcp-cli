@@ -78,7 +78,7 @@ test_pass
 # Test: create a test file and read it via restarted session
 test_case "file operations work after restart"
 echo "Content after restart test" > "$TEST_TMP/restart-test.txt"
-run_xmcpc "$SESSION" tools-call read_file --args path="$TEST_TMP/restart-test.txt"
+run_xmcpc "$SESSION" tools-call read_file "path:=$TEST_TMP/restart-test.txt"
 assert_success
 assert_contains "$STDOUT" "Content after restart test"
 test_pass
