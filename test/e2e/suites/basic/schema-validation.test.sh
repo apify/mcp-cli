@@ -155,8 +155,10 @@ test_pass
 
 test_case "tools-call fails when server removes required field"
 # The actual server doesn't have "extra" as required, so validation should fail
-# in compatible mode when extra is in expected but not in actual
-run_mcpc "$SESSION" tools-call echo --args message="test" \
+# in compatible mode when extra is in expected but not in actual.
+# Note: We use tools-get instead of tools-call because tools-call with args
+# only validates the passed args (by design). tools-get validates the full schema.
+run_mcpc "$SESSION" tools-get echo \
   --schema "$TEST_TMP/extra-required-schema.json"
 assert_failure
 assert_contains "$STDERR" "extra"
@@ -189,7 +191,7 @@ test_case "invalid --schema-mode value fails"
 run_mcpc "$SESSION" tools-call echo --args message="test" \
   --schema "$TEST_TMP/echo-schema.json" --schema-mode invalid
 assert_failure
-assert_contains "$STDERR" "Invalid schema mode"
+assert_contains "$STDERR" "Invalid --schema-mode value"
 test_pass
 
 # =============================================================================

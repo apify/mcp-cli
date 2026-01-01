@@ -310,11 +310,13 @@ async function sendAuthCredentialsToBridge(
     logger.debug(`Including ${Object.keys(headers).length} headers in credentials`);
   }
 
-  // Only send if we have some credentials
-  if (!credentials.refreshToken && !credentials.headers) {
-    logger.debug('No auth credentials to send to bridge');
-    return;
-  }
+  // Always send credentials to the bridge (even if minimal)
+  // The bridge waits for this message before connecting to MCP server
+  logger.debug('Sending auth credentials to bridge' +
+    (credentials.refreshToken ? ' (with refresh token)' : '') +
+    (credentials.headers ? ` (with ${Object.keys(credentials.headers).length} headers)` : '') +
+    (!credentials.refreshToken && !credentials.headers ? ' (minimal - no tokens or headers)' : '')
+  );
 
   // Connect to bridge and send credentials
   const client = new BridgeClient(socketPath);

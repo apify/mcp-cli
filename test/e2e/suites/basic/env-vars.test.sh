@@ -9,8 +9,9 @@ start_test_server
 
 # Test: MCPC_HOME_DIR changes home directory
 test_case "MCPC_HOME_DIR changes home directory"
-# Create a custom home directory
-CUSTOM_HOME="$TEST_TMP/custom-home"
+# Create a custom home directory in /tmp to keep socket paths short
+# (Unix sockets are limited to ~104 characters)
+CUSTOM_HOME="/tmp/mcpc-e2e-custom-$_TEST_SHORT_ID"
 mkdir -p "$CUSTOM_HOME"
 
 # Copy the auth profile to custom home (needed for HTTP server auth)
@@ -28,8 +29,9 @@ assert_file_exists "$CUSTOM_HOME/sessions.json"
 MCPC_HOME_DIR="$CUSTOM_HOME" run_xmcpc "$SESSION" tools-list
 assert_success
 
-# Clean up - close the session
+# Clean up - close the session and remove custom home
 MCPC_HOME_DIR="$CUSTOM_HOME" run_mcpc "$SESSION" close 2>/dev/null || true
+rm -rf "$CUSTOM_HOME"
 test_pass
 
 # Test: MCPC_JSON=1 enables JSON output

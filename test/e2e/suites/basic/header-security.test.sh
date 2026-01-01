@@ -9,8 +9,10 @@ test_init "basic/header-security" --isolated
 start_test_server
 
 # Define a secret header value that should never appear in ps or sessions.json
+# Note: We use X-Api-Key instead of Authorization because Authorization headers
+# are specially handled by OAuth profile logic (deleted when profile exists).
 SECRET_VALUE="super-secret-token-$(date +%s)"
-SECRET_HEADER="Authorization"
+SECRET_HEADER="X-Api-Key"
 
 # =============================================================================
 # Test: Headers don't leak in process list (ps aux)
@@ -35,7 +37,7 @@ if echo "$ps_output" | grep -q "$SECRET_VALUE"; then
 fi
 
 # Verify the session is working (header was passed correctly via IPC)
-run_xmcpc "$SESSION" ping
+run_mcpc "$SESSION" ping
 assert_success
 
 test_pass
@@ -101,9 +103,9 @@ if echo "$STDOUT" | grep -q "$SECRET_VALUE"; then
 fi
 
 # If headers are shown, they should be redacted
-if echo "$STDOUT" | jq -e ".sessions[] | select(.name == \"$SESSION\") | .serverConfig.headers" >/dev/null 2>&1; then
+if echo "$STDOUT" | jq -e ".sessions[] | select(.name == \"$SESSION\") | .server.headers" >/dev/null 2>&1; then
   # Headers field exists - verify values are redacted
-  header_value=$(echo "$STDOUT" | jq -r ".sessions[] | select(.name == \"$SESSION\") | .serverConfig.headers.Authorization // empty")
+  header_value=$(echo "$STDOUT" | jq -r ".sessions[] | select(.name == \"$SESSION\") | .server.headers[\"$SECRET_HEADER\"] // empty")
   if [[ -n "$header_value" && "$header_value" != "<redacted>" ]]; then
     test_fail "Header value not properly redacted in JSON output: $header_value"
   fi
@@ -120,8 +122,8 @@ SESSION2=$(session_name "sec-multi")
 ANOTHER_SECRET="another-secret-$(date +%s)"
 
 run_mcpc "$TEST_SERVER_URL" session "$SESSION2" \
-  --header "Authorization: Bearer $SECRET_VALUE" \
-  --header "X-Api-Key: $ANOTHER_SECRET" \
+  --header "X-Api-Key: $SECRET_VALUE" \
+  --header "X-Secret-Token: $ANOTHER_SECRET" \
   --header "X-Public: public-value"
 assert_success
 _SESSIONS_CREATED+=("$SESSION2")
@@ -136,7 +138,7 @@ if echo "$sessions_content" | grep -q "$ANOTHER_SECRET"; then
 fi
 
 # But headers should still work for requests
-run_xmcpc "$SESSION2" ping
+run_mcpc "$SESSION2" ping
 assert_success
 
 # Clean up
@@ -153,7 +155,7 @@ SESSION3=$(session_name "sec-verb")
 VERBOSE_SECRET="verbose-secret-$(date +%s)"
 
 # Create session with verbose mode
-run_mcpc --verbose "$TEST_SERVER_URL" session "$SESSION3" --header "Authorization: Bearer $VERBOSE_SECRET"
+run_mcpc --verbose "$TEST_SERVER_URL" session "$SESSION3" --header "X-Api-Key: $VERBOSE_SECRET"
 assert_success
 _SESSIONS_CREATED+=("$SESSION3")
 
@@ -165,9 +167,9 @@ if echo "$ALL_OUTPUT" | grep -q "$VERBOSE_SECRET"; then
   test_fail "Secret header value found in verbose session creation output!"
 fi
 
-# Bearer token patterns should not appear
-if echo "$ALL_OUTPUT" | grep -iE "Bearer [A-Za-z0-9_-]{10,}" | grep -q "$VERBOSE_SECRET"; then
-  test_fail "Bearer token pattern with secret found in verbose output!"
+# API key patterns should not appear
+if echo "$ALL_OUTPUT" | grep -iE "X-Api-Key:.*$VERBOSE_SECRET" >/dev/null 2>&1; then
+  test_fail "X-Api-Key header with secret found in verbose output!"
 fi
 
 test_pass
@@ -184,9 +186,9 @@ if echo "$ALL_OUTPUT" | grep -q "$VERBOSE_SECRET"; then
   test_fail "Secret header value found in verbose command output!"
 fi
 
-# Authorization header with secret should not appear
-if echo "$ALL_OUTPUT" | grep -iE "Authorization:\s*Bearer\s+$VERBOSE_SECRET" >/dev/null 2>&1; then
-  test_fail "Authorization header with secret found in verbose output!"
+# X-Api-Key header with secret should not appear
+if echo "$ALL_OUTPUT" | grep -iE "X-Api-Key:.*$VERBOSE_SECRET" >/dev/null 2>&1; then
+  test_fail "X-Api-Key header with secret found in verbose output!"
 fi
 
 test_pass
@@ -203,14 +205,9 @@ if [[ -f "$BRIDGE_LOG" ]]; then
     test_fail "Secret header value found in bridge log!"
   fi
 
-  # Bearer token with secret should not appear
-  if echo "$LOG_CONTENT" | grep -iE "Bearer.*$VERBOSE_SECRET" >/dev/null 2>&1; then
-    test_fail "Bearer token with secret found in bridge log!"
-  fi
-
-  # Authorization header with secret should not appear
-  if echo "$LOG_CONTENT" | grep -iE "Authorization:.*$VERBOSE_SECRET" >/dev/null 2>&1; then
-    test_fail "Authorization header with secret found in bridge log!"
+  # X-Api-Key header with secret should not appear
+  if echo "$LOG_CONTENT" | grep -iE "X-Api-Key:.*$VERBOSE_SECRET" >/dev/null 2>&1; then
+    test_fail "X-Api-Key header with secret found in bridge log!"
   fi
 fi
 

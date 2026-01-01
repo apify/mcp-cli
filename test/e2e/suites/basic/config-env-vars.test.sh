@@ -36,7 +36,7 @@ assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
 # Verify connection works
-run_xmcpc "$SESSION" tools-list
+run_mcpc "$SESSION" tools-list
 assert_success
 assert_contains "$STDOUT" "echo"
 
@@ -75,7 +75,7 @@ assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
 # Verify connection works
-run_xmcpc "$SESSION" ping
+run_mcpc "$SESSION" ping
 assert_success
 
 # Clean up
@@ -123,17 +123,16 @@ test_pass
 # =============================================================================
 
 test_case "multiple env vars in same value"
-export PREFIX="api"
-export VERSION="v1"
+export MY_HOST="localhost"
+export MY_PORT="$TEST_SERVER_PORT"
 
-# Create config with multiple env vars in URL path
+# Create config with multiple env vars in URL
 CONFIG_FILE="$TEST_TMP/env-multi-config.json"
-# Note: Test server ignores path, so any URL path works
 cat > "$CONFIG_FILE" <<EOF
 {
   "mcpServers": {
     "multi-test": {
-      "url": "http://localhost:$TEST_SERVER_PORT/\${PREFIX}/\${VERSION}"
+      "url": "http://\${MY_HOST}:\${MY_PORT}"
     }
   }
 }
@@ -154,8 +153,8 @@ assert_success
 # Clean up
 run_mcpc "$SESSION" close >/dev/null 2>&1
 _SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION}")
-unset PREFIX
-unset VERSION
+unset MY_HOST
+unset MY_PORT
 test_pass
 
 test_done
