@@ -1,19 +1,19 @@
 # `mcpc`: Universal MCP command-line client
 
-`mcpc` is a CLI for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
-which maps MCP operations to intuitive commands for interactive shell use, scripts, and AI coding agents.
+`mcpc` is a CLI for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
+that maps MCP operations to intuitive commands for interactive shell use, scripts, and AI coding agents.
 
 `mcpc` can connect to any MCP server over Streamable HTTP or stdio transports,
-securely login via OAuth credentials and store credentials,
-and keep long-term sessions to multiple servers.
+securely authenticate via OAuth and store credentials,
+and maintain persistent sessions to multiple servers.
 It supports all major MCP features, including tools, resources, prompts, asynchronous tasks, and notifications.
 
-`mcpc` is handy for manual testing of MCP servers, scripting,
-and AI coding agents to use MCP in ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp),
-for better accuracy and lower token compared to traditional tool function calling.
+`mcpc` is useful for manual testing of MCP servers, scripting,
+and enabling AI coding agents to use MCP in ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp)
+for better accuracy and lower token usage compared to traditional tool function calling.
 After all, UNIX-compatible shell script is THE most universal coding language, for people and LLMs alike.
 
-Note that `mcpc` does not use LLMs on its own; that's a job for the higher layer.
+Note that `mcpc` does not invoke LLMs itself; that's the job of the higher layer.
 
 **Key features**
 
@@ -147,7 +147,7 @@ Management commands (without <target>):
   close @<session>        Close a session
   
 MCP commands (<target> provided): 
-  help                    Show server info ("help" can be ommitted)                    
+  help                    Show server info ("help" can be omitted)                    
   shell                   Open interactive shell
   tools-list
   tools-get <tool-name>  
@@ -185,14 +185,14 @@ For additional management commands, see [OAuth profiles](#oauth-profiles) and [C
 
 ### Targets
 
-To connect to MCP serve, you need to specify `<target>`, which can be one of (in this order of precedence):
+To connect to an MCP server, you need to specify a `<target>`, which can be one of (in order of precedence):
 
 - **Entry in a config file** (e.g. `--config .vscode/mcp.json filesystem`) - see [Config file](#mcp-server-config-file)
 - **Remote MCP server URL** (e.g. `https://mcp.apify.com`)
 - **Named session** (e.g. `@apify`) - see [Sessions](#sessions)
 
 `mcpc` automatically selects the transport protocol based on the server (stdio or Streamable HTTP),
-connects to the server, and enables you to interact with it. 
+connects, and enables you to interact with it.
 
 ### MCP commands
 
@@ -216,11 +216,11 @@ mcpc @apify tools-list
 mcpc @apify tools-call search-apify-docs --args query="What are Actors?"
 ```
 
-See [MCP feature support](#mcp-feature-support) for details about all supported MCP features and commands
+See [MCP feature support](#mcp-feature-support) for details about all supported MCP features and commands.
 
 #### MCP command arguments
 
-The `tools-call` and `prompts-get` commands enable passing arguments to MCP server:
+The `tools-call` and `prompts-get` commands accept arguments to pass to the MCP server:
 
 ```bash
 # Inline JSON object (most convenient)
@@ -252,7 +252,7 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 
 ### JSON mode
 
-By default, `mcpc` prints output in Markdown-ish text format with colors, to make easy to read by both humands and AIs.
+By default, `mcpc` prints output in Markdown-ish text format with colors, making it easy to read by both humans and AIs.
 
 With `--json` option, `mcpc` always emits only a single JSON object (or array), to enable scripting.
 **For all MCP commands, the returned objects are always consistent with the
@@ -312,8 +312,8 @@ mcpc @apify close
 
 ### Session failover
 
-`mcpc` bridge process attempts to keep sessions alive by sending periodic ping messages to the MCP server.
-But even then, the session can fail for a number of reasons:
+The `mcpc` bridge process keeps sessions alive by sending periodic ping messages to the MCP server.
+However, sessions can still fail for several reasons:
 
 - Network disconnects
 - Server drops the session for inactivity or other reasons
@@ -323,12 +323,12 @@ Here's how `mcpc` handles these situations:
 
 - If the bridge process is running, it will automatically try to reconnect to the server if the connection fails
   and establish the keep-alive pings.
-- If the server response indicates the `MCP-Session-Id` is no longer valid or authentication permanently failed (HTTP error 401 or 402),
+- If the server response indicates the `MCP-Session-Id` is no longer valid or authentication permanently failed (HTTP 401 or 403),
   the bridge process will flag the session as **expired** in `~/.mcpc/sessions.json` and terminate.
 - If the bridge process crashes, `mcpc` attempts to restart it next time you use the specific session.
 
-Note that `mcpc` never automatically removes sessions from the list, but rather flags the session as **expired**,
-and any attempts to use it will fail.
+`mcpc` never automatically removes sessions from the list. Instead, it flags them as **expired**,
+and any attempts to use an expired session will fail.
 To remove the session from the list, you need to explicitly close it:
 
 ```bash
@@ -451,7 +451,7 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
    - If server accepts (no auth required) → Continue without creating profile
    - If server rejects with 401 + `WWW-Authenticate` → Fail with an error
 
-On failure, the error message includes instructions on how to login and save the profile, so the users know what to do.
+On failure, the error message includes instructions on how to login and save the profile, so you know what to do.
 
 This flow ensures:
 - You only authenticate when necessary
@@ -479,7 +479,7 @@ mcpc mcp.apify.com\?tools=docs tools-list
 
 ## Interaction
 
-`mcpc` is designed to  
+`mcpc` supports multiple interaction modes: interactive shell for exploration, scripting for automation, and direct integration with AI agents.
 
 ### Interactive shell
 
@@ -502,7 +502,7 @@ and the following additional commands:
 
 ### Scripting
 
-`mcpc` is designed for us in (AI-generated) scripts.
+`mcpc` is designed for use in (AI-generated) scripts.
 With the `--json` option, `mcpc` returns a single JSON object (object or array) as follows:
 
 - On success, the JSON object is printed to stdout
@@ -515,13 +515,13 @@ or if there are invalid arguments, as those take precedence.
 
 For all MCP operations, the **returned JSON is and always will be strictly consistent
 with the [MCP specification](https://modelcontextprotocol.io/specification/latest)**,
-based to the protocol version negotiated between client and server in the initial handshake.
+based on the protocol version negotiated between client and server in the initial handshake.
 
-Additionally, one of the core [design principles](CONTRIBUTING.md#design-principles) of `mcpc` 
-is to keep backwards compatibility to maximum extent possible, to ensure the scripts using `mcpc`
+Additionally, one of the core [design principles](CONTRIBUTING.md#design-principles) of `mcpc`
+is to maintain backwards compatibility to the maximum extent possible, ensuring your scripts
 will not break over time.
 
-Piping between sessions
+**Piping between sessions:**
 
 ```bash
 mcpc --json @apify tools-call search-actors --args query="tiktok scraper" \
@@ -559,15 +559,15 @@ The `--schema-mode <mode>` parameter determines how `mcpc` validates the schema:
 
 ### AI agents
 
-`mcpc` is [designed](CONTRIBUTING.md#design-principles) for AI agent use: 
-the commands and messages are consise, intuitive, and avoid unnecessary interaction loops.
-You AI coding agents can readily interact with `mcpc` in text mode
+`mcpc` is [designed](CONTRIBUTING.md#design-principles) for AI agent use:
+commands and messages are concise, intuitive, and avoid unnecessary interaction loops.
+Your AI coding agents can readily interact with `mcpc` in text mode.
 
 #### Code mode
 
-TODO: Explain that scripting can be used for this,
+<!-- TODO: Explain that scripting can be used for this,
 link to https://www.anthropic.com/engineering/code-execution-with-mcp
-and https://blog.cloudflare.com/code-mode/ 
+and https://blog.cloudflare.com/code-mode/ -->
 
 #### Claude Code skill
 
@@ -586,10 +586,7 @@ See [`claude-skill/README.md`](./claude-skill/README.md) for details.
 
 #### Sandboxing
 
-TODO: explain auth profiles need to be created by person before
-
-Future: sharing with 
-
+<!-- TODO: explain auth profiles need to be created by person before -->
 
 ## Configuration
 
@@ -836,7 +833,7 @@ mcpc @apify prompts-list
 mcpc @apify prompts-get analyze-website --args url="https://example.com"
 ```
 
-TODO: Add example of prompt templates
+<!-- TODO: Add example of prompt templates -->
 
 #### Resources
 
@@ -865,11 +862,11 @@ In [shell mode](#interactive-shell), notifications are displayed in real-time.
 
 #### Server logs
 
-Supports server logging settings (`logging/setLevel`) and messages (`notifications/message`),
-and prints them to bridge log or stderr, subject to [verbosity level](#verbose-mode).
+`mcpc` supports server logging settings (`logging/setLevel`) and log messages (`notifications/message`).
+Log messages are printed to bridge log or stderr, subject to [verbosity level](#verbose-mode).
 
-MCP servers can be instructed to adjust their [logging level](https://modelcontextprotocol.io/specification/latest/server/utilities/logging)
-using the `logging/setLevel` command:
+You can instruct MCP servers to adjust their [logging level](https://modelcontextprotocol.io/specification/latest/server/utilities/logging)
+using the `logging-set-level` command:
 
 ```bash
 # Set server log level to debug for detailed output
@@ -902,7 +899,7 @@ token - you always get the complete list without manual iteration.
 #### Ping
 
 Sessions automatically send periodic pings to keep the [connection alive](#session-failover) and detect failures early.
-You can send ping manually to check if a server connection is alive:
+You can also send a ping manually to check if a server connection is alive:
 
 ```bash
 # Ping a session and measure round-trip time
