@@ -39,6 +39,8 @@ const OPTIONS_WITH_VALUES = [
   '--profile',
   '--schema',
   '--schema-mode',
+  '--proxy',
+  '--proxy-bearer-token',
 ];
 
 // All known options (both boolean flags and value options)
@@ -156,6 +158,15 @@ export function validateArgValues(args: string[]): void {
       const schemaPath = resolvePath(nextArg);
       if (!existsSync(schemaPath)) {
         throw new ClientError(`Schema file not found: ${nextArg}`);
+      }
+    }
+
+    // Validate --proxy format (but don't parse yet, just check basic format)
+    if (arg === '--proxy' && nextArg) {
+      // Basic validation - just check it's not empty
+      // Full parsing with better error messages is done in parseProxyArg
+      if (!nextArg.trim()) {
+        throw new ClientError('--proxy requires a value in format [HOST:]PORT');
       }
     }
   }
@@ -402,4 +413,44 @@ export function parseHeaderFlags(headerFlags: string[] | undefined): Record<stri
     }
   }
   return headers;
+}
+
+/**
+ * Parse --proxy argument in format [HOST:]PORT
+ * Returns { host, port } with default host 127.0.0.1
+ *
+ * Examples:
+ *   "8080" -> { host: "127.0.0.1", port: 8080 }
+ *   "0.0.0.0:8080" -> { host: "0.0.0.0", port: 8080 }
+ *   "localhost:3000" -> { host: "localhost", port: 3000 }
+ */
+export function parseProxyArg(value: string): { host: string; port: number } {
+  const DEFAULT_HOST = '127.0.0.1';
+
+  // Check if value contains a colon (host:port format)
+  const lastColonIndex = value.lastIndexOf(':');
+
+  if (lastColonIndex === -1) {
+    // No colon - just port
+    const port = parseInt(value, 10);
+    if (isNaN(port) || port <= 0 || port > 65535) {
+      throw new ClientError(`Invalid --proxy port: "${value}". Must be a number between 1 and 65535.`);
+    }
+    return { host: DEFAULT_HOST, port };
+  }
+
+  // Has colon - host:port format
+  const host = value.substring(0, lastColonIndex);
+  const portStr = value.substring(lastColonIndex + 1);
+  const port = parseInt(portStr, 10);
+
+  if (!host) {
+    throw new ClientError(`Invalid --proxy format: "${value}". Host cannot be empty.`);
+  }
+
+  if (isNaN(port) || port <= 0 || port > 65535) {
+    throw new ClientError(`Invalid --proxy port: "${portStr}". Must be a number between 1 and 65535.`);
+  }
+
+  return { host, port };
 }

@@ -677,6 +677,11 @@ export function formatSessionLine(session: SessionData): string {
     parts.push('MCP: ' + session.protocolVersion);
   }
 
+  // Add proxy info if configured
+  if (session.proxyConfig) {
+    parts.push('proxy: ' + chalk.blue(`${session.proxyConfig.host}:${session.proxyConfig.port}`));
+  }
+
   const infoStr = chalk.dim('(') + chalk.dim(parts.join(', ')) + chalk.dim(')');
 
   return `${nameStr} → ${targetStr} ${infoStr}`;

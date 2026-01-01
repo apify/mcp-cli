@@ -16,7 +16,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { unlink } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import type { ServerConfig, AuthCredentials } from './types.js';
+import type { ServerConfig, AuthCredentials, ProxyConfig } from './types.js';
 import { getSocketPath, waitForFile, isProcessAlive, fileExists, getLogsDir } from './utils.js';
 import { updateSession, getSession } from './sessions.js';
 import { createLogger } from './logger.js';
@@ -44,6 +44,7 @@ export interface StartBridgeOptions {
   verbose?: boolean;
   profileName?: string; // Auth profile name for token refresh
   headers?: Record<string, string>; // Headers to send via IPC (caller stores in keychain)
+  proxyConfig?: ProxyConfig; // Proxy server configuration
 }
 
 export interface StartBridgeResult {
@@ -66,7 +67,7 @@ export interface StartBridgeResult {
  * @returns Bridge process PID
  */
 export async function startBridge(options: StartBridgeOptions): Promise<StartBridgeResult> {
-  const { sessionName, serverConfig, verbose, profileName, headers } = options;
+  const { sessionName, serverConfig, verbose, profileName, headers, proxyConfig } = options;
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
 
@@ -102,6 +103,12 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
     args.push('--profile', profileName);
   } else if (headers && Object.keys(headers).length > 0) {
     args.push('--profile', 'dummy');
+  }
+
+  // Pass proxy config to bridge (if enabled)
+  if (proxyConfig) {
+    args.push('--proxy-host', proxyConfig.host);
+    args.push('--proxy-port', String(proxyConfig.port));
   }
 
   logger.debug('Bridge executable:', bridgeExecutable);
@@ -237,7 +244,7 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
     logger.debug(`Retrieved ${expectedHeaderKeys.length} headers from keychain for failover`);
   }
 
-  // Start a new bridge, preserving auth profile
+  // Start a new bridge, preserving auth profile and proxy config
   const bridgeOptions: StartBridgeOptions = {
     sessionName,
     serverConfig: serverConfig,
@@ -247,6 +254,9 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   }
   if (session.profileName) {
     bridgeOptions.profileName = session.profileName;
+  }
+  if (session.proxyConfig) {
+    bridgeOptions.proxyConfig = session.proxyConfig;
   }
 
   const { pid } = await startBridge(bridgeOptions);

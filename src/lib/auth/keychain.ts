@@ -58,6 +58,13 @@ function buildSessionAccountName(sessionName: string): string {
 }
 
 /**
+ * Get a keychain account name for proxy bearer token
+ */
+function buildProxyBearerTokenAccountName(sessionName: string): string {
+  return `session:${sessionName}:proxy-bearer-token`;
+}
+
+/**
  * Store OAuth client info in keychain
  */
 export async function storeKeychainOAuthClientInfo(
@@ -207,5 +214,41 @@ export async function removeKeychainSessionHeaders(sessionName: string): Promise
   const account = buildSessionAccountName(sessionName);
 
   logger.debug(`Deleting headers for session ${sessionName}`);
+  return keytar.deletePassword(SERVICE_NAME, account);
+}
+
+/**
+ * Store proxy bearer token for a session in keychain
+ * Used to secure the proxy MCP server with authentication
+ */
+export async function storeKeychainProxyBearerToken(
+  sessionName: string,
+  token: string
+): Promise<void> {
+  const account = buildProxyBearerTokenAccountName(sessionName);
+
+  logger.debug(`Storing proxy bearer token for session ${sessionName}`);
+  await keytar.setPassword(SERVICE_NAME, account, token);
+}
+
+/**
+ * Retrieve proxy bearer token for a session from keychain
+ */
+export async function readKeychainProxyBearerToken(
+  sessionName: string
+): Promise<string | undefined> {
+  const account = buildProxyBearerTokenAccountName(sessionName);
+
+  logger.debug(`Retrieving proxy bearer token for session ${sessionName}`);
+  return (await keytar.getPassword(SERVICE_NAME, account)) || undefined;
+}
+
+/**
+ * Delete proxy bearer token for a session from keychain
+ */
+export async function removeKeychainProxyBearerToken(sessionName: string): Promise<boolean> {
+  const account = buildProxyBearerTokenAccountName(sessionName);
+
+  logger.debug(`Deleting proxy bearer token for session ${sessionName}`);
   return keytar.deletePassword(SERVICE_NAME, account);
 }

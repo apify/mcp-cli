@@ -79,6 +79,16 @@ export interface ServerConfig {
 }
 
 /**
+ * Configuration for proxy MCP server
+ * When enabled, bridge launches an HTTP MCP server that forwards requests
+ * to upstream server without exposing original auth tokens
+ */
+export interface ProxyConfig {
+  host: string; // Host to bind proxy server (default: 127.0.0.1)
+  port: number; // Port to bind proxy server
+}
+
+/**
  * Session status
  * - active: Session is healthy and can be used
  * - expired: Server indicated session is no longer valid (e.g., 404 response)
@@ -100,6 +110,7 @@ export interface SessionData {
     version: string;
   };
   status?: SessionStatus; // Session health status (default: active)
+  proxyConfig?: ProxyConfig; // Proxy server configuration (if enabled)
   // Timestamps (ISO 8601 strings)
   createdAt: string; // When the session was created
   lastSeenAt?: string; // Last successful server response (ping, command, etc.)

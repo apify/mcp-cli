@@ -19,8 +19,11 @@ import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
 import { OAuthProvider } from '../lib/auth/oauth-provider.js';
 import { storeKeychainOAuthTokenInfo, readKeychainOAuthTokenInfo } from '../lib/auth/keychain.js';
 import { updateAuthProfileRefreshedAt } from '../lib/auth/profiles.js';
+import { readKeychainProxyBearerToken } from '../lib/auth/keychain.js';
 import type { Tool, Resource, Prompt } from '@modelcontextprotocol/sdk/types.js';
 import packageJson from '../../package.json' with { type: 'json' };
+import { ProxyServer } from './proxy-server.js';
+import type { ProxyConfig } from '../lib/types.js';
 
 // Keepalive ping interval in milliseconds (30 seconds)
 const KEEPALIVE_INTERVAL_MS = 30_000;
@@ -32,6 +35,7 @@ interface BridgeOptions {
   serverConfig: ServerConfig;
   verbose?: boolean;
   profileName?: string; // Auth profile name for token refresh
+  proxyConfig?: ProxyConfig; // Proxy server configuration
 }
 
 /**
@@ -41,6 +45,7 @@ interface BridgeOptions {
 class BridgeProcess {
   private client: McpClient | null = null;
   private server: NetServer | null = null;
+  private proxyServer: ProxyServer | null = null;
   private connections: Set<Socket> = new Set();
   private options: BridgeOptions;
   private socketPath: string;
@@ -291,6 +296,11 @@ class BridgeProcess {
         await this.connectToMcp();
         // Signal that MCP client is ready (unblocks pending requests)
         this.mcpClientReadyResolver();
+
+        // 5b. Start proxy server if configured
+        if (this.options.proxyConfig && this.client) {
+          await this.startProxyServer();
+        }
       } catch (error) {
         // Signal that MCP connection failed (rejects pending requests with actual error)
         // Don't exit immediately - stay alive briefly so CLI can receive the error
@@ -443,6 +453,41 @@ class BridgeProcess {
     // Note: Token refresh is handled automatically by the SDK
     // The SDK calls authProvider.tokens() before each request,
     // which triggers OAuthTokenManager.getValidAccessToken() to refresh if needed
+  }
+
+  /**
+   * Start the proxy MCP server
+   * Creates an HTTP server that forwards MCP requests to upstream client
+   */
+  private async startProxyServer(): Promise<void> {
+    if (!this.options.proxyConfig || !this.client) {
+      return;
+    }
+
+    const { host, port } = this.options.proxyConfig;
+
+    // Load proxy bearer token from keychain if stored
+    const bearerToken = await readKeychainProxyBearerToken(this.options.sessionName);
+
+    logger.info(`Starting proxy server on ${host}:${port}`);
+    if (bearerToken) {
+      logger.debug('Proxy server will require bearer token authentication');
+    }
+
+    const proxyOptions: ConstructorParameters<typeof ProxyServer>[0] = {
+      host,
+      port,
+      client: this.client,
+      sessionName: this.options.sessionName,
+    };
+    if (bearerToken) {
+      proxyOptions.bearerToken = bearerToken;
+    }
+
+    this.proxyServer = new ProxyServer(proxyOptions);
+
+    await this.proxyServer.start();
+    logger.info(`Proxy server started at ${this.proxyServer.getAddress()}`);
   }
 
   /**
@@ -850,6 +895,17 @@ class BridgeProcess {
       logger.debug('Keepalive interval stopped');
     }
 
+    // Stop proxy server if running
+    if (this.proxyServer) {
+      try {
+        await this.proxyServer.stop();
+        this.proxyServer = null;
+        logger.debug('Proxy server stopped');
+      } catch (error) {
+        logger.warn('Failed to stop proxy server:', error);
+      }
+    }
+
     // Close all client connections
     for (const socket of this.connections) {
       socket.end();
@@ -907,7 +963,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   if (args.length < 2) {
-    console.error('Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>]');
+    console.error('Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>]');
     process.exit(1);
   }
 
@@ -922,6 +978,18 @@ async function main(): Promise<void> {
     profileName = args[profileIndex + 1];
   }
 
+  // Parse --proxy-host and --proxy-port arguments
+  let proxyConfig: ProxyConfig | undefined;
+  const proxyHostIndex = args.indexOf('--proxy-host');
+  const proxyPortIndex = args.indexOf('--proxy-port');
+  if (proxyHostIndex !== -1 && proxyPortIndex !== -1) {
+    const host = args[proxyHostIndex + 1];
+    const port = parseInt(args[proxyPortIndex + 1] || '', 10);
+    if (host && !isNaN(port)) {
+      proxyConfig = { host, port };
+    }
+  }
+
   try {
     const bridgeOptions: BridgeOptions = {
       sessionName,
@@ -930,6 +998,9 @@ async function main(): Promise<void> {
     };
     if (profileName) {
       bridgeOptions.profileName = profileName;
+    }
+    if (proxyConfig) {
+      bridgeOptions.proxyConfig = proxyConfig;
     }
 
     const bridge = new BridgeProcess(bridgeOptions);

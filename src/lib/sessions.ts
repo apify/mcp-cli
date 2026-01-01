@@ -19,7 +19,7 @@ import {
 import { withFileLock } from './file-lock.js';
 import { createLogger } from './logger.js';
 import { ClientError } from './errors.js';
-import { removeKeychainSessionHeaders } from './auth/keychain.js';
+import { removeKeychainSessionHeaders, removeKeychainProxyBearerToken } from './auth/keychain.js';
 
 const logger = createLogger('sessions');
 
@@ -186,6 +186,14 @@ export async function deleteSession(sessionName: string): Promise<void> {
       // Ignore errors - headers may not exist
     }
 
+    // Delete proxy bearer token from keychain (if any)
+    try {
+      await removeKeychainProxyBearerToken(sessionName);
+      logger.debug(`Deleted proxy bearer token from keychain for session: ${sessionName}`);
+    } catch {
+      // Ignore errors - token may not exist
+    }
+
     logger.debug(`Session ${sessionName} deleted`);
   }, SESSIONS_DEFAULT_CONTENT);
 }
@@ -253,6 +261,14 @@ export async function consolidateSessions(cleanExpired: boolean): Promise<Consol
           logger.debug(`Deleted headers from keychain for session: ${name}`);
         } catch {
           // Ignore errors - headers may not exist
+        }
+
+        // Delete proxy bearer token from keychain (if any)
+        try {
+          await removeKeychainProxyBearerToken(name);
+          logger.debug(`Deleted proxy bearer token from keychain for session: ${name}`);
+        } catch {
+          // Ignore errors - token may not exist
         }
 
         // Delete socket file (Unix only - Windows named pipes don't leave files)

@@ -3,7 +3,7 @@
  */
 
 import { OutputMode, isValidSessionName, validateProfileName, isProcessAlive, getServerHost, redactHeaders } from '../../lib/index.js';
-import type { ServerConfig } from '../../lib/types.js';
+import type { ServerConfig, ProxyConfig } from '../../lib/types.js';
 import { formatOutput, formatSuccess, formatError, formatSessionLine, formatServerDetails } from '../output.js';
 import { withMcpClient, resolveTarget, resolveAuthProfile } from '../helpers.js';
 import { listAuthProfiles } from '../../lib/auth/profiles.js';
@@ -16,10 +16,11 @@ import {
   getSession,
 } from '../../lib/sessions.js';
 import { startBridge, StartBridgeOptions, stopBridge } from '../../lib/bridge-manager.js';
-import { storeKeychainSessionHeaders } from '../../lib/auth/keychain.js';
+import { storeKeychainSessionHeaders, storeKeychainProxyBearerToken } from '../../lib/auth/keychain.js';
 import { ClientError } from '../../lib/index.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
+import { parseProxyArg } from '../parser.js';
 
 const logger = createLogger('sessions');
 
@@ -30,7 +31,16 @@ const logger = createLogger('sessions');
 export async function connectSession(
   name: string,
   target: string,
-  options: { outputMode: OutputMode; verbose?: boolean; config?: string; headers?: string[]; timeout?: number; profile?: string }
+  options: {
+    outputMode: OutputMode;
+    verbose?: boolean;
+    config?: string;
+    headers?: string[];
+    timeout?: number;
+    profile?: string;
+    proxy?: string;
+    proxyBearerToken?: string;
+  }
 ): Promise<void> {
   try {
     // Validate session name
@@ -44,6 +54,18 @@ export async function connectSession(
     // Validate profile name (if provided)
     if (options.profile) {
       validateProfileName(options.profile);
+    }
+
+    // Parse proxy configuration (if provided)
+    let proxyConfig: ProxyConfig | undefined;
+    if (options.proxy) {
+      proxyConfig = parseProxyArg(options.proxy);
+      logger.debug(`Proxy config: ${proxyConfig.host}:${proxyConfig.port}`);
+    }
+
+    // Validate proxy-bearer-token is only used with --proxy
+    if (options.proxyBearerToken && !options.proxy) {
+      throw new ClientError('--proxy-bearer-token requires --proxy to be specified');
     }
 
     // Check if session already exists
@@ -110,6 +132,12 @@ export async function connectSession(
       }
     }
 
+    // Store proxy bearer token in keychain (if provided)
+    if (options.proxyBearerToken) {
+      logger.debug(`Storing proxy bearer token for session ${name} in keychain`);
+      await storeKeychainProxyBearerToken(name, options.proxyBearerToken);
+    }
+
     // Create or update session record (without pid - that comes from startBridge)
     // Store serverConfig with headers redacted (actual values in keychain)
     const isReconnect = !!existingSession;
@@ -122,6 +150,7 @@ export async function connectSession(
     const sessionUpdate: Parameters<typeof updateSession>[1] = {
       server: sessionTransportConfig,
       ...(profileName && { profileName }),
+      ...(proxyConfig && { proxyConfig }),
     };
 
     if (isReconnect) {
@@ -144,6 +173,9 @@ export async function connectSession(
       }
       if (profileName) {
         bridgeOptions.profileName = profileName;
+      }
+      if (proxyConfig) {
+        bridgeOptions.proxyConfig = proxyConfig;
       }
 
       const { pid } = await startBridge(bridgeOptions);
@@ -477,6 +509,10 @@ export async function restartSession(
 
     if (session.profileName) {
       bridgeOptions.profileName = session.profileName;
+    }
+
+    if (session.proxyConfig) {
+      bridgeOptions.proxyConfig = session.proxyConfig;
     }
 
     const { pid } = await startBridge(bridgeOptions);

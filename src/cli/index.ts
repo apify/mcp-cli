@@ -250,7 +250,7 @@ MCP commands (<target> provided):
   logging-set-level <level>
   ping
 
-Documentation: https://github.com/apify/mcpc/tree/v${packageJson.version}`
+Full docs: https://github.com/apify/mcpc/tree/v${packageJson.version}`
   );
 
   return program;
@@ -313,8 +313,14 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
   program
     .command('connect <name>')
     .description('Create or reconnect a named session to an MCP server')
-    .action(async (name, _options, command) => {
-      await sessions.connectSession(name, target, getOptionsFromCommand(command));
+    .option('--proxy <[host:]port>', 'Start proxy MCP server on HOST:PORT (default host: 127.0.0.1)')
+    .option('--proxy-bearer-token <token>', 'Require bearer token authentication for proxy server')
+    .action(async (name, options, command) => {
+      await sessions.connectSession(name, target, {
+        ...getOptionsFromCommand(command),
+        proxy: options.proxy,
+        proxyBearerToken: options.proxyBearerToken,
+      });
     });
 
   // Authentication commands
