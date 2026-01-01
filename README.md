@@ -193,37 +193,33 @@ To connecto to MCP server you need to specify `<target>`, which can be one of (i
 connects to the server, and enables interaction with it. 
 
 ```bash
-# Entry in config file / one-shot command
-mcpc --config .vscode/mcp.json filesystem 
-mcpc --config .vscode/mcp.json filesystem tools-list
-mcpc --config .vscode/mcp.json filesystem tools-call --args key:=value
+# Server from config file (stdio), one-shot interaction
+mcpc --config .vscode/mcp.json fs 
+mcpc --config .vscode/mcp.json fs tools-list
+mcpc --config .vscode/mcp.json fs tools-call --args key:=value
+mcpc --config .vscode/mcp.json fs tools-call list_directory --args path="/"
 
-# Remote MCP server / one-shot command
+# Remote server (Streamable HTTP), one-shot interaction
 mcpc mcp.apify.com\?tools=docs
 mcpc mcp.apify.com\?tools=docs tools-list
 mcpc mcp.apify.com\?tools=docs tools-call search-apify-docs --args query="What are Actors?"
 
-# Entry in config file / session
-mcpc mcp.apify.com\?tools=docs session @test
-mcpc @test tools-list
+# Entry in config file, session interaction
+mcpc --config .vscode/mcp.json fs session @fs 
+mcpc @fs tools-list
+mcpc @fs tools-call --args key:=value
+mcpc @fs tools-call list_directory --args path="/"
 
-....
-
-mcpc @test tools-list`
-* `mcpc @test tools-get <name>`
-* `mcpc @test tools-call <name> [--args key=val ...] [--args-file <file>]`
-* `mcpc @test resources-list`
-* `mcpc @test resources-read <uri>`
-* `mcpc @test prompts-list`
-* `mcpc @test prompts-get <name>`
-* `mcpc @test logging-set-level <lvl>`
-* `mcpc @test shell`
+# Remote server (Streamable HTTP), session interaction
+mcpc mcp.apify.com\?tools=docs session @apify
+mcpc @apify tools-list
+mcpc @apify tools-call search-apify-docs --args query="What are Actors?"
 ```
 
-#### MCP command arguments
+#### Arguments
 
-The `tools-call` and `prompts-get` commands accept arguments that are passed to MCP server.
-THere are several ways to provide them:
+The `tools-call` and `prompts-get` commands enable passing arguments to MCP server.
+There are several ways to do so:
 
 ```bash
 # Inline JSON object (most convenient)
@@ -252,8 +248,6 @@ echo '{"query":"hello","count":10}' | mcpc @server tools-call my-tool
 - Key=value pairs: After `--args`, all `key=value` or `key:=json` pairs are consumed until next flag
 - `=` assigns as string, `:=` parses as JSON
 - Stdin is automatically detected when input is piped (not interactive terminal)
-
-
 
 ### JSON mode
 
