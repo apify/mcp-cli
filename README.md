@@ -20,10 +20,10 @@ Note that `mcpc` does not invoke LLMs itself; that's the job of the higher layer
 - 🔌 **Highly compatible** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
 - 🚀 **Zero setup** - Connect to remote servers instantly with just a URL.
-- 🔧 **Full protocol support** - Tools, resources, prompts, dynamic discovery, and async notifications.
+- 🔧 **Strong MCP support** - Instructions, tools, resources, prompts, dynamic discovery.
 - 📊 **JSON output** - Easy integration with `jq`, scripts, and other CLI tools.
-- 🤖 **AI-friendly** - Designed for code generation and automated workflows.
-- 🔒 **Secure** - OS keychain integration for credentials, encrypted auth storage.
+- 🤖 **AI-friendly** - Designed for code generation, enables MCP proxy for sandboxing.
+- 🔒 **Secure** - Full OAuth support, OS keychain for credentials storage.
 
 
 ## Table of contents
@@ -34,13 +34,53 @@ Note that `mcpc` does not invoke LLMs itself; that's the job of the higher layer
 - [Install](#install)
 - [Quickstart](#quickstart)
 - [Usage](#usage)
+  - [Management commands](#management-commands)
+  - [Targets](#targets)
+  - [MCP commands](#mcp-commands)
+    - [Command arguments](#command-arguments)
+  - [JSON mode](#json-mode)
 - [Sessions](#sessions)
+  - [Session lifecycle](#session-lifecycle)
 - [Authentication](#authentication)
+  - [Anonymous access](#anonymous-access)
+  - [Bearer token authentication](#bearer-token-authentication)
+  - [OAuth profiles](#oauth-profiles)
+  - [Authentication precedence](#authentication-precedence)
+    - [Proxy MCP server](#proxy-mcp-server)
 - [Interaction](#interaction)
-- [Configuration](#configuration)
+  - [Interactive shell](#interactive-shell)
+  - [Scripting](#scripting)
+  - [Schema validation](#schema-validation)
+  - [AI agents](#ai-agents)
+    - [Sandboxing AI access](#sandboxing-ai-access)
+    - [Agent skills](#agent-skills)
 - [MCP support](#mcp-support)
+  - [Transport](#transport)
+  - [Authorization](#authorization)
+  - [MCP session](#mcp-session)
+  - [MCP feature support](#mcp-feature-support)
+    - [Server instructions](#server-instructions)
+    - [Tools](#tools)
+    - [Prompts](#prompts)
+    - [Resources](#resources)
+    - [List change notifications](#list-change-notifications)
+    - [Server logs](#server-logs)
+    - [Pagination](#pagination)
+    - [Ping](#ping)
+- [Configuration](#configuration)
+  - [MCP server config file](#mcp-server-config-file)
+  - [Saved state](#saved-state)
+  - [Environment variables](#environment-variables)
+  - [Cleanup](#cleanup)
 - [Security](#security)
+  - [Credential protection](#credential-protection)
+  - [Network security](#network-security)
+  - [AI security](#ai-security)
 - [Error handling](#error-handling)
+  - [Exit codes](#exit-codes)
+  - [Verbose mode](#verbose-mode)
+  - [Logs](#logs)
+  - [Troubleshooting](#troubleshooting)
 - [Development](#development)
 - [License](#license)
 
@@ -130,6 +170,7 @@ MCP commands (<target> provided):
   resources-templates-list
   logging-set-level <level>
   ping
+
 ```
 
 ### Management commands
@@ -196,17 +237,17 @@ The `tools-call` and `prompts-get` commands accept arguments as positional param
 
 ```bash
 # Key:=value pairs (auto-parsed: tries JSON, falls back to string)
-mcpc <target> tools-call <tool-name> query:="hello world" count:=10 enabled:=true
+mcpc <target> tools-call <tool-name> greeting:="hello world" count:=10 enabled:=true
 mcpc <target> tools-call <tool-name> config:='{"key":"value"}' items:='[1,2,3]'
 
 # Force string type with JSON quotes
 mcpc <target> tools-call <tool-name> id:='"123"' flag:='"true"'
 
 # Inline JSON object (if first arg starts with { or [)
-mcpc <target> tools-call <tool-name> '{"query":"hello","count":10}'
+mcpc <target> tools-call <tool-name> '{"greeting":"hello world","count":10}'
 
 # Read from stdin (automatic when no positional args and input is piped)
-echo '{"query":"hello","count":10}' | mcpc <target> tools-call <tool-name>
+echo '{"greeting":"hello","count":10}' | mcpc <target> tools-call <tool-name>
 cat args.json | mcpc <target> tools-call <tool-name>
 ```
 
@@ -215,7 +256,7 @@ cat args.json | mcpc <target> tools-call <tool-name>
 - Values are auto-parsed: valid JSON becomes that type, otherwise treated as string
   - `count:=10` → number `10`
   - `enabled:=true` → boolean `true`
-  - `query:=hello` → string `"hello"` (not valid JSON, so string)
+  - `greeting:=hello` → string `"hello"` (not valid JSON, so string)
   - `id:='"123"'` → string `"123"` (JSON string literal)
 - Inline JSON: If first argument starts with `{` or `[`, it's parsed as a JSON object/array
 - Stdin: When no positional args are provided and input is piped, reads JSON from stdin
@@ -289,7 +330,7 @@ mcpc @apify close
 # ...now session name "@apify" is forgotten and available for future use
 ```
 
-### Session failover
+### Session lifecycle
 
 The sessions are persistent: metadata is saved in `~/.mcpc/sessions.json` file,
 [authentication tokens](#authentication) in OS keychain.
@@ -462,6 +503,70 @@ mcpc mcp.apify.com\?tools=docs tools-list
 ```
 
 
+#### Proxy MCP server
+
+For stronger isolation, `mcpc` can expose an MCP session under new local proxy MCP server using the `--proxy` option.
+The proxy forwards all MCP requests to the upstream server but **never exposes the original authentication tokens** to the client.
+This is useful when you want to give someone or something MCP access without revealing your credentials.
+
+```bash
+# Human authenticates to a remote server
+mcpc mcp.apify.com login
+
+# Create authenticated session with proxy server on localhost:8080
+mcpc mcp.apify.com connect @open-relay --proxy 8080
+
+# Now any MCP client can connect to proxy like to a regular MCP server
+# The client has NO access to the original OAuth tokens or HTTP headers
+# Note: localhost/127.0.0.1 URLs default to http:// (no scheme needed)
+mcpc localhost:8080 tools-list
+mcpc 127.0.0.1:8080 tools-call search-actors keywords:="web scraper"
+
+# Or create a new session from the proxy for convenience
+mcpc localhost:8080 connect @sandboxed
+mcpc @sandboxed tools-call search-actors keywords:="web scraper"
+
+# Optionally protect proxy with bearer token for better security (stored in OS keychain)
+mcpc mcp.apify.com connect @secure-relay --proxy 8081 --proxy-bearer-token secret123
+# To use the proxy, caller needs to pass the bearer token in HTTP header
+mcpc localhost:8081 connect @sandboxed2 --header "Authorization: Bearer secret123"
+```
+
+**Proxy options for `connect` command:**
+
+| Option                         | Description                                                                    |
+|--------------------------------|--------------------------------------------------------------------------------|
+| `--proxy [host:]port`          | Start proxy MCP server. Default host: `127.0.0.1` (localhost only)             |
+| `--proxy-bearer-token <token>` | Requires `Authorization: Bearer <token>` header to access the proxy MCP server |
+
+**Security model:**
+
+- **Localhost by default**: `--proxy 8080` binds to `127.0.0.1` only, preventing network access
+- **Tokens hidden**: Original OAuth tokens and/or HTTP headers are never exposed to proxy clients
+- **Optional auth**: Use `--proxy-bearer-token` to add another layer of security
+- **Explicit opt-in**: Proxy only starts when `--proxy` flag is provided
+
+**Binding to network interfaces:**
+
+```bash
+# Localhost only (default, most secure)
+mcpc mcp.apify.com connect @relay --proxy 8080
+
+# Bind to all interfaces (allows network access - use with caution!)
+mcpc mcp.apify.com connect @relay --proxy 0.0.0.0:8080
+
+# Bind to specific interface
+mcpc mcp.apify.com connect @relay --proxy 192.168.1.100:8080
+```
+
+When listing sessions, proxy info is displayed prominently:
+
+```bash
+mcpc
+# @relay → https://mcp.apify.com (HTTP, OAuth: default) [proxy: 127.0.0.1:8080]
+```
+
+
 ## Interaction
 
 `mcpc` supports multiple interaction modes: interactive shell, scripting, and AI agent integration.
@@ -502,7 +607,7 @@ Validate tool/prompt schemas to detect breaking changes early:
 mcpc --json @apify tools-get search-actors > expected.json
 
 # Validate before calling (fails if schema changed incompatibly)
-mcpc @apify tools-call search-actors --schema expected.json query:="test"
+mcpc @apify tools-call search-actors --schema expected.json keywords:="test"
 ```
 
 Schema modes (`--schema-mode`):
@@ -513,9 +618,15 @@ Schema modes (`--schema-mode`):
 
 ### AI agents
 
-`mcpc` is designed for MCP "[code mode](https://blog.cloudflare.com/code-mode/)" -
-AI agents that write and execute code rather than using tool function calling.
-This approach is [more accurate](https://www.anthropic.com/engineering/code-execution-with-mcp) and uses fewer tokens.
+`mcpc` is designed for use AI agents, in both interactive MCP tool calling mode 
+and "[code mode](https://blog.cloudflare.com/code-mode/)".
+
+- **Tool calling mode** - CLI-based AI agents can dynamically explore and interact with the MCP server, thanks to the default Markdown-ish output.
+  Think MCP connectors in ChatGPT or Claude, just in CLI and with much longer command timeouts.  
+- **Code mode** - AI coding agents can write and execute shell [scripts](#scripting) composing multiple MCP server operations,
+  thanks to the `--json` output mode and access to MCP servers schemas.
+  For well-defined workflow scenarios, this approach can be [more accurate](https://www.anthropic.com/engineering/code-execution-with-mcp)
+  and use fewer tokens.
 
 AI agent can discover and use tools via shell commands
 
@@ -527,212 +638,35 @@ mcpc @server tools-call search query:="hello world"
 
 and then generate shell scripts to execute sequences of actions,
 with `--schema` checks to ensure stability of integrations and faster failure recovery.
-Make no harm!
-
-#### Claude Code skill
-
-Install [Claude Skill](./docs/claude-skill/README.md) for optimized `mcpc` usage:
-
-```bash
-mkdir -p ~/.claude/skills/mcpc && cp claude-skill/SKILL.md ~/.claude/skills/mcpc/
-```
-
-See [`claude-skill/README.md`](./claude-skill/README.md) for details.
+Agents, make no harm!
 
 #### Sandboxing AI access
 
-Authentication profiles provide a security boundary for AI agents:
+To ensure AI coding agents don't perform destructive actions or leak credentials,
+it's always a good idea to run them in a code sandbox
+with limited access to your resources.
 
-1. **Human creates profile**: `mcpc mcp.apify.com login --profile ai-sandbox`
-2. **Human creates session**: `mcpc mcp.apify.com connect @ai-session --profile ai-sandbox`
-3. **AI uses session**: The agent can only use `@ai-session` - it cannot create new profiles or sessions
+The [proxy MCP server](#proxy-mcp-server) feature provides a security boundary for AI agents:
+
+1. **Human creates authentication profile**: `mcpc mcp.apify.com login --profile ai-access`
+2. **Human creates session**: `mcpc mcp.apify.com connect @ai-sandbox --profile ai-access --proxy 8080`
+3. **AI runs inside a sandbox**: If sandbox has access limited to `localhost:8080`,
+   it can only interact with the MCP server through the `@ai-sandbox` session,
+   without access to the original OAuth credentials, HTTP headers, or `mcpc` configuration.
 
 This ensures AI agents operate only with pre-authorized credentials, preventing unauthorized access to MCP servers.
 The human controls which servers the AI can access and with what permissions (OAuth scopes).
 
-#### Proxy server for AI isolation
+**IMPORTANT:** Beware that MCP proxy will not make an insecure MCP server secure.
+Local stdio servers will still have access to your local system, and HTTP servers to provided auth credentials,
+and both can easily perform destructive actions or leak credentials on their own, or let MCP client to do such actions.
+**Always use only trusted local and remote MCP servers and limit their access to the necessary minimum.**
 
-For stronger isolation, `mcpc` can expose a session as a local proxy MCP server.
-The proxy forwards all MCP requests to the upstream server but **never exposes the original authentication tokens**.
-This is useful when you want to give an AI agent MCP access without revealing your credentials.
+#### Agent skills
 
-```bash
-# Human creates authenticated session with proxy server on localhost:8080
-mcpc mcp.apify.com connect @ai-proxy --proxy 8080
+To help Claude Code use `mcpc`, you can install this [Claude skill](./docs/claude-skill/README.md):
 
-# Optionally protect proxy with bearer token (stored in OS keychain)
-mcpc mcp.apify.com connect @ai-proxy --proxy 8080 --proxy-bearer-token secret123
-
-# AI agent connects to proxy as if it were a regular MCP server
-# The agent has NO access to the original OAuth tokens
-# Note: localhost/127.0.0.1 URLs default to http:// (no scheme needed)
-mcpc localhost:8080 tools-list
-mcpc 127.0.0.1:8080 tools-call search-actors query:="web scraper"
-
-# Or create a new session from the proxy for convenience
-mcpc localhost:8080 connect @sandboxed
-mcpc @sandboxed tools-call search-actors query:="web scraper"
-```
-
-**Proxy options for `connect` command:**
-
-| Option | Description                                                        |
-|--------|--------------------------------------------------------------------|
-| `--proxy [host:]port` | Start proxy MCP server. Default host: `127.0.0.1` (localhost only) |
-| `--proxy-bearer-token <token>` | Require bearer token for proxy authentication                      |
-
-**Security model:**
-
-- **Localhost by default**: `--proxy 8080` binds to `127.0.0.1` only, preventing network access
-- **Tokens hidden**: Original OAuth/bearer tokens are never exposed to proxy clients
-- **Optional auth**: Use `--proxy-bearer-token` to add another layer of security
-- **Explicit opt-in**: Proxy only starts when `--proxy` flag is provided
-
-**Binding to network interfaces:**
-
-```bash
-# Localhost only (default, most secure)
-mcpc mcp.apify.com connect @ai-proxy --proxy 8080
-
-# Bind to all interfaces (allows network access - use with caution!)
-mcpc mcp.apify.com connect @ai-proxy --proxy 0.0.0.0:8080
-
-# Bind to specific interface
-mcpc mcp.apify.com connect @ai-proxy --proxy 192.168.1.100:8080
-```
-
-When listing sessions, proxy info is displayed prominently:
-
-```bash
-mcpc
-# @ai-proxy → https://mcp.apify.com (HTTP, OAuth: default) [proxy: 127.0.0.1:8080]
-```
-
-## Configuration
-
-Configuration can be provided via file, environment variables, or command-line flags.
-
-**Precedence** (highest to lowest):
-1. Command-line flags (including `--config` option)
-2. Environment variables
-3. Built-in defaults
-
-### MCP server config file
-
-`mcpc` supports the ["standard"](https://gofastmcp.com/integrations/mcp-json-configuration)
-MCP server JSON config file, compatible with Claude Desktop, VS Code, and other MCP clients.
-You can point to an existing config file with `--config`:
-
-```bash
-# One-shot command to an MCP server configured in Visual Studio Code
-mcpc --config .vscode/mcp.json apify tools-list
-
-# Open a session to a server specified in the custom config file
-mcpc --config .vscode/mcp.json apify connect @my-apify
-```
-
-**Example MCP config JSON file:**
-
-```json
-{
-  "mcpServers": {
-    "apify": {
-      "url": "https://mcp.apify.com",
-      "headers": {
-        "Authorization": "Bearer ${APIFY_TOKEN}"
-      }
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
-      "env": {
-        "DEBUG": "mcp:*"
-      }
-    },
-    "local-package": {
-      "command": "node",
-      "args": ["/path/to/server.js"]
-    }
-  }
-}
-```
-
-**Server configuration properties:**
-
-For **HTTP/HTTPS servers:**
-- `url` (required) - MCP server endpoint URL
-- `headers` (optional) - HTTP headers to include with requests
-- `timeout` (optional) - Request timeout in seconds
-
-For **stdio servers:**
-- `command` (required) - Command to execute (e.g., `node`, `npx`, `python`)
-- `args` (optional) - Array of command arguments
-- `env` (optional) - Environment variables for the process
-
-**Using servers from config file:**
-
-When `--config` is provided, you can reference servers by name:
-
-```bash
-# With config file, use server names directly
-mcpc --config .vscode/mcp.json filesystem tools-list
-
-# Create a named session from server in config
-mcpc --config .vscode/mcp.json filesystem connect @fs
-mcpc @fs tools-call search
-```
-
-**Environment variable substitution:**
-
-Config files support environment variable substitution using `${VAR_NAME}` syntax:
-
-```json
-{
-  "mcpServers": {
-    "secure-server": {
-      "url": "https://mcp.apify.com",
-      "headers": {
-        "Authorization": "Bearer ${API_TOKEN}",
-        "X-User-ID": "${USER_ID}"
-      }
-    }
-  }
-}
-```
-
-### Saved state
-
-`mcpc` saves its state to `~/.mcpc/` directory (unless overridden by `MCPC_HOME_DIR`), in the following files:
-
-- `~/.mcpc/sessions.json` - Active sessions with references to authentication profiles (file-locked for concurrent access)
-- `~/.mcpc/profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
-- `~/.mcpc/bridges/` - Unix domain socket files for each bridge process
-- `~/.mcpc/logs/bridge-*.log` - Log files for each bridge process
-- OS keychain - Sensitive credentials (OAuth tokens, bearer tokens, client secrets)
-
-### Environment variables
-
-- `MCPC_HOME_DIR` - Directory for session and authentication profiles data (default is `~/.mcpc`)
-- `MCPC_VERBOSE` - Enable verbose logging (set to `1`, `true`, or `yes`, case-insensitive)
-- `MCPC_JSON` - Enable JSON output (set to `1`, `true`, or `yes`, case-insensitive)
-
-### Cleanup
-
-You can clean up the `mcpc` state and data using the `--clean` option:
-
-```bash
-# Safe non-destructive cleanup: remove expired sessions, delete old orphaned logs
-mcpc --clean
-
-# Clean specific resources (comma-separated)
-mcpc --clean=sessions      # Kill bridges, delete all sessions
-mcpc --clean=profiles      # Delete all authentication profiles
-mcpc --clean=logs          # Delete all log files
-mcpc --clean=sessions,logs # Clean multiple resource types
-
-# Nuclear option: remove everything
-mcpc --clean=all           # Delete all sessions, profiles, logs, and sockets
-```
+<!-- TODO: Add also AGENTS.md, GitHub skills etc. -->
 
 ## MCP support
 
@@ -751,7 +685,7 @@ mcpc --clean=all           # Delete all sessions, profiles, logs, and sockets
 - [HTTP header authorization](#bearer-token-authentication)
 - [OAuth 2.1](#oauth-profiles)
 
-### Session lifecycle
+### MCP session
 
 The bridge process manages the full MCP session lifecycle:
 - Performs initialization handshake (`initialize` → `initialized`)
@@ -764,21 +698,21 @@ The bridge process manages the full MCP session lifecycle:
 
 ### MCP feature support
 
-| **Feature**                                        | **Status**                       |
-|----------------------------------------------------|----------------------------------|
-| 📖 [**Instructions**](#server-instructions)        | ✅ Supported                      |
-| 🔧 [**Tools**](#tools)                             | ✅ Supported                      |
-| 💬 [**Prompts**](#prompts)                         | ✅ Supported                      |
-| 📦 [**Resources**](#resources)                     | ✅ Supported                      |
-| 📝 [**Logging**](#server-logs)                     | ✅ Supported                      |
-| 🔔 [**Notifications**](#list-change-notifications) | ✅ Supported                      |
-| 📄 [**Pagination**](#pagination)                   | ✅ Supported                      |
-| 🏓 [**Ping**](#ping)                               | ✅ Supported                      |
-| ⏳ **Async tasks**                                  | 🚧 Planned                       |
-| 📁 **Roots**                                       | 🚧 Planned                       |
-| ❓ **Elicitation**                                  | 🚧 Planned                       |
-| 🔤 **Completion**                                  | 🚧 Planned                       |
-| 🤖 **Sampling**                                    | ❌ Not applicable (no LLM access) |
+| **Feature**                                        | **Status**                         |
+|:---------------------------------------------------|:-----------------------------------|
+| 📖 [**Instructions**](#server-instructions)        | ✅ Supported                        |
+| 🔧 [**Tools**](#tools)                             | ✅ Supported                        |
+| 💬 [**Prompts**](#prompts)                         | ✅ Supported                        |
+| 📦 [**Resources**](#resources)                     | ✅ Supported                        |
+| 📝 [**Logging**](#server-logs)                     | ✅ Supported                        |
+| 🔔 [**Notifications**](#list-change-notifications) | ✅ Supported                        |
+| 📄 [**Pagination**](#pagination)                   | ✅ Supported                        |
+| 🏓 [**Ping**](#ping)                               | ✅ Supported                        |
+| ⏳ **Async tasks**                                  | 🚧 Planned                         |
+| 📁 **Roots**                                       | 🚧 Planned                         |
+| ❓ **Elicitation**                                  | 🚧 Planned                         |
+| 🔤 **Completion**                                  | 🚧 Planned                         |
+| 🤖 **Sampling**                                    | ❌ Not applicable (no LLM access)   |
 
 #### Server instructions
 
@@ -833,7 +767,7 @@ mcpc @apify tools-list
 mcpc @apify tools-get search-actors
 
 # Call a tool with arguments
-mcpc @apify tools-call search-actors query:="web scraper"
+mcpc @apify tools-call search-actors keywords:="web scraper"
 
 # Pass complex JSON arguments
 mcpc @apify tools-call create-task '{"name": "my-task", "options": {"memory": 1024}}'
@@ -909,7 +843,7 @@ token - you always get the complete list without manual iteration. Keep it simpl
 
 #### Ping
 
-Sessions automatically send periodic pings to keep the [connection alive](#session-failover) and detect failures early.
+Sessions automatically send periodic pings to keep the [connection alive](#session-lifecycle) and detect failures early.
 Send a ping to check if a server connection is alive:
 
 ```bash
@@ -918,31 +852,161 @@ mcpc @apify ping
 mcpc @apify ping --json
 ```
 
+## Configuration
+
+You can configure `mcpc` using a config file, environment variables, or command-line flags.
+
+**Precedence** (highest to lowest):
+1. Command-line flags (including `--config` option)
+2. Environment variables
+3. Built-in defaults
+
+### MCP server config file
+
+`mcpc` supports the ["standard"](https://gofastmcp.com/integrations/mcp-json-configuration)
+MCP server JSON config file, compatible with Claude Desktop, VS Code, and other MCP clients.
+You can point to an existing config file with `--config`:
+
+```bash
+# One-shot command to an MCP server configured in Visual Studio Code
+mcpc --config .vscode/mcp.json apify tools-list
+
+# Open a session to a server specified in the custom config file
+mcpc --config .vscode/mcp.json apify connect @my-apify
+```
+
+**Example MCP config JSON file:**
+
+```json
+{
+  "mcpServers": {
+    "apify": {
+      "url": "https://mcp.apify.com",
+      "headers": {
+        "Authorization": "Bearer ${APIFY_TOKEN}"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "env": {
+        "DEBUG": "mcp:*"
+      }
+    },
+    "local-package": {
+      "command": "node",
+      "args": ["/path/to/server.js"]
+    }
+  }
+}
+```
+
+**Server configuration properties:**
+
+For **Streamable HTTP servers:**
+- `url` (required) - MCP server endpoint URL
+- `headers` (optional) - HTTP headers to include with requests
+- `timeout` (optional) - Request timeout in seconds
+
+For **stdio servers:**
+- `command` (required) - Command to execute (e.g., `node`, `npx`, `python`)
+- `args` (optional) - Array of command arguments
+- `env` (optional) - Environment variables for the process
+
+**Using servers from config file:**
+
+When `--config` is provided, you can reference servers by name:
+
+```bash
+# With config file, use server names directly
+mcpc --config .vscode/mcp.json filesystem tools-list
+
+# Create a named session from server in config
+mcpc --config .vscode/mcp.json filesystem connect @fs
+mcpc @fs tools-call search
+```
+
+**Environment variable substitution:**
+
+Config files support environment variable substitution using `${VAR_NAME}` syntax:
+
+```json
+{
+  "mcpServers": {
+    "secure-server": {
+      "url": "https://mcp.apify.com",
+      "headers": {
+        "Authorization": "Bearer ${API_TOKEN}",
+        "X-User-ID": "${USER_ID}"
+      }
+    }
+  }
+}
+```
+
+### Saved state
+
+`mcpc` saves its state to `~/.mcpc/` directory (unless overridden by `MCPC_HOME_DIR`), in the following files:
+
+- `~/.mcpc/sessions.json` - Active sessions with references to authentication profiles (file-locked for concurrent access)
+- `~/.mcpc/profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
+- `~/.mcpc/bridges/` - Unix domain socket files for each bridge process
+- `~/.mcpc/logs/bridge-*.log` - Log files for each bridge process
+- OS keychain - Sensitive credentials (OAuth tokens, bearer tokens, client secrets)
+
+### Environment variables
+
+- `MCPC_HOME_DIR` - Directory for session and authentication profiles data (default is `~/.mcpc`)
+- `MCPC_VERBOSE` - Enable verbose logging (set to `1`, `true`, or `yes`, case-insensitive)
+- `MCPC_JSON` - Enable JSON output (set to `1`, `true`, or `yes`, case-insensitive)
+
+### Cleanup
+
+You can clean up the `mcpc` state and data using the `--clean` option:
+
+```bash
+# Safe non-destructive cleanup: remove expired sessions, delete old orphaned logs
+mcpc --clean
+
+# Clean specific resources (comma-separated)
+mcpc --clean=sessions      # Kill bridges, delete all sessions
+mcpc --clean=profiles      # Delete all authentication profiles
+mcpc --clean=logs          # Delete all log files
+mcpc --clean=sessions,logs # Clean multiple resource types
+
+# Nuclear option: remove everything
+mcpc --clean=all           # Delete all sessions, profiles, logs, and sockets
+```
+
 ## Security
 
 `mcpc` follows [MCP security best practices](https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices).
 MCP enables arbitrary tool execution and data access - treat servers like you treat shells:
 
 - Use least-privilege tokens/headers
-- Prefer trusted endpoints
+- Only use trusted servers!
 - Audit tools before running them
 
 ### Credential protection
 
-| What | How |
-|------|-----|
-| **OAuth tokens** | Stored in OS keychain, never on disk |
-| **HTTP headers** | Stored in OS keychain per-session |
+| What                   | How                                             |
+|------------------------|-------------------------------------------------|
+| **OAuth tokens**       | Stored in OS keychain, never on disk            |
+| **HTTP headers**       | Stored in OS keychain per-session               |
 | **Bridge credentials** | Passed via Unix socket IPC, kept in memory only |
-| **Process arguments** | No secrets visible in `ps aux` |
-| **Config files** | Contain only metadata, never tokens |
-| **File permissions** | `0600` (user-only) for all config files |
+| **Process arguments**  | No secrets visible in `ps aux`                  |
+| **Config files**       | Contain only metadata, never tokens             |
+| **File permissions**   | `0600` (user-only) for all config files         |
 
 ### Network security
 
 - HTTPS enforced for remote servers (auto-upgraded from HTTP)
 - OAuth callback binds to `127.0.0.1` only
 - Credentials never logged, even in verbose mode
+
+### AI security
+
+See [](#sandboxing-ai-access) for details.
 
 ## Error handling
 
