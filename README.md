@@ -4,9 +4,8 @@
 that maps MCP operations to intuitive commands for interactive shell use, scripts, and AI coding agents.
 
 `mcpc` is useful for inspecting MCP servers, scripting,
-and enabling AI coding agents to use MCP in ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp)
-for better accuracy and lower token usage compared to tool function calling.
-After all, UNIX-compatible shell script is THE most universal coding language, for people and LLMs alike.
+and enabling AI coding agents to use MCP ["code mode"](#ai-agents) in shell.
+After all, UNIX-compatible shell script is THE most universal coding language.
 
 ![mcpc screenshot](https://raw.githubusercontent.com/apify/mcpc/main/docs/images/mcpc-screenshot.png)
 
@@ -493,7 +492,7 @@ mcpc mcp.apify.com\?tools=docs tools-list
 
 ## MCP proxy
 
-For stronger isolation, `mcpc` can expose an MCP session under new local proxy MCP server using the `--proxy` option.
+For stronger isolation, `mcpc` can expose an MCP session under a new local proxy MCP server using the `--proxy` option.
 The proxy forwards all MCP requests to the upstream server but **never exposes the original authentication tokens** to the client.
 This is useful when you want to give someone or something MCP access without revealing your credentials.
 See also [AI sandbox access](#ai-sandbox-access).
@@ -599,17 +598,18 @@ Schema modes (`--schema-mode`):
 
 ### AI agents
 
-`mcpc` is designed for use by AI agents, in both interactive MCP tool calling mode
-and "[code mode](https://blog.cloudflare.com/code-mode/)".
+`mcpc` is designed for use by AI agents, supporting both the interactive tool calling mode
+and ["code mode"](https://blog.cloudflare.com/code-mode/):
 
-- **Tool calling mode** - CLI-based AI agents can dynamically explore and interact with the MCP server, thanks to the default Markdown-ish output.
-  Similar to MCP connectors in ChatGPT or Claude, but via CLI and with much longer command timeouts.  
-- **Code mode** - AI coding agents can write and execute shell [scripts](#scripting) composing multiple MCP server operations,
+- **Tool calling mode** - CLI-based AI agents such as Claude Code or Codex CLI can call `mcpc` commands to dynamically explore and interact with the 
+  MCP server, using the default Markdown-ish text output.
+  This is similar to how MCP connectors in ChatGPT or Claude work, but in CLI you have more flexibility and longer operation timeouts.
+- **Code mode** - AI coding agents can write and execute shell [scripts](#scripting) composing multiple `mcpc` commands,
   thanks to the `--json` output mode and access to MCP server schemas.
-  For well-defined workflow scenarios, this approach can be [more accurate](https://www.anthropic.com/engineering/code-execution-with-mcp)
-  and use fewer tokens.
+  In more complex interaction scenarios, this can be [more accurate](https://www.anthropic.com/engineering/code-execution-with-mcp)
+  and use fewer tokens than tool calling.
 
-AI agents can discover and use tools via shell commands:
+AI agents can discover and call tools via shell commands:
 
 ```bash
 mcpc @server tools-list
@@ -617,9 +617,11 @@ mcpc --json @server tools-get search | jq '.inputSchema'
 mcpc @server tools-call search query:="hello world"
 ```
 
-and then generate shell scripts to execute sequences of actions,
+Once they understand the schema of the tools, they can generate shell scripts to execute sequences of actions,
 with `--schema` checks to ensure stability of integrations and faster failure recovery.
 Agents, make no harm!
+
+See an [example](./docs/examples/company-lookup.sh) of such an AI-generated shell script.
 
 #### AI sandbox access
 
@@ -670,7 +672,7 @@ To help Claude Code use `mcpc`, you can install this [Claude skill](./docs/claud
 
 The bridge process manages the full MCP session lifecycle:
 - Performs initialization handshake (`initialize` → `initialized`)
-- Negotiates protocol version (currently `2025-11-25`) and capabilities
+- Negotiates protocol version and capabilities
 - Fetches server-provided `instructions`
 - Maintains persistent HTTP connections with bidirectional streaming, or stdio bidirectional pipe to subprocess
 - Handles `MCP-Protocol-Version` and `MCP-Session-Id` headers automatically
@@ -966,7 +968,7 @@ mcpc --clean=all           # Delete all sessions, profiles, logs, and sockets
 
 ## Security
 
-`mcpc` follows [MCP security best practices](https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices).
+`mcpc` follows [MCP security best practices](https://modelcontextprotocol.io/specification/latest/basic/security_best_practices).
 MCP enables arbitrary tool execution and data access - treat servers like you treat shells:
 
 - Use least-privilege tokens/headers
