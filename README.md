@@ -7,7 +7,7 @@ that maps MCP operations to intuitive commands for interactive shell use, script
 and enabling AI coding agents to use MCP ["code mode"](#ai-agents) in shell.
 After all, UNIX-compatible shell script is THE most universal coding language.
 
-![mcpc screenshot](https://raw.githubusercontent.com/apify/mcpc/main/docs/images/mcpc-video.gif)
+![mcpc screenshot](https://raw.githubusercontent.com/apify/mcpc/main/docs/images/mcpc-demo.gif)
 
 **Key features:**
 - 🌎 **Highly compatible** - Works with any MCP server over Streamable HTTP or stdio.
