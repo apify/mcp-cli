@@ -33,8 +33,8 @@ run_mcpc --json
 assert_success
 session_info=$(json_get ".sessions[] | select(.name == \"$SESSION_UPSTREAM\")")
 assert_not_empty "$session_info" "session should exist"
-proxy_host=$(echo "$session_info" | jq -r '.proxyConfig.host // empty')
-proxy_port=$(echo "$session_info" | jq -r '.proxyConfig.port // empty')
+proxy_host=$(echo "$session_info" | jq -r '.proxy.host // empty')
+proxy_port=$(echo "$session_info" | jq -r '.proxy.port // empty')
 assert_eq "$proxy_host" "127.0.0.1" "proxy host should be 127.0.0.1"
 assert_eq "$proxy_port" "$PROXY_PORT" "proxy port should match"
 test_pass

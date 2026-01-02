@@ -150,7 +150,7 @@ export async function connectSession(
     const sessionUpdate: Parameters<typeof updateSession>[1] = {
       server: sessionTransportConfig,
       ...(profileName && { profileName }),
-      ...(proxyConfig && { proxyConfig }),
+      ...(proxyConfig && { proxy: proxyConfig }),
     };
 
     if (isReconnect) {
