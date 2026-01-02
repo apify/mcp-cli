@@ -358,6 +358,19 @@ class BridgeProcess {
   }
 
   /**
+   * Update session with notification timestamp for list changes
+   */
+  private async updateNotificationTimestamp(type: 'tools' | 'prompts' | 'resources'): Promise<void> {
+    const now = new Date().toISOString();
+    await updateSession(this.options.sessionName, {
+      notifications: {
+        [type]: { listChangedAt: now },
+      },
+    });
+    logger.debug(`Updated ${type} listChangedAt timestamp`);
+  }
+
+  /**
    * Connect to the MCP server
    */
   private async connectToMcp(): Promise<void> {
@@ -408,6 +421,10 @@ class BridgeProcess {
             logger.debug('Tools list changed', { error, count: tools?.length });
             // Broadcast notification to all connected clients
             this.broadcastNotification('tools/list_changed');
+            // Update session with notification timestamp
+            this.updateNotificationTimestamp('tools').catch((err) => {
+              logger.warn('Failed to update tools notification timestamp:', err);
+            });
           },
         },
         resources: {
@@ -416,6 +433,10 @@ class BridgeProcess {
             logger.debug('Resources list changed', { error, count: resources?.length });
             // Broadcast notification to all connected clients
             this.broadcastNotification('resources/list_changed');
+            // Update session with notification timestamp
+            this.updateNotificationTimestamp('resources').catch((err) => {
+              logger.warn('Failed to update resources notification timestamp:', err);
+            });
           },
         },
         prompts: {
@@ -424,6 +445,10 @@ class BridgeProcess {
             logger.debug('Prompts list changed', { error, count: prompts?.length });
             // Broadcast notification to all connected clients
             this.broadcastNotification('prompts/list_changed');
+            // Update session with notification timestamp
+            this.updateNotificationTimestamp('prompts').catch((err) => {
+              logger.warn('Failed to update prompts notification timestamp:', err);
+            });
           },
         },
       },

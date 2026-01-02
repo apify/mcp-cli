@@ -148,12 +148,24 @@ export async function updateSession(
       throw new ClientError(`Session not found: ${sessionName}`);
     }
 
-    // Merge updates
-    storage.sessions[sessionName] = {
+    // Merge updates (shallow merge for most fields)
+    const merged = {
       ...existingSession,
       ...updates,
       name: sessionName, // Ensure name doesn't change
     };
+
+    // Deep merge notifications field to preserve existing timestamps
+    if (updates.notifications) {
+      merged.notifications = {
+        ...existingSession.notifications,
+        tools: { ...existingSession.notifications?.tools, ...updates.notifications.tools },
+        prompts: { ...existingSession.notifications?.prompts, ...updates.notifications.prompts },
+        resources: { ...existingSession.notifications?.resources, ...updates.notifications.resources },
+      };
+    }
+
+    storage.sessions[sessionName] = merged;
 
     await saveSessionsInternal(storage);
 

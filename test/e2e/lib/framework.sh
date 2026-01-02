@@ -693,6 +693,21 @@ server_reset() {
   curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
 }
 
+# Server control: send tools/list_changed notification
+server_notify_tools_changed() {
+  curl -s -X POST "$TEST_SERVER_URL/control/notify-tools-changed" >/dev/null
+}
+
+# Server control: send prompts/list_changed notification
+server_notify_prompts_changed() {
+  curl -s -X POST "$TEST_SERVER_URL/control/notify-prompts-changed" >/dev/null
+}
+
+# Server control: send resources/list_changed notification
+server_notify_resources_changed() {
+  curl -s -X POST "$TEST_SERVER_URL/control/notify-resources-changed" >/dev/null
+}
+
 # Add server cleanup to trap
 _original_cleanup=$(trap -p EXIT | sed "s/trap -- '\(.*\)' EXIT/\1/")
 trap 'stop_test_server; '"$_original_cleanup" EXIT

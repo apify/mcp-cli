@@ -800,8 +800,9 @@ mcpc @apify resources-templates-list
 
 When connected via a [session](#sessions), `mcpc` automatically handles `list_changed`
 notifications for tools, resources, and prompts.
-The bridge process updates the session record so the caller can detect and act on these notifications.
+The bridge process tracks when each notification type was last received.
 In [shell mode](#interactive-shell), notifications are displayed in real-time.
+The timestamps are available in JSON output via `mcpc --json` for scripting.
 
 #### Server logs
 

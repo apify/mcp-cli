@@ -97,6 +97,22 @@ export interface ProxyConfig {
 export type SessionStatus = 'active' | 'expired' | 'crashed';
 
 /**
+ * Notification timestamps for list change events
+ * Tracks when the server last notified about changes to tools, prompts, or resources
+ */
+export interface SessionNotifications {
+  tools?: {
+    listChangedAt?: string; // ISO 8601 timestamp of last tools/list_changed notification
+  };
+  prompts?: {
+    listChangedAt?: string; // ISO 8601 timestamp of last prompts/list_changed notification
+  };
+  resources?: {
+    listChangedAt?: string; // ISO 8601 timestamp of last resources/list_changed notification
+  };
+}
+
+/**
  * Session data stored in sessions.json
  */
 export interface SessionData {
@@ -111,6 +127,7 @@ export interface SessionData {
   };
   status?: SessionStatus; // Session health status (default: active)
   proxy?: ProxyConfig; // Proxy server configuration (if enabled)
+  notifications?: SessionNotifications; // Last list change notification timestamps
   // Timestamps (ISO 8601 strings)
   createdAt: string; // When the session was created
   lastSeenAt?: string; // Last successful server response (ping, command, etc.)

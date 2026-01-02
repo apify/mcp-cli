@@ -195,6 +195,9 @@ function shouldFail(): boolean {
   return false;
 }
 
+// MCP server instance (accessible for sending notifications)
+let mcpServer: Server | null = null;
+
 // Create the MCP server
 function createMcpServer(): Server {
   const server = new Server(
@@ -383,7 +386,7 @@ function createMcpServer(): Server {
 
 // Create HTTP server with MCP transport and control endpoints
 async function main() {
-  const mcpServer = createMcpServer();
+  mcpServer = createMcpServer();
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
   const httpServer = http.createServer(async (req, res) => {
@@ -444,6 +447,39 @@ async function main() {
           deletedSessions.length = 0;
           res.writeHead(200);
           res.end('State reset');
+          return;
+
+        case 'notify-tools-changed':
+          if (mcpServer) {
+            await mcpServer.sendToolListChanged();
+            res.writeHead(200);
+            res.end('Sent tools/list_changed notification');
+          } else {
+            res.writeHead(500);
+            res.end('MCP server not initialized');
+          }
+          return;
+
+        case 'notify-prompts-changed':
+          if (mcpServer) {
+            await mcpServer.sendPromptListChanged();
+            res.writeHead(200);
+            res.end('Sent prompts/list_changed notification');
+          } else {
+            res.writeHead(500);
+            res.end('MCP server not initialized');
+          }
+          return;
+
+        case 'notify-resources-changed':
+          if (mcpServer) {
+            await mcpServer.sendResourceListChanged();
+            res.writeHead(200);
+            res.end('Sent resources/list_changed notification');
+          } else {
+            res.writeHead(500);
+            res.end('MCP server not initialized');
+          }
           return;
 
         default:
