@@ -10,6 +10,7 @@
 - Store last time of all listChanged notifications on session object, so that users can see it and act on that.
 
 - Ensure "logging-set-level" works well
+- Ensure that after human output commands, there's either a new line or "````", for better visual separation in shell
 
 ## Later
 
