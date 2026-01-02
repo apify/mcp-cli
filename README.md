@@ -30,7 +30,7 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 - [Sessions](#sessions)
 - [Authentication](#authentication)
 - [MCP proxy](#mcp-proxy)
-- [Automation](#automation)
+- [AI agents](#ai-agents)
 - [MCP support](#mcp-support)
 - [Configuration](#configuration)
 - [Security](#security)
@@ -495,7 +495,7 @@ mcpc mcp.apify.com\?tools=docs tools-list
 For stronger isolation, `mcpc` can expose an MCP session under a new local proxy MCP server using the `--proxy` option.
 The proxy forwards all MCP requests to the upstream server but **never exposes the original authentication tokens** to the client.
 This is useful when you want to give someone or something MCP access without revealing your credentials.
-See also [AI sandbox access](#ai-sandbox-access).
+See also [AI sandboxes](#ai-sandboxes).
 
 ```bash
 # Human authenticates to a remote server
@@ -555,9 +555,42 @@ mcpc
 ```
 
 
-## Automation
+## AI agents
 
-`mcpc` is designed for automation: shell scripting, schema validation for stable behavior, and AI agent integration.
+`mcpc` is designed for CLI-enabled AI agents like Claude Code or Codex CLI, supporting both
+interactive **tool calling** and **[code mode](https://www.anthropic.com/engineering/code-execution-with-mcp)**.
+
+**Tool calling mode** - Agents call `mcpc` commands to dynamically explore and interact with MCP servers,
+using the default text output. This is similar to how MCP connectors in ChatGPT or Claude work,
+but CLI gives you more flexibility and longer operation timeouts.
+
+```bash
+# Discover available tools
+mcpc @server tools-list
+
+# Get tool schema
+mcpc @server tools-get search
+
+# Call a tool
+mcpc @server tools-call search query:="hello world"
+```
+
+**Code mode** - Once agents understand the server's capabilities, they can write shell scripts
+that compose multiple `mcpc` commands with `--json` output. This can be
+[more accurate](https://www.anthropic.com/engineering/code-execution-with-mcp)
+and use fewer tokens than tool calling for complex workflows.
+
+```bash
+# AI-generated script using --json for structured data
+mcpc --json @apify tools-call search-actors keywords:="scraper" \
+  | jq '.content[0].text | fromjson | .items[0].id' \
+  | xargs -I {} mcpc @apify tools-call get-actor actorId:="{}"
+```
+
+With [schema validation](#schema-validation), agents can ensure stability of integrations and faster failure recovery.
+Agents, make no harm!
+
+See an [example](./docs/examples/company-lookup.sh) of an AI-generated shell script.
 
 ### Scripting
 
@@ -580,7 +613,7 @@ For a complete example script, see [`docs/examples/company-lookup.sh`](./docs/ex
 
 ### Schema validation
 
-Validate tool/prompt schemas to detect breaking changes early:
+Validate tool/prompt schemas using the `--schema` option to detect breaking changes early:
 
 ```bash
 # Save expected schema
@@ -595,39 +628,10 @@ Schema modes (`--schema-mode`):
 - `strict` - Exact match required for all fields, types, and descriptions
 - `ignore` - Skip validation
 
-
-### AI agents
-
-`mcpc` is designed for use by AI agents, supporting both the interactive tool calling mode
-and ["code mode"](https://blog.cloudflare.com/code-mode/):
-
-- **Tool calling mode** - CLI-based AI agents such as Claude Code or Codex CLI can call `mcpc` commands to dynamically explore and interact with the 
-  MCP server, using the default Markdown-ish text output.
-  This is similar to how MCP connectors in ChatGPT or Claude work, but in CLI you have more flexibility and longer operation timeouts.
-- **Code mode** - AI coding agents can write and execute shell [scripts](#scripting) composing multiple `mcpc` commands,
-  thanks to the `--json` output mode and access to MCP server schemas.
-  In more complex interaction scenarios, this can be [more accurate](https://www.anthropic.com/engineering/code-execution-with-mcp)
-  and use fewer tokens than tool calling.
-
-AI agents can discover and call tools via shell commands:
-
-```bash
-mcpc @server tools-list
-mcpc --json @server tools-get search | jq '.inputSchema'
-mcpc @server tools-call search query:="hello world"
-```
-
-Once they understand the schema of the tools, they can generate shell scripts to execute sequences of actions,
-with `--schema` checks to ensure stability of integrations and faster failure recovery.
-Agents, make no harm!
-
-See an [example](./docs/examples/company-lookup.sh) of such an AI-generated shell script.
-
-#### AI sandbox access
+### AI sandboxes
 
 To ensure AI coding agents don't perform destructive actions or leak credentials,
-it's always a good idea to run them in a code sandbox
-with limited access to your resources.
+it's always a good idea to run them in a code sandbox with limited access to your resources.
 
 The [proxy MCP server](#mcp-proxy) feature provides a security boundary for AI agents:
 
@@ -645,7 +649,7 @@ Local stdio servers will still have access to your local system, and HTTP server
 and both can easily perform destructive actions or leak credentials on their own, or let MCP clients do such actions.
 **Always use only trusted local and remote MCP servers and limit their access to the necessary minimum.**
 
-#### Agent skills
+### Agent skills
 
 To help Claude Code use `mcpc`, you can install this [Claude skill](./docs/claude-skill/README.md):
 
@@ -994,7 +998,7 @@ MCP enables arbitrary tool execution and data access - treat servers like you tr
 
 ### AI security
 
-See [AI sandbox access](#ai-sandbox-access) for details.
+See [AI sandboxes](#ai-sandboxes) for details.
 
 ## Errors
 
