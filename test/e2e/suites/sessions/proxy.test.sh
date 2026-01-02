@@ -100,6 +100,37 @@ assert_eq "$health_response" "CURL_FAILED" "proxy should be unavailable after cl
 test_pass
 
 # ========================================
+# Port conflict detection tests
+# ========================================
+
+SESSION_CONFLICT1=$(session_name "proxy-conflict1")
+SESSION_CONFLICT2=$(session_name "proxy-conflict2")
+PROXY_PORT_CONFLICT=$((8300 + RANDOM % 100))
+
+# Test: create first session with proxy
+test_case "create first session with proxy for conflict test"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION_CONFLICT1" --proxy "$PROXY_PORT_CONFLICT"
+assert_success
+_SESSIONS_CREATED+=("$SESSION_CONFLICT1")
+test_pass
+
+sleep 1
+
+# Test: second session on same port should fail
+test_case "second session on same port fails"
+run_mcpc "$TEST_SERVER_URL" connect "$SESSION_CONFLICT2" --proxy "$PROXY_PORT_CONFLICT"
+assert_failure "should fail when port is already in use"
+assert_contains "$STDERR" "already in use" "error should mention port in use"
+test_pass
+
+# Test: cleanup conflict test session
+test_case "cleanup conflict test session"
+run_mcpc "$SESSION_CONFLICT1" close
+assert_success
+_SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION_CONFLICT1}")
+test_pass
+
+# ========================================
 # Bearer token authentication tests
 # ========================================
 

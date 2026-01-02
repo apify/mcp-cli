@@ -222,6 +222,8 @@ function createProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--proxy <[host:]port>', 'Start proxy MCP server (with "connect" command)')
+    .option('--proxy-bearer-token <token>', 'Require bearer token for proxy server')
     .option('--clean[=types]', 'Clean up mcpc data (types: sessions, logs, profiles, all)');
 
   // Add help text to match README
@@ -320,13 +322,12 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
   program
     .command('connect <name>')
     .description('Create or reconnect a named session to an MCP server')
-    .option('--proxy <[host:]port>', 'Start proxy MCP server on HOST:PORT (default host: 127.0.0.1)')
-    .option('--proxy-bearer-token <token>', 'Require bearer token authentication for proxy server')
-    .action(async (name, options, command) => {
+    .action(async (name, _options, command) => {
+      const opts = command.optsWithGlobals();
       await sessions.connectSession(name, target, {
         ...getOptionsFromCommand(command),
-        proxy: options.proxy,
-        proxyBearerToken: options.proxyBearerToken,
+        proxy: opts.proxy,
+        proxyBearerToken: opts.proxyBearerToken,
       });
     });
 

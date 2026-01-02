@@ -96,17 +96,19 @@ Usage: mcpc [options] <target> [command]
 Universal command-line client for the Model Context Protocol (MCP).
 
 Options:
-  -j, --json             Output in JSON format for scripting
-  -c, --config <file>    Path to MCP config JSON file (e.g. ".vscode/mcp.json")
-  -H, --header <header>  HTTP header for remote MCP server (can be repeated)
-  -v, --version          Output the version number
-  --verbose              Enable debug logging
-  --profile <name>       OAuth profile for the server (default: "default")
-  --schema <file>        Validate tool/prompt schema against expected schema
-  --schema-mode <mode>   Schema validation mode: strict, compatible (default), ignore
-  --timeout <seconds>    Request timeout in seconds (default: 300)
-  --clean[=types]        Clean up mcpc data (types: sessions, logs, profiles, all)
-  -h, --help             Display general help
+  -j, --json                    Output in JSON format for scripting
+  -c, --config <file>           Path to MCP config JSON file (e.g. ".vscode/mcp.json")
+  -H, --header <header>         HTTP header for remote MCP server (can be repeated)
+  -v, --version                 Output the version number
+  --verbose                     Enable debug logging
+  --profile <name>              OAuth profile for the server (default: "default")
+  --schema <file>               Validate tool/prompt schema against expected schema
+  --schema-mode <mode>          Schema validation mode: strict, compatible (default), ignore
+  --timeout <seconds>           Request timeout in seconds (default: 300)
+  --proxy <[host:]port>         Start proxy MCP server (with "connect" command)
+  --proxy-bearer-token <token>  Require bearer token for proxy server
+  --clean[=types]               Clean up mcpc data (types: sessions, logs, profiles, all)
+  -h, --help                    Display general help
 
 Targets:
   @<session>             Named persistent session (e.g. "@apify")

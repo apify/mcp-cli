@@ -294,17 +294,19 @@ class BridgeProcess {
       // 5. Connect to MCP server (now with auth credentials if provided)
       try {
         await this.connectToMcp();
-        // Signal that MCP client is ready (unblocks pending requests)
-        this.mcpClientReadyResolver();
 
-        // 5b. Start proxy server if configured
+        // 5b. Start proxy server if configured (BEFORE signaling ready)
         if (this.options.proxyConfig && this.client) {
           await this.startProxyServer();
         }
+
+        // Signal that MCP client is ready (unblocks pending requests)
+        // Only signal after both MCP connection AND proxy server are ready
+        this.mcpClientReadyResolver();
       } catch (error) {
-        // Signal that MCP connection failed (rejects pending requests with actual error)
+        // Signal that MCP connection or proxy startup failed (rejects pending requests with actual error)
         // Don't exit immediately - stay alive briefly so CLI can receive the error
-        logger.error('MCP connection failed, will stay alive briefly for CLI to receive error:', error);
+        logger.error('Bridge startup failed, will stay alive briefly for CLI to receive error:', error);
         this.mcpClientReadyRejecter(error as Error);
 
         // Set up signal handlers so we can be killed
@@ -313,7 +315,7 @@ class BridgeProcess {
         // Stay alive for 10 seconds to allow CLI to connect and get the error
         // Then shutdown gracefully
         setTimeout(() => {
-          logger.info('Shutting down after MCP connection failure');
+          logger.info('Shutting down after startup failure');
           this.shutdown().catch(() => process.exit(1));
         }, 10_000);
 

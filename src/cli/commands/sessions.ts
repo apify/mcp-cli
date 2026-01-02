@@ -2,6 +2,7 @@
  * Sessions command handlers
  */
 
+import { createServer } from 'net';
 import { OutputMode, isValidSessionName, validateProfileName, isProcessAlive, getServerHost, redactHeaders } from '../../lib/index.js';
 import type { ServerConfig, ProxyConfig } from '../../lib/types.js';
 import { formatOutput, formatSuccess, formatError, formatSessionLine, formatServerDetails } from '../output.js';
@@ -23,6 +24,32 @@ import { createLogger } from '../../lib/logger.js';
 import { parseProxyArg } from '../parser.js';
 
 const logger = createLogger('sessions');
+
+/**
+ * Check if a port is available for binding
+ */
+async function checkPortAvailable(host: string, port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = createServer();
+
+    server.once('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(false);
+      } else {
+        // Other errors (like permission denied) - treat as unavailable
+        resolve(false);
+      }
+    });
+
+    server.once('listening', () => {
+      server.close(() => {
+        resolve(true);
+      });
+    });
+
+    server.listen(port, host);
+  });
+}
 
 /**
  * Creates a new session, starts a bridge process, and instructs it to connect an MCP server.
@@ -61,6 +88,15 @@ export async function connectSession(
     if (options.proxy) {
       proxyConfig = parseProxyArg(options.proxy);
       logger.debug(`Proxy config: ${proxyConfig.host}:${proxyConfig.port}`);
+
+      // Validate port is available before starting bridge
+      const portAvailable = await checkPortAvailable(proxyConfig.host, proxyConfig.port);
+      if (!portAvailable) {
+        throw new ClientError(
+          `Port ${proxyConfig.port} is already in use on ${proxyConfig.host}. ` +
+          `Choose a different port with --proxy [host:]port`
+        );
+      }
     }
 
     // Validate proxy-bearer-token is only used with --proxy
