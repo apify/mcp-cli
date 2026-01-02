@@ -50,6 +50,7 @@ import {
   formatPrompts,
   formatPromptDetail,
   formatSessionLine,
+  formatHuman,
   logTarget,
 } from '../../../src/cli/output.js';
 import type { Tool, Resource, ResourceTemplate, Prompt, ServerDetails, ServerConfig, SessionData } from '../../../src/lib/types.js';
@@ -903,6 +904,177 @@ describe('formatPromptDetail', () => {
     // Optional should NOT have [required]
     expect(output).toContain('`optional_arg`: string');
     expect(output).not.toMatch(/`optional_arg`.*\[required\]/);
+  });
+});
+
+describe('formatHuman with GetPromptResult', () => {
+  it('should format single text message with backticks', () => {
+    const result = {
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'text', text: 'Hello, world!' },
+        },
+      ],
+    };
+
+    const output = formatHuman(result);
+
+    expect(output).toContain('Messages (1):');
+    expect(output).toContain('Role: user');
+    expect(output).toContain('````');
+    expect(output).toContain('Hello, world!');
+  });
+
+  it('should format multiple messages', () => {
+    const result = {
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'text', text: 'First message' },
+        },
+        {
+          role: 'assistant',
+          content: { type: 'text', text: 'Second message' },
+        },
+      ],
+    };
+
+    const output = formatHuman(result);
+
+    expect(output).toContain('Messages (2):');
+    expect(output).toContain('Role: user');
+    expect(output).toContain('First message');
+    expect(output).toContain('Role: assistant');
+    expect(output).toContain('Second message');
+  });
+
+  it('should format image content', () => {
+    const result = {
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'image', data: 'base64data...', mimeType: 'image/png' },
+        },
+      ],
+    };
+
+    const output = formatHuman(result);
+
+    expect(output).toContain('Messages (1):');
+    expect(output).toContain('[Image: image/png]');
+  });
+
+  it('should format audio content', () => {
+    const result = {
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'audio', data: 'audiodata', mimeType: 'audio/mp3' },
+        },
+      ],
+    };
+
+    const output = formatHuman(result);
+
+    expect(output).toContain('[Audio: audio/mp3]');
+  });
+
+  it('should format resource_link content', () => {
+    const result = {
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'resource_link', uri: 'file:///path/to/file.txt' },
+        },
+      ],
+    };
+
+    const output = formatHuman(result);
+
+    expect(output).toContain('[Resource link: file:///path/to/file.txt]');
+  });
+
+  it('should format embedded resource content', () => {
+    const result = {
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'resource',
+            resource: { uri: 'file:///data.json', text: 'embedded content' },
+          },
+        },
+      ],
+    };
+
+    const output = formatHuman(result);
+
+    expect(output).toContain('[Embedded resource: file:///data.json]');
+    expect(output).toContain('embedded content');
+  });
+
+  it('should include description before messages', () => {
+    const result = {
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'text', text: 'Message text' },
+        },
+      ],
+      description: 'This is a prompt description',
+    };
+
+    const output = formatHuman(result);
+
+    expect(output).toContain('Description:');
+    expect(output).toContain('This is a prompt description');
+    // Description should come before Messages
+    const descIndex = output.indexOf('Description:');
+    const messagesIndex = output.indexOf('Messages (1):');
+    expect(descIndex).toBeLessThan(messagesIndex);
+  });
+
+  it('should handle unknown content types gracefully', () => {
+    const result = {
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'unknown_type', data: 'some data' },
+        },
+      ],
+    };
+
+    const output = formatHuman(result);
+
+    // Should fall back to JSON representation
+    expect(output).toContain('Messages (1):');
+    expect(output).toContain('unknown_type');
+  });
+
+  it('should NOT treat empty messages array as prompt result', () => {
+    const result = {
+      messages: [],
+    };
+
+    const output = formatHuman(result);
+
+    // Should NOT show "Messages (0):" header since empty messages
+    // falls back to generic object formatting
+    expect(output).not.toContain('Messages (0):');
+  });
+
+  it('should NOT treat objects without role/content as prompt result', () => {
+    const result = {
+      messages: [
+        { id: 1, text: 'not a prompt message' },
+      ],
+    };
+
+    const output = formatHuman(result);
+
+    // Should NOT show "Messages (1):" header
+    expect(output).not.toContain('Messages (1):');
   });
 });
 

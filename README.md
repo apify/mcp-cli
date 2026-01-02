@@ -109,14 +109,11 @@ Options:
   -H, --header <header>  HTTP header for remote MCP server (can be repeated)
   -v, --version          Output the version number
   --verbose              Enable debug logging
-  --profile <name>       OAuth authentication profile to use (default:
-                         "default")
+  --profile <name>       OAuth authentication profile to use (default: "default")
   --schema <file>        Validate tool/prompt schema against expected schema
-  --schema-mode <mode>   Schema validation mode: strict, compatible (default),
-                         ignore
+  --schema-mode <mode>   Schema validation mode: strict, compatible (default), ignore
   --timeout <seconds>    Request timeout in seconds (default: 300)
-  --clean[=types]        Clean up mcpc data (types: sessions, logs, profiles,
-                         all)
+  --clean[=types]        Clean up mcpc data (types: sessions, logs, profiles, all)
   -h, --help             Display general help
 
 Targets:
@@ -803,7 +800,7 @@ mcpc @apify resources-templates-list
 
 When connected via a [session](#sessions), `mcpc` automatically handles `list_changed`
 notifications for tools, resources, and prompts.
-The bridge process updates the session record so the caller can detect and react on these notifications.
+The bridge process updates the session record so the caller can detect and act on these notifications.
 In [shell mode](#interactive-shell), notifications are displayed in real-time.
 
 #### Server logs

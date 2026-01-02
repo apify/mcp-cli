@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 import chalk from 'chalk';
+import type { GetPromptResult, PromptMessage, ContentBlock } from '@modelcontextprotocol/sdk/types.js';
 import type { OutputMode, ServerConfig } from '../lib/index.js';
 import type { Tool, Resource, ResourceTemplate, Prompt, SessionData, ServerDetails } from '../lib/types.js';
 import { extractSingleTextContent } from './tool-result.js';
@@ -117,10 +118,10 @@ export function formatHuman(data: unknown): string {
   }
 
   // Check if this is a tool call result with a single text content
-  // If so, just output the text directly (as Markdown)
+  // If so, wrap it in quadruple backticks to prevent markdown interference
   const singleText = extractSingleTextContent(data);
   if (singleText !== undefined) {
-    return singleText;
+    return `${chalk.gray('````')}\n${singleText}\n${chalk.gray('````')}`;
   }
 
   // Handle different data types
@@ -151,6 +152,10 @@ export function formatHuman(data: unknown): string {
   }
 
   if (typeof data === 'object') {
+    // Check if this is a GetPromptResult (has messages array with role/content)
+    if (isPromptResult(data)) {
+      return formatPromptResult(data);
+    }
     return formatObject(data as Record<string, unknown>);
   }
 
@@ -571,6 +576,106 @@ export function formatPromptDetail(prompt: Prompt): string {
     lines.push(chalk.gray('````'));
     lines.push(chalk.gray('(no description)'));
     lines.push(chalk.gray('````'));
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Check if data is a GetPromptResult (has messages array with role/content)
+ */
+function isPromptResult(data: unknown): data is GetPromptResult {
+  if (!data || typeof data !== 'object') return false;
+  const obj = data as Record<string, unknown>;
+  if (!('messages' in obj) || !Array.isArray(obj.messages)) return false;
+  if (obj.messages.length === 0) return false;
+  const first = obj.messages[0] as Record<string, unknown>;
+  return 'role' in first && 'content' in first;
+}
+
+/**
+ * Format GetPromptResult messages with nice display
+ */
+function formatPromptResult(result: GetPromptResult): string {
+  const lines: string[] = [];
+
+  // Description first if present
+  if (result.description) {
+    lines.push(chalk.bold('Description:'));
+    lines.push(chalk.gray('````'));
+    lines.push(result.description);
+    lines.push(chalk.gray('````'));
+    lines.push('');
+  }
+
+  // Messages header
+  lines.push(chalk.bold(`Messages (${result.messages.length}):`));
+
+  // Format each message
+  for (const message of result.messages) {
+    lines.push('');
+    lines.push(`${chalk.bold('Role:')} ${chalk.cyan(message.role)}`);
+    lines.push(formatPromptContent(message.content));
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a single content block from a prompt message
+ */
+function formatPromptContent(content: PromptMessage['content']): string {
+  const lines: string[] = [];
+
+  // ContentBlock is a union type, use type narrowing
+  const block = content as ContentBlock;
+
+  switch (block.type) {
+    case 'text':
+      lines.push(chalk.gray('````'));
+      lines.push(block.text || '');
+      lines.push(chalk.gray('````'));
+      break;
+
+    case 'image':
+      lines.push(chalk.gray('````'));
+      lines.push(`[Image: ${block.mimeType || 'unknown type'}]`);
+      if (block.data) {
+        lines.push(`${block.data.substring(0, 50)}...`);
+      }
+      lines.push(chalk.gray('````'));
+      break;
+
+    case 'audio':
+      lines.push(chalk.gray('````'));
+      lines.push(`[Audio: ${block.mimeType || 'unknown type'}]`);
+      lines.push(chalk.gray('````'));
+      break;
+
+    case 'resource_link':
+      lines.push(chalk.gray('````'));
+      lines.push(`[Resource link: ${block.uri || 'unknown'}]`);
+      lines.push(chalk.gray('````'));
+      break;
+
+    case 'resource':
+      lines.push(chalk.gray('````'));
+      if (block.resource) {
+        lines.push(`[Embedded resource: ${block.resource.uri}]`);
+        if ('text' in block.resource && block.resource.text) {
+          lines.push(block.resource.text);
+        }
+      } else {
+        lines.push('[Embedded resource]');
+      }
+      lines.push(chalk.gray('````'));
+      break;
+
+    default:
+      // Fallback for unknown content types
+      lines.push(chalk.gray('````'));
+      lines.push(JSON.stringify(content, null, 2));
+      lines.push(chalk.gray('````'));
   }
 
   return lines.join('\n');

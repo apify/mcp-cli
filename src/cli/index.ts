@@ -199,6 +199,13 @@ async function main(): Promise<void> {
 function createProgram(): Command {
   const program = new Command();
 
+  // Configure help output width to avoid wrapping (default is 80)
+  program.configureOutput({
+    outputError: (str, write) => write(str),
+    getOutHelpWidth: () => 100,
+    getErrHelpWidth: () => 100,
+  });
+
   program
     .name('mcpc')
     .description(

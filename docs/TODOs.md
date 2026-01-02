@@ -7,7 +7,8 @@
 - Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
   automatically update the -o file on changes, without it just keep track of changed files in
   bridge process' cache, and report in resources-list/resources-read operation
-
+- Store last time of all listChanged notifications on session object, so that users can see it and act on that.
+  Update the README - the "List notifications" section to reflect this.
 
 ## Later
 
