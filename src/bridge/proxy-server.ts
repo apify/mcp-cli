@@ -32,6 +32,7 @@ export interface ProxyServerOptions {
   client: McpClient;
   sessionName: string;
   bearerToken?: string;
+  instructions?: string; // Instructions from upstream server to pass to proxy clients
 }
 
 /**
@@ -52,7 +53,7 @@ export class ProxyServer {
    * Start the proxy server
    */
   async start(): Promise<void> {
-    const { host, port, client, sessionName, bearerToken } = this.options;
+    const { host, port, client, sessionName, bearerToken, instructions } = this.options;
 
     logger.info(`Starting proxy server on ${host}:${port} for session ${sessionName}`);
 
@@ -69,6 +70,8 @@ export class ProxyServer {
           prompts: {},
           logging: {},
         },
+        // Pass upstream server's instructions to proxy clients (if available)
+        ...(instructions && { instructions }),
       }
     );
 

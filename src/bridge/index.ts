@@ -499,6 +499,10 @@ class BridgeProcess {
       logger.debug('Proxy server will require bearer token authentication');
     }
 
+    // Get upstream server instructions to pass to proxy clients
+    const serverDetails = await this.client.getServerDetails();
+    const instructions = serverDetails.instructions;
+
     const proxyOptions: ConstructorParameters<typeof ProxyServer>[0] = {
       host,
       port,
@@ -507,6 +511,9 @@ class BridgeProcess {
     };
     if (bearerToken) {
       proxyOptions.bearerToken = bearerToken;
+    }
+    if (instructions) {
+      proxyOptions.instructions = instructions;
     }
 
     this.proxyServer = new ProxyServer(proxyOptions);

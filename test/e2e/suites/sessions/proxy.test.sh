@@ -56,6 +56,15 @@ assert_success "connect to proxy should succeed"
 _SESSIONS_CREATED+=("$SESSION_DOWNSTREAM")
 test_pass
 
+# Test: proxy passes through upstream server instructions
+test_case "proxy passes instructions"
+run_mcpc --json "$SESSION_DOWNSTREAM"
+assert_success
+instructions=$(json_get '.instructions // empty')
+assert_not_empty "$instructions" "proxy should return instructions"
+assert_contains "$instructions" "E2E test server" "instructions should be from upstream server"
+test_pass
+
 # Test: tools-list works through proxy
 test_case "tools-list works via proxy"
 run_mcpc "$SESSION_DOWNSTREAM" tools-list
