@@ -3,17 +3,10 @@
 `mcpc` is a CLI for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 that maps MCP operations to intuitive commands for interactive shell use, scripts, and AI coding agents.
 
-`mcpc` can connect to any MCP server over Streamable HTTP or stdio transports,
-securely authenticate via OAuth and store credentials,
-and maintain persistent sessions to multiple servers.
-It supports all major MCP features, including tools, resources, prompts, asynchronous tasks, and notifications.
-
-`mcpc` is useful for manual testing of MCP servers, scripting,
+`mcpc` is useful for inspecting MCP servers, scripting,
 and enabling AI coding agents to use MCP in ["code mode"](https://www.anthropic.com/engineering/code-execution-with-mcp)
-for better accuracy and lower token usage compared to traditional tool function calling.
+for better accuracy and lower token usage compared to tool function calling.
 After all, UNIX-compatible shell script is THE most universal coding language, for people and LLMs alike.
-
-Note that `mcpc` does not invoke LLMs itself; that's the job of the higher layer.
 
 ![mcpc screenshot](https://raw.githubusercontent.com/apify/mcpc/main/docs/images/mcpc-screenshot.png)
 
