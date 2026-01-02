@@ -3,18 +3,23 @@
 
 
 - `--capabilities '{"tools":...,"prompts":...}"` to limit access to selected MCP features and tools,
-  for both proxy and normal session, for simplicity.
+  for both proxy and normal session, for simplicity. The command could work on the fly, to give
+  agents less room to wiggle.
 - Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
   automatically update the -o file on changes, without it just keep track of changed files in
   bridge process' cache, and report in resources-list/resources-read operation
 - Store last time of all listChanged notifications on session object, so that users can see it and act on that.
 
 - Ensure "logging-set-level" works well
-- Ensure that after human output commands, there's either a new line or "````", for better visual separation in shell
 
 ## Later
 
-- nit: in "login", make profile color consistent with "mcpc"
+- nit: in "login", make profile color consistent with "mcpc", and remove the dark blue text which is too hard to see (actually, ensure we don't 
+  use that blue anywhere). For example:
+  mcpc mcp.apify.com login                                                                    ✔
+  ℹ Starting OAuth authentication for https://mcp.apify.com
+  ℹ Profile: default
+
 - nit: show also header / open auth statuses for HTTP servers?
 - ux: consider forking "alive" session state to "alive" and "diconnected", to indicate the remove server is not responding but bridge 
   runs fine. We can use lastSeenAt + ping interval info for that, or status of last ping.

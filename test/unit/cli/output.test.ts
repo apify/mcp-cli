@@ -452,7 +452,7 @@ describe('formatToolDetail', () => {
     expect(output).toContain('(none)');
   });
 
-  it('should show (no description) placeholder when description is missing', () => {
+  it('should omit Description section when description is missing', () => {
     const tool: Tool = {
       name: 'undocumented-tool',
       inputSchema: {
@@ -463,8 +463,8 @@ describe('formatToolDetail', () => {
 
     const output = formatToolDetail(tool);
 
-    expect(output).toContain('Description:');
-    expect(output).toContain('(no description)');
+    // Description section should be omitted when no description
+    expect(output).not.toContain('Description:');
   });
 
   it('should show default values for input arguments', () => {

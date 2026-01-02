@@ -168,7 +168,7 @@ async function main(): Promise<void> {
     if (json) setJsonMode(true);
     await sessions.listSessionsAndAuthProfiles({ outputMode: json ? 'json' : 'human' });
     if (!json) {
-      console.log('\nRun "mcpc --help" for usage information.');
+      console.log('\nRun "mcpc --help" for usage information.\n');
     }
 
     await closeFileLogger();

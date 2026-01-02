@@ -57,12 +57,18 @@ export function rainbow(text: string): string {
 
 /**
  * Format output based on the specified mode
+ * Human mode output always ends with a newline for visual separation
  */
 export function formatOutput(data: unknown, mode: OutputMode = 'human'): string {
   if (mode === 'json') {
     return formatJson(data);
   }
-  return formatHuman(data);
+  const output = formatHuman(data);
+  // Ensure trailing newline for visual separation in shell (unless ends with code block)
+  if (!output.endsWith('````') && !output.endsWith('\n')) {
+    return output + '\n';
+  }
+  return output;
 }
 
 /**
@@ -382,15 +388,11 @@ export function formatToolDetail(tool: Tool): string {
   }
 
   // Description in code block
-  lines.push('');
-  lines.push(chalk.bold('Description:'));
   if (tool.description) {
+    lines.push('');
+    lines.push(chalk.bold('Description:'));
     lines.push(chalk.gray('````'));
     lines.push(tool.description);
-    lines.push(chalk.gray('````'));
-  } else {
-    lines.push(chalk.gray('````'));
-    lines.push(chalk.gray('(no description)'));
     lines.push(chalk.gray('````'));
   }
 
