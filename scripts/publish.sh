@@ -135,6 +135,12 @@ echo "Building..."
 npm run build
 echo -e "${GREEN}✓ Build succeeded${NC}"
 
+# Update README (TOC, etc.)
+echo ""
+echo "Updating README..."
+npm run build:readme
+echo -e "${GREEN}✓ README updated${NC}"
+
 # Run tests
 echo ""
 echo "Running tests..."
@@ -173,7 +179,7 @@ echo -e "${GREEN}✓ Pushed commit and tag${NC}"
 # Publish to npm
 echo ""
 echo "Publishing to npm..."
-npm publish --access public
+MCPC_RELEASE=1 npm publish --access public
 
 echo ""
 echo -e "${GREEN}✅ Successfully published mcpc@$NEW_VERSION${NC}"

@@ -45,7 +45,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
-    "prepublishOnly": "npm run lint && npm run build:readme && npm run build && npm run test:unit && ./test/e2e/run.sh --no-build --parallel 1",
+    "prepublishOnly": "if [ -z \"$MCPC_RELEASE\" ]; then echo '\\n❌ Direct npm publish is not allowed.\\n   Please use: npm run release\\n' && exit 1; fi",
     "release": "bash scripts/publish.sh",
     "release:minor": "bash scripts/publish.sh minor",
     "release:major": "bash scripts/publish.sh major"

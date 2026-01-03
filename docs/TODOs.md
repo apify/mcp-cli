@@ -13,11 +13,6 @@
 
 ## Later
 
-- nit: in "login", make profile color consistent with "mcpc", and remove the dark blue text which is too hard to see (actually, ensure we don't 
-  use that blue anywhere). For example:
-  mcpc mcp.apify.com login                                                                    ✔
-  ℹ Starting OAuth authentication for https://mcp.apify.com
-  ℹ Profile: default
 
 - nit: show also header / open auth statuses for HTTP servers?
 - ux: consider forking "alive" session state to "alive" and "diconnected", to indicate the remove server is not responding but bridge 
