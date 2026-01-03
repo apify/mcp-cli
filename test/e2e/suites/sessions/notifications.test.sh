@@ -34,7 +34,7 @@ test_pass
 test_case "trigger tools/list_changed updates timestamp"
 server_notify_tools_changed
 # Give bridge time to receive and process notification
-sleep 0.5
+sleep 1
 run_mcpc --json
 assert_success
 session_json=$(echo "$STDOUT" | jq -r ".sessions[] | select(.name == \"$SESSION\")")
@@ -52,7 +52,7 @@ TOOLS_TIMESTAMP="$notif_tools"
 # Test: trigger prompts/list_changed notification
 test_case "trigger prompts/list_changed updates timestamp"
 server_notify_prompts_changed
-sleep 0.5
+sleep 1
 run_mcpc --json
 assert_success
 session_json=$(echo "$STDOUT" | jq -r ".sessions[] | select(.name == \"$SESSION\")")
@@ -70,7 +70,7 @@ test_pass
 # Test: trigger resources/list_changed notification
 test_case "trigger resources/list_changed updates timestamp"
 server_notify_resources_changed
-sleep 0.5
+sleep 1
 run_mcpc --json
 assert_success
 session_json=$(echo "$STDOUT" | jq -r ".sessions[] | select(.name == \"$SESSION\")")

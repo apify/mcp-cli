@@ -934,7 +934,7 @@ export function formatServerDetails(details: ServerDetails, target: string): str
 
   if (capabilities?.prompts) {
     commands.push(`${bullet} ${bt}mcpc ${target} prompts-list${bt}`);
-    commands.push(`${bullet} ${bt}mcpc ${target} prompts-get <name>${bt}`);
+    commands.push(`${bullet} ${bt}mcpc ${target} prompts-get <name> [<args-json> | arg1:=val1 arg2:=val2 ...]${bt}`);
   }
 
   if (capabilities?.logging) {
