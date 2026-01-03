@@ -924,7 +924,7 @@ export function formatServerDetails(details: ServerDetails, target: string): str
   if (capabilities?.tools) {
     commands.push(`${bullet} ${bt}mcpc ${target} tools-list${bt}`);
     commands.push(`${bullet} ${bt}mcpc ${target} tools-get <name>${bt}`);
-    commands.push(`${bullet} ${bt}mcpc ${target} tools-call <name> [<args-json> | arg1:=val1 arg2:=val2 ...]${bt}`);
+    commands.push(`${bullet} ${bt}mcpc ${target} tools-call <name> [arg1:=val1 ... | <args-json> | <stdin]${bt}`);
   }
 
   if (capabilities?.resources) {
@@ -934,7 +934,7 @@ export function formatServerDetails(details: ServerDetails, target: string): str
 
   if (capabilities?.prompts) {
     commands.push(`${bullet} ${bt}mcpc ${target} prompts-list${bt}`);
-    commands.push(`${bullet} ${bt}mcpc ${target} prompts-get <name> [<args-json> | arg1:=val1 arg2:=val2 ...]${bt}`);
+    commands.push(`${bullet} ${bt}mcpc ${target} prompts-get <name> [arg1:=val1 ... | <args-json> | <stdin]${bt}`);
   }
 
   if (capabilities?.logging) {
