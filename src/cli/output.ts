@@ -924,7 +924,7 @@ export function formatServerDetails(details: ServerDetails, target: string): str
   if (capabilities?.tools) {
     commands.push(`${bullet} ${bt}mcpc ${target} tools-list${bt}`);
     commands.push(`${bullet} ${bt}mcpc ${target} tools-get <name>${bt}`);
-    commands.push(`${bullet} ${bt}mcpc ${target} tools-call <name> [--args key=val ...] [--args-file <file>]${bt}`);
+    commands.push(`${bullet} ${bt}mcpc ${target} tools-call <name> [<args-json> | arg1:=val1 arg2:=val2 ...]${bt}`);
   }
 
   if (capabilities?.resources) {
