@@ -240,7 +240,7 @@ Targets:
   <config-entry>                Entry in MCP config file specified by --config (e.g. "fs")
   <server-url>                  Remote MCP server URL (e.g. "mcp.apify.com")
 
-Management commands (<target> missing):
+Management commands (<target> omitted):
   login                         Create OAuth profile with credentials for remote server
   logout                        Remove OAuth profile for remote server
   connect @<session>            Connect to server and create named persistent session

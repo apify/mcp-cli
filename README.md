@@ -115,7 +115,7 @@ Targets:
   <config-entry>                Entry in MCP config file specified by --config (e.g. "fs")
   <server-url>                  Remote MCP server URL (e.g. "mcp.apify.com")
 
-Management commands (<target> missing):
+Management commands (<target> omitted):
   login                         Create OAuth profile with credentials for remote server
   logout                        Remove OAuth profile for remote server
   connect @<session>            Connect to server and create named persistent session
@@ -143,7 +143,7 @@ MCP commands (<target> provided):
 
 ### Management commands
 
-When `<target>` is missing, `mcpc` provides general management commands.
+When `<target>` is omitted, `mcpc` provides general management commands:
 
 ```bash
 # List all sessions and OAuth profiles (also in JSON mode)
@@ -158,11 +158,11 @@ mcpc --version
 mcpc --clean
 ```
 
-For additional management commands, see [OAuth profiles](#oauth-profiles) and [Cleanup](#cleanup).
+For additional commands, see [OAuth profiles](#oauth-profiles) and [Cleanup](#cleanup).
 
 ### Targets
 
-To connect to an MCP server, you need to specify a `<target>`, which can be one of (in order of precedence):
+To connect and interact with an MCP server, you need to specify a `<target>`, which can be one of (in order of precedence):
 
 - **Entry in a config file** (e.g. `--config .vscode/mcp.json filesystem`) - see [Config file](#mcp-server-config-file)
 - **Remote MCP server URL** (e.g. `https://mcp.apify.com`)
@@ -178,7 +178,7 @@ connects, and enables you to interact with it.
 
 ### MCP commands
 
-Examples of sending MCP commands to various targets:
+When `<target>` is provided, `mcpc` sends MCP requests to the target server:
 
 ```bash
 # Server from config file (stdio)
