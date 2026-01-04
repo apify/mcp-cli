@@ -127,9 +127,9 @@ MCP commands (<target> provided):
   shell                         Open interactive shell
   tools-list                    Send "tools/list" MCP request...
   tools-get <tool-name>
-  tools-call <tool-name> [arg1:=val1 ... | <args-json> | <stdin]
+  tools-call <tool-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
   prompts-list
-  prompts-get <prompt-name> [arg1:=val1 ... | <args-json> | <stdin]
+  prompts-get <prompt-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
   resources
   resources-list
   resources-read <uri>
