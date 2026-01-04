@@ -227,6 +227,11 @@ function createProgram(): Command {
     .option('--clean[=types]', 'Clean up mcpc data (types: sessions, logs, profiles, all)');
 
   // Add help text to match README
+  // Use raw markdown URL for pipes (AI agents), GitHub UI for TTY (humans)
+  const docsUrl = process.stdout.isTTY
+    ? `https://github.com/apify/mcpc/tree/v${packageJson.version}`
+    : `https://raw.githubusercontent.com/apify/mcpc/v${packageJson.version}/README.md`;
+
   program.addHelpText(
     'after',
     `
@@ -247,9 +252,9 @@ MCP commands (<target> provided):
   shell                         Open interactive shell
   tools-list                    Send "tools/list" MCP request...
   tools-get <tool-name>
-  tools-call <tool-name> [arg1:=val1 ... | <args-json> | <stdin]
+  tools-call <tool-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
   prompts-list
-  prompts-get <prompt-name> [arg1:=val1 ... | <args-json> | <stdin]
+  prompts-get <prompt-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
   resources
   resources-list
   resources-read <uri>
@@ -259,7 +264,7 @@ MCP commands (<target> provided):
   logging-set-level <level>
   ping
 
-Full docs: https://github.com/apify/mcpc/tree/v${packageJson.version}`
+Full docs: ${docsUrl}`
   );
 
   return program;

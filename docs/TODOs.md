@@ -26,6 +26,7 @@
 - nit: Implement typing completions (e.g. "mcpc @ap...") - not sure if that's even possible
 - later: maybe add --no-color option to disable chalk
 - feature: enable generation of TypeScript stubs based on the server schema, with access to session and schema validation, for TS code mode.
+  For simplicity they an just "mcpc" command, later we can use IPC for more efficiency.
 
 ## E2E test scenarios
 
