@@ -13,6 +13,11 @@
 
 ## Later
 
+- Emit tools to dirs ("codegen" variant?) - see https://cursor.com/blog/dynamic-context-discovery - generate skills file too?
+
+- Support for Markdown generation with shebang?
+
+- Restart of expires OAuth session is too many steps - why not add "mcpc <session> login" to refresh?
 
 - nit: show also header / open auth statuses for HTTP servers?
 - ux: consider forking "alive" session state to "alive" and "diconnected", to indicate the remove server is not responding but bridge 
