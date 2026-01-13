@@ -1057,7 +1057,7 @@ The main `mcpc` process doesn't save log files, but supports [verbose mode](#ver
 
 ## Development
 
-The initial version of `mcpc` was developed by [Jan Curn](https://x.com/jancurn) of [Apify](https://apify.com)
+The initial version of `mcpc` was developed and [launched by Jan Curn](https://x.com/jancurn/status/2007144080959291756) of [Apify](https://apify.com)
 with the help of Claude Code, during late nights over Christmas 2025 in North Beach, San Francisco.
 
 See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overview, and contribution guidelines.

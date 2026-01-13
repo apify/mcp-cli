@@ -2,6 +2,24 @@
 # TODOs
 
 
+
+~/Projects  mcpc @apify tools-list                                                                                                                                                                              ✔
+[@apify → https://mcp.apify.com (HTTP, OAuth: default, MCP: 2025-11-25)]
+
+Error: Failed to list tools: Streamable HTTP error: Error POSTing to endpoint: {"jsonrpc":"2.0","error":{"code":-32000,"message":"Bad Request: Session ID 334c4cc0-ea1a-49f5-89a6-13bbe29b17d6 not found"},"id":null}. For details, check logs at /Users/jancurn/.mcpc/logs/bridge-@apify.log
+~/Projects  mcpc                                                                                                                                                                                              2 ✘
+MCP sessions:
+@fs → npx -y @modelcontextprotocol/server-filesystem /Users/jancurn/Projects/mcpc (stdio) ● live
+@apify → https://mcp.apify.com (HTTP, OAuth: default, MCP: 2025-11-25) ● live, 3 days ago
+
+Available OAuth profiles:
+mcp.apify.com / default, refreshed 1m ago
+
+Run "mcpc --help" for usage information.
+
+
+
+
 - `--capabilities '{"tools":...,"prompts":...}"` to limit access to selected MCP features and tools,
   for both proxy and normal session, for simplicity. The command could work on the fly, to give
   agents less room to wiggle.
@@ -10,6 +28,9 @@
   bridge process' cache, and report in resources-list/resources-read operation
 
 - Ensure "logging-set-level" works well
+
+- Add glob-based tool search across all servers like `mcpc grep *mail*`. Consider making `tools-list` more succinct for discovery.
+- Consider adding support for something like `mcp-cli @session/tool [args]` to make it easier to use
 
 ## Later
 
