@@ -362,3 +362,23 @@ export function redactHeaders(headers: Record<string, string>): Record<string, s
   return redacted;
 }
 
+/**
+ * Check if an error message indicates MCP session expiration.
+ * Used to detect when a server has invalidated a session so it can be marked as expired.
+ */
+export function isSessionExpiredError(errorMessage: string): boolean {
+  const msg = errorMessage.toLowerCase();
+  return (
+    // HTTP 404 typically means session endpoint not found
+    // NOTE: Be careful not to match normal MCP errors like "tool not found"
+    (msg.includes('404') && !msg.includes('tool')) ||
+    // Explicit session-related messages
+    msg.includes('session expired') ||
+    // Match "session not found" or "session id xyz not found" (with ID in between)
+    /session(\s+id)?\s+\S+\s+not\s+found/.test(msg) ||
+    msg.includes('session not found') ||
+    msg.includes('invalid session') ||
+    msg.includes('session is no longer valid')
+  );
+}
+

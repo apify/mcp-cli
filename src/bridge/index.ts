@@ -11,7 +11,7 @@ import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
 import type { McpClient } from '../core/index.js';
 import type { ServerConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
 import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
-import { fileExists, getBridgesDir, getSocketPath, ensureDir, cleanupOrphanedLogFiles } from '../lib/index.js';
+import { fileExists, getBridgesDir, getSocketPath, ensureDir, cleanupOrphanedLogFiles, isSessionExpiredError } from '../lib/index.js';
 import { ClientError, NetworkError } from '../lib/index.js';
 import { loadSessions, updateSession } from '../lib/sessions.js';
 import type { AuthCredentials } from '../lib/types.js';
@@ -576,21 +576,7 @@ class BridgeProcess {
    * Check if an error indicates session expiration and handle accordingly
    */
   private handlePossibleExpiration(error: Error): void {
-    // Check for session expiration indicators:
-    // - HTTP 404 (session not found on server)
-    // - Specific error messages indicating session is no longer valid
-    // NOTE: Be careful not to match normal MCP errors like "tool not found"
-    const errorMessage = error.message.toLowerCase();
-    const isExpired =
-      // HTTP 404 typically means session endpoint not found
-      (errorMessage.includes('404') && !errorMessage.includes('tool')) ||
-      // Explicit session-related messages
-      errorMessage.includes('session expired') ||
-      errorMessage.includes('session not found') ||
-      errorMessage.includes('invalid session') ||
-      errorMessage.includes('session is no longer valid');
-
-    if (isExpired) {
+    if (isSessionExpiredError(error.message)) {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
       this.markSessionExpiredAndExit().catch((e) => {
         logger.error('Failed to mark session as expired:', e);
