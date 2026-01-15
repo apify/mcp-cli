@@ -302,12 +302,13 @@ export async function consolidateSessions(cleanExpired: boolean): Promise<Consol
         logger.debug(`Clearing crashed bridge PID for session: ${name} (PID: ${session.pid})`);
         delete session.pid;
         hasChanges = true;
-        if (session.status !== 'crashed') {
+        // Don't overwrite 'expired' status - that's a server-side state, not bridge state
+        if (session.status !== 'crashed' && session.status !== 'expired') {
           session.status = 'crashed';
           result.crashedBridges++;
         }
-      } else if (!session.pid && session.status !== 'crashed') {
-        // No pid but not marked crashed yet
+      } else if (!session.pid && session.status !== 'crashed' && session.status !== 'expired') {
+        // No pid but not marked crashed yet (and not expired)
         session.status = 'crashed';
         result.crashedBridges++;
         hasChanges = true;

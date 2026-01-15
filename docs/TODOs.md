@@ -14,6 +14,7 @@
 
 - mcp-cli inspiration
   - Add glob-based tool search across all servers like `mcpc grep *mail*`. Consider making `tools-list` more succinct for discovery.
+    - Use https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool for inspiration/compatibility?
   - Consider adding support for something like `mcp-cli @session/tool [args]` to make it easier to use
 
 
