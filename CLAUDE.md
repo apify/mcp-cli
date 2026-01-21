@@ -632,6 +632,45 @@ or create sessions for interactive use and long-running workflows.
 - [Official TypeScript SDK for MCP servers and clients](https://www.npmjs.com/package/@modelcontextprotocol/sdk)
 - [MCP Inspector](https://github.com/modelcontextprotocol/inspector) - CLI client implementation for reference
 
+## Releasing
+
+The release process is automated via `npm run release` (runs `scripts/publish.sh`). Before releasing:
+
+1. **Update CHANGELOG.md** with all changes since the last release
+2. Run `npm run release` (or `npm run release minor` / `npm run release major`)
+
+The script will: run tests, bump version, create git tag, push, publish to npm, and create GitHub release.
+
+### Changelog maintenance
+
+The `CHANGELOG.md` file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. When making changes to the codebase, update the `[Unreleased]` section with your changes.
+
+**Categories to use:**
+- `Added` - New features
+- `Changed` - Changes in existing functionality
+- `Deprecated` - Soon-to-be removed features
+- `Removed` - Removed features
+- `Fixed` - Bug fixes
+- `Security` - Vulnerability fixes
+
+**Example entry:**
+```markdown
+## [Unreleased]
+
+### Added
+- New `--foo` option for the `bar` command
+
+### Fixed
+- Fixed crash when server returns empty response
+```
+
+**Before each release**, Claude should:
+1. Review all commits since the last release: `git log $(git describe --tags --abbrev=0)..HEAD --oneline`
+2. Ensure all significant changes are documented in `[Unreleased]`
+3. The release script will automatically move `[Unreleased]` entries to the new version section
+
+**Important:** Always keep user-facing changes documented. Internal refactoring or test changes don't need changelog entries unless they affect behavior.
+
 # Misc
 
 When writing titles of sections in README and code, do not capitalize first letters (e.g. "Session management" instead of "Session Management")

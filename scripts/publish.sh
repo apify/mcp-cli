@@ -60,7 +60,19 @@ if ! npm whoami > /dev/null 2>&1; then
   exit 1
 fi
 NPM_USER=$(npm whoami)
-echo -e "${GREEN}✓ Logged in as: $NPM_USER${NC}"
+echo -e "${GREEN}✓ Logged in to npm as: $NPM_USER${NC}"
+
+# Check if gh CLI is installed and authenticated
+echo "Checking GitHub CLI..."
+if ! command -v gh &> /dev/null; then
+  echo -e "${RED}❌ GitHub CLI (gh) not installed. Please install: brew install gh${NC}"
+  exit 1
+fi
+if ! gh auth status &> /dev/null; then
+  echo -e "${RED}❌ Not logged in to GitHub CLI. Please run: gh auth login${NC}"
+  exit 1
+fi
+echo -e "${GREEN}✓ GitHub CLI authenticated${NC}"
 
 # Check current branch
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -160,10 +172,36 @@ npm version "$VERSION_TYPE" --no-git-tag-version
 NEW_VERSION=$(node -p "require('./package.json').version")
 echo -e "${GREEN}New version: $NEW_VERSION${NC}"
 
+# Update CHANGELOG.md - replace [Unreleased] with new version
+echo ""
+echo "Updating CHANGELOG.md..."
+TODAY=$(date +%Y-%m-%d)
+if [ -f "CHANGELOG.md" ]; then
+  # Check if there are unreleased changes
+  if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
+    # Replace [Unreleased] with new version and add new [Unreleased] section
+    sed -i.bak "s/^## \[Unreleased\]/## [Unreleased]\n\n## [$NEW_VERSION] - $TODAY/" CHANGELOG.md
+    rm -f CHANGELOG.md.bak
+
+    # Update the comparison links at the bottom
+    # Add new unreleased link and update the old one
+    if grep -q "^\[Unreleased\]:" CHANGELOG.md; then
+      sed -i.bak "s|\[Unreleased\]: \(.*\)/compare/v[0-9.]*\.\.\.HEAD|[Unreleased]: \1/compare/v$NEW_VERSION...HEAD\n[$NEW_VERSION]: \1/compare/v$CURRENT_VERSION...v$NEW_VERSION|" CHANGELOG.md
+      rm -f CHANGELOG.md.bak
+    fi
+
+    echo -e "${GREEN}✓ CHANGELOG.md updated${NC}"
+  else
+    echo -e "${YELLOW}⚠️  No [Unreleased] section found in CHANGELOG.md${NC}"
+  fi
+else
+  echo -e "${YELLOW}⚠️  CHANGELOG.md not found${NC}"
+fi
+
 # Create git commit and tag
 echo ""
 echo "Creating git commit and tag..."
-git add package.json package-lock.json
+git add package.json package-lock.json CHANGELOG.md
 git commit -m "v$NEW_VERSION"
 git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
 
@@ -180,12 +218,18 @@ echo -e "${GREEN}✓ Pushed commit and tag${NC}"
 echo ""
 echo "Publishing to npm..."
 MCPC_RELEASE=1 npm publish --access public
+echo -e "${GREEN}✓ Published to npm${NC}"
+
+# Create GitHub release with auto-generated notes
+echo ""
+echo "Creating GitHub release..."
+gh release create "v$NEW_VERSION" \
+  --title "v$NEW_VERSION" \
+  --generate-notes
+echo -e "${GREEN}✓ Created GitHub release${NC}"
 
 echo ""
 echo -e "${GREEN}✅ Successfully published mcpc@$NEW_VERSION${NC}"
 echo ""
 echo "🔗 npm: https://www.npmjs.com/package/@apify/mcpc"
-echo "🔗 tag: https://github.com/apify/mcpc/releases/tag/v$NEW_VERSION"
-echo ""
-echo "Next steps:"
-echo "  - Create a GitHub release at: https://github.com/apify/mcpc/releases/new?tag=v$NEW_VERSION"
+echo "🔗 release: https://github.com/apify/mcpc/releases/tag/v$NEW_VERSION"
