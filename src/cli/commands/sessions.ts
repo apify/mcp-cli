@@ -551,10 +551,15 @@ export async function restartSession(
       bridgeOptions.proxyConfig = session.proxy;
     }
 
+    // NOTE: Do NOT pass mcpSessionId on explicit restart.
+    // Explicit restart should create a fresh session, not try to resume the old one.
+    // Session resumption is only attempted on automatic bridge restart (when bridge crashes
+    // and CLI detects it). If server rejects the session ID, session is marked as expired.
+
     const { pid } = await startBridge(bridgeOptions);
 
-    // Update session with new bridge PID
-    await updateSession(name, { pid });
+    // Update session with new bridge PID and clear any expired/crashed status
+    await updateSession(name, { pid, status: 'active' });
     logger.debug(`Session ${name} restarted with bridge PID: ${pid}`);
 
     // Success message

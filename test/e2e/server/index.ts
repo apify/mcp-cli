@@ -509,15 +509,15 @@ async function main() {
     // MCP endpoint
     if (url.pathname === '/' || url.pathname === '/mcp') {
       // Handle MCP requests via StreamableHTTPServerTransport
-      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      const mcpSessionId = req.headers['mcp-session-id'] as string | undefined;
 
       // Handle DELETE first (session termination) - must check before regular session lookup
       if (req.method === 'DELETE') {
-        if (sessionId && transports.has(sessionId)) {
-          const oldTransport = transports.get(sessionId)!;
+        if (mcpSessionId && transports.has(mcpSessionId)) {
+          const oldTransport = transports.get(mcpSessionId)!;
           await oldTransport.close();
-          transports.delete(sessionId);
-          deletedSessions.push(sessionId);
+          transports.delete(mcpSessionId);
+          deletedSessions.push(mcpSessionId);
         }
         res.writeHead(200);
         res.end();
@@ -526,9 +526,9 @@ async function main() {
 
       let transport: StreamableHTTPServerTransport;
 
-      if (sessionId && transports.has(sessionId)) {
-        transport = transports.get(sessionId)!;
-      } else if (req.method === 'POST' && !sessionId) {
+      if (mcpSessionId && transports.has(mcpSessionId)) {
+        transport = transports.get(mcpSessionId)!;
+      } else if (req.method === 'POST' && !mcpSessionId) {
         // New session - create transport
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => `e2e-session-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -540,6 +540,11 @@ async function main() {
         // Connect to MCP server
         // Type assertion needed due to exactOptionalPropertyTypes incompatibility with MCP SDK
         await mcpServer.connect(transport as Parameters<typeof mcpServer.connect>[0]);
+      } else if (mcpSessionId && !transports.has(mcpSessionId)) {
+        // Session ID provided but not found - per MCP spec, return 404
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: `Session ID ${mcpSessionId} not found` }));
+        return;
       } else {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid request' }));

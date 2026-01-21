@@ -45,6 +45,7 @@ export interface StartBridgeOptions {
   profileName?: string; // Auth profile name for token refresh
   headers?: Record<string, string>; // Headers to send via IPC (caller stores in keychain)
   proxyConfig?: ProxyConfig; // Proxy server configuration
+  mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
 }
 
 export interface StartBridgeResult {
@@ -67,7 +68,7 @@ export interface StartBridgeResult {
  * @returns Bridge process PID
  */
 export async function startBridge(options: StartBridgeOptions): Promise<StartBridgeResult> {
-  const { sessionName, serverConfig, verbose, profileName, headers, proxyConfig } = options;
+  const { sessionName, serverConfig, verbose, profileName, headers, proxyConfig, mcpSessionId } = options;
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
 
@@ -109,6 +110,12 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
   if (proxyConfig) {
     args.push('--proxy-host', proxyConfig.host);
     args.push('--proxy-port', String(proxyConfig.port));
+  }
+
+  // Pass MCP session ID for resumption (if available)
+  if (mcpSessionId) {
+    args.push('--mcp-session-id', mcpSessionId);
+    logger.debug(`Passing MCP session ID for resumption: ${mcpSessionId}`);
   }
 
   logger.debug('Bridge executable:', bridgeExecutable);
@@ -244,7 +251,7 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
     logger.debug(`Retrieved ${expectedHeaderKeys.length} headers from keychain for failover`);
   }
 
-  // Start a new bridge, preserving auth profile and proxy config
+  // Start a new bridge, preserving auth profile, proxy config, and MCP session ID
   const bridgeOptions: StartBridgeOptions = {
     sessionName,
     serverConfig: serverConfig,
@@ -257,6 +264,10 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   }
   if (session.proxy) {
     bridgeOptions.proxyConfig = session.proxy;
+  }
+  if (session.mcpSessionId) {
+    bridgeOptions.mcpSessionId = session.mcpSessionId;
+    logger.debug(`Using saved MCP session ID for resumption: ${session.mcpSessionId}`);
   }
 
   const { pid } = await startBridge(bridgeOptions);
@@ -397,7 +408,7 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     throw new ClientError(
       `Session ${sessionName} has expired. ` +
       `The MCP server indicated the session is no longer valid.\n` +
-      `To reconnect, run: mcpc ${sessionName} connect\n` +
+      `To reconnect, run: mcpc ${sessionName} restart\n` +
       `To remove the expired session, run: mcpc ${sessionName} close`
     );
   }

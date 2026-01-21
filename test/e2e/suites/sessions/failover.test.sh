@@ -50,22 +50,48 @@ session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .status
 assert_eq "$session_status" "crashed" "session should show as crashed"
 test_pass
 
-# Test: using session triggers automatic restart
-test_case "using crashed session triggers restart"
+# Test: using crashed session attempts restart but server rejects old session ID
+# This is correct behavior - session should be marked as expired, not auto-reconnected
+test_case "using crashed session fails when server rejects session ID"
 run_xmcpc "$SESSION" tools-list
-assert_success "session should auto-restart and work"
-assert_contains "$STDOUT" "echo"
+# This should FAIL because server rejects the old session ID
+# and session is marked as expired (not auto-reconnected)
+if [[ "$EXIT_CODE" -eq 0 ]]; then
+  test_fail "expected command to fail when server rejects session ID"
+  exit 1
+fi
 test_pass
 
-# Test: session is live again
-test_case "session is live after auto-restart"
+# Test: session is marked as expired (not live)
+test_case "session marked as expired after rejection"
 run_mcpc --json
 session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .status")
-assert_eq "$session_status" "live" "session should be live again"
+assert_eq "$session_status" "expired" "session should be marked as expired"
+test_pass
+
+# Test: explicit restart recovers from expired session
+test_case "explicit restart recovers from expired session"
+run_mcpc "$SESSION" restart
+assert_success
+test_pass
+
+# Test: session is live again after explicit restart
+test_case "session is live after explicit restart"
+run_mcpc --json
+session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .status")
+assert_eq "$session_status" "live" "session should be live after restart"
+test_pass
+
+# Test: commands work after explicit restart
+test_case "commands work after explicit restart"
+run_xmcpc "$SESSION" tools-list
+assert_success "commands should work after explicit restart"
+assert_contains "$STDOUT" "echo"
 test_pass
 
 # Test: new PID is different
 test_case "bridge has new PID after restart"
+run_mcpc --json
 new_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
 if [[ "$new_pid" == "$bridge_pid" ]]; then
   test_fail "PID should be different after restart"

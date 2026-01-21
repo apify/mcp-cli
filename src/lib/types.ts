@@ -121,6 +121,7 @@ export interface SessionData {
   profileName?: string; // Name of auth profile (for OAuth servers)
   pid?: number; // Bridge process PID
   protocolVersion?: string; // Negotiated MCP version
+  mcpSessionId?: string; // Server-assigned MCP session ID for resumption (Streamable HTTP only)
   serverInfo?: {
     name: string;
     version: string;

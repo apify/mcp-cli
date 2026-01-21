@@ -28,6 +28,13 @@ interface TransportWithProtocolVersion extends Transport {
 }
 
 /**
+ * Transport with MCP-Session-Id for resumption (e.g., StreamableHTTPClientTransport)
+ */
+interface TransportWithMcpSessionId extends Transport {
+  mcpSessionId?: string;
+}
+
+/**
  * Options for creating an MCP client
  */
 export interface McpClientOptions extends ClientOptions {
@@ -59,6 +66,7 @@ export class McpClient implements IMcpClient {
   private client: SDKClient;
   private logger: Logger;
   private negotiatedProtocolVersion?: string;
+  private mcpSessionId?: string;
   private transport?: TransportWithTermination;
   private hasConnected = false;
   private requestTimeout?: number;
@@ -130,6 +138,14 @@ export class McpClient implements IMcpClient {
         this.logger.debug(`Negotiated protocol version: ${this.negotiatedProtocolVersion}`);
       }
 
+      // Capture MCP session ID from transport if available (for session resumption)
+      // StreamableHTTPClientTransport exposes sessionId after initialization
+      const transportWithMcpSessionId = transport as TransportWithMcpSessionId;
+      if (transportWithMcpSessionId.mcpSessionId) {
+        this.mcpSessionId = transportWithMcpSessionId.mcpSessionId;
+        this.logger.debug(`MCP session ID: ${this.mcpSessionId}`);
+      }
+
       const serverVersion = this.client.getServerVersion();
       const serverCapabilities = this.client.getServerCapabilities();
 
@@ -197,6 +213,14 @@ export class McpClient implements IMcpClient {
     if (instructions) details.instructions = instructions;
 
     return Promise.resolve(details);
+  }
+
+  /**
+   * Get the MCP session ID assigned by the server (if any)
+   * This can be used for session resumption after bridge restart
+   */
+  getMcpSessionId(): string | undefined {
+    return this.mcpSessionId;
   }
 
   /**

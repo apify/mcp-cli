@@ -113,6 +113,12 @@ export interface CreateTransportOptions {
    * OAuth provider for automatic token refresh (HTTP transport only)
    */
   authProvider?: OAuthClientProvider;
+
+  /**
+   * MCP session ID for resuming a previous session (HTTP transport only)
+   * If provided, the transport will include this in the MCP-Session-Id header
+   */
+  mcpSessionId?: string;
 }
 
 /**
@@ -151,6 +157,12 @@ export function createTransportFromConfig(
       logger.debug(`  authProvider has tokens method: ${typeof options.authProvider.tokens === 'function'}`);
     } else {
       logger.debug('No authProvider provided for HTTP transport');
+    }
+
+    // Set session ID for resuming a previous MCP session
+    if (options.mcpSessionId) {
+      transportOptions.sessionId = options.mcpSessionId;
+      logger.debug(`Setting mcpSessionId for session resumption: ${options.mcpSessionId}`);
     }
 
     if (config.headers !== undefined) {

@@ -36,6 +36,7 @@ interface BridgeOptions {
   verbose?: boolean;
   profileName?: string; // Auth profile name for token refresh
   proxyConfig?: ProxyConfig; // Proxy server configuration
+  mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
 }
 
 /**
@@ -309,6 +310,17 @@ class BridgeProcess {
         logger.error('Bridge startup failed, will stay alive briefly for CLI to receive error:', error);
         this.mcpClientReadyRejecter(error as Error);
 
+        // If the error was due to session ID rejection, mark session as expired
+        // User must explicitly use 'mcpc @session restart' to start a new session
+        if (isSessionExpiredError((error as Error).message)) {
+          logger.warn('Session ID was rejected by server, marking session as expired');
+          try {
+            await updateSession(this.options.sessionName, { status: 'expired' });
+          } catch (updateError) {
+            logger.error('Failed to mark session as expired:', updateError);
+          }
+        }
+
         // Set up signal handlers so we can be killed
         this.setupSignalHandlers();
 
@@ -414,6 +426,8 @@ class BridgeProcess {
       },
       // Pass auth provider for automatic token refresh (HTTP transport only)
       ...(this.authProvider && { authProvider: this.authProvider }),
+      // Pass session ID for resumption (HTTP transport only)
+      ...(this.options.mcpSessionId && { mcpSessionId: this.options.mcpSessionId }),
       listChanged: {
         tools: {
           // Let SDK auto-fetch the tools on list changed notification.
@@ -459,13 +473,20 @@ class BridgeProcess {
     };
 
     logger.debug('Calling createMcpClient with authProvider:', !!clientConfig.authProvider);
+    if (clientConfig.mcpSessionId) {
+      logger.info(`Attempting session resumption with MCP-Session-Id: ${clientConfig.mcpSessionId}`);
+    }
+
+    // Connect to MCP server - if session ID is rejected, this will throw
+    // and the bridge will mark the session as expired (user must explicitly restart)
     this.client = await createMcpClient(clientConfig);
 
     logger.info('Connected to MCP server');
     logger.debug('MCP client created successfully, authProvider was:', !!clientConfig.authProvider);
 
-    // Update session with protocol version and lastSeenAt
+    // Update session with protocol version, MCP session ID, and lastSeenAt
     const serverDetails = await this.client.getServerDetails();
+    const newMcpSessionId = this.client.getMcpSessionId();
     const sessionUpdate: Parameters<typeof updateSession>[1] = {
       lastSeenAt: new Date().toISOString(),
     };
@@ -474,6 +495,10 @@ class BridgeProcess {
     }
     if (serverDetails.serverInfo) {
       sessionUpdate.serverInfo = serverDetails.serverInfo;
+    }
+    if (newMcpSessionId) {
+      sessionUpdate.mcpSessionId = newMcpSessionId;
+      logger.info(`MCP-Session-Id saved for resumption: ${newMcpSessionId}`);
     }
     await updateSession(this.options.sessionName, sessionUpdate);
 
@@ -983,7 +1008,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   if (args.length < 2) {
-    console.error('Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>]');
+    console.error('Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>]');
     process.exit(1);
   }
 
@@ -1010,6 +1035,13 @@ async function main(): Promise<void> {
     }
   }
 
+  // Parse --mcp-session-id argument (for session resumption)
+  let mcpSessionId: string | undefined;
+  const mcpSessionIdIndex = args.indexOf('--mcp-session-id');
+  if (mcpSessionIdIndex !== -1 && args[mcpSessionIdIndex + 1]) {
+    mcpSessionId = args[mcpSessionIdIndex + 1];
+  }
+
   try {
     const bridgeOptions: BridgeOptions = {
       sessionName,
@@ -1021,6 +1053,9 @@ async function main(): Promise<void> {
     }
     if (proxyConfig) {
       bridgeOptions.proxyConfig = proxyConfig;
+    }
+    if (mcpSessionId) {
+      bridgeOptions.mcpSessionId = mcpSessionId;
     }
 
     const bridge = new BridgeProcess(bridgeOptions);

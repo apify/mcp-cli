@@ -42,8 +42,20 @@ mcp_session_ids=$(curl -s "$TEST_SERVER_URL/control/get-active-sessions" | jq -r
 assert_not_empty "$mcp_session_ids" "should have at least one MCP session"
 test_pass
 
-# Test: bridge restart creates new MCP session
-test_case "bridge restart creates new MCP session"
+# Test: MCP session ID is stored in sessions.json
+test_case "MCP session ID persists in sessions.json"
+run_mcpc --json
+stored_mcp_session_id=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .mcpSessionId")
+assert_not_empty "$stored_mcp_session_id" "mcpSessionId should be stored in sessions.json"
+# Verify it matches one of the active sessions on server
+if ! echo "$mcp_session_ids" | grep -q "$stored_mcp_session_id"; then
+  test_fail "stored mcpSessionId ($stored_mcp_session_id) not found in server's active sessions"
+  exit 1
+fi
+test_pass
+
+# Test: bridge restart with rejected session ID marks session as expired
+test_case "rejected session ID marks session as expired"
 
 # Get bridge PID (use run_mcpc, not run_xmcpc, because session list output
 # can change between runs when other tests run in parallel with shared home)
@@ -51,26 +63,57 @@ run_mcpc --json
 bridge_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
 assert_not_empty "$bridge_pid" "should have bridge PID"
 
-# Remember current MCP session IDs
-old_mcp_sessions=$(curl -s "$TEST_SERVER_URL/control/get-active-sessions" | jq -r '.activeSessions[]')
-
 # Kill the bridge
 kill "$bridge_pid" 2>/dev/null || true
 sleep 1
 
-# Use session again - should restart bridge and create new MCP session
+# Use session again - server should reject the old session ID
+# and bridge should mark session as expired (NOT auto-reconnect)
 run_xmcpc "$SESSION" tools-list
-assert_success
-
-# Get new MCP session IDs
-new_mcp_sessions=$(curl -s "$TEST_SERVER_URL/control/get-active-sessions" | jq -r '.activeSessions[]')
-
-# The session IDs should be different (new session created)
-# Note: Old session might still exist briefly due to server cleanup timing
-if [[ -z "$new_mcp_sessions" ]]; then
-  test_fail "no MCP sessions after bridge restart"
+# This should FAIL because session is marked as expired
+if [[ "$EXIT_CODE" -eq 0 ]]; then
+  test_fail "expected command to fail when session ID is rejected"
   exit 1
 fi
+
+# Verify session is marked as expired
+run_mcpc --json
+session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .status")
+if [[ "$session_status" != "expired" ]]; then
+  test_fail "expected session status to be 'expired' but got '$session_status'"
+  exit 1
+fi
+test_pass
+
+# Test: explicit restart creates new session
+test_case "explicit restart recovers from expired session"
+run_mcpc "$SESSION" restart
+assert_success
+
+# Verify session is now live
+run_mcpc --json
+session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .status")
+if [[ "$session_status" != "live" ]]; then
+  test_fail "expected session status to be 'live' after restart but got '$session_status'"
+  exit 1
+fi
+
+# Commands should work again
+run_xmcpc "$SESSION" tools-list
+assert_success
+test_pass
+
+# Test: new session ID is stored after explicit restart
+test_case "new MCP session ID stored after explicit restart"
+run_mcpc --json
+new_stored_mcp_session_id=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .mcpSessionId")
+assert_not_empty "$new_stored_mcp_session_id" "new mcpSessionId should be stored after restart"
+# The new session ID should be different from the old one
+if [[ "$new_stored_mcp_session_id" == "$stored_mcp_session_id" ]]; then
+  test_fail "expected different session ID after restart but got same: $new_stored_mcp_session_id"
+  exit 1
+fi
+echo "MCP session ID changed from $stored_mcp_session_id to $new_stored_mcp_session_id"
 test_pass
 
 # Test: graceful close removes MCP session

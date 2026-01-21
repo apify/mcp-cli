@@ -47,6 +47,11 @@ export interface CreateMcpClientOptions {
   authProvider?: OAuthClientProvider;
 
   /**
+   * MCP-Session-Id for resuming a previous session (HTTP transport only)
+   */
+  mcpSessionId?: string;
+
+  /**
    * Whether to automatically connect after creation
    * @default true
    */
@@ -114,10 +119,15 @@ export async function createMcpClient(options: CreateMcpClientOptions): Promise<
   // Create and connect transport if autoConnect is true
   if (autoConnect) {
     factoryLogger.debug('Creating transport with authProvider:', !!options.authProvider);
-    const transport = createTransportFromConfig(
-      options.serverConfig,
-      options.authProvider ? { authProvider: options.authProvider } : {}
-    );
+    factoryLogger.debug('Creating transport with mcpSessionId:', options.mcpSessionId || '(none)');
+    const transportOptions: { authProvider?: OAuthClientProvider; mcpSessionId?: string } = {};
+    if (options.authProvider) {
+      transportOptions.authProvider = options.authProvider;
+    }
+    if (options.mcpSessionId) {
+      transportOptions.mcpSessionId = options.mcpSessionId;
+    }
+    const transport = createTransportFromConfig(options.serverConfig, transportOptions);
     await client.connect(transport);
   }
 
