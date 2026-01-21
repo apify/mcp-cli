@@ -29,9 +29,10 @@ interface TransportWithProtocolVersion extends Transport {
 
 /**
  * Transport with MCP-Session-Id for resumption (e.g., StreamableHTTPClientTransport)
+ * Note: The SDK uses 'sessionId' property name
  */
 interface TransportWithMcpSessionId extends Transport {
-  mcpSessionId?: string;
+  sessionId?: string;
 }
 
 /**
@@ -141,8 +142,8 @@ export class McpClient implements IMcpClient {
       // Capture MCP session ID from transport if available (for session resumption)
       // StreamableHTTPClientTransport exposes sessionId after initialization
       const transportWithMcpSessionId = transport as TransportWithMcpSessionId;
-      if (transportWithMcpSessionId.mcpSessionId) {
-        this.mcpSessionId = transportWithMcpSessionId.mcpSessionId;
+      if (transportWithMcpSessionId.sessionId) {
+        this.mcpSessionId = transportWithMcpSessionId.sessionId;
         this.logger.debug(`MCP session ID: ${this.mcpSessionId}`);
       }
 
