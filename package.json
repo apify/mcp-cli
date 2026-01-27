@@ -14,12 +14,12 @@
   "author": "Jan Curn (@jancurn)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/apify/mcpc.git"
+    "url": "git+https://github.com/apify/mcp-cli.git"
   },
   "bugs": {
-    "url": "https://github.com/apify/mcpc/issues"
+    "url": "https://github.com/apify/mcp-cli/issues"
   },
-  "homepage": "https://github.com/apify/mcpc",
+  "homepage": "https://github.com/apify/mcp-cli",
   "bin": {
     "mcpc": "./bin/mcpc",
     "mcpc-bridge": "./bin/mcpc-bridge"
