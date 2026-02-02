@@ -883,7 +883,8 @@ describe('formatResourceDetail', () => {
     expect(output).toContain('`test://minimal`');
     expect(output).not.toContain('Name:');
     expect(output).not.toContain('MIME type:');
-    expect(output).toContain('(no description)');
+    // No description section when description is missing
+    expect(output).not.toContain('Description:');
   });
 });
 
@@ -1038,8 +1039,8 @@ describe('formatPromptDetail', () => {
 
     expect(output).toContain('Prompt:');
     expect(output).toContain('`undocumented`');
-    expect(output).toContain('Description:');
-    expect(output).toContain('(no description)');
+    // No description section when description is missing
+    expect(output).not.toContain('Description:');
   });
 
   it('should format prompt argument with required indicator in correct style', () => {

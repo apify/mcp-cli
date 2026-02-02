@@ -40,6 +40,7 @@
 - later: maybe add --no-color option to disable chalk
 - feature: enable generation of TypeScript stubs based on the server schema, with access to session and schema validation, for TS code mode.
   For simplicity they an just "mcpc" command, later we can use IPC for more efficiency.
+- Show protocolVersion also for stdio - but for that we need to update the SDK to save it! See setProtocolVersion
 
 ## E2E test scenarios
 

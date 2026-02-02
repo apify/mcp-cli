@@ -435,11 +435,12 @@ export function formatToolDetail(tool: Tool): string {
   }
 
   // Description in code block
-  if (tool.description) {
+  const description = (tool.description || '').trim();
+  if (description) {
     lines.push('');
     lines.push(chalk.bold('Description:'));
     lines.push(chalk.gray('````'));
-    lines.push(tool.description);
+    lines.push(description);
     lines.push(chalk.gray('````'));
   }
 
@@ -491,15 +492,12 @@ export function formatResourceDetail(resource: Resource): string {
   }
 
   // Description in code block
-  lines.push('');
-  lines.push(chalk.bold('Description:'));
-  if (resource.description) {
+  const description = (resource.description || '').trim();
+  if (description) {
+    lines.push('');
+    lines.push(chalk.bold('Description:'));
     lines.push(chalk.gray('````'));
-    lines.push(resource.description);
-    lines.push(chalk.gray('````'));
-  } else {
-    lines.push(chalk.gray('````'));
-    lines.push(chalk.gray('(no description)'));
+    lines.push(description);
     lines.push(chalk.gray('````'));
   }
 
@@ -551,15 +549,12 @@ export function formatResourceTemplateDetail(template: ResourceTemplate): string
   }
 
   // Description in code block
-  lines.push('');
-  lines.push(chalk.bold('Description:'));
-  if (template.description) {
+  const description = (template.description || '').trim();
+  if (description) {
+    lines.push('');
+    lines.push(chalk.bold('Description:'));
     lines.push(chalk.gray('````'));
-    lines.push(template.description);
-    lines.push(chalk.gray('````'));
-  } else {
-    lines.push(chalk.gray('````'));
-    lines.push(chalk.gray('(no description)'));
+    lines.push(description);
     lines.push(chalk.gray('````'));
   }
 
@@ -615,15 +610,12 @@ export function formatPromptDetail(prompt: Prompt): string {
   }
 
   // Description in code block
-  lines.push('');
-  lines.push(chalk.bold('Description:'));
-  if (prompt.description) {
+  const description = (prompt.description || '').trim();
+  if (description) {
+    lines.push('');
+    lines.push(chalk.bold('Description:'));
     lines.push(chalk.gray('````'));
-    lines.push(prompt.description);
-    lines.push(chalk.gray('````'));
-  } else {
-    lines.push(chalk.gray('````'));
-    lines.push(chalk.gray('(no description)'));
+    lines.push(description);
     lines.push(chalk.gray('````'));
   }
 
@@ -649,10 +641,11 @@ function formatPromptResult(result: GetPromptResult): string {
   const lines: string[] = [];
 
   // Description first if present
-  if (result.description) {
+  const description = (result.description || '').trim();
+  if (description) {
     lines.push(chalk.bold('Description:'));
     lines.push(chalk.gray('````'));
-    lines.push(result.description);
+    lines.push(description);
     lines.push(chalk.gray('````'));
     lines.push('');
   }
