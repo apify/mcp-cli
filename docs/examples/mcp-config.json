@@ -10,8 +10,8 @@
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "${PWD}"]
     },
 
-    "apify-docs": {
-      "url": "https://mcp.apify.com/?tools=docs"
+    "apify-public": {
+      "url": "https://mcp.apify.com/?tools=docs,search-actors"
     },
 
     "apify-bearer": {
