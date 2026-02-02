@@ -343,7 +343,7 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
   } else {
     // Display sessions
     if (sessions.length === 0) {
-      console.log(chalk.dim('No active MCP sessions.'));
+      console.log(chalk.bold('No active MCP sessions.'));
     } else {
       console.log(chalk.bold('MCP sessions:'));
       for (const session of sessions) {
