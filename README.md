@@ -140,7 +140,7 @@ MCP server commands:
   logging-set-level <level>
   ping
   
-Run "mcpc" (without <target>) to show available sessions and profiles.
+Run "mcpc" without <target> to show available sessions and profiles.
 ```
 
 ### General actions
