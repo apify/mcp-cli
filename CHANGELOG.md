@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated GitHub release creation in publish script
 
 ### Changed
+- `tools-list` now shows a compact summary by default to support dynamic tool discovery
+- Added `--full` flag to `tools-list` for detailed tool information
 - Publish script now automatically updates CHANGELOG.md version on release
 
 ## [0.1.8] - 2026-01-21
