@@ -38,6 +38,7 @@ interface HandlerOptions {
   profile?: string;
   schema?: string;
   schemaMode?: 'strict' | 'compatible' | 'ignore';
+  full?: boolean;
 }
 
 /**
@@ -78,6 +79,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
     }
     options.schemaMode = mode;
   }
+  if (opts.full) options.full = opts.full;
 
   return options;
 }
@@ -250,7 +252,7 @@ Management commands:
 MCP server commands:
   help                          Show server info ("help" can be omitted)
   shell                         Open interactive shell
-  tools-list                    Send "tools/list" MCP request...
+  tools-list [--full]           Send "tools/list" MCP request...
   tools-get <tool-name>
   tools-call <tool-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
   prompts-list
@@ -367,6 +369,7 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
   program
     .command('tools')
     .description('List available tools (shorthand for tools-list)')
+    .option('--full', 'Show full tool details including complete input schema')
     .action(async (_options, command) => {
       await tools.listTools(target, getOptionsFromCommand(command));
     });
@@ -374,6 +377,7 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
   program
     .command('tools-list')
     .description('List available tools')
+    .option('--full', 'Show full tool details including complete input schema')
     .action(async (_options, command) => {
       await tools.listTools(target, getOptionsFromCommand(command));
     });

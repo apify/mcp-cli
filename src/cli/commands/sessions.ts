@@ -370,7 +370,7 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
     // Display auth profiles
     console.log('');
     if (profiles.length === 0) {
-      console.log(chalk.dim('No OAuth profiles.'));
+      console.log(chalk.bold('No OAuth profiles.'));
     } else {
       console.log(chalk.bold('Available OAuth profiles:'));
       for (const profile of profiles) {

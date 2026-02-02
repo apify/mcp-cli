@@ -126,7 +126,7 @@ Management commands:
 MCP server commands:
   help                          Show server info ("help" can be omitted)
   shell                         Open interactive shell
-  tools-list                    Send "tools/list" MCP request...
+  tools-list [--full]           Send "tools/list" MCP request...
   tools-get <tool-name>
   tools-call <tool-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
   prompts-list
@@ -754,10 +754,13 @@ and includes the `_mcpc` field with relevant server/session metadata.
 List, inspect, and call server-provided tools:
 
 ```bash
-# List available tools
+# List available tools (only names and attributes - useful for dynamic discovery)
 mcpc @apify tools-list
 
-# Get tool schema details
+# List available tools (full details including input/output args and description)
+mcpc @apify tools-list --full
+
+# Get tool schema with full details
 mcpc @apify tools-get search-actors
 
 # Call a tool with arguments

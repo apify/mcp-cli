@@ -19,7 +19,7 @@ _SESSIONS_CREATED+=("$SESSION")
 test_pass
 
 # =============================================================================
-# Test: tools-list human output
+# Test: tools-list human output (compact mode - default)
 # =============================================================================
 
 test_case "tools-list contains header with count"
@@ -28,32 +28,55 @@ assert_success
 assert_contains "$STDOUT" "Available tools"
 test_pass
 
-test_case "tools-list contains tool names"
+test_case "tools-list contains tool names in backticks"
 run_mcpc "$SESSION" tools-list
 assert_success
-assert_contains "$STDOUT" "echo"
-assert_contains "$STDOUT" "add"
+assert_contains "$STDOUT" "\`echo\`"
+assert_contains "$STDOUT" "\`add\`"
 test_pass
 
-test_case "tools-list contains descriptions"
+test_case "tools-list uses * bullet character"
 run_mcpc "$SESSION" tools-list
 assert_success
-assert_contains "$STDOUT" "Returns the input message"
+assert_contains "$STDOUT" "* \`"
 test_pass
 
-test_case "tools-list contains Input section"
+test_case "tools-list compact shows hint about --full"
 run_mcpc "$SESSION" tools-list
+assert_success
+assert_contains "$STDOUT" "--full"
+assert_contains "$STDOUT" "tools-get"
+test_pass
+
+test_case "tools-list compact does NOT show Input section"
+run_mcpc "$SESSION" tools-list
+assert_success
+assert_not_contains "$STDOUT" "Input:"
+test_pass
+
+# =============================================================================
+# Test: tools-list human output (full mode with --full)
+# =============================================================================
+
+test_case "tools-list --full contains Input section"
+run_mcpc "$SESSION" tools-list --full
 assert_success
 assert_contains "$STDOUT" "Input:"
 test_pass
 
-test_case "tools-list contains parameter info"
-run_mcpc "$SESSION" tools-list
+test_case "tools-list --full contains parameter info"
+run_mcpc "$SESSION" tools-list --full
 assert_success
 # Should show parameter with type and [required]
 assert_contains "$STDOUT" "message"
 assert_contains "$STDOUT" "string"
 assert_contains "$STDOUT" "[required]"
+test_pass
+
+test_case "tools-list --full does NOT show hint"
+run_mcpc "$SESSION" tools-list --full
+assert_success
+assert_not_contains "$STDOUT" "Use \`tools-list --full\`"
 test_pass
 
 # =============================================================================
@@ -175,15 +198,19 @@ test_pass
 # Test: Consistent formatting between commands
 # =============================================================================
 
-test_case "all list commands use separator lines"
-run_mcpc "$SESSION" tools-list
+test_case "tools-list --full uses separator lines"
+run_mcpc "$SESSION" tools-list --full
 assert_success
 assert_contains "$STDOUT" "---"
+test_pass
 
+test_case "resources-list uses separator lines"
 run_mcpc "$SESSION" resources-list
 assert_success
 assert_contains "$STDOUT" "---"
+test_pass
 
+test_case "prompts-list uses separator lines"
 run_mcpc "$SESSION" prompts-list
 assert_success
 assert_contains "$STDOUT" "---"

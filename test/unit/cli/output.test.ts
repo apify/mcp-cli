@@ -41,6 +41,7 @@ jest.mock('../../../src/lib/sessions.js', () => ({
 import {
   formatSchemaType,
   formatSimplifiedArgs,
+  formatTools,
   formatToolDetail,
   formatServerDetails,
   formatResources,
@@ -324,6 +325,159 @@ describe('formatSimplifiedArgs', () => {
     expect(lines[0]).toBe('* `tags`: array<string>');
     expect(lines[1]).toBe('* `status`: "active" | "inactive"');
     expect(lines[2]).toBe('* `data`: string | null');
+  });
+});
+
+describe('formatTools', () => {
+  const sampleTools: Tool[] = [
+    {
+      name: 'search_web',
+      description: 'Search the web for information using DuckDuckGo and return relevant results',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search query' },
+          maxResults: { type: 'number', description: 'Max results' },
+          language: { type: 'string', description: 'Language code' },
+        },
+        required: ['query'],
+      },
+      outputSchema: {
+        type: 'object',
+        properties: {
+          results: { type: 'array' },
+          total: { type: 'number' },
+        },
+      },
+      annotations: {
+        readOnlyHint: true,
+      },
+    },
+    {
+      name: 'run_actor',
+      description: 'Run an Apify Actor with the given input',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          actorId: { type: 'string' },
+          input: { type: 'object' },
+          memory: { type: 'number' },
+          timeout: { type: 'number' },
+          build: { type: 'string' },
+        },
+        required: ['actorId'],
+      },
+      outputSchema: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            status: { type: 'string' },
+          },
+        },
+      },
+      annotations: {
+        destructiveHint: true,
+      },
+    },
+  ] as Tool[];
+
+  describe('compact format (default)', () => {
+    it('should show header with tool count', () => {
+      const output = formatTools(sampleTools);
+      expect(output).toContain('Available tools (2):');
+    });
+
+    it('should show tool names in backticks', () => {
+      const output = formatTools(sampleTools);
+      expect(output).toContain('`search_web`');
+      expect(output).toContain('`run_actor`');
+    });
+
+    it('should use * bullet character', () => {
+      const output = formatTools(sampleTools);
+      expect(output).toContain('* `');
+    });
+
+    it('should show annotations after tool name', () => {
+      const output = formatTools(sampleTools);
+      expect(output).toContain('[read-only]');
+      expect(output).toContain('[destructive]');
+    });
+
+    it('should show hint about --full flag', () => {
+      const output = formatTools(sampleTools);
+      expect(output).toContain('tools-list --full');
+      expect(output).toContain('tools-get <name>');
+    });
+
+    it('should NOT show detailed input schema', () => {
+      const output = formatTools(sampleTools);
+      // Detailed format has "Input:" sections
+      expect(output).not.toContain('Input:');
+    });
+  });
+
+  describe('full format (with { full: true })', () => {
+    it('should show detailed view with separators', () => {
+      const output = formatTools(sampleTools, { full: true });
+      expect(output).toContain('---');
+    });
+
+    it('should show Input sections', () => {
+      const output = formatTools(sampleTools, { full: true });
+      expect(output).toContain('Input:');
+    });
+
+    it('should show full parameter details with types', () => {
+      const output = formatTools(sampleTools, { full: true });
+      expect(output).toContain('`query`: string [required]');
+      expect(output).toContain('`maxResults`: number');
+    });
+
+    it('should show full descriptions in code blocks', () => {
+      const output = formatTools(sampleTools, { full: true });
+      expect(output).toContain('Description:');
+      expect(output).toContain('````');
+      expect(output).toContain('Search the web for information using DuckDuckGo and return relevant results');
+    });
+
+    it('should NOT show hint about --full flag', () => {
+      const output = formatTools(sampleTools, { full: true });
+      expect(output).not.toContain('tools-list --full');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle tools with no parameters', () => {
+      const tools: Tool[] = [{
+        name: 'no_params_tool',
+        description: 'A tool with no parameters',
+        inputSchema: { type: 'object', properties: {} },
+      }];
+
+      const output = formatTools(tools);
+      expect(output).toContain('`no_params_tool`');
+    });
+
+    it('should handle tools with no description', () => {
+      const tools: Tool[] = [{
+        name: 'undocumented',
+        inputSchema: {
+          type: 'object',
+          properties: { arg: { type: 'string' } },
+        },
+      }];
+
+      const output = formatTools(tools);
+      expect(output).toContain('`undocumented`');
+    });
+
+    it('should handle empty tools array', () => {
+      const output = formatTools([]);
+      expect(output).toContain('Available tools (0):');
+    });
   });
 });
 

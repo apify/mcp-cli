@@ -55,6 +55,7 @@ const KNOWN_OPTIONS = [
   '--help',
   '--verbose',
   '--clean',
+  '--full',
 ];
 
 // Valid --clean types

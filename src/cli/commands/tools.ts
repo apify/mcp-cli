@@ -19,8 +19,12 @@ import {
 /**
  * List available tools
  * Automatically fetches all pages if pagination is present
+ * By default shows compact format; use --full for complete details
  */
-export async function listTools(target: string, options: CommandOptions): Promise<void> {
+export async function listTools(
+  target: string,
+  options: CommandOptions & { full?: boolean }
+): Promise<void> {
   await withMcpClient(target, options, async (client, _context) => {
     // Fetch all tools across all pages
     const allTools = [];
@@ -32,7 +36,7 @@ export async function listTools(target: string, options: CommandOptions): Promis
       cursor = result.nextCursor;
     } while (cursor);
 
-    console.log(formatOutput(allTools, options.outputMode));
+    console.log(formatOutput(allTools, options.outputMode, options.full ? { full: true } : undefined));
   });
 }
 

@@ -56,14 +56,26 @@ export function rainbow(text: string): string {
 }
 
 /**
+ * Options for formatting output
+ */
+export interface FormatOptions {
+  /** Show full details (for tools-list, shows complete input schema) */
+  full?: boolean;
+}
+
+/**
  * Format output based on the specified mode
  * Human mode output always ends with a newline for visual separation
  */
-export function formatOutput(data: unknown, mode: OutputMode = 'human'): string {
+export function formatOutput(
+  data: unknown,
+  mode: OutputMode = 'human',
+  options?: FormatOptions
+): string {
   if (mode === 'json') {
     return formatJson(data);
   }
-  const output = formatHuman(data);
+  const output = formatHuman(data, options);
   // Ensure trailing newline for visual separation in shell (unless ends with code block)
   if (!output.endsWith('````') && !output.endsWith('\n')) {
     return output + '\n';
@@ -118,7 +130,7 @@ function highlightJson(json: string): string {
 /**
  * Format data for human-readable output
  */
-export function formatHuman(data: unknown): string {
+export function formatHuman(data: unknown, options?: FormatOptions): string {
   if (data === null || data === undefined) {
     return chalk.gray('(no data)');
   }
@@ -140,7 +152,7 @@ export function formatHuman(data: unknown): string {
     const first = data[0];
     if (first && typeof first === 'object') {
       if ('name' in first && 'inputSchema' in first) {
-        return formatTools(data as Tool[]);
+        return formatTools(data as Tool[], options);
       }
       if ('uriTemplate' in first) {
         return formatResourceTemplates(data as ResourceTemplate[]);
@@ -330,9 +342,22 @@ export function formatSimplifiedArgs(
 }
 
 /**
- * Format a list of tools with Markdown-like display
+ * Format a list of tools
+ * Default: compact format for quick scanning
+ * With full option: detailed format with complete input schema
  */
-export function formatTools(tools: Tool[]): string {
+export function formatTools(tools: Tool[], options?: FormatOptions): string {
+  if (options?.full) {
+    return formatToolsFull(tools);
+  }
+  return formatToolsCompact(tools);
+}
+
+/**
+ * Format tools summary list (shared by compact and full modes)
+ * Format: * `tool_name` [annotations]
+ */
+function formatToolsSummary(tools: Tool[]): string[] {
   const lines: string[] = [];
 
   // Header with tool count
@@ -345,6 +370,28 @@ export function formatTools(tools: Tool[]): string {
     const annotationsSuffix = annotationsStr ? ` ${chalk.gray(`[${annotationsStr}]`)}` : '';
     lines.push(`${bullet} ${inBackticks(tool.name)}${annotationsSuffix}`);
   }
+
+  return lines;
+}
+
+/**
+ * Format tools in compact form (just the summary list)
+ */
+function formatToolsCompact(tools: Tool[]): string {
+  const lines = formatToolsSummary(tools);
+
+  // Footer hint
+  lines.push('');
+  lines.push('For full details, use "tools-list --full" or "tools-get <name>"');
+
+  return lines.join('\n');
+}
+
+/**
+ * Format tools with full details (summary + detailed view for each tool)
+ */
+function formatToolsFull(tools: Tool[]): string {
+  const lines = formatToolsSummary(tools);
 
   // Detailed view for each tool with separators
   for (const tool of tools) {
