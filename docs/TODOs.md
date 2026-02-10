@@ -2,6 +2,7 @@
 # TODOs
 
 
+- mcpc @apify tools-get fetch-actor-details => should print also "object" properties in human mode
 
 - `--capabilities '{"tools":...,"prompts":...}"` to limit access to selected MCP features and tools,
   for both proxy and normal session, for simplicity. The command could work on the fly, to give

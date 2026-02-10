@@ -1067,18 +1067,24 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 ## Related work
 
-- https://github.com/steipete/mcporter
-- https://github.com/philschmid/mcp-cli (https://www.philschmid.de/mcp-cli)
-- https://github.com/chrishayuk/mcp-cli
-- https://github.com/wong2/mcp-cli
-- https://github.com/f/mcptools
-- https://github.com/adhikasp/mcp-client-cli
-- https://github.com/mattzcarey/cloudflare-mcp 
-- https://github.com/TeamSparkAI/mcpGraph
-- https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool (https://x.com/trq212/status/2011523109871108570)
-- https://cursor.com/blog/dynamic-context-discovery
-- https://www.anthropic.com/engineering/code-execution-with-mcp
-- https://blog.cloudflare.com/code-mode/
+- MCP CLI clients
+  - https://github.com/chrishayuk/mcp-cli
+  - https://github.com/wong2/mcp-cli
+  - https://github.com/f/mcptools
+  - https://github.com/adhikasp/mcp-client-cli
+  - https://github.com/mattzcarey/cloudflare-mcp
+- Code mode
+  - https://blog.cloudflare.com/code-mode/
+  - https://www.anthropic.com/engineering/code-execution-with-mcp
+  - https://github.com/steipete/mcporter
+- Dynamic tool discovery
+  - https://www.anthropic.com/engineering/advanced-tool-use
+    - https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool
+  - https://cursor.com/blog/dynamic-context-discovery
+  - https://github.com/philschmid/mcp-cli (https://www.philschmid.de/mcp-cli)
+- Other
+  - https://github.com/TeamSparkAI/mcpGraph
+
 
 ## License
 
