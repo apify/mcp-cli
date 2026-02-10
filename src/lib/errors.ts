@@ -86,7 +86,7 @@ export class AuthError extends McpError {
  * Check if an error message indicates an authentication error from the server
  */
 export function isAuthenticationError(errorMessage: string): boolean {
-  return /invalid_token|unauthorized|missing.*token|access.*token|authentication|401|403/i.test(errorMessage);
+  return /invalid_token|unauthorized|missing.*token|access.*token|authentication|re-authenticate|401|403/i.test(errorMessage);
 }
 
 /**

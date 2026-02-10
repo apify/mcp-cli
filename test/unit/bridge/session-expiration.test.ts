@@ -3,6 +3,7 @@
  */
 
 import { isSessionExpiredError } from '../../../src/lib/utils';
+import { isAuthenticationError } from '../../../src/lib/errors';
 
 describe('isSessionExpiredError', () => {
   describe('should detect session expiration', () => {
@@ -103,6 +104,67 @@ describe('isSessionExpiredError', () => {
       expect(isSessionExpiredError('INVALID SESSION')).toBe(true);
       expect(isSessionExpiredError('SESSION IS NO LONGER VALID')).toBe(true);
       expect(isSessionExpiredError('SESSION ID ABC NOT FOUND')).toBe(true);
+    });
+  });
+});
+
+describe('isAuthenticationError', () => {
+  describe('should detect authentication errors', () => {
+    it('detects "re-authenticate" messages from createReauthError', () => {
+      expect(
+        isAuthenticationError(
+          'Could not find OAuth token endpoint for https://mcp.notion.com/mcp. Please re-authenticate with: mcpc https://mcp.notion.com/mcp login'
+        )
+      ).toBe(true);
+      expect(
+        isAuthenticationError(
+          'Token refresh failed. Please re-authenticate with: mcpc https://example.com login'
+        )
+      ).toBe(true);
+    });
+
+    it('detects "unauthorized" messages', () => {
+      expect(isAuthenticationError('Unauthorized')).toBe(true);
+      expect(isAuthenticationError('unauthorized access')).toBe(true);
+    });
+
+    it('detects "invalid_token" messages', () => {
+      expect(isAuthenticationError('invalid_token')).toBe(true);
+      expect(isAuthenticationError('Error: invalid_token')).toBe(true);
+    });
+
+    it('detects HTTP 401 and 403 status codes', () => {
+      expect(isAuthenticationError('HTTP 401')).toBe(true);
+      expect(isAuthenticationError('Error: 403 Forbidden')).toBe(true);
+    });
+
+    it('detects "authentication" keyword', () => {
+      expect(isAuthenticationError('authentication failed')).toBe(true);
+      expect(isAuthenticationError('Authentication required')).toBe(true);
+    });
+
+    it('detects "missing token" messages', () => {
+      expect(isAuthenticationError('missing access token')).toBe(true);
+      expect(isAuthenticationError('Missing token in request')).toBe(true);
+    });
+  });
+
+  describe('should NOT detect as authentication error', () => {
+    it('ignores generic errors', () => {
+      expect(isAuthenticationError('Connection refused')).toBe(false);
+      expect(isAuthenticationError('Network error')).toBe(false);
+      expect(isAuthenticationError('Timeout')).toBe(false);
+      expect(isAuthenticationError('Internal server error')).toBe(false);
+    });
+
+    it('ignores session-related errors', () => {
+      expect(isAuthenticationError('session not found')).toBe(false);
+      expect(isAuthenticationError('session expired')).toBe(false);
+    });
+
+    it('ignores empty or whitespace messages', () => {
+      expect(isAuthenticationError('')).toBe(false);
+      expect(isAuthenticationError('   ')).toBe(false);
     });
   });
 });

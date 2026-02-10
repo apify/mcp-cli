@@ -12,7 +12,7 @@ import type { McpClient } from '../core/index.js';
 import type { ServerConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
 import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
 import { fileExists, getBridgesDir, getSocketPath, ensureDir, cleanupOrphanedLogFiles, isSessionExpiredError } from '../lib/index.js';
-import { ClientError, NetworkError } from '../lib/index.js';
+import { ClientError, NetworkError, isAuthenticationError } from '../lib/index.js';
 import { loadSessions, updateSession } from '../lib/sessions.js';
 import type { AuthCredentials } from '../lib/types.js';
 import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
@@ -601,7 +601,7 @@ class BridgeProcess {
    * Check if an error indicates session expiration and handle accordingly
    */
   private handlePossibleExpiration(error: Error): void {
-    if (isSessionExpiredError(error.message)) {
+    if (isSessionExpiredError(error.message) || isAuthenticationError(error.message)) {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
       this.markSessionExpiredAndExit().catch((e) => {
         logger.error('Failed to mark session as expired:', e);
