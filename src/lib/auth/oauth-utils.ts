@@ -24,12 +24,26 @@ export interface OAuthTokenResponse {
 /**
  * Discover OAuth token endpoint from server
  * Tries standard well-known endpoints per OAuth 2.0 and OpenID Connect specs
+ * First tries path-based discovery, then falls back to root-based discovery
+ * (some servers like Notion host metadata at root instead of path)
  */
 export async function discoverTokenEndpoint(serverUrl: string): Promise<string | undefined> {
+  // Try path-based discovery first (e.g., https://example.com/mcp/.well-known/...)
   const discoveryUrls = [
     `${serverUrl}/.well-known/oauth-authorization-server`,
     `${serverUrl}/.well-known/openid-configuration`,
   ];
+
+  // Add root-based fallback URLs (e.g., https://example.com/.well-known/...)
+  // Some servers like Notion host OAuth metadata at the root instead of the path
+  const serverUrlObj = new URL(serverUrl);
+  const base = `${serverUrlObj.protocol}//${serverUrlObj.host}`;
+  if (serverUrl !== base && serverUrl !== `${base}/`) {
+    discoveryUrls.push(
+      `${base}/.well-known/oauth-authorization-server`,
+      `${base}/.well-known/openid-configuration`,
+    );
+  }
 
   for (const url of discoveryUrls) {
     try {
