@@ -61,6 +61,21 @@ const KNOWN_OPTIONS = [
 // Valid --clean types
 const VALID_CLEAN_TYPES = ['sessions', 'profiles', 'logs', 'all'];
 
+/**
+ * All known MCP subcommands (used to detect when user forgets to specify a target)
+ */
+export const KNOWN_COMMANDS = [
+  'help', 'shell',
+  'login', 'logout',
+  'connect', 'close', 'restart',
+  'tools', 'tools-list', 'tools-get', 'tools-call',
+  'resources', 'resources-list', 'resources-read',
+  'resources-subscribe', 'resources-unsubscribe', 'resources-templates-list',
+  'prompts', 'prompts-list', 'prompts-get',
+  'logging-set-level',
+  'ping',
+];
+
 // Valid --schema-mode values
 const VALID_SCHEMA_MODES = ['strict', 'compatible', 'ignore'];
 
