@@ -14,7 +14,8 @@ import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
 import { getAuthProfile, listAuthProfiles } from '../lib/auth/profiles.js';
 import { readKeychainOAuthTokenInfo, readKeychainOAuthClientInfo } from '../lib/auth/keychain.js';
 import { logTarget } from './output.js';
-import packageJson from '../../package.json' with { type: 'json' };
+import { createRequire } from 'module';
+const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as { version: string };
 import { DEFAULT_AUTH_PROFILE } from '../lib/auth/oauth-utils.js';
 import { parseHeaderFlags } from './parser.js';
 
@@ -285,7 +286,7 @@ export async function withMcpClient<T>(
 
   // Create and connect client
   const clientConfig: Parameters<typeof createMcpClient>[0] = {
-    clientInfo: { name: 'mcpc', version: packageJson.version },
+    clientInfo: { name: 'mcpc', version: mcpcVersion },
     serverConfig,
     capabilities: {
       // Declare client capabilities

@@ -21,7 +21,8 @@ import { storeKeychainOAuthTokenInfo, readKeychainOAuthTokenInfo } from '../lib/
 import { updateAuthProfileRefreshedAt } from '../lib/auth/profiles.js';
 import { readKeychainProxyBearerToken } from '../lib/auth/keychain.js';
 import type { Tool, Resource, Prompt } from '@modelcontextprotocol/sdk/types.js';
-import packageJson from '../../package.json' with { type: 'json' };
+import { createRequire } from 'module';
+const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as { version: string };
 import { ProxyServer } from './proxy-server.js';
 import type { ProxyConfig } from '../lib/types.js';
 
@@ -260,7 +261,7 @@ class BridgeProcess {
   async start(): Promise<void> {
     // 1. First, initialize file logger to see what's going on
     await initFileLogger(`bridge-${this.options.sessionName}.log`, {
-      version: packageJson.version,
+      version: mcpcVersion,
       command: process.argv.slice(1).join(' '),
     });
 
@@ -418,7 +419,7 @@ class BridgeProcess {
     }
 
     const clientConfig: CreateMcpClientOptions = {
-      clientInfo: { name: 'mcpc', version: packageJson.version },
+      clientInfo: { name: 'mcpc', version: mcpcVersion },
       serverConfig,
       capabilities: {
         roots: { listChanged: true },

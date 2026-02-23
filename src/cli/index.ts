@@ -24,7 +24,8 @@ import * as auth from './commands/auth.js';
 import { clean } from './commands/clean.js';
 import type { OutputMode } from '../lib/index.js';
 import { findTarget, extractOptions, hasCommandAfterTarget, getVerboseFromEnv, getJsonFromEnv, validateOptions, validateCleanTypes, validateArgValues } from './parser.js';
-import packageJson from '../../package.json' with { type: 'json' };
+import { createRequire } from 'module';
+const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as { version: string };
 
 /**
  * Options passed to command handlers
@@ -106,9 +107,9 @@ async function main(): Promise<void> {
     const options = extractOptions(args);
     if (options.json) {
       setJsonMode(true);
-      console.log(formatJson({ version: packageJson.version }));
+      console.log(formatJson({ version: mcpcVersion }));
     } else {
-      console.log(packageJson.version);
+      console.log(mcpcVersion);
     }
     return;
   }
@@ -218,7 +219,7 @@ function createProgram(): Command {
     .option('-j, --json', 'Output in JSON format for scripting')
     .option('-c, --config <file>', 'Path to MCP config JSON file (e.g. ".vscode/mcp.json")')
     .option('-H, --header <header>', 'HTTP header for remote MCP server (can be repeated)')
-    .version(packageJson.version, '-v, --version', 'Output the version number')
+    .version(mcpcVersion, '-v, --version', 'Output the version number')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
@@ -231,8 +232,8 @@ function createProgram(): Command {
   // Add help text to match README
   // Use raw Markdown URL for pipes (AI agents), GitHub UI for TTY (humans)
   const docsUrl = process.stdout.isTTY
-    ? `https://github.com/apify/mcpc/tree/v${packageJson.version}`
-    : `https://raw.githubusercontent.com/apify/mcpc/v${packageJson.version}/README.md`;
+    ? `https://github.com/apify/mcpc/tree/v${mcpcVersion}`
+    : `https://raw.githubusercontent.com/apify/mcpc/v${mcpcVersion}/README.md`;
 
   program.addHelpText(
     'after',
