@@ -23,9 +23,21 @@ import * as utilities from './commands/utilities.js';
 import * as auth from './commands/auth.js';
 import { clean } from './commands/clean.js';
 import type { OutputMode } from '../lib/index.js';
-import { findTarget, extractOptions, hasCommandAfterTarget, getVerboseFromEnv, getJsonFromEnv, validateOptions, validateCleanTypes, validateArgValues, KNOWN_COMMANDS } from './parser.js';
+import {
+  findTarget,
+  extractOptions,
+  hasCommandAfterTarget,
+  getVerboseFromEnv,
+  getJsonFromEnv,
+  validateOptions,
+  validateCleanTypes,
+  validateArgValues,
+  KNOWN_COMMANDS,
+} from './parser.js';
 import { createRequire } from 'module';
-const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as { version: string };
+const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
+  version: string;
+};
 
 /**
  * Options passed to command handlers

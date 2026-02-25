@@ -86,7 +86,12 @@ export async function getPrompt(
         throw new ClientError(`Prompt not found: ${name}`);
       }
 
-      const validation = validatePromptSchema(actualSchema as PromptSchema, expectedSchema, schemaMode, promptArgs);
+      const validation = validatePromptSchema(
+        actualSchema as PromptSchema,
+        expectedSchema,
+        schemaMode,
+        promptArgs
+      );
 
       if (!validation.valid) {
         throw new ClientError(formatValidationError(validation, `prompt "${name}"`));

@@ -32,11 +32,14 @@ export class BridgeClient extends EventEmitter {
   private socket: Socket | null = null;
   private socketPath: string;
   private buffer = '';
-  private pendingRequests = new Map<string, {
-    resolve: (result: unknown) => void;
-    reject: (error: Error) => void;
-    timeoutId: NodeJS.Timeout;
-  }>();
+  private pendingRequests = new Map<
+    string,
+    {
+      resolve: (result: unknown) => void;
+      reject: (error: Error) => void;
+      timeoutId: NodeJS.Timeout;
+    }
+  >();
 
   constructor(socketPath: string) {
     super();

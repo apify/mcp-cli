@@ -65,13 +65,26 @@ const VALID_CLEAN_TYPES = ['sessions', 'profiles', 'logs', 'all'];
  * All known MCP subcommands (used to detect when user forgets to specify a target)
  */
 export const KNOWN_COMMANDS = [
-  'help', 'shell',
-  'login', 'logout',
-  'connect', 'close', 'restart',
-  'tools', 'tools-list', 'tools-get', 'tools-call',
-  'resources', 'resources-list', 'resources-read',
-  'resources-subscribe', 'resources-unsubscribe', 'resources-templates-list',
-  'prompts', 'prompts-list', 'prompts-get',
+  'help',
+  'shell',
+  'login',
+  'logout',
+  'connect',
+  'close',
+  'restart',
+  'tools',
+  'tools-list',
+  'tools-get',
+  'tools-call',
+  'resources',
+  'resources-list',
+  'resources-read',
+  'resources-subscribe',
+  'resources-unsubscribe',
+  'resources-templates-list',
+  'prompts',
+  'prompts-list',
+  'prompts-get',
   'logging-set-level',
   'ping',
 ];
@@ -232,7 +245,8 @@ export function extractOptions(args: string[]): {
 
   // Extract --config
   const configIndex = args.findIndex((arg) => arg === '--config' || arg === '-c');
-  const config = configIndex >= 0 && configIndex + 1 < args.length ? args[configIndex + 1] : undefined;
+  const config =
+    configIndex >= 0 && configIndex + 1 < args.length ? args[configIndex + 1] : undefined;
 
   // Extract --header (can be repeated)
   const headers: string[] = [];
@@ -246,12 +260,14 @@ export function extractOptions(args: string[]): {
 
   // Extract --timeout
   const timeoutIndex = args.findIndex((arg) => arg === '--timeout');
-  const timeoutValue = timeoutIndex >= 0 && timeoutIndex + 1 < args.length ? args[timeoutIndex + 1] : undefined;
+  const timeoutValue =
+    timeoutIndex >= 0 && timeoutIndex + 1 < args.length ? args[timeoutIndex + 1] : undefined;
   const timeout = timeoutValue ? parseInt(timeoutValue, 10) : undefined;
 
   // Extract --profile
   const profileIndex = args.findIndex((arg) => arg === '--profile');
-  const profile = profileIndex >= 0 && profileIndex + 1 < args.length ? args[profileIndex + 1] : undefined;
+  const profile =
+    profileIndex >= 0 && profileIndex + 1 < args.length ? args[profileIndex + 1] : undefined;
 
   return {
     ...options,
@@ -341,7 +357,7 @@ export function parseCommandArgs(args: string[] | undefined): Record<string, unk
     if (!pair.includes(':=')) {
       throw new ClientError(
         `Invalid argument format: "${pair}". Use key:=value pairs or inline JSON.\n` +
-        `Examples: name:=hello count:=10 enabled:=true '{"key":"value"}'`
+          `Examples: name:=hello count:=10 enabled:=true '{"key":"value"}'`
       );
     }
 
@@ -450,7 +466,9 @@ export function parseProxyArg(value: string): { host: string; port: number } {
     // No colon - just port
     const port = parseInt(value, 10);
     if (isNaN(port) || port <= 0 || port > 65535) {
-      throw new ClientError(`Invalid --proxy port: "${value}". Must be a number between 1 and 65535.`);
+      throw new ClientError(
+        `Invalid --proxy port: "${value}". Must be a number between 1 and 65535.`
+      );
     }
     return { host: DEFAULT_HOST, port };
   }
@@ -465,7 +483,9 @@ export function parseProxyArg(value: string): { host: string; port: number } {
   }
 
   if (isNaN(port) || port <= 0 || port > 65535) {
-    throw new ClientError(`Invalid --proxy port: "${portStr}". Must be a number between 1 and 65535.`);
+    throw new ClientError(
+      `Invalid --proxy port: "${portStr}". Must be a number between 1 and 65535.`
+    );
   }
 
   return { host, port };

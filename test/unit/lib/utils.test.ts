@@ -221,7 +221,9 @@ describe('normalizeServerUrl', () => {
     expect(normalizeServerUrl('https://user:pass@example.com')).toBe('https://example.com');
     expect(normalizeServerUrl('https://admin@example.com')).toBe('https://example.com');
     expect(normalizeServerUrl('http://user:pass@localhost:8080')).toBe('http://localhost:8080');
-    expect(normalizeServerUrl('https://user:pass@example.com/path')).toBe('https://example.com/path');
+    expect(normalizeServerUrl('https://user:pass@example.com/path')).toBe(
+      'https://example.com/path'
+    );
     expect(normalizeServerUrl('https://user:pass@example.com#hash')).toBe('https://example.com');
   });
 });

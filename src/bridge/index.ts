@@ -11,7 +11,14 @@ import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
 import type { McpClient } from '../core/index.js';
 import type { ServerConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
 import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
-import { fileExists, getBridgesDir, getSocketPath, ensureDir, cleanupOrphanedLogFiles, isSessionExpiredError } from '../lib/index.js';
+import {
+  fileExists,
+  getBridgesDir,
+  getSocketPath,
+  ensureDir,
+  cleanupOrphanedLogFiles,
+  isSessionExpiredError,
+} from '../lib/index.js';
 import { ClientError, NetworkError, isAuthenticationError } from '../lib/index.js';
 import { loadSessions, updateSession } from '../lib/sessions.js';
 import type { AuthCredentials } from '../lib/types.js';
@@ -22,7 +29,9 @@ import { updateAuthProfileRefreshedAt } from '../lib/auth/profiles.js';
 import { readKeychainProxyBearerToken } from '../lib/auth/keychain.js';
 import type { Tool, Resource, Prompt } from '@modelcontextprotocol/sdk/types.js';
 import { createRequire } from 'module';
-const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as { version: string };
+const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
+  version: string;
+};
 import { ProxyServer } from './proxy-server.js';
 import type { ProxyConfig } from '../lib/types.js';
 
@@ -109,14 +118,21 @@ class BridgeProcess {
         // Reload tokens from keychain before refresh (handles token rotation by other processes)
         onBeforeRefresh: async () => {
           logger.debug('Reloading tokens from keychain before refresh...');
-          const tokenInfo = await readKeychainOAuthTokenInfo(credentials.serverUrl, credentials.profileName);
+          const tokenInfo = await readKeychainOAuthTokenInfo(
+            credentials.serverUrl,
+            credentials.profileName
+          );
           if (!tokenInfo) {
             logger.debug('No tokens found in keychain');
             return undefined;
           }
           logger.debug('Loaded tokens from keychain');
           // Build result object with only defined properties (for exactOptionalPropertyTypes)
-          const result: { refreshToken?: string; accessToken?: string; accessTokenExpiresAt?: number } = {
+          const result: {
+            refreshToken?: string;
+            accessToken?: string;
+            accessTokenExpiresAt?: number;
+          } = {
             accessToken: tokenInfo.accessToken,
           };
           if (tokenInfo.refreshToken) {
@@ -144,7 +160,11 @@ class BridgeProcess {
           if (tokens.scope !== undefined) {
             tokenInfo.scope = tokens.scope;
           }
-          await storeKeychainOAuthTokenInfo(credentials.serverUrl, credentials.profileName, tokenInfo);
+          await storeKeychainOAuthTokenInfo(
+            credentials.serverUrl,
+            credentials.profileName,
+            tokenInfo
+          );
 
           // Update profile's refreshedAt timestamp (atomic operation)
           await updateAuthProfileRefreshedAt(credentials.serverUrl, credentials.profileName);
@@ -308,7 +328,10 @@ class BridgeProcess {
       } catch (error) {
         // Signal that MCP connection or proxy startup failed (rejects pending requests with actual error)
         // Don't exit immediately - stay alive briefly so CLI can receive the error
-        logger.error('Bridge startup failed, will stay alive briefly for CLI to receive error:', error);
+        logger.error(
+          'Bridge startup failed, will stay alive briefly for CLI to receive error:',
+          error
+        );
         this.mcpClientReadyRejecter(error as Error);
 
         // If the error was due to session ID rejection, mark session as expired
@@ -375,7 +398,9 @@ class BridgeProcess {
   /**
    * Update session with notification timestamp for list changes
    */
-  private async updateNotificationTimestamp(type: 'tools' | 'prompts' | 'resources'): Promise<void> {
+  private async updateNotificationTimestamp(
+    type: 'tools' | 'prompts' | 'resources'
+  ): Promise<void> {
     const now = new Date().toISOString();
     await updateSession(this.options.sessionName, {
       notifications: {
@@ -404,7 +429,9 @@ class BridgeProcess {
       serverConfig = { ...this.options.serverConfig };
       if (this.headers) {
         serverConfig.headers = { ...serverConfig.headers, ...this.headers };
-        logger.debug(`Added non-OAuth headers "${Object.keys(this.headers).join(', ')}" to transport`);
+        logger.debug(
+          `Added non-OAuth headers "${Object.keys(this.headers).join(', ')}" to transport`
+        );
       }
     } else {
       // No authProvider - use updateTransportAuth for static headers
@@ -475,7 +502,9 @@ class BridgeProcess {
 
     logger.debug('Calling createMcpClient with authProvider:', !!clientConfig.authProvider);
     if (clientConfig.mcpSessionId) {
-      logger.info(`Attempting session resumption with MCP-Session-Id: ${clientConfig.mcpSessionId}`);
+      logger.info(
+        `Attempting session resumption with MCP-Session-Id: ${clientConfig.mcpSessionId}`
+      );
     }
 
     // Connect to MCP server - if session ID is rejected, this will throw
@@ -1009,7 +1038,9 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   if (args.length < 2) {
-    console.error('Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>]');
+    console.error(
+      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>]'
+    );
     process.exit(1);
   }
 

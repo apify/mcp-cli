@@ -6,9 +6,20 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 import chalk from 'chalk';
-import type { GetPromptResult, PromptMessage, ContentBlock } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  GetPromptResult,
+  PromptMessage,
+  ContentBlock,
+} from '@modelcontextprotocol/sdk/types.js';
 import type { OutputMode, ServerConfig } from '../lib/index.js';
-import type { Tool, Resource, ResourceTemplate, Prompt, SessionData, ServerDetails } from '../lib/types.js';
+import type {
+  Tool,
+  Resource,
+  ResourceTemplate,
+  Prompt,
+  SessionData,
+  ServerDetails,
+} from '../lib/types.js';
 import { extractSingleTextContent } from './tool-result.js';
 import { isValidSessionName } from '../lib/utils.js';
 import { getSession } from '../lib/sessions.js';
@@ -26,7 +37,9 @@ function hslToHex(h: number, s: number, l: number): string {
   const f = (n: number): string => {
     const k = (n + h / 30) % 12;
     const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * color).toString(16).padStart(2, '0');
+    return Math.round(255 * color)
+      .toString(16)
+      .padStart(2, '0');
   };
   return `#${f(0)}${f(8)}${f(4)}`;
 }
@@ -105,7 +118,13 @@ function highlightJson(json: string): string {
   // Match JSON tokens and apply colors
   return json.replace(
     /("(?:\\.|[^"\\])*")\s*:|("(?:\\.|[^"\\])*")|(\b(?:true|false|null)\b)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
-    (match, key: string | undefined, str: string | undefined, bool: string | undefined, num: string | undefined) => {
+    (
+      match,
+      key: string | undefined,
+      str: string | undefined,
+      bool: string | undefined,
+      num: string | undefined
+    ) => {
       if (key) {
         // Object key (includes the quotes and colon)
         return chalk.cyan(key) + ':';
@@ -736,7 +755,11 @@ export function formatObject(obj: Record<string, unknown>): string {
       formattedValue = chalk.gray(String(value));
     } else if (typeof value === 'object') {
       formattedValue = JSON.stringify(value, null, 2);
-    } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    } else if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
       formattedValue = String(value);
     } else {
       // Fallback for other types (bigint, symbol, function)
@@ -829,7 +852,11 @@ export function formatSessionLine(session: SessionData): string {
   // Add proxy info separately (not dimmed, for visibility)
   let proxyStr = '';
   if (session.proxy) {
-    proxyStr = ' ' + chalk.green('[proxy: ') + chalk.greenBright(`${session.proxy.host}:${session.proxy.port}`) + chalk.green(']');
+    proxyStr =
+      ' ' +
+      chalk.green('[proxy: ') +
+      chalk.greenBright(`${session.proxy.host}:${session.proxy.port}`) +
+      chalk.green(']');
   }
 
   return `${nameStr} → ${targetStr} ${infoStr}${proxyStr}`;
@@ -914,7 +941,9 @@ export function formatServerDetails(details: ServerDetails, target: string): str
 
   // Server info
   if (serverInfo) {
-    lines.push(chalk.bold('Server:') + ` ${serverInfo.name} (version: ${serverInfo.version || "N/A"})`);
+    lines.push(
+      chalk.bold('Server:') + ` ${serverInfo.name} (version: ${serverInfo.version || 'N/A'})`
+    );
     lines.push('');
   }
 
@@ -964,7 +993,9 @@ export function formatServerDetails(details: ServerDetails, target: string): str
   if (capabilities?.tools) {
     commands.push(`${bullet} ${bt}mcpc ${target} tools-list${bt}`);
     commands.push(`${bullet} ${bt}mcpc ${target} tools-get <name>${bt}`);
-    commands.push(`${bullet} ${bt}mcpc ${target} tools-call <name> [arg1:=val1 ... | <args-json> | <stdin]${bt}`);
+    commands.push(
+      `${bullet} ${bt}mcpc ${target} tools-call <name> [arg1:=val1 ... | <args-json> | <stdin]${bt}`
+    );
   }
 
   if (capabilities?.resources) {
@@ -974,7 +1005,9 @@ export function formatServerDetails(details: ServerDetails, target: string): str
 
   if (capabilities?.prompts) {
     commands.push(`${bullet} ${bt}mcpc ${target} prompts-list${bt}`);
-    commands.push(`${bullet} ${bt}mcpc ${target} prompts-get <name> [arg1:=val1 ... | <args-json> | <stdin]${bt}`);
+    commands.push(
+      `${bullet} ${bt}mcpc ${target} prompts-get <name> [arg1:=val1 ... | <args-json> | <stdin]${bt}`
+    );
   }
 
   if (capabilities?.logging) {

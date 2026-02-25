@@ -89,14 +89,20 @@ export async function logout(
     }
 
     if (options.outputMode === 'human') {
-      console.log(formatSuccess(`Profile ${chalk.magenta(profileName)} for ${normalizedUrl} deleted`));
+      console.log(
+        formatSuccess(`Profile ${chalk.magenta(profileName)} for ${normalizedUrl} deleted`)
+      );
 
       // Warn about affected sessions
       if (result.affectedSessions.length > 0) {
-        console.log(formatWarning(
-          `Warning: ${result.affectedSessions.length} session(s) were using this profile: ${result.affectedSessions.join(', ')}`
-        ));
-        console.log(formatWarning('These sessions may fail to authenticate. Recreate them or login again.'));
+        console.log(
+          formatWarning(
+            `Warning: ${result.affectedSessions.length} session(s) were using this profile: ${result.affectedSessions.join(', ')}`
+          )
+        );
+        console.log(
+          formatWarning('These sessions may fail to authenticate. Recreate them or login again.')
+        );
       }
     } else {
       console.log(

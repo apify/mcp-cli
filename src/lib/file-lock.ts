@@ -54,9 +54,7 @@ export async function withFileLock<T>(
     return await operation();
   } catch (error) {
     if ((error as Error).message.includes('ELOCKED')) {
-      throw new ClientError(
-        `File is locked by another process: ${filePath}. Please try again.`
-      );
+      throw new ClientError(`File is locked by another process: ${filePath}. Please try again.`);
     }
     throw error;
   } finally {

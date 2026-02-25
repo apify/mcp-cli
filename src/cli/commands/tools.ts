@@ -15,7 +15,6 @@ import {
   type SchemaMode,
 } from '../../lib/schema-validator.js';
 
-
 /**
  * List available tools
  * Automatically fetches all pages if pagination is present
@@ -36,14 +35,20 @@ export async function listTools(
       cursor = result.nextCursor;
     } while (cursor);
 
-    console.log(formatOutput(allTools, options.outputMode, options.full ? { full: true } : undefined));
+    console.log(
+      formatOutput(allTools, options.outputMode, options.full ? { full: true } : undefined)
+    );
   });
 }
 
 /**
  * Get information about a specific tool
  */
-export async function getTool(target: string, name: string, options: CommandOptions): Promise<void> {
+export async function getTool(
+  target: string,
+  name: string,
+  options: CommandOptions
+): Promise<void> {
   // Load expected schema if provided
   let expectedSchema: ToolSchema | undefined;
   if (options.schema) {
@@ -132,7 +137,12 @@ export async function callTool(
         throw new ClientError(`Tool not found: ${name}`);
       }
 
-      const validation = validateToolSchema(actualTool as ToolSchema, expectedSchema, schemaMode, parsedArgs);
+      const validation = validateToolSchema(
+        actualTool as ToolSchema,
+        expectedSchema,
+        schemaMode,
+        parsedArgs
+      );
 
       if (!validation.valid) {
         throw new ClientError(formatValidationError(validation, `tool "${name}"`));

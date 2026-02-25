@@ -72,7 +72,10 @@ export interface InitFileLoggerOptions {
  * @param logFileName - Name of the log file (e.g., 'cli.log', 'bridge.log')
  * @param options - Optional version and command info to log at startup
  */
-export async function initFileLogger(logFileName: string, options?: InitFileLoggerOptions): Promise<void> {
+export async function initFileLogger(
+  logFileName: string,
+  options?: InitFileLoggerOptions
+): Promise<void> {
   // Close existing logger if any
   if (fileLogger) {
     log('warn', 'Logging file already open?');
@@ -192,7 +195,9 @@ export function formatExceptionChain(error: Error, indent = ''): string {
   if (extraProps.length > 0) {
     for (const prop of extraProps) {
       const value = (error as unknown as Record<string, unknown>)[prop];
-      lines.push(`${indent}  ${prop}: ${inspect(value, { depth: 2, colors: false, compact: true })}`);
+      lines.push(
+        `${indent}  ${prop}: ${inspect(value, { depth: 2, colors: false, compact: true })}`
+      );
     }
   }
 

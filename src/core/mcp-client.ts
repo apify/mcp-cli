@@ -167,9 +167,12 @@ export class McpClient implements IMcpClient {
       this.logger.debug('Server capabilities:', serverCapabilities);
     } catch (error) {
       this.logger.debug('Failed to connect:', error);
-      throw new NetworkError(`Failed to connect to MCP server: ${getRootCauseMessage(error as Error)}`, {
-        originalError: error,
-      });
+      throw new NetworkError(
+        `Failed to connect to MCP server: ${getRootCauseMessage(error as Error)}`,
+        {
+          originalError: error,
+        }
+      );
     }
   }
 

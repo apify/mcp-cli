@@ -5,7 +5,14 @@
 
 import { createMcpClient } from '../core/factory.js';
 import type { IMcpClient, OutputMode, ServerConfig } from '../lib/types.js';
-import { ClientError, NetworkError, AuthError, McpError, isAuthenticationError, createServerAuthError } from '../lib/errors.js';
+import {
+  ClientError,
+  NetworkError,
+  AuthError,
+  McpError,
+  isAuthenticationError,
+  createServerAuthError,
+} from '../lib/errors.js';
 import { normalizeServerUrl, isValidSessionName, getServerHost } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
@@ -15,7 +22,9 @@ import { getAuthProfile, listAuthProfiles } from '../lib/auth/profiles.js';
 import { readKeychainOAuthTokenInfo, readKeychainOAuthClientInfo } from '../lib/auth/keychain.js';
 import { logTarget } from './output.js';
 import { createRequire } from 'module';
-const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as { version: string };
+const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
+  version: string;
+};
 import { DEFAULT_AUTH_PROFILE } from '../lib/auth/oauth-utils.js';
 import { parseHeaderFlags } from './parser.js';
 
@@ -109,8 +118,8 @@ export async function resolveAuthProfile(
     if (!profile) {
       throw new ClientError(
         `Authentication profile "${specifiedProfile}" not found for ${host}.\n\n` +
-        `To create this profile, run:\n` +
-        `  mcpc ${target} login --profile ${specifiedProfile}`
+          `To create this profile, run:\n` +
+          `  mcpc ${target} login --profile ${specifiedProfile}`
       );
     }
     return specifiedProfile;
@@ -125,7 +134,7 @@ export async function resolveAuthProfile(
 
   // No default profile - check if ANY profile exists for this server
   const allProfiles = await listAuthProfiles();
-  const serverProfiles = allProfiles.filter(p => getServerHost(p.serverUrl) === host);
+  const serverProfiles = allProfiles.filter((p) => getServerHost(p.serverUrl) === host);
 
   if (serverProfiles.length === 0) {
     // No profiles at all - allow unauthenticated connection attempt
@@ -134,15 +143,15 @@ export async function resolveAuthProfile(
     return undefined;
   } else {
     // Profiles exist but no default - suggest using --profile
-    const profileNames = serverProfiles.map(p => p.name).join(', ');
+    const profileNames = serverProfiles.map((p) => p.name).join(', ');
     const commandHint = context?.sessionName
       ? `mcpc ${target} connect ${context.sessionName} --profile <name>`
       : `mcpc ${target} <command> --profile <name>`;
     throw new ClientError(
       `No default authentication profile for ${host}.\n\n` +
-      `Available profiles: ${profileNames}\n\n` +
-      `To use a profile, run:\n` +
-      `  ${commandHint}`
+        `Available profiles: ${profileNames}\n\n` +
+        `To use a profile, run:\n` +
+        `  ${commandHint}`
     );
   }
 }
@@ -325,13 +334,15 @@ export async function withMcpClient<T>(
     if (error instanceof NetworkError) {
       const serverUrl = serverConfig.url ?? target;
       const causeMsg = error.message.replace(/^Failed to connect to MCP server: /, '');
-      throw new NetworkError(`Failed to connect to MCP server "${serverUrl}": ${causeMsg}`, error.details);
+      throw new NetworkError(
+        `Failed to connect to MCP server "${serverUrl}": ${causeMsg}`,
+        error.details
+      );
     }
     if (error instanceof McpError) throw error;
-    throw new NetworkError(
-      `Failed to connect to ${serverConfig.url ?? target}: ${errorMessage}`,
-      { originalError: error }
-    );
+    throw new NetworkError(`Failed to connect to ${serverConfig.url ?? target}: ${errorMessage}`, {
+      originalError: error,
+    });
   }
 
   try {
@@ -358,7 +369,11 @@ export async function withMcpClient<T>(
   } catch (error) {
     logger.error('MCP operation failed:', error);
 
-    if (error instanceof NetworkError || error instanceof ClientError || error instanceof AuthError) {
+    if (
+      error instanceof NetworkError ||
+      error instanceof ClientError ||
+      error instanceof AuthError
+    ) {
       throw error;
     }
 
@@ -368,10 +383,9 @@ export async function withMcpClient<T>(
       throw createServerAuthError(target, { originalError: error as Error });
     }
 
-    throw new NetworkError(
-      `Failed to communicate with MCP server: ${(error as Error).message}`,
-      { originalError: error }
-    );
+    throw new NetworkError(`Failed to communicate with MCP server: ${(error as Error).message}`, {
+      originalError: error,
+    });
   } finally {
     // Always clean up
     try {

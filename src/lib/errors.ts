@@ -86,7 +86,9 @@ export class AuthError extends McpError {
  * Check if an error message indicates an authentication error from the server
  */
 export function isAuthenticationError(errorMessage: string): boolean {
-  return /invalid_token|unauthorized|missing.*token|access.*token|authentication|re-authenticate|401|403/i.test(errorMessage);
+  return /invalid_token|unauthorized|missing.*token|access.*token|authentication|re-authenticate|401|403/i.test(
+    errorMessage
+  );
 }
 
 /**
@@ -106,9 +108,9 @@ export function createServerAuthError(
 
   return new AuthError(
     `Authentication required by server.\n\n` +
-    `To authenticate, run:\n` +
-    `  mcpc ${target} login\n\n` +
-    sessionHint,
+      `To authenticate, run:\n` +
+      `  mcpc ${target} login\n\n` +
+      sessionHint,
     options?.originalError ? { originalError: options.originalError } : undefined
   );
 }
@@ -141,7 +143,11 @@ export function isShutdownError(error: unknown): boolean {
   }
 
   // Check for object with name property (DOMException-like)
-  if (typeof error === 'object' && 'name' in error && (error as { name: string }).name === 'AbortError') {
+  if (
+    typeof error === 'object' &&
+    'name' in error &&
+    (error as { name: string }).name === 'AbortError'
+  ) {
     return true;
   }
 

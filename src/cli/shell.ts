@@ -22,7 +22,6 @@ import { parseShellCommand } from './shell-parser.js';
 const HISTORY_MAX_COMMANDS = 1000;
 const HISTORY_FILE = 'shell-history';
 
-
 /**
  * Shell context
  */
@@ -291,8 +290,8 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
       case 'shell': {
         // Easter egg: shell inside shell
         const shellMessages = [
-          '🐚 Shell-ception! You\'re already in a shell.',
-          '🪆 It\'s shells all the way down...',
+          "🐚 Shell-ception! You're already in a shell.",
+          "🪆 It's shells all the way down...",
           '🎭 Ha, nice try!',
           '🔄 Yo dawg, I heard you like shells...',
           '🌀 Recursion limit reached. Just kidding.',

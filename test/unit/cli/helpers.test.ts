@@ -22,10 +22,9 @@ describe('parseHeaderFlags', () => {
     });
 
     it('should parse multiple headers', () => {
-      expect(parseHeaderFlags([
-        'Authorization: Bearer token123',
-        'X-Custom-Header: custom-value',
-      ])).toEqual({
+      expect(
+        parseHeaderFlags(['Authorization: Bearer token123', 'X-Custom-Header: custom-value'])
+      ).toEqual({
         Authorization: 'Bearer token123',
         'X-Custom-Header': 'custom-value',
       });
@@ -84,10 +83,7 @@ describe('parseHeaderFlags', () => {
     });
 
     it('should allow overwriting same header', () => {
-      expect(parseHeaderFlags([
-        'X-Header: first',
-        'X-Header: second',
-      ])).toEqual({
+      expect(parseHeaderFlags(['X-Header: first', 'X-Header: second'])).toEqual({
         'X-Header': 'second',
       });
     });

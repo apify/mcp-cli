@@ -6,7 +6,11 @@
 
 import { createLogger } from '../logger.js';
 import { AuthError } from '../errors.js';
-import { discoverAndRefreshToken, createReauthError, type OAuthTokenResponse } from './oauth-utils.js';
+import {
+  discoverAndRefreshToken,
+  createReauthError,
+  type OAuthTokenResponse,
+} from './oauth-utils.js';
 
 const logger = createLogger('oauth-token-manager');
 
@@ -27,7 +31,9 @@ export type OnTokenRefreshCallback = (tokens: OAuthTokenResponse) => void | Prom
  * Returns the current refresh token from persistent storage (e.g., keychain)
  * This handles cases where another process may have rotated the token
  */
-export type OnBeforeRefreshCallback = () => Promise<{ refreshToken?: string; accessToken?: string; accessTokenExpiresAt?: number } | undefined>;
+export type OnBeforeRefreshCallback = () => Promise<
+  { refreshToken?: string; accessToken?: string; accessTokenExpiresAt?: number } | undefined
+>;
 
 /**
  * Options for creating an OAuthTokenManager
@@ -95,7 +101,8 @@ export class OAuthTokenManager {
     if (!this.accessToken || !this.accessTokenExpiresAt) {
       return 0;
     }
-    const secondsUntil = this.accessTokenExpiresAt - EXPIRY_BUFFER_SECONDS - Math.floor(Date.now() / 1000);
+    const secondsUntil =
+      this.accessTokenExpiresAt - EXPIRY_BUFFER_SECONDS - Math.floor(Date.now() / 1000);
     return Math.max(0, secondsUntil);
   }
 
@@ -142,7 +149,11 @@ export class OAuthTokenManager {
     logger.debug(`Refreshing access token for profile: ${this.profileName}`);
 
     try {
-      const tokenResponse = await discoverAndRefreshToken(this.serverUrl, this.refreshToken, this.clientId);
+      const tokenResponse = await discoverAndRefreshToken(
+        this.serverUrl,
+        this.refreshToken,
+        this.clientId
+      );
 
       // Store new access token
       this.accessToken = tokenResponse.access_token;

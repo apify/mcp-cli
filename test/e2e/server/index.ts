@@ -212,7 +212,8 @@ function createMcpServer(): Server {
         prompts: { listChanged: true },
         logging: {},
       },
-      instructions: 'E2E test server for mcpc. Provides sample tools, resources, and prompts for testing.',
+      instructions:
+        'E2E test server for mcpc. Provides sample tools, resources, and prompts for testing.',
     }
   );
 
@@ -531,7 +532,8 @@ async function main() {
       } else if (req.method === 'POST' && !mcpSessionId) {
         // New session - create transport
         transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => `e2e-session-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          sessionIdGenerator: () =>
+            `e2e-session-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           onsessioninitialized: (newSessionId) => {
             transports.set(newSessionId, transport);
           },
@@ -539,6 +541,7 @@ async function main() {
 
         // Connect to MCP server
         // Type assertion needed due to exactOptionalPropertyTypes incompatibility with MCP SDK
+        // @ts-ignore
         await mcpServer.connect(transport as Parameters<typeof mcpServer.connect>[0]);
       } else if (mcpSessionId && !transports.has(mcpSessionId)) {
         // Session ID provided but not found - per MCP spec, return 404
@@ -563,7 +566,9 @@ async function main() {
 
   httpServer.listen(PORT, () => {
     console.log(`E2E test server running on http://localhost:${PORT}`);
-    console.log(`  Pagination: ${PAGINATION_SIZE > 0 ? `${PAGINATION_SIZE} items/page` : 'disabled'}`);
+    console.log(
+      `  Pagination: ${PAGINATION_SIZE > 0 ? `${PAGINATION_SIZE} items/page` : 'disabled'}`
+    );
     console.log(`  Latency: ${LATENCY_MS}ms`);
     console.log(`  Auth required: ${REQUIRE_AUTH}`);
   });

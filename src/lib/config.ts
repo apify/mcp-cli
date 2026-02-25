@@ -33,7 +33,7 @@ export function loadConfig(configPath: string): McpConfig {
     if (!config.mcpServers || typeof config.mcpServers !== 'object') {
       throw new ClientError(
         `Invalid config file format: missing or invalid "mcpServers" field.\n` +
-        `Expected: { "mcpServers": { "server-name": {...} } }`
+          `Expected: { "mcpServers": { "server-name": {...} } }`
       );
     }
 
@@ -46,9 +46,7 @@ export function loadConfig(configPath: string): McpConfig {
     }
 
     if (error instanceof SyntaxError) {
-      throw new ClientError(
-        `Invalid JSON in config file: ${absolutePath}\n${error.message}`
-      );
+      throw new ClientError(`Invalid JSON in config file: ${absolutePath}\n${error.message}`);
     }
 
     if (error instanceof ClientError) {
@@ -76,7 +74,7 @@ export function getServerConfig(config: McpConfig, serverName: string): ServerCo
     const availableServers = Object.keys(config.mcpServers);
     throw new ClientError(
       `Server "${serverName}" not found in config file.\n` +
-      `Available servers: ${availableServers.join(', ')}`
+        `Available servers: ${availableServers.join(', ')}`
     );
   }
 
@@ -197,17 +195,13 @@ export function validateServerConfig(config: ServerConfig): boolean {
 
   // Cannot have both
   if (hasUrl && hasCommand) {
-    throw new ClientError(
-      'Invalid server config: cannot specify both "url" and "command"'
-    );
+    throw new ClientError('Invalid server config: cannot specify both "url" and "command"');
   }
 
   // HTTP-specific validation
   if (config.url !== undefined) {
     if (typeof config.url !== 'string' || config.url.trim() === '') {
-      throw new ClientError(
-        'Invalid server config: "url" must be a non-empty string'
-      );
+      throw new ClientError('Invalid server config: "url" must be a non-empty string');
     }
     if (!config.url.startsWith('http://') && !config.url.startsWith('https://')) {
       throw new ClientError(
@@ -219,9 +213,7 @@ export function validateServerConfig(config: ServerConfig): boolean {
   // Stdio-specific validation
   if (config.command !== undefined) {
     if (typeof config.command !== 'string' || config.command.trim() === '') {
-      throw new ClientError(
-        'Invalid server config: "command" must be a non-empty string'
-      );
+      throw new ClientError('Invalid server config: "command" must be a non-empty string');
     }
   }
 

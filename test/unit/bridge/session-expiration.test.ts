@@ -2,8 +2,8 @@
  * Unit tests for session expiration detection
  */
 
-import { isSessionExpiredError } from '../../../src/lib/utils';
-import { isAuthenticationError } from '../../../src/lib/errors';
+import { isSessionExpiredError } from '../../../src/lib/utils.js';
+import { isAuthenticationError } from '../../../src/lib/errors.js';
 
 describe('isSessionExpiredError', () => {
   describe('should detect session expiration', () => {
@@ -20,12 +20,8 @@ describe('isSessionExpiredError', () => {
           'Bad Request: Session ID 334c4cc0-ea1a-49f5-89a6-13bbe29b17d6 not found'
         )
       ).toBe(true);
-      expect(
-        isSessionExpiredError('Session ID abc123 not found')
-      ).toBe(true);
-      expect(
-        isSessionExpiredError('session id test-session not found')
-      ).toBe(true);
+      expect(isSessionExpiredError('Session ID abc123 not found')).toBe(true);
+      expect(isSessionExpiredError('session id test-session not found')).toBe(true);
     });
 
     it('detects "session xyz not found" message (without "id" keyword)', () => {

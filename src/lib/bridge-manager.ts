@@ -20,9 +20,18 @@ import type { ServerConfig, AuthCredentials, ProxyConfig } from './types.js';
 import { getSocketPath, waitForFile, isProcessAlive, fileExists, getLogsDir } from './utils.js';
 import { updateSession, getSession } from './sessions.js';
 import { createLogger } from './logger.js';
-import { ClientError, NetworkError, isAuthenticationError, createServerAuthError } from './errors.js';
+import {
+  ClientError,
+  NetworkError,
+  isAuthenticationError,
+  createServerAuthError,
+} from './errors.js';
 import { BridgeClient } from './bridge-client.js';
-import { readKeychainOAuthTokenInfo, readKeychainOAuthClientInfo, readKeychainSessionHeaders } from './auth/keychain.js';
+import {
+  readKeychainOAuthTokenInfo,
+  readKeychainOAuthClientInfo,
+  readKeychainSessionHeaders,
+} from './auth/keychain.js';
 import { getAuthProfile } from './auth/profiles.js';
 
 const logger = createLogger('bridge-manager');
@@ -68,7 +77,8 @@ export interface StartBridgeResult {
  * @returns Bridge process PID
  */
 export async function startBridge(options: StartBridgeOptions): Promise<StartBridgeResult> {
-  const { sessionName, serverConfig, verbose, profileName, headers, proxyConfig, mcpSessionId } = options;
+  const { sessionName, serverConfig, verbose, profileName, headers, proxyConfig, mcpSessionId } =
+    options;
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
 
@@ -189,7 +199,7 @@ export async function stopBridge(sessionName: string): Promise<void> {
       process.kill(session.pid, 'SIGTERM');
 
       // Wait for graceful shutdown (gives time for HTTP DELETE to be sent)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Force kill if still alive
       if (isProcessAlive(session.pid)) {
@@ -241,7 +251,7 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   if (expectedHeaderKeys.length > 0) {
     headers = await readKeychainSessionHeaders(sessionName);
     const retrievedHeaderKeys = new Set(Object.keys(headers || {}));
-    const missingKeys = expectedHeaderKeys.filter(key => !retrievedHeaderKeys.has(key));
+    const missingKeys = expectedHeaderKeys.filter((key) => !retrievedHeaderKeys.has(key));
     if (missingKeys.length > 0) {
       throw new ClientError(
         `Missing HTTP header(s) in keychain for session ${sessionName}: ${missingKeys.join(', ')}. ` +
@@ -333,10 +343,11 @@ async function sendAuthCredentialsToBridge(
 
   // Always send credentials to the bridge (even if minimal)
   // The bridge waits for this message before connecting to MCP server
-  logger.debug('Sending auth credentials to bridge' +
-    (credentials.refreshToken ? ' (with refresh token)' : '') +
-    (credentials.headers ? ` (with ${Object.keys(credentials.headers).length} headers)` : '') +
-    (!credentials.refreshToken && !credentials.headers ? ' (minimal - no tokens or headers)' : '')
+  logger.debug(
+    'Sending auth credentials to bridge' +
+      (credentials.refreshToken ? ' (with refresh token)' : '') +
+      (credentials.headers ? ` (with ${Object.keys(credentials.headers).length} headers)` : '') +
+      (!credentials.refreshToken && !credentials.headers ? ' (minimal - no tokens or headers)' : '')
   );
 
   // Connect to bridge and send credentials
@@ -407,9 +418,9 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   if (session.status === 'expired') {
     throw new ClientError(
       `Session ${sessionName} has expired. ` +
-      `The MCP server indicated the session is no longer valid.\n` +
-      `To reconnect, run: mcpc ${sessionName} restart\n` +
-      `To remove the expired session, run: mcpc ${sessionName} close`
+        `The MCP server indicated the session is no longer valid.\n` +
+        `To reconnect, run: mcpc ${sessionName} restart\n` +
+        `To remove the expired session, run: mcpc ${sessionName} close`
     );
   }
 
@@ -469,6 +480,6 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
   throw new ClientError(
     `Bridge for ${sessionName} failed after restart: ${errorMsg}. ` +
-    `For details, check logs at ${logPath}`
+      `For details, check logs at ${logPath}`
   );
 }

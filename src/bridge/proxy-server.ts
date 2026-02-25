@@ -6,7 +6,12 @@
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from 'http';
+import {
+  createServer,
+  type Server as HttpServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from 'http';
 import { Server as MCPServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -193,10 +198,7 @@ export class ProxyServer {
     });
 
     this.mcpServer!.setRequestHandler(CallToolRequestSchema, async (request) => {
-      return await client.callTool(
-        request.params.name,
-        request.params.arguments
-      );
+      return await client.callTool(request.params.name, request.params.arguments);
     });
 
     // Resources
@@ -218,10 +220,7 @@ export class ProxyServer {
     });
 
     this.mcpServer!.setRequestHandler(GetPromptRequestSchema, async (request) => {
-      return await client.getPrompt(
-        request.params.name,
-        request.params.arguments
-      );
+      return await client.getPrompt(request.params.name, request.params.arguments);
     });
 
     // Logging

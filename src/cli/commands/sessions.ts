@@ -3,9 +3,22 @@
  */
 
 import { createServer } from 'net';
-import { OutputMode, isValidSessionName, validateProfileName, isProcessAlive, getServerHost, redactHeaders } from '../../lib/index.js';
+import {
+  OutputMode,
+  isValidSessionName,
+  validateProfileName,
+  isProcessAlive,
+  getServerHost,
+  redactHeaders,
+} from '../../lib/index.js';
 import type { ServerConfig, ProxyConfig } from '../../lib/types.js';
-import { formatOutput, formatSuccess, formatError, formatSessionLine, formatServerDetails } from '../output.js';
+import {
+  formatOutput,
+  formatSuccess,
+  formatError,
+  formatSessionLine,
+  formatServerDetails,
+} from '../output.js';
 import { withMcpClient, resolveTarget, resolveAuthProfile } from '../helpers.js';
 import { listAuthProfiles } from '../../lib/auth/profiles.js';
 import {
@@ -17,7 +30,10 @@ import {
   getSession,
 } from '../../lib/sessions.js';
 import { startBridge, StartBridgeOptions, stopBridge } from '../../lib/bridge-manager.js';
-import { storeKeychainSessionHeaders, storeKeychainProxyBearerToken } from '../../lib/auth/keychain.js';
+import {
+  storeKeychainSessionHeaders,
+  storeKeychainProxyBearerToken,
+} from '../../lib/auth/keychain.js';
 import { ClientError } from '../../lib/index.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
@@ -74,7 +90,7 @@ export async function connectSession(
     if (!isValidSessionName(name)) {
       throw new ClientError(
         `Invalid session name: ${name}\n` +
-        `Session names must start with @ and be followed by 1-64 characters, alphanumeric with hyphens or underscores only (e.g., @my-session).`
+          `Session names must start with @ and be followed by 1-64 characters, alphanumeric with hyphens or underscores only (e.g., @my-session).`
       );
     }
 
@@ -94,7 +110,7 @@ export async function connectSession(
       if (!portAvailable) {
         throw new ClientError(
           `Port ${proxyConfig.port} is already in use on ${proxyConfig.host}. ` +
-          `Choose a different port with --proxy [host:]port`
+            `Choose a different port with --proxy [host:]port`
         );
       }
     }
@@ -120,7 +136,9 @@ export async function connectSession(
 
       // Bridge has crashed or expired - reconnect with warning
       if (options.outputMode === 'human') {
-        console.log(chalk.yellow(`Session ${name} exists but bridge is ${bridgeStatus}, reconnecting...`));
+        console.log(
+          chalk.yellow(`Session ${name} exists but bridge is ${bridgeStatus}, reconnecting...`)
+        );
       }
 
       // Clean up old bridge resources before reconnecting
@@ -137,12 +155,9 @@ export async function connectSession(
     // For HTTP targets, resolve auth profile (with helpful errors if none available)
     let profileName: string | undefined;
     if (serverConfig.url) {
-      profileName = await resolveAuthProfile(
-        serverConfig.url,
-        target,
-        options.profile,
-        { sessionName: name }
-      );
+      profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
+        sessionName: name,
+      });
     }
 
     // Store headers in OS keychain (secure storage) before starting bridge
@@ -155,13 +170,17 @@ export async function connectSession(
 
       // Remove OAuth-derived Authorization header - it will be handled via the profile
       if (profileName && headers.Authorization?.startsWith('Bearer ')) {
-        logger.debug(`Skipping OAuth Authorization header storage for session ${name} (handled via profile)`);
+        logger.debug(
+          `Skipping OAuth Authorization header storage for session ${name} (handled via profile)`
+        );
         delete headers.Authorization;
       }
 
       // Only store remaining headers (from --header flags)
       if (Object.keys(headers).length > 0) {
-        logger.debug(`Storing ${Object.keys(headers).length} headers for session ${name} in keychain`);
+        logger.debug(
+          `Storing ${Object.keys(headers).length} headers for session ${name} in keychain`
+        );
         await storeKeychainSessionHeaders(name, headers);
       } else {
         headers = undefined;
@@ -193,7 +212,11 @@ export async function connectSession(
       await updateSession(name, sessionUpdate);
       logger.debug(`Session record updated for reconnect: ${name}`);
     } else {
-      await saveSession(name, { server: sessionTransportConfig, createdAt: new Date().toISOString(), ...sessionUpdate });
+      await saveSession(name, {
+        server: sessionTransportConfig,
+        createdAt: new Date().toISOString(),
+        ...sessionUpdate,
+      });
       logger.debug(`Initial session record created for: ${name}`);
     }
 
@@ -266,7 +289,10 @@ export async function connectSession(
 /**
  * Determine bridge status for a session
  */
-function getBridgeStatus(session: { status?: string; pid?: number }): 'live' | 'crashed' | 'expired' {
+function getBridgeStatus(session: {
+  status?: string;
+  pid?: number;
+}): 'live' | 'crashed' | 'expired' {
   if (session.status === 'expired') {
     return 'expired';
   }
@@ -317,7 +343,9 @@ function formatTimeAgo(isoDate: string | undefined): string {
  * List active sessions and authentication profiles
  * Consolidates session state first (cleans up crashed bridges, removes expired sessions)
  */
-export async function listSessionsAndAuthProfiles(options: { outputMode: OutputMode }): Promise<void> {
+export async function listSessionsAndAuthProfiles(options: {
+  outputMode: OutputMode;
+}): Promise<void> {
   // Consolidate sessions first (cleans up crashed bridges, removes expired sessions)
   const consolidateResult = await consolidateSessions(false);
   const sessions = Object.values(consolidateResult.sessions);
@@ -391,7 +419,6 @@ export async function listSessionsAndAuthProfiles(options: { outputMode: OutputM
         console.log(line);
       }
     }
-
   }
 }
 
@@ -473,7 +500,9 @@ export async function showServerDetails(
       // Build _mcpc.server with redacted headers for security
       const server: ServerConfig = {
         ...context.serverConfig,
-        ...(context.serverConfig?.headers && { headers: redactHeaders(context.serverConfig.headers) }),
+        ...(context.serverConfig?.headers && {
+          headers: redactHeaders(context.serverConfig.headers),
+        }),
       };
 
       console.log(
@@ -594,10 +623,7 @@ export async function restartSession(
 /**
  * Show help for a server (alias for getInstructions)
  */
-export async function showHelp(
-  target: string,
-  options: { outputMode: OutputMode }
-): Promise<void> {
+export async function showHelp(target: string, options: { outputMode: OutputMode }): Promise<void> {
   await showServerDetails(target, options);
 }
 

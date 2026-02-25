@@ -30,7 +30,10 @@ export async function listResources(target: string, options: CommandOptions): Pr
  * List available resource templates
  * Automatically fetches all pages if pagination is present
  */
-export async function listResourceTemplates(target: string, options: CommandOptions): Promise<void> {
+export async function listResourceTemplates(
+  target: string,
+  options: CommandOptions
+): Promise<void> {
   await withMcpClient(target, options, async (client, _context) => {
     // Fetch all resource templates across all pages
     const allTemplates = [];
@@ -87,7 +90,11 @@ export async function getResource(
 /**
  * Subscribe to resource updates
  */
-export async function subscribeResource(target: string, uri: string, options: CommandOptions): Promise<void> {
+export async function subscribeResource(
+  target: string,
+  uri: string,
+  options: CommandOptions
+): Promise<void> {
   await withMcpClient(target, options, async (client, _context) => {
     await client.subscribeResource(uri);
 
@@ -102,7 +109,11 @@ export async function subscribeResource(target: string, uri: string, options: Co
 /**
  * Unsubscribe from resource updates
  */
-export async function unsubscribeResource(target: string, uri: string, options: CommandOptions): Promise<void> {
+export async function unsubscribeResource(
+  target: string,
+  uri: string,
+  options: CommandOptions
+): Promise<void> {
   await withMcpClient(target, options, async (client, _context) => {
     await client.unsubscribeResource(uri);
 

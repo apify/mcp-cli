@@ -194,7 +194,12 @@ export function validateToolSchema(
           const expectedProp = expectedProps[argName] as Record<string, unknown> | undefined;
           const actualProp = actualProps[argName] as Record<string, unknown> | undefined;
 
-          if (expectedProp && actualProp && expectedProp.type && actualProp.type !== expectedProp.type) {
+          if (
+            expectedProp &&
+            actualProp &&
+            expectedProp.type &&
+            actualProp.type !== expectedProp.type
+          ) {
             result.errors.push(
               `Argument "${argName}" type changed: expected ${JSON.stringify(expectedProp.type)}, got ${JSON.stringify(actualProp.type)}`
             );

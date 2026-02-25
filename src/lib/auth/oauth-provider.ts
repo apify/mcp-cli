@@ -310,11 +310,15 @@ export class OAuthProvider implements OAuthClientProvider {
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     // Runtime mode: not supported
     if (this.isRuntimeMode()) {
-      throw new Error('OAuthProvider in runtime mode does not support authorization flow. Use CLI "login" command first.');
+      throw new Error(
+        'OAuthProvider in runtime mode does not support authorization flow. Use CLI "login" command first.'
+      );
     }
 
     // Auth flow mode: log the URL (actual redirect handled by oauth-flow.ts)
-    logger.warn(`MCP SDK requested redirect to authorization URL (ignoring): ${authorizationUrl.toString()}`);
+    logger.warn(
+      `MCP SDK requested redirect to authorization URL (ignoring): ${authorizationUrl.toString()}`
+    );
   }
 
   async saveCodeVerifier(codeVerifier: string): Promise<void> {

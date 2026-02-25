@@ -6,7 +6,13 @@
 import { readdir, unlink, rm } from 'fs/promises';
 import { join } from 'path';
 import type { OutputMode } from '../../lib/index.js';
-import { getMcpcHome, getBridgesDir, getLogsDir, fileExists, cleanupOrphanedLogFiles } from '../../lib/index.js';
+import {
+  getMcpcHome,
+  getBridgesDir,
+  getLogsDir,
+  fileExists,
+  cleanupOrphanedLogFiles,
+} from '../../lib/index.js';
 import { formatOutput, formatSuccess, formatWarning } from '../output.js';
 import { loadSessions, deleteSession, consolidateSessions } from '../../lib/sessions.js';
 import { stopBridge } from '../../lib/bridge-manager.js';
@@ -240,15 +246,14 @@ export async function clean(options: CleanOptions): Promise<void> {
 
     if (!cleaningSpecific) {
       const hasCleanups =
-        result.crashedBridges > 0 ||
-        result.expiredSessions > 0 ||
-        result.orphanedBridgeLogs > 0;
+        result.crashedBridges > 0 || result.expiredSessions > 0 || result.orphanedBridgeLogs > 0;
 
       if (hasCleanups) {
         const parts: string[] = [];
         if (result.crashedBridges > 0) parts.push(`${result.crashedBridges} crashed bridge(s)`);
         if (result.expiredSessions > 0) parts.push(`${result.expiredSessions} expired session(s)`);
-        if (result.orphanedBridgeLogs > 0) parts.push(`${result.orphanedBridgeLogs} orphaned log(s)`);
+        if (result.orphanedBridgeLogs > 0)
+          parts.push(`${result.orphanedBridgeLogs} orphaned log(s)`);
         messages.push(`Cleaned ${parts.join(', ')}`);
       } else {
         messages.push('No stale resources found');
@@ -260,7 +265,11 @@ export async function clean(options: CleanOptions): Promise<void> {
     }
 
     if (options.profiles) {
-      messages.push(result.profiles > 0 ? `Removed ${result.profiles} authentication profile(s)` : 'No profiles to remove');
+      messages.push(
+        result.profiles > 0
+          ? `Removed ${result.profiles} authentication profile(s)`
+          : 'No profiles to remove'
+      );
     }
 
     if (options.logs) {
@@ -273,10 +282,14 @@ export async function clean(options: CleanOptions): Promise<void> {
 
     // Warn about sessions that were using deleted profiles
     if (result.affectedSessions && result.affectedSessions.length > 0) {
-      console.log(formatWarning(
-        `Warning: ${result.affectedSessions.length} session(s) were using deleted profiles: ${result.affectedSessions.join(', ')}`
-      ));
-      console.log(formatWarning('These sessions may fail to authenticate. Recreate them or login again.'));
+      console.log(
+        formatWarning(
+          `Warning: ${result.affectedSessions.length} session(s) were using deleted profiles: ${result.affectedSessions.join(', ')}`
+        )
+      );
+      console.log(
+        formatWarning('These sessions may fail to authenticate. Recreate them or login again.')
+      );
     }
   } else {
     console.log(formatOutput(result, 'json'));

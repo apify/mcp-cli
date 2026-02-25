@@ -154,7 +154,9 @@ export function createTransportFromConfig(
       transportOptions.authProvider = options.authProvider;
       logger.debug('Setting authProvider on transport options');
       logger.debug(`  authProvider type: ${options.authProvider.constructor.name}`);
-      logger.debug(`  authProvider has tokens method: ${typeof options.authProvider.tokens === 'function'}`);
+      logger.debug(
+        `  authProvider has tokens method: ${typeof options.authProvider.tokens === 'function'}`
+      );
     } else {
       logger.debug('No authProvider provided for HTTP transport');
     }

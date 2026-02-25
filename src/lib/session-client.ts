@@ -71,10 +71,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
    * This handles the common case of a crashed bridge without complex retry logic.
    * MCP-level errors (server errors, auth errors) are NOT retried - they're returned to caller.
    */
-  private async withRetry<T>(
-    operation: () => Promise<T>,
-    operationName: string
-  ): Promise<T> {
+  private async withRetry<T>(operation: () => Promise<T>, operationName: string): Promise<T> {
     try {
       return await operation();
     } catch (error) {
@@ -122,10 +119,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
   // MCP operations
   async ping(): Promise<void> {
-    return this.withRetry(
-      () => this.bridgeClient.request('ping').then(() => undefined),
-      'ping'
-    );
+    return this.withRetry(() => this.bridgeClient.request('ping').then(() => undefined), 'ping');
   }
 
   async listTools(cursor?: string): Promise<ListToolsResult> {
@@ -137,7 +131,8 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
   async callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('callTool', { name, arguments: args }) as Promise<CallToolResult>,
+      () =>
+        this.bridgeClient.request('callTool', { name, arguments: args }) as Promise<CallToolResult>,
       'callTool'
     );
   }
@@ -151,7 +146,11 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
   async listResourceTemplates(cursor?: string): Promise<ListResourceTemplatesResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('listResourceTemplates', cursor) as Promise<ListResourceTemplatesResult>,
+      () =>
+        this.bridgeClient.request(
+          'listResourceTemplates',
+          cursor
+        ) as Promise<ListResourceTemplatesResult>,
       'listResourceTemplates'
     );
   }
@@ -186,7 +185,11 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
   async getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('getPrompt', { name, arguments: args }) as Promise<GetPromptResult>,
+      () =>
+        this.bridgeClient.request('getPrompt', {
+          name,
+          arguments: args,
+        }) as Promise<GetPromptResult>,
       'getPrompt'
     );
   }

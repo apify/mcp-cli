@@ -46,11 +46,10 @@ describe('parseShellCommand', () => {
   });
 
   it('handles JSON in quotes', () => {
-    expect(parseShellCommand('tools-call search --dummy \'{"query":"test"}\''))
-      .toEqual({
-        command: 'tools-call',
-        args: ['search', '--dummy', '{"query":"test"}'],
-      });
+    expect(parseShellCommand('tools-call search --dummy \'{"query":"test"}\'')).toEqual({
+      command: 'tools-call',
+      args: ['search', '--dummy', '{"query":"test"}'],
+    });
   });
 
   it('trims leading and trailing whitespace', () => {

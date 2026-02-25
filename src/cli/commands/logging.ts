@@ -7,12 +7,25 @@ import { formatOutput, formatSuccess } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import { withMcpClient } from '../helpers.js';
 
-const VALID_LOG_LEVELS: LoggingLevel[] = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
+const VALID_LOG_LEVELS: LoggingLevel[] = [
+  'debug',
+  'info',
+  'notice',
+  'warning',
+  'error',
+  'critical',
+  'alert',
+  'emergency',
+];
 
 /**
  * Set server logging level
  */
-export async function setLogLevel(target: string, level: string, options: CommandOptions): Promise<void> {
+export async function setLogLevel(
+  target: string,
+  level: string,
+  options: CommandOptions
+): Promise<void> {
   // Validate log level
   if (!VALID_LOG_LEVELS.includes(level as LoggingLevel)) {
     throw new ClientError(

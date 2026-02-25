@@ -381,4 +381,3 @@ export function isSessionExpiredError(errorMessage: string): boolean {
     msg.includes('session is no longer valid')
   );
 }
-

@@ -43,7 +43,7 @@ export async function discoverTokenEndpoint(serverUrl: string): Promise<string |
   if (serverUrl !== base && serverUrl !== `${base}/`) {
     discoveryUrls.push(
       `${base}/.well-known/oauth-authorization-server`,
-      `${base}/.well-known/openid-configuration`,
+      `${base}/.well-known/openid-configuration`
     );
   }
 
@@ -55,7 +55,7 @@ export async function discoverTokenEndpoint(serverUrl: string): Promise<string |
       });
 
       if (response.ok) {
-        const metadata = await response.json() as { token_endpoint?: string };
+        const metadata = (await response.json()) as { token_endpoint?: string };
         if (metadata.token_endpoint) {
           logger.debug(`Found token endpoint: ${metadata.token_endpoint}`);
           return metadata.token_endpoint;
@@ -114,7 +114,7 @@ export async function refreshAccessToken(
     throw new AuthError(`Failed to refresh token: ${response.status} ${response.statusText}`);
   }
 
-  const tokenResponse = await response.json() as OAuthTokenResponse;
+  const tokenResponse = (await response.json()) as OAuthTokenResponse;
   return tokenResponse;
 }
 
@@ -140,7 +140,6 @@ export async function discoverAndRefreshToken(
 
   return refreshAccessToken(tokenEndpoint, refreshToken, clientId);
 }
-
 
 /**
  * Create an AuthError with a re-authentication hint

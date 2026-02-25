@@ -54,7 +54,15 @@ import {
   formatHuman,
   logTarget,
 } from '../../../src/cli/output.js';
-import type { Tool, Resource, ResourceTemplate, Prompt, ServerDetails, ServerConfig, SessionData } from '../../../src/lib/types.js';
+import type {
+  Tool,
+  Resource,
+  ResourceTemplate,
+  Prompt,
+  ServerDetails,
+  ServerConfig,
+  SessionData,
+} from '../../../src/lib/types.js';
 
 describe('extractSingleTextContent', () => {
   it('should return text for single text content item', () => {
@@ -300,9 +308,7 @@ describe('formatSimplifiedArgs', () => {
   });
 
   it('should return "(none)" for null or invalid schema', () => {
-    expect(formatSimplifiedArgs(null as unknown as Record<string, unknown>)).toEqual([
-      '* (none)',
-    ]);
+    expect(formatSimplifiedArgs(null as unknown as Record<string, unknown>)).toEqual(['* (none)']);
     expect(formatSimplifiedArgs(undefined as unknown as Record<string, unknown>)).toEqual([
       '* (none)',
     ]);
@@ -440,7 +446,9 @@ describe('formatTools', () => {
       const output = formatTools(sampleTools, { full: true });
       expect(output).toContain('Description:');
       expect(output).toContain('````');
-      expect(output).toContain('Search the web for information using DuckDuckGo and return relevant results');
+      expect(output).toContain(
+        'Search the web for information using DuckDuckGo and return relevant results'
+      );
     });
 
     it('should NOT show hint about --full flag', () => {
@@ -451,24 +459,28 @@ describe('formatTools', () => {
 
   describe('edge cases', () => {
     it('should handle tools with no parameters', () => {
-      const tools: Tool[] = [{
-        name: 'no_params_tool',
-        description: 'A tool with no parameters',
-        inputSchema: { type: 'object', properties: {} },
-      }];
+      const tools: Tool[] = [
+        {
+          name: 'no_params_tool',
+          description: 'A tool with no parameters',
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ];
 
       const output = formatTools(tools);
       expect(output).toContain('`no_params_tool`');
     });
 
     it('should handle tools with no description', () => {
-      const tools: Tool[] = [{
-        name: 'undocumented',
-        inputSchema: {
-          type: 'object',
-          properties: { arg: { type: 'string' } },
+      const tools: Tool[] = [
+        {
+          name: 'undocumented',
+          inputSchema: {
+            type: 'object',
+            properties: { arg: { type: 'string' } },
+          },
         },
-      }];
+      ];
 
       const output = formatTools(tools);
       expect(output).toContain('`undocumented`');
@@ -873,6 +885,7 @@ describe('formatResourceDetail', () => {
   });
 
   it('should format resource with minimal fields', () => {
+    // @ts-ignore
     const resource: Resource = {
       uri: 'test://minimal',
     };
@@ -955,9 +968,7 @@ describe('formatPrompts', () => {
       {
         name: 'greeting',
         description: 'Generate a greeting',
-        arguments: [
-          { name: 'name', description: 'Name to greet', required: true },
-        ],
+        arguments: [{ name: 'name', description: 'Name to greet', required: true }],
       },
       {
         name: 'farewell',
@@ -1221,9 +1232,7 @@ describe('formatHuman with GetPromptResult', () => {
 
   it('should NOT treat objects without role/content as prompt result', () => {
     const result = {
-      messages: [
-        { id: 1, text: 'not a prompt message' },
-      ],
+      messages: [{ id: 1, text: 'not a prompt message' }],
     };
 
     const output = formatHuman(result);
@@ -1326,7 +1335,7 @@ describe('logTarget', () => {
     const serverConfig: ServerConfig = {
       url: 'https://mcp.example.com',
       headers: {
-        'Authorization': 'Bearer super-secret-token-12345',
+        Authorization: 'Bearer super-secret-token-12345',
         'X-Api-Key': 'secret-api-key-67890',
       },
     };
@@ -1337,7 +1346,7 @@ describe('logTarget', () => {
     });
 
     // Get the output that was logged
-    const output = consoleSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    const output = consoleSpy.mock.calls.map((call) => call.join(' ')).join('\n');
 
     // Should NOT contain any header values
     expect(output).not.toContain('super-secret-token-12345');
@@ -1353,7 +1362,7 @@ describe('logTarget', () => {
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-test'],
       headers: {
-        'Authorization': 'Bearer leaked-token',
+        Authorization: 'Bearer leaked-token',
       },
     };
 
@@ -1362,7 +1371,7 @@ describe('logTarget', () => {
       serverConfig,
     });
 
-    const output = consoleSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    const output = consoleSpy.mock.calls.map((call) => call.join(' ')).join('\n');
 
     // Should NOT contain header values
     expect(output).not.toContain('leaked-token');
@@ -1377,7 +1386,7 @@ describe('logTarget', () => {
     const serverConfig: ServerConfig = {
       url: 'https://mcp.example.com',
       headers: {
-        'Authorization': 'Bearer secret',
+        Authorization: 'Bearer secret',
       },
     };
 

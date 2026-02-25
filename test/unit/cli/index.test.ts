@@ -94,12 +94,7 @@ describe('extractOptions', () => {
   });
 
   it('should extract multiple --header options', () => {
-    const result = extractOptions([
-      '--header',
-      'Auth: Bearer token',
-      '--header',
-      'X-Key: value',
-    ]);
+    const result = extractOptions(['--header', 'Auth: Bearer token', '--header', 'X-Key: value']);
     expect(result).toEqual({
       json: false,
       verbose: false,
@@ -168,13 +163,7 @@ describe('extractOptions', () => {
 
   it('should handle args with target mixed in', () => {
     // Target should be ignored - extractOptions only cares about options
-    const result = extractOptions([
-      '--json',
-      'apify',
-      '--config',
-      'file.json',
-      'tools-list',
-    ]);
+    const result = extractOptions(['--json', 'apify', '--config', 'file.json', 'tools-list']);
     expect(result).toEqual({ json: true, verbose: false, config: 'file.json' });
   });
 

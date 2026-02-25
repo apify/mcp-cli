@@ -153,7 +153,9 @@ describe('schema-validator', () => {
       };
       const result = validateToolSchema(actual, expected, 'compatible');
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Output field') && e.includes('type changed'))).toBe(true);
+      expect(
+        result.errors.some((e) => e.includes('Output field') && e.includes('type changed'))
+      ).toBe(true);
     });
 
     it('allows description mismatch in compatible mode with warning', () => {
@@ -214,7 +216,9 @@ describe('schema-validator', () => {
         };
         const result = validateToolSchema(actual, expected, 'compatible');
         expect(result.valid).toBe(true);
-        expect(result.warnings.some((w) => w.includes('newField') && w.includes('added'))).toBe(true);
+        expect(result.warnings.some((w) => w.includes('newField') && w.includes('added'))).toBe(
+          true
+        );
       });
 
       it('warns when required output field becomes optional', () => {
@@ -240,7 +244,9 @@ describe('schema-validator', () => {
         };
         const result = validateToolSchema(actual, expected, 'compatible');
         expect(result.valid).toBe(true);
-        expect(result.warnings.some((w) => w.includes('result') && w.includes('required to optional'))).toBe(true);
+        expect(
+          result.warnings.some((w) => w.includes('result') && w.includes('required to optional'))
+        ).toBe(true);
       });
 
       it('warns when optional output field becomes required (not breaking)', () => {
@@ -266,7 +272,9 @@ describe('schema-validator', () => {
         };
         const result = validateToolSchema(actual, expected, 'compatible');
         expect(result.valid).toBe(true);
-        expect(result.warnings.some((w) => w.includes('result') && w.includes('optional to required'))).toBe(true);
+        expect(
+          result.warnings.some((w) => w.includes('result') && w.includes('optional to required'))
+        ).toBe(true);
       });
 
       it('fails when output schema is completely removed', () => {
@@ -451,7 +459,9 @@ describe('schema-validator', () => {
         // Passing arg2, so type change should be detected
         const result = validateToolSchema(actual, expected, 'compatible', { arg2: 123 });
         expect(result.valid).toBe(false);
-        expect(result.errors.some((e) => e.includes('arg2') && e.includes('type changed'))).toBe(true);
+        expect(result.errors.some((e) => e.includes('arg2') && e.includes('type changed'))).toBe(
+          true
+        );
       });
 
       it('detects when passed argument no longer exists', () => {
@@ -479,7 +489,9 @@ describe('schema-validator', () => {
         };
         const result = validateToolSchema(actual, expected, 'compatible', { arg2: 'value' });
         expect(result.valid).toBe(false);
-        expect(result.errors.some((e) => e.includes('arg2') && e.includes('no longer exists'))).toBe(true);
+        expect(
+          result.errors.some((e) => e.includes('arg2') && e.includes('no longer exists'))
+        ).toBe(true);
       });
 
       it('allows new required field if it is being passed', () => {
@@ -505,7 +517,10 @@ describe('schema-validator', () => {
           },
         };
         // Passing the new required field, so it should be valid
-        const result = validateToolSchema(actual, expected, 'compatible', { arg1: 'hello', newRequired: 'world' });
+        const result = validateToolSchema(actual, expected, 'compatible', {
+          arg1: 'hello',
+          newRequired: 'world',
+        });
         expect(result.valid).toBe(true);
       });
 
@@ -534,7 +549,9 @@ describe('schema-validator', () => {
         // Not passing the new required field
         const result = validateToolSchema(actual, expected, 'compatible', { arg1: 'hello' });
         expect(result.valid).toBe(false);
-        expect(result.errors.some((e) => e.includes('newRequired') && e.includes('breaking change'))).toBe(true);
+        expect(
+          result.errors.some((e) => e.includes('newRequired') && e.includes('breaking change'))
+        ).toBe(true);
       });
     });
   });
@@ -665,9 +682,14 @@ describe('schema-validator', () => {
           ],
         };
         // Passing arg2, so its removal should be detected
-        const result = validatePromptSchema(actual, expected, 'compatible', { arg1: 'hello', arg2: 'world' });
+        const result = validatePromptSchema(actual, expected, 'compatible', {
+          arg1: 'hello',
+          arg2: 'world',
+        });
         expect(result.valid).toBe(false);
-        expect(result.errors.some((e) => e.includes('arg2') && e.includes('no longer exists'))).toBe(true);
+        expect(
+          result.errors.some((e) => e.includes('arg2') && e.includes('no longer exists'))
+        ).toBe(true);
       });
 
       it('allows new required argument if it is being passed', () => {
@@ -683,7 +705,10 @@ describe('schema-validator', () => {
           ],
         };
         // Passing the new required argument, so it should be valid
-        const result = validatePromptSchema(actual, expected, 'compatible', { arg1: 'hello', newRequired: 'world' });
+        const result = validatePromptSchema(actual, expected, 'compatible', {
+          arg1: 'hello',
+          newRequired: 'world',
+        });
         expect(result.valid).toBe(true);
       });
 
@@ -702,7 +727,9 @@ describe('schema-validator', () => {
         // Not passing the new required argument
         const result = validatePromptSchema(actual, expected, 'compatible', { arg1: 'hello' });
         expect(result.valid).toBe(false);
-        expect(result.errors.some((e) => e.includes('newRequired') && e.includes('breaking change'))).toBe(true);
+        expect(
+          result.errors.some((e) => e.includes('newRequired') && e.includes('breaking change'))
+        ).toBe(true);
       });
     });
   });

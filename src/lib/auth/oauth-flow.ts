@@ -34,9 +34,10 @@ type KeyHandlerResult<T> =
  * Set up raw mode keypress listener
  * Returns cleanup function and allows custom key handling via callback
  */
-function setupKeyListener<T>(
-  onKey: (char: string) => KeyHandlerResult<T>
-): { promise: Promise<T>; cleanup: () => void } {
+function setupKeyListener<T>(onKey: (char: string) => KeyHandlerResult<T>): {
+  promise: Promise<T>;
+  cleanup: () => void;
+} {
   let cleanup = () => {};
   let cleaned = false;
 
@@ -289,7 +290,11 @@ export async function performOAuthFlow(
 
   // Warn about OAuth over plain HTTP (except localhost)
   const parsedUrl = new URL(normalizedServerUrl);
-  if (parsedUrl.protocol === 'http:' && parsedUrl.hostname !== 'localhost' && parsedUrl.hostname !== '127.0.0.1') {
+  if (
+    parsedUrl.protocol === 'http:' &&
+    parsedUrl.hostname !== 'localhost' &&
+    parsedUrl.hostname !== '127.0.0.1'
+  ) {
     console.warn('\nWarning: OAuth over plain HTTP is insecure. Only use for local development.\n');
   }
 
@@ -329,7 +334,9 @@ export async function performOAuthFlow(
     });
 
     // Escape handler - set up after browser opens (use object wrapper to avoid TypeScript closure narrowing)
-    const escapeHandlerRef: { current: ReturnType<typeof waitForEscapeKey> | null } = { current: null };
+    const escapeHandlerRef: { current: ReturnType<typeof waitForEscapeKey> | null } = {
+      current: null,
+    };
 
     // Override redirectToAuthorization to open browser
     provider.redirectToAuthorization = async (authorizationUrl: URL) => {
@@ -337,7 +344,9 @@ export async function performOAuthFlow(
       console.log(`\nAuthorization URL: ${authorizationUrl.toString()}`);
 
       // Ask for confirmation before opening browser
-      const confirmed = await waitForEnterKey('Press Enter to open browser (any other key to cancel): ');
+      const confirmed = await waitForEnterKey(
+        'Press Enter to open browser (any other key to cancel): '
+      );
       if (!confirmed) {
         throw new ClientError('Authentication cancelled by user');
       }

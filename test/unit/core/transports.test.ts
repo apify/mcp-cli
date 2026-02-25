@@ -2,8 +2,8 @@
  * Unit tests for MCP transports
  */
 
-import { createTransportFromConfig } from '../../../src/core/transports';
-import { ClientError } from '../../../src/lib/errors';
+import { createTransportFromConfig } from '../../../src/core/transports.js';
+import { ClientError } from '../../../src/lib/errors.js';
 
 // Mock the SDK transports
 jest.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
@@ -43,9 +43,7 @@ describe('createTransportFromConfig', () => {
   });
 
   it('should throw error for config without url or command', () => {
-    expect(() =>
-      createTransportFromConfig({} as any)
-    ).toThrow(ClientError);
+    expect(() => createTransportFromConfig({} as any)).toThrow(ClientError);
   });
 
   it('should pass headers to http transport', () => {

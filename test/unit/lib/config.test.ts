@@ -4,8 +4,13 @@
 
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { loadConfig, getServerConfig, validateServerConfig, listServers } from '../../../src/lib/config';
-import { ClientError } from '../../../src/lib/errors';
+import {
+  loadConfig,
+  getServerConfig,
+  validateServerConfig,
+  listServers,
+} from '../../../src/lib/config.js';
+import { ClientError } from '../../../src/lib/errors.js';
 
 const TEST_DIR = join(process.cwd(), 'test-tmp-config');
 
@@ -115,11 +120,15 @@ describe('getServerConfig', () => {
 
   it('should throw on non-existent server', () => {
     expect(() => getServerConfig(config, 'non-existent')).toThrow(ClientError);
-    expect(() => getServerConfig(config, 'non-existent')).toThrow('Server "non-existent" not found');
+    expect(() => getServerConfig(config, 'non-existent')).toThrow(
+      'Server "non-existent" not found'
+    );
   });
 
   it('should list available servers in error message', () => {
-    expect(() => getServerConfig(config, 'unknown')).toThrow('Available servers: http-server, stdio-server');
+    expect(() => getServerConfig(config, 'unknown')).toThrow(
+      'Available servers: http-server, stdio-server'
+    );
   });
 });
 
@@ -137,7 +146,9 @@ describe('validateServerConfig', () => {
   it('should reject config without url or command', () => {
     const config = { timeout: 60 };
     expect(() => validateServerConfig(config)).toThrow(ClientError);
-    expect(() => validateServerConfig(config)).toThrow('must specify either "url" (for HTTP) or "command" (for stdio)');
+    expect(() => validateServerConfig(config)).toThrow(
+      'must specify either "url" (for HTTP) or "command" (for stdio)'
+    );
   });
 
   it('should reject config with both url and command', () => {
