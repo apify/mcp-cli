@@ -18,6 +18,8 @@
     - Use https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool for inspiration/compatibility?
   - Consider adding support for something like `mcp-cli @session/tool [args]` to make it easier to use
 
+- Add CI/CD unit testing for other Node versions, maybe proper release management?
+- Add GitHub packages?
 
 ## Later
 
@@ -28,6 +30,7 @@
 - Restart of expires OAuth session is too many steps - why not add "mcpc <session> login" to refresh?
 - Tool list refresh - how about printing it to stderr on first time after it happens? then the agent/user would notice and tools-list again
 
+- maybe introduce new session status: auth failed or unauthed
 - nit: show also header / open auth statuses for HTTP servers?
 - ux: consider forking "alive" session state to "alive" and "diconnected", to indicate the remove server is not responding but bridge 
   runs fine. We can use lastSeenAt + ping interval info for that, or status of last ping.

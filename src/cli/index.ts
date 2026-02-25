@@ -191,9 +191,19 @@ async function main(): Promise<void> {
   try {
     await handleCommands(target, modifiedArgs);
   } catch (error) {
-    if (error instanceof NetworkError && KNOWN_COMMANDS.includes(target)) {
-      console.error(`Cannot connect to server "${target}". Did you mean: mcpc <server> ${target}?`);
-      console.error(`\nRun "mcpc --help" for usage information.`);
+    if (isMcpError(error)) {
+      const opts = extractOptions(args);
+      const outputMode: OutputMode = opts.json ? 'json' : 'human';
+      if (outputMode === 'json') {
+        console.error(formatJsonError(error, error.code));
+      } else {
+        console.error(formatHumanError(error, opts.verbose));
+        if (error instanceof NetworkError && KNOWN_COMMANDS.includes(target)) {
+          console.error(`\nDid you mean "mcpc <target> ${target}" ?`);
+          console.error(`Run "mcpc --help" for usage information.\n`);
+          process.exit(error.code);
+        }
+      }
       process.exit(error.code);
     }
     throw error;

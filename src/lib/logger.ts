@@ -170,7 +170,7 @@ function formatMessage(level: LogLevel, message: string, forFile = false): strin
  * Format an Error object for logging
  * Recursively handles cause chain
  */
-function formatExceptionChain(error: Error, indent = ''): string {
+export function formatExceptionChain(error: Error, indent = ''): string {
   const lines: string[] = [];
 
   // Error name and message

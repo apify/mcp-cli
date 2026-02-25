@@ -18,6 +18,17 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 import { createNoOpLogger, type Logger } from '../lib/logger.js';
 import { ServerError, NetworkError, isShutdownError } from '../lib/errors.js';
+
+/**
+ * Traverse the .cause chain to find the deepest (most specific) error message
+ */
+function getRootCauseMessage(error: Error): string {
+  let current: Error = error;
+  while (current.cause instanceof Error) {
+    current = current.cause;
+  }
+  return current.message;
+}
 import type { IMcpClient, ServerDetails } from '../lib/types.js';
 
 /**
@@ -155,8 +166,8 @@ export class McpClient implements IMcpClient {
       );
       this.logger.debug('Server capabilities:', serverCapabilities);
     } catch (error) {
-      this.logger.error('Failed to connect:', error);
-      throw new NetworkError(`Failed to connect to MCP server: ${(error as Error).message}`, {
+      this.logger.debug('Failed to connect:', error);
+      throw new NetworkError(`Failed to connect to MCP server: ${getRootCauseMessage(error as Error)}`, {
         originalError: error,
       });
     }

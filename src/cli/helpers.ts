@@ -5,7 +5,7 @@
 
 import { createMcpClient } from '../core/factory.js';
 import type { IMcpClient, OutputMode, ServerConfig } from '../lib/types.js';
-import { ClientError, NetworkError, AuthError, isAuthenticationError, createServerAuthError } from '../lib/errors.js';
+import { ClientError, NetworkError, AuthError, McpError, isAuthenticationError, createServerAuthError } from '../lib/errors.js';
 import { normalizeServerUrl, isValidSessionName, getServerHost } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
@@ -316,14 +316,20 @@ export async function withMcpClient<T>(
   try {
     client = await createMcpClient(clientConfig);
   } catch (error) {
-    // Check if this is an authentication error from the server
+    // Check if this is an authentication error from the server (check before McpError guard)
     const errorMessage = (error as Error).message || '';
     if (isAuthenticationError(errorMessage)) {
       throw createServerAuthError(target, { originalError: error as Error });
     }
-
+    // NetworkError from mcp-client.ts — re-throw with server URL in message
+    if (error instanceof NetworkError) {
+      const serverUrl = serverConfig.url ?? target;
+      const causeMsg = error.message.replace(/^Failed to connect to MCP server: /, '');
+      throw new NetworkError(`Failed to connect to MCP server "${serverUrl}": ${causeMsg}`, error.details);
+    }
+    if (error instanceof McpError) throw error;
     throw new NetworkError(
-      `Failed to connect to MCP server: ${errorMessage}`,
+      `Failed to connect to ${serverConfig.url ?? target}: ${errorMessage}`,
       { originalError: error }
     );
   }
