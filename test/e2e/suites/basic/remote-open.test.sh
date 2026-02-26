@@ -5,6 +5,13 @@
 source "$(dirname "$0")/../../lib/framework.sh"
 test_init "basic/remote-open" --isolated
 
+# Skip in CI — external network dependency makes tests flaky
+# if [[ "${CI:-}" == "true" ]]; then
+#  test_case "skip: running in CI"
+#  test_skip "Remote tests skipped in CI (external network dependency)"
+#  test_done
+# fi
+
 # Remote server URL (open, no auth required)
 # The ?tools=docs parameter selects the documentation tools subset, ensuring no auth is needed
 REMOTE_SERVER="https://mcp.apify.com?tools=docs"
