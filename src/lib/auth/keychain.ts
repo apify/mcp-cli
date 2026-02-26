@@ -1,9 +1,9 @@
 /**
  * OS Keychain integration for secure credential storage
- * Uses keytar package for cross-platform keychain access
+ * Uses @napi-rs/keyring package for cross-platform keychain access
  */
 
-import keytar from 'keytar';
+import { Entry } from '@napi-rs/keyring';
 import { createLogger } from '../logger.js';
 import { getServerHost } from '../utils.js';
 
@@ -76,7 +76,7 @@ export async function storeKeychainOAuthClientInfo(
   const value = JSON.stringify(client);
 
   logger.debug(`Storing OAuth client info for ${profileName} @ ${serverUrl}`);
-  await keytar.setPassword(SERVICE_NAME, account, value);
+  new Entry(SERVICE_NAME, account).setPassword(value);
 }
 
 /**
@@ -89,7 +89,7 @@ export async function readKeychainOAuthClientInfo(
   const account = buildOAuthClientAccountName(serverUrl, profileName);
 
   logger.debug(`Retrieving OAuth client info for ${profileName} @ ${serverUrl}`);
-  const value = await keytar.getPassword(SERVICE_NAME, account);
+  const value = new Entry(SERVICE_NAME, account).getPassword();
 
   if (!value) {
     return undefined;
@@ -113,7 +113,7 @@ export async function removeKeychainOAuthClientInfo(
   const account = buildOAuthClientAccountName(serverUrl, profileName);
 
   logger.debug(`Deleting OAuth client info for ${profileName} @ ${serverUrl}`);
-  return keytar.deletePassword(SERVICE_NAME, account);
+  return new Entry(SERVICE_NAME, account).deletePassword();
 }
 
 /**
@@ -129,7 +129,7 @@ export async function storeKeychainOAuthTokenInfo(
   const value = JSON.stringify(tokens);
 
   logger.debug(`Storing OAuth tokens for ${profileName} @ ${serverUrl}`);
-  await keytar.setPassword(SERVICE_NAME, account, value);
+  new Entry(SERVICE_NAME, account).setPassword(value);
 }
 
 /**
@@ -142,7 +142,7 @@ export async function readKeychainOAuthTokenInfo(
   const account = buildOAuthTokensAccountName(serverUrl, profileName);
 
   logger.debug(`Retrieving OAuth tokens for ${profileName} @ ${serverUrl}`);
-  const value = await keytar.getPassword(SERVICE_NAME, account);
+  const value = new Entry(SERVICE_NAME, account).getPassword();
 
   if (!value) {
     return undefined;
@@ -166,7 +166,7 @@ export async function removeKeychainOAuthTokenInfo(
   const account = buildOAuthTokensAccountName(serverUrl, profileName);
 
   logger.debug(`Deleting OAuth tokens for ${profileName} @ ${serverUrl}`);
-  return keytar.deletePassword(SERVICE_NAME, account);
+  return new Entry(SERVICE_NAME, account).deletePassword();
 }
 
 /**
@@ -181,7 +181,7 @@ export async function storeKeychainSessionHeaders(
   const value = JSON.stringify(headers);
 
   logger.debug(`Storing headers for session ${sessionName}`);
-  await keytar.setPassword(SERVICE_NAME, account, value);
+  new Entry(SERVICE_NAME, account).setPassword(value);
 }
 
 /**
@@ -193,7 +193,7 @@ export async function readKeychainSessionHeaders(
   const account = buildSessionAccountName(sessionName);
 
   logger.debug(`Retrieving headers for session ${sessionName}`);
-  const value = await keytar.getPassword(SERVICE_NAME, account);
+  const value = new Entry(SERVICE_NAME, account).getPassword();
 
   if (!value) {
     return undefined;
@@ -214,7 +214,7 @@ export async function removeKeychainSessionHeaders(sessionName: string): Promise
   const account = buildSessionAccountName(sessionName);
 
   logger.debug(`Deleting headers for session ${sessionName}`);
-  return keytar.deletePassword(SERVICE_NAME, account);
+  return new Entry(SERVICE_NAME, account).deletePassword();
 }
 
 /**
@@ -228,7 +228,7 @@ export async function storeKeychainProxyBearerToken(
   const account = buildProxyBearerTokenAccountName(sessionName);
 
   logger.debug(`Storing proxy bearer token for session ${sessionName}`);
-  await keytar.setPassword(SERVICE_NAME, account, token);
+  new Entry(SERVICE_NAME, account).setPassword(token);
 }
 
 /**
@@ -240,7 +240,7 @@ export async function readKeychainProxyBearerToken(
   const account = buildProxyBearerTokenAccountName(sessionName);
 
   logger.debug(`Retrieving proxy bearer token for session ${sessionName}`);
-  return (await keytar.getPassword(SERVICE_NAME, account)) || undefined;
+  return new Entry(SERVICE_NAME, account).getPassword() ?? undefined;
 }
 
 /**
@@ -250,5 +250,5 @@ export async function removeKeychainProxyBearerToken(sessionName: string): Promi
   const account = buildProxyBearerTokenAccountName(sessionName);
 
   logger.debug(`Deleting proxy bearer token for session ${sessionName}`);
-  return keytar.deletePassword(SERVICE_NAME, account);
+  return new Entry(SERVICE_NAME, account).deletePassword();
 }
