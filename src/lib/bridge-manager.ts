@@ -419,7 +419,7 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     throw new ClientError(
       `Session ${sessionName} has expired. ` +
         `The MCP server indicated the session is no longer valid.\n` +
-        `To reconnect, run: mcpc ${sessionName} restart\n` +
+        `To restart the session, run: mcpc ${sessionName} restart\n` +
         `To remove the expired session, run: mcpc ${sessionName} close`
     );
   }
