@@ -41,7 +41,6 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-
 ## Install
 
 ```bash
