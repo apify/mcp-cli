@@ -320,6 +320,13 @@ MCP server commands:
   resources-templates-list
   logging-set-level <level>
   ping
+
+x402 payment commands (no target needed):
+  x402 init [--name <name>]     Create a new x402 wallet
+  x402 import <key> [--name]    Import wallet from private key
+  x402 sign -r <base64>         Sign payment from PAYMENT-REQUIRED header
+  x402 list                     List saved wallets
+  x402 remove [--name <name>]   Remove a wallet
   
 Run "mcpc" without <target> to show available sessions and profiles.
 
