@@ -59,6 +59,7 @@
     "commander": "^14.0.2",
     "ora": "^9.0.0",
     "proper-lockfile": "^4.1.2",
+    "undici": "^7.22.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
@@ -75,6 +76,7 @@
     "markdown-link-check": "^3.14.2",
     "nyc": "^18.0.0",
     "prettier": "^3.7.4",
+    "proxy-chain": "^2.7.1",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3"
   }

@@ -146,6 +146,14 @@ _test_cleanup() {
     done
   fi
 
+  # Stop proxy server if started
+  if [[ -n "${_PROXY_SERVER_PID:-}" ]]; then
+    pkill -P "$_PROXY_SERVER_PID" 2>/dev/null || true
+    kill "$_PROXY_SERVER_PID" 2>/dev/null || true
+    wait "$_PROXY_SERVER_PID" 2>/dev/null || true
+    _PROXY_SERVER_PID=""
+  fi
+
   # Clean up keychain entries for our sessions
   _cleanup_keychain
 
@@ -548,6 +556,7 @@ assert_stderr_empty() {
 # Default test server port
 TEST_SERVER_PORT="${TEST_SERVER_PORT:-0}"  # 0 = random port
 _TEST_SERVER_PID=""
+_PROXY_SERVER_PID=""
 
 # Start test MCP server
 # Usage: start_test_server [env_vars...]
@@ -663,6 +672,35 @@ EOF
 }
 EOF
   fi
+}
+
+# Start a local HTTP proxy server (proxy-chain) for testing HTTPS_PROXY / HTTP_PROXY support.
+# Sets PROXY_URL and PROXY_CONTROL_URL in the environment.
+start_proxy_server() {
+  local log="$_TEST_RUN_DIR/proxy-server.log"
+  cd "$PROJECT_ROOT"
+  npx tsx test/e2e/server/proxy-server.ts >"$log" 2>&1 &
+  _PROXY_SERVER_PID=$!
+
+  # Wait for PROXY_PORT= line in log (up to 10 seconds)
+  local max_wait=50
+  local waited=0
+  while ! grep -q "^PROXY_PORT=" "$log" 2>/dev/null; do
+    sleep 0.2
+    ((waited++)) || true
+    if [[ $waited -ge $max_wait ]]; then
+      echo "Error: Proxy server failed to start" >&2
+      cat "$log" >&2
+      kill $_PROXY_SERVER_PID 2>/dev/null || true
+      exit 1
+    fi
+  done
+
+  local proxy_port
+  proxy_port=$(grep "^PROXY_PORT=" "$log" | cut -d= -f2 | tr -d '[:space:]')
+
+  export PROXY_URL="http://127.0.0.1:${proxy_port}"
+  echo "# Proxy server started at $PROXY_URL (PID: $_PROXY_SERVER_PID)"
 }
 
 # Stop test server
