@@ -87,6 +87,7 @@ export const KNOWN_COMMANDS = [
   'prompts-get',
   'logging-set-level',
   'ping',
+  'x402',
 ];
 
 // Valid --schema-mode values

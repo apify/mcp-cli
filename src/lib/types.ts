@@ -263,6 +263,23 @@ export interface McpConfig {
 }
 
 /**
+ * x402 wallet data stored in ~/.mcpc/wallets.json
+ */
+export interface WalletData {
+  name: string;
+  address: string;
+  privateKey: string; // Hex string starting with 0x
+  createdAt: string; // ISO 8601
+}
+
+/**
+ * Wallets storage structure (~/.mcpc/wallets.json)
+ */
+export interface WalletsStorage {
+  wallets: Record<string, WalletData>; // walletName -> WalletData
+}
+
+/**
  * Combined server details returned by getServerDetails()
  * Structure matches MCP InitializeResult for consistency
  * Fetched once during initialization, cached locally

@@ -22,6 +22,7 @@ import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
 import * as utilities from './commands/utilities.js';
 import * as auth from './commands/auth.js';
+import { handleX402Command } from './commands/x402.js';
 import { clean } from './commands/clean.js';
 import type { OutputMode } from '../lib/index.js';
 import {
@@ -202,6 +203,14 @@ async function main(): Promise<void> {
     ...args.slice(0, targetIndex),
     ...args.slice(targetIndex + 1),
   ];
+
+  // Handle x402 as a top-level command (not a server target)
+  if (target === 'x402') {
+    const x402Args = args.slice(targetIndex + 1);
+    await handleX402Command(x402Args);
+    await closeFileLogger();
+    return;
+  }
 
   // Handle commands
   try {
