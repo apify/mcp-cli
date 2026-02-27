@@ -5,7 +5,6 @@
  */
 
 import { readFile, writeFile, rename, unlink } from 'fs/promises';
-import { tmpdir } from 'os';
 import { join } from 'path';
 import type { SessionData, SessionsStorage } from './types.js';
 import {
@@ -62,7 +61,9 @@ async function saveSessionsInternal(storage: SessionsStorage): Promise<void> {
   await ensureDir(getMcpcHome());
 
   // Write to a temp file first (atomic operation)
-  const tempFile = join(tmpdir(), `mcpc-sessions-${Date.now()}-${process.pid}.json`);
+  // Write temp file in the same directory as the target to avoid EXDEV on Linux
+  // (rename() fails across filesystem boundaries, e.g. /tmp vs ~/.mcpc)
+  const tempFile = join(getMcpcHome(), `.sessions-${Date.now()}-${process.pid}.tmp`);
 
   try {
     const content = JSON.stringify(storage, null, 2);
