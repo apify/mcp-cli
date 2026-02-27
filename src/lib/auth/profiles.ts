@@ -5,7 +5,6 @@
  */
 
 import { readFile, writeFile, rename, unlink } from 'fs/promises';
-import { tmpdir } from 'os';
 import { join } from 'path';
 import type { AuthProfile, AuthProfilesStorage } from '../types.js';
 import {
@@ -64,7 +63,9 @@ async function saveAuthProfilesInternal(storage: AuthProfilesStorage): Promise<v
   await ensureDir(getMcpcHome());
 
   // Write to a temp file first (atomic operation)
-  const tempFile = join(tmpdir(), `mcpc-auth-profiles-${Date.now()}-${process.pid}.json`);
+  // Write temp file in the same directory as the target to avoid EXDEV on Linux
+  // (rename() fails across filesystem boundaries, e.g. /tmp vs ~/.mcpc)
+  const tempFile = join(getMcpcHome(), `.profiles-${Date.now()}-${process.pid}.tmp`);
 
   try {
     const content = JSON.stringify(storage, null, 2);
