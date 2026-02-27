@@ -5,8 +5,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { createWalletClient, http, type Hex } from 'viem';
-import { base, baseSepolia } from 'viem/chains';
+import type { Hex } from 'viem';
 import { formatSuccess, formatError, formatInfo, formatJson } from '../output.js';
 import {
   loadWallets,
@@ -17,6 +16,7 @@ import {
 } from '../../lib/wallets.js';
 import { ClientError } from '../../lib/errors.js';
 import type { OutputMode } from '../../lib/types.js';
+import { signPayment, parsePaymentRequired } from '../../lib/x402/signer.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -24,108 +24,6 @@ import type { OutputMode } from '../../lib/types.js';
 
 const DEFAULT_WALLET_NAME = 'default';
 const USDC_DECIMALS = 6;
-const X402_VERSION = 2;
-
-const TRANSFER_WITH_AUTHORIZATION_TYPES = {
-  TransferWithAuthorization: [
-    { name: 'from', type: 'address' },
-    { name: 'to', type: 'address' },
-    { name: 'value', type: 'uint256' },
-    { name: 'validAfter', type: 'uint256' },
-    { name: 'validBefore', type: 'uint256' },
-    { name: 'nonce', type: 'bytes32' },
-  ],
-} as const;
-
-interface NetworkConfig {
-  chain: typeof base | typeof baseSepolia;
-  networkId: string;
-  rpcUrl: string;
-  label: string;
-}
-
-const NETWORKS: Record<string, NetworkConfig> = {
-  [`eip155:${base.id}`]: {
-    chain: base,
-    networkId: `eip155:${base.id}`,
-    rpcUrl: 'https://mainnet.base.org',
-    label: 'Base Mainnet',
-  },
-  [`eip155:${baseSepolia.id}`]: {
-    chain: baseSepolia,
-    networkId: `eip155:${baseSepolia.id}`,
-    rpcUrl: 'https://sepolia.base.org',
-    label: 'Base Sepolia (testnet)',
-  },
-};
-
-// ---------------------------------------------------------------------------
-// PAYMENT-REQUIRED header parsing
-// ---------------------------------------------------------------------------
-
-interface PaymentRequiredAccept {
-  scheme: string;
-  network: string;
-  amount: string;
-  asset: string;
-  payTo: string;
-  maxTimeoutSeconds: number;
-  extra?: { name?: string; version?: string };
-}
-
-interface PaymentRequiredHeader {
-  x402Version: number;
-  resource?: { url?: string; description?: string; mimeType?: string };
-  accepts: PaymentRequiredAccept[];
-}
-
-function parsePaymentRequired(base64Value: string): {
-  header: PaymentRequiredHeader;
-  accept: PaymentRequiredAccept;
-} {
-  let decoded: string;
-  try {
-    decoded = Buffer.from(base64Value, 'base64').toString('utf-8');
-  } catch {
-    throw new ClientError('Failed to base64-decode the --payment-required value.');
-  }
-
-  let header: PaymentRequiredHeader;
-  try {
-    header = JSON.parse(decoded) as PaymentRequiredHeader;
-  } catch {
-    throw new ClientError('PAYMENT-REQUIRED header is not valid JSON after base64 decoding.');
-  }
-
-  if (!header.accepts || !Array.isArray(header.accepts) || header.accepts.length === 0) {
-    throw new ClientError('PAYMENT-REQUIRED header has no "accepts" entries.');
-  }
-
-  const accept = header.accepts.find((a) => a.scheme === 'exact');
-  if (!accept) {
-    throw new ClientError(
-      `No "exact" scheme found in PAYMENT-REQUIRED accepts. Available: ${header.accepts.map((a) => a.scheme).join(', ')}`
-    );
-  }
-
-  if (!accept.payTo || !accept.amount || !accept.network || !accept.asset) {
-    throw new ClientError(
-      'PAYMENT-REQUIRED accept entry is missing required fields (payTo, amount, network, asset).'
-    );
-  }
-
-  return { header, accept };
-}
-
-// ---------------------------------------------------------------------------
-// Crypto helpers
-// ---------------------------------------------------------------------------
-
-function randomBytes32(): Hex {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return ('0x' + [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')) as Hex;
-}
 
 // ---------------------------------------------------------------------------
 // Command: init
@@ -262,7 +160,7 @@ interface SignOptions {
   outputMode: OutputMode;
 }
 
-async function signPayment(options: SignOptions): Promise<void> {
+async function signPaymentCommand(options: SignOptions): Promise<void> {
   const name = resolveWalletName(options.name);
 
   const wallet = await getWallet(name);
@@ -275,132 +173,57 @@ async function signPayment(options: SignOptions): Promise<void> {
   // Parse PAYMENT-REQUIRED header
   const { header, accept } = parsePaymentRequired(options.paymentRequired);
 
-  // Resolve network
-  const networkConfig = NETWORKS[accept.network];
-  if (!networkConfig) {
-    throw new ClientError(
-      `Unknown network "${accept.network}" in PAYMENT-REQUIRED. Supported: ${Object.keys(NETWORKS).join(', ')}`
-    );
-  }
-
-  // Resolve amount (CLI override or from header)
-  let amountAtomicUnits: bigint;
-  let amountUsd: number;
+  // Resolve overrides
+  let amountOverride: bigint | undefined;
   if (options.amount) {
-    amountUsd = parseFloat(options.amount);
+    const amountUsd = parseFloat(options.amount);
     if (isNaN(amountUsd) || amountUsd <= 0)
       throw new ClientError('--amount must be a positive number.');
-    amountAtomicUnits = BigInt(Math.round(amountUsd * 10 ** USDC_DECIMALS));
-  } else {
-    amountAtomicUnits = BigInt(accept.amount);
-    amountUsd = Number(amountAtomicUnits) / 10 ** USDC_DECIMALS;
+    amountOverride = BigInt(Math.round(amountUsd * 10 ** USDC_DECIMALS));
   }
 
-  // Resolve expiry
-  const expirySeconds = options.expiry
-    ? parseInt(options.expiry, 10)
-    : accept.maxTimeoutSeconds || 3600;
+  const expiryOverride = options.expiry ? parseInt(options.expiry, 10) : undefined;
 
-  // EIP-3009 domain from header extra or defaults
-  const eip3009Name = accept.extra?.name ?? 'USDC';
-  const eip3009Version = accept.extra?.version ?? '2';
-
-  // Resource from header
-  const resource = header.resource ?? {
-    url: 'https://mcp.apify.com/mcp',
-    description: 'MCP Server',
-    mimeType: 'application/json',
-  };
-
-  // Sign
-  const account = privateKeyToAccount(wallet.privateKey as Hex);
-  const walletClient = createWalletClient({
-    account,
-    chain: networkConfig.chain,
-    transport: http(networkConfig.rpcUrl),
+  // Sign using shared signer
+  const result = await signPayment({
+    wallet: { privateKey: wallet.privateKey, address: wallet.address },
+    accept,
+    resource: header.resource,
+    ...(amountOverride !== undefined && { amountOverride }),
+    ...(expiryOverride !== undefined && { expiryOverride }),
   });
-
-  const nonce = randomBytes32();
-  const validBefore = BigInt(Math.floor(Date.now() / 1000) + expirySeconds);
-
-  const signature = await walletClient.signTypedData({
-    domain: {
-      name: eip3009Name,
-      version: eip3009Version,
-      chainId: networkConfig.chain.id,
-      verifyingContract: accept.asset as Hex,
-    },
-    types: TRANSFER_WITH_AUTHORIZATION_TYPES,
-    primaryType: 'TransferWithAuthorization',
-    message: {
-      from: account.address,
-      to: accept.payTo as Hex,
-      value: amountAtomicUnits,
-      validAfter: 0n,
-      validBefore,
-      nonce,
-    },
-  });
-
-  // Build x402 payload
-  const paymentPayload = {
-    x402Version: X402_VERSION,
-    resource,
-    payload: {
-      signature,
-      authorization: {
-        from: account.address,
-        to: accept.payTo,
-        value: amountAtomicUnits.toString(),
-        validAfter: '0',
-        validBefore: validBefore.toString(),
-        nonce,
-      },
-    },
-    accepted: {
-      scheme: 'exact',
-      network: networkConfig.networkId,
-      asset: accept.asset,
-      amount: amountAtomicUnits.toString(),
-      payTo: accept.payTo,
-      maxTimeoutSeconds: expirySeconds,
-      extra: { name: eip3009Name, version: eip3009Version },
-    },
-  };
-
-  const payloadBase64 = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
 
   if (options.outputMode === 'json') {
     console.log(
       formatJson({
-        paymentSignature: payloadBase64,
-        from: account.address,
-        to: accept.payTo,
-        amount: amountUsd,
-        amountAtomicUnits: amountAtomicUnits.toString(),
-        network: networkConfig.label,
-        expiresAt: new Date(Number(validBefore) * 1000).toISOString(),
+        paymentSignature: result.paymentSignatureBase64,
+        from: result.from,
+        to: result.to,
+        amount: result.amountUsd,
+        amountAtomicUnits: result.amountAtomicUnits.toString(),
+        network: result.networkLabel,
+        expiresAt: result.expiresAt.toISOString(),
       })
     );
     return;
   }
 
   // Human output
-  const resourceUrl = (resource.url ?? 'https://mcp.apify.com/mcp').replace(/\?.*$/, '');
+  const resourceUrl = (header.resource?.url ?? 'https://mcp.apify.com/mcp').replace(/\?.*$/, '');
 
   console.log(formatSuccess('Payment signed'));
-  console.log(formatInfo(`Wallet    : ${chalk.bold(name)} (${account.address})`));
-  console.log(formatInfo(`Network   : ${networkConfig.label}`));
-  console.log(formatInfo(`To        : ${accept.payTo}`));
+  console.log(formatInfo(`Wallet    : ${chalk.bold(name)} (${result.from})`));
+  console.log(formatInfo(`Network   : ${result.networkLabel}`));
+  console.log(formatInfo(`To        : ${result.to}`));
   console.log(
     formatInfo(
-      `Amount    : $${amountUsd.toFixed(2)} (${amountAtomicUnits.toString()} atomic units)`
+      `Amount    : $${result.amountUsd.toFixed(2)} (${result.amountAtomicUnits.toString()} atomic units)`
     )
   );
-  console.log(formatInfo(`Expires   : ${new Date(Number(validBefore) * 1000).toISOString()}`));
+  console.log(formatInfo(`Expires   : ${result.expiresAt.toISOString()}`));
   console.log('');
   console.log(chalk.bold('  PAYMENT-SIGNATURE header:'));
-  console.log(`  ${payloadBase64}`);
+  console.log(`  ${result.paymentSignatureBase64}`);
   console.log('');
   console.log(chalk.bold('  MCP config snippet:'));
   console.log(
@@ -410,7 +233,7 @@ async function signPayment(options: SignOptions): Promise<void> {
           'apify-x402': {
             type: 'remote',
             url: `${resourceUrl}?payment=x402`,
-            headers: { 'PAYMENT-SIGNATURE': payloadBase64 },
+            headers: { 'PAYMENT-SIGNATURE': result.paymentSignatureBase64 },
           },
         },
       },
@@ -482,7 +305,7 @@ export async function handleX402Command(args: string[]): Promise<void> {
     .option('--amount <usd>', 'Override amount in USD')
     .option('--expiry <seconds>', 'Override expiry in seconds')
     .action(async (opts, cmd) => {
-      await signPayment({
+      await signPaymentCommand({
         name: opts.name,
         paymentRequired: opts.paymentRequired,
         amount: opts.amount,

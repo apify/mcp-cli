@@ -119,6 +119,7 @@ export interface SessionData {
   name: string;
   server: ServerConfig; // Transport configuration (header values redacted to "<redacted>")
   profileName?: string; // Name of auth profile (for OAuth servers)
+  walletName?: string; // x402 wallet name for automatic payment signing
   pid?: number; // Bridge process PID
   protocolVersion?: string; // Negotiated MCP version
   mcpSessionId?: string; // Server-assigned MCP session ID for resumption (Streamable HTTP only)
@@ -178,7 +179,8 @@ export type IpcMessageType =
   | 'response'
   | 'shutdown'
   | 'notification'
-  | 'set-auth-credentials';
+  | 'set-auth-credentials'
+  | 'set-x402-wallet';
 
 /**
  * Auth credentials sent from CLI to bridge via IPC
@@ -192,6 +194,16 @@ export interface AuthCredentials {
   refreshToken?: string;
   // HTTP headers (from --header flags, stored in keychain)
   headers?: Record<string, string>;
+}
+
+/**
+ * x402 wallet credentials sent from CLI to bridge via IPC
+ * Only the wallet name is sent; bridge loads the private key from wallets.json
+ */
+export interface X402WalletCredentials {
+  walletName: string;
+  address: string;
+  privateKey: string; // Hex with 0x prefix
 }
 
 /**
@@ -224,6 +236,7 @@ export interface IpcMessage {
   result?: unknown; // Response result
   notification?: NotificationData; // Notification data (for type='notification')
   authCredentials?: AuthCredentials; // Auth credentials (for type='set-auth-credentials')
+  x402Wallet?: X402WalletCredentials; // x402 wallet (for type='set-x402-wallet')
   error?: {
     code: number;
     message: string;

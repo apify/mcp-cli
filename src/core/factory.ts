@@ -4,6 +4,7 @@
 
 import type { ClientCapabilities, ListChangedHandlers } from '@modelcontextprotocol/sdk/types.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { McpClient, type McpClientOptions } from './mcp-client.js';
 import { createTransportFromConfig } from './transports.js';
 import { type ServerConfig } from '../lib/types.js';
@@ -50,6 +51,12 @@ export interface CreateMcpClientOptions {
    * MCP-Session-Id for resuming a previous session (HTTP transport only)
    */
   mcpSessionId?: string;
+
+  /**
+   * Custom fetch function for the transport (HTTP transport only)
+   * Used by x402 payment middleware
+   */
+  customFetch?: FetchLike;
 
   /**
    * Whether to automatically connect after creation
@@ -120,12 +127,20 @@ export async function createMcpClient(options: CreateMcpClientOptions): Promise<
   if (autoConnect) {
     factoryLogger.debug('Creating transport with authProvider:', !!options.authProvider);
     factoryLogger.debug('Creating transport with mcpSessionId:', options.mcpSessionId || '(none)');
-    const transportOptions: { authProvider?: OAuthClientProvider; mcpSessionId?: string } = {};
+    factoryLogger.debug('Creating transport with customFetch:', !!options.customFetch);
+    const transportOptions: {
+      authProvider?: OAuthClientProvider;
+      mcpSessionId?: string;
+      customFetch?: FetchLike;
+    } = {};
     if (options.authProvider) {
       transportOptions.authProvider = options.authProvider;
     }
     if (options.mcpSessionId) {
       transportOptions.mcpSessionId = options.mcpSessionId;
+    }
+    if (options.customFetch) {
+      transportOptions.customFetch = options.customFetch;
     }
     const transport = createTransportFromConfig(options.serverConfig, transportOptions);
     await client.connect(transport);

@@ -54,6 +54,7 @@ interface HandlerOptions {
   timeout?: number;
   verbose?: boolean;
   profile?: string;
+  x402?: string;
   schema?: string;
   schemaMode?: 'strict' | 'compatible' | 'ignore';
   full?: boolean;
@@ -89,6 +90,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
   if (opts.profile) options.profile = opts.profile;
   if (verbose) options.verbose = verbose;
+  if (opts.x402) options.x402 = 'default';
   if (opts.schema) options.schema = opts.schema;
   if (opts.schemaMode) {
     const mode = opts.schemaMode as string;
@@ -281,6 +283,7 @@ function createProgram(): Command {
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session (with "connect" command)')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
+    .option('--x402', 'Enable x402 auto-payment using the default wallet')
     .option('--clean[=types]', 'Clean up mcpc data (types: sessions, logs, profiles, all)');
 
   // Add help text to match README
@@ -399,6 +402,7 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
         ...getOptionsFromCommand(command),
         proxy: opts.proxy,
         proxyBearerToken: opts.proxyBearerToken,
+        x402: opts.x402,
       });
     });
 
