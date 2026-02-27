@@ -48,20 +48,30 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 npm install -g @apify/mcpc
 ```
 
-**Linux users:** `mcpc` uses the OS keychain for secure credential storage, which requires the [Libsecret](https://wiki.gnome.org/Projects/Libsecret) 
-library. Install it with:
+**Linux users:** `mcpc` uses the OS keychain for secure credential storage via the
+[Secret Service API](https://specifications.freedesktop.org/secret-service/). Two things are required:
 
-```bash
-# Debian/Ubuntu
-sudo apt-get update
-sudo apt-get install libsecret-1-0
+1. **`libsecret`** — the shared library (client side):
+   ```bash
+   # Debian/Ubuntu
+   sudo apt-get install libsecret-1-0
 
-# Fedora/RHEL/CentOS
-sudo dnf install libsecret
+   # Fedora/RHEL/CentOS
+   sudo dnf install libsecret
 
-# Arch Linux
-sudo pacman -S libsecret
-```
+   # Arch Linux
+   sudo pacman -S libsecret
+   ```
+
+2. **A running secret service daemon** — on desktop systems (GNOME, KDE) this is already provided
+   by gnome-keyring or KWallet. On headless/server/CI environments you need to install and start one:
+   ```bash
+   # Debian/Ubuntu
+   sudo apt-get install gnome-keyring
+
+   # Then start it (e.g. in CI):
+   dbus-run-session -- bash -c "echo -n 'password' | gnome-keyring-daemon --unlock && your-command"
+   ```
 
 ## Quickstart
 
