@@ -4,7 +4,7 @@
 # that forwards requests without exposing original auth tokens
 
 source "$(dirname "$0")/../../lib/framework.sh"
-test_init "sessions/proxy"
+test_init "sessions/proxy" --isolated
 
 # Start test server
 start_test_server
@@ -24,8 +24,8 @@ assert_contains "$STDOUT" "created"
 _SESSIONS_CREATED+=("$SESSION_UPSTREAM")
 test_pass
 
-# Wait for proxy server to start
-sleep 1
+# Wait for proxy server to be ready
+wait_for "curl -s http://127.0.0.1:$PROXY_PORT/health 2>/dev/null | grep -q ok"
 
 # Test: session shows proxy info
 test_case "session shows proxy info in list"
@@ -51,6 +51,8 @@ test_pass
 
 # Test: can connect to proxy as MCP server (localhost defaults to http://)
 test_case "connect to proxy server"
+# Ensure proxy is still healthy before connecting downstream
+wait_for "curl -s http://127.0.0.1:$PROXY_PORT/health 2>/dev/null | grep -q ok"
 run_mcpc "127.0.0.1:$PROXY_PORT" connect "$SESSION_DOWNSTREAM"
 assert_success "connect to proxy should succeed"
 _SESSIONS_CREATED+=("$SESSION_DOWNSTREAM")
@@ -114,7 +116,8 @@ assert_success
 _SESSIONS_CREATED+=("$SESSION_CONFLICT1")
 test_pass
 
-sleep 1
+# Wait for proxy to be ready before testing conflict
+wait_for "curl -s http://127.0.0.1:$PROXY_PORT_CONFLICT/health 2>/dev/null | grep -q ok"
 
 # Test: second session on same port should fail
 test_case "second session on same port fails"
@@ -145,7 +148,8 @@ assert_success "connect with --proxy-bearer-token should succeed"
 _SESSIONS_CREATED+=("$SESSION_AUTH")
 test_pass
 
-sleep 1
+# Wait for proxy to be ready
+wait_for "curl -s http://127.0.0.1:$PROXY_PORT_AUTH/health 2>/dev/null | grep -q ok"
 
 # Test: health endpoint works without auth (health is public)
 test_case "proxy health endpoint works without auth"

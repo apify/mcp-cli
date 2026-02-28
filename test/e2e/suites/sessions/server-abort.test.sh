@@ -2,7 +2,7 @@
 # Test: Server-side session abort handling
 
 source "$(dirname "$0")/../../lib/framework.sh"
-test_init "sessions/server-abort"
+test_init "sessions/server-abort" --isolated
 
 # Start test server
 start_test_server
@@ -43,6 +43,8 @@ test_pass
 # Test: reset server state
 test_case "reset server state"
 curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
+# Wait for server to be healthy after reset
+wait_for "curl -s $TEST_SERVER_URL/health 2>/dev/null | grep -q ok"
 test_pass
 
 # Test: session can be recreated after server reset
@@ -56,6 +58,9 @@ SESSION2=$(session_name "server-abort-2")
 run_mcpc "$TEST_SERVER_URL" connect "$SESSION2"
 assert_success
 _SESSIONS_CREATED+=("$SESSION2")
+
+# Wait for bridge to be fully ready before running invariant checks
+wait_for "$MCPC $SESSION2 ping >/dev/null 2>&1"
 
 run_xmcpc "$SESSION2" tools-list
 assert_success
