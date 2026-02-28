@@ -195,10 +195,10 @@ function shouldFail(): boolean {
   return false;
 }
 
-// MCP server instance (accessible for sending notifications)
-let mcpServer: Server | null = null;
+// Active MCP server instances, keyed by session ID
+const mcpServers = new Map<string, Server>();
 
-// Create the MCP server
+// Create a new MCP server instance (one per session)
 function createMcpServer(): Server {
   const server = new Server(
     {
@@ -387,7 +387,6 @@ function createMcpServer(): Server {
 
 // Create HTTP server with MCP transport and control endpoints
 async function main() {
-  mcpServer = createMcpServer();
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
   const httpServer = http.createServer(async (req, res) => {
@@ -451,36 +450,21 @@ async function main() {
           return;
 
         case 'notify-tools-changed':
-          if (mcpServer) {
-            await mcpServer.sendToolListChanged();
-            res.writeHead(200);
-            res.end('Sent tools/list_changed notification');
-          } else {
-            res.writeHead(500);
-            res.end('MCP server not initialized');
-          }
+          await Promise.all([...mcpServers.values()].map((s) => s.sendToolListChanged()));
+          res.writeHead(200);
+          res.end('Sent tools/list_changed notification');
           return;
 
         case 'notify-prompts-changed':
-          if (mcpServer) {
-            await mcpServer.sendPromptListChanged();
-            res.writeHead(200);
-            res.end('Sent prompts/list_changed notification');
-          } else {
-            res.writeHead(500);
-            res.end('MCP server not initialized');
-          }
+          await Promise.all([...mcpServers.values()].map((s) => s.sendPromptListChanged()));
+          res.writeHead(200);
+          res.end('Sent prompts/list_changed notification');
           return;
 
         case 'notify-resources-changed':
-          if (mcpServer) {
-            await mcpServer.sendResourceListChanged();
-            res.writeHead(200);
-            res.end('Sent resources/list_changed notification');
-          } else {
-            res.writeHead(500);
-            res.end('MCP server not initialized');
-          }
+          await Promise.all([...mcpServers.values()].map((s) => s.sendResourceListChanged()));
+          res.writeHead(200);
+          res.end('Sent resources/list_changed notification');
           return;
 
         default:
@@ -518,6 +502,7 @@ async function main() {
           const oldTransport = transports.get(mcpSessionId)!;
           await oldTransport.close();
           transports.delete(mcpSessionId);
+          mcpServers.delete(mcpSessionId);
           deletedSessions.push(mcpSessionId);
         }
         res.writeHead(200);
@@ -530,19 +515,21 @@ async function main() {
       if (mcpSessionId && transports.has(mcpSessionId)) {
         transport = transports.get(mcpSessionId)!;
       } else if (req.method === 'POST' && !mcpSessionId) {
-        // New session - create transport
+        // New session - create a fresh Server + transport per connection
+        const sessionServer = createMcpServer();
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () =>
             `e2e-session-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           onsessioninitialized: (newSessionId) => {
             transports.set(newSessionId, transport);
+            mcpServers.set(newSessionId, sessionServer);
           },
         });
 
-        // Connect to MCP server
+        // Connect the fresh server instance to the transport
         // Type assertion needed due to exactOptionalPropertyTypes incompatibility with MCP SDK
         // @ts-ignore
-        await mcpServer.connect(transport as Parameters<typeof mcpServer.connect>[0]);
+        await sessionServer.connect(transport as Parameters<typeof sessionServer.connect>[0]);
       } else if (mcpSessionId && !transports.has(mcpSessionId)) {
         // Session ID provided but not found - per MCP spec, return 404
         res.writeHead(404, { 'Content-Type': 'application/json' });

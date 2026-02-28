@@ -18,12 +18,13 @@ assert_contains "$STDOUT" "echo"
 test_pass
 
 # =============================================================================
-# HTTPS_PROXY is checked before HTTP_PROXY
+# HTTPS_PROXY does not affect HTTP connections (scheme-specific proxy selection)
 # =============================================================================
 
-test_case "HTTPS_PROXY takes precedence over HTTP_PROXY"
-# HTTPS_PROXY points to working proxy; HTTP_PROXY points to a dead port — should succeed
-HTTPS_PROXY="$PROXY_URL" HTTP_PROXY="http://127.0.0.1:1" run_mcpc "$TEST_SERVER_URL" tools-list
+test_case "HTTPS_PROXY does not affect HTTP connections"
+# HTTPS_PROXY points to a dead port; HTTP_PROXY points to working proxy
+# Since MCP server URL is HTTP, only HTTP_PROXY should be used — should succeed
+HTTPS_PROXY="http://127.0.0.1:1" HTTP_PROXY="$PROXY_URL" run_mcpc "$TEST_SERVER_URL" tools-list
 assert_success
 assert_contains "$STDOUT" "echo"
 test_pass
