@@ -54,7 +54,7 @@ interface BridgeOptions {
   profileName?: string; // Auth profile name for token refresh
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
-  walletName?: string; // x402 wallet name for automatic payment signing
+  x402?: boolean; // Enable x402 auto-payment
 }
 
 /**
@@ -223,7 +223,7 @@ class BridgeProcess {
    * The wallet private key is used for automatic payment signing
    */
   setX402Wallet(credentials: X402WalletCredentials): void {
-    logger.info(`Received x402 wallet: ${credentials.walletName} (${credentials.address})`);
+    logger.info(`Received x402 wallet: ${credentials.address}`);
     this.x402Wallet = {
       privateKey: credentials.privateKey,
       address: credentials.address,
@@ -343,8 +343,8 @@ class BridgeProcess {
         ipcWaiters.push(this.authCredentialsReceived);
       }
 
-      if (this.options.walletName) {
-        logger.debug(`Waiting for x402 wallet (wallet: ${this.options.walletName})...`);
+      if (this.options.x402) {
+        logger.debug('Waiting for x402 wallet...');
         this.x402WalletReceived = new Promise<void>((resolve) => {
           this.x402WalletResolver = resolve;
         });
@@ -1137,7 +1137,7 @@ async function main(): Promise<void> {
 
   if (args.length < 2) {
     console.error(
-      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--wallet <name>]'
+      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--x402]'
     );
     process.exit(1);
   }
@@ -1172,12 +1172,8 @@ async function main(): Promise<void> {
     mcpSessionId = args[mcpSessionIdIndex + 1];
   }
 
-  // Parse --wallet argument (for x402 payment signing)
-  let walletName: string | undefined;
-  const walletIndex = args.indexOf('--wallet');
-  if (walletIndex !== -1 && args[walletIndex + 1]) {
-    walletName = args[walletIndex + 1];
-  }
+  // Parse --x402 flag (for x402 payment signing)
+  const x402 = args.includes('--x402');
 
   try {
     const bridgeOptions: BridgeOptions = {
@@ -1194,8 +1190,8 @@ async function main(): Promise<void> {
     if (mcpSessionId) {
       bridgeOptions.mcpSessionId = mcpSessionId;
     }
-    if (walletName) {
-      bridgeOptions.walletName = walletName;
+    if (x402) {
+      bridgeOptions.x402 = true;
     }
 
     const bridge = new BridgeProcess(bridgeOptions);

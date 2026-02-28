@@ -35,7 +35,7 @@ import {
   storeKeychainProxyBearerToken,
 } from '../../lib/auth/keychain.js';
 import { AuthError, ClientError } from '../../lib/index.js';
-import { getWallet, resolveWalletName } from '../../lib/wallets.js';
+import { getWallet } from '../../lib/wallets.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
 import { parseProxyArg } from '../parser.js';
@@ -84,7 +84,7 @@ export async function connectSession(
     profile?: string;
     proxy?: string;
     proxyBearerToken?: string;
-    x402?: string;
+    x402?: boolean;
   }
 ): Promise<void> {
   try {
@@ -196,16 +196,12 @@ export async function connectSession(
     }
 
     // Validate x402 wallet (if provided)
-    let walletName: string | undefined;
     if (options.x402) {
-      walletName = resolveWalletName(options.x402);
-      const wallet = await getWallet(walletName);
+      const wallet = await getWallet();
       if (!wallet) {
-        throw new ClientError(
-          `x402 wallet "${walletName}" not found. Create one with: mcpc x402 init --name ${walletName}`
-        );
+        throw new ClientError('x402 wallet not found. Create one with: mcpc x402 init');
       }
-      logger.debug(`Using x402 wallet: ${walletName} (${wallet.address})`);
+      logger.debug(`Using x402 wallet: ${wallet.address}`);
     }
 
     // Create or update session record (without pid - that comes from startBridge)
@@ -221,7 +217,7 @@ export async function connectSession(
       server: sessionTransportConfig,
       ...(profileName && { profileName }),
       ...(proxyConfig && { proxy: proxyConfig }),
-      ...(walletName && { walletName }),
+      ...(options.x402 && { x402: true }),
     };
 
     if (isReconnect) {
@@ -252,8 +248,8 @@ export async function connectSession(
       if (proxyConfig) {
         bridgeOptions.proxyConfig = proxyConfig;
       }
-      if (walletName) {
-        bridgeOptions.walletName = walletName;
+      if (options.x402) {
+        bridgeOptions.x402 = true;
       }
 
       const { pid } = await startBridge(bridgeOptions);
@@ -611,8 +607,8 @@ export async function restartSession(
       bridgeOptions.proxyConfig = session.proxy;
     }
 
-    if (session.walletName) {
-      bridgeOptions.walletName = session.walletName;
+    if (session.x402) {
+      bridgeOptions.x402 = session.x402;
     }
 
     // NOTE: Do NOT pass mcpSessionId on explicit restart.

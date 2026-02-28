@@ -54,7 +54,7 @@ interface HandlerOptions {
   timeout?: number;
   verbose?: boolean;
   profile?: string;
-  x402?: string;
+  x402?: boolean;
   schema?: string;
   schemaMode?: 'strict' | 'compatible' | 'ignore';
   full?: boolean;
@@ -90,7 +90,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
   if (opts.profile) options.profile = opts.profile;
   if (verbose) options.verbose = verbose;
-  if (opts.x402) options.x402 = 'default';
+  if (opts.x402) options.x402 = true;
   if (opts.schema) options.schema = opts.schema;
   if (opts.schemaMode) {
     const mode = opts.schemaMode as string;
@@ -283,7 +283,7 @@ function createProgram(): Command {
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session (with "connect" command)')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
-    .option('--x402', 'Enable x402 auto-payment using the default wallet')
+    .option('--x402', 'Enable x402 auto-payment using the configured wallet')
     .option('--clean[=types]', 'Clean up mcpc data (types: sessions, logs, profiles, all)');
 
   // Add help text to match README
@@ -325,11 +325,11 @@ MCP server commands:
   ping
 
 x402 payment commands (no target needed):
-  x402 init [--name <name>]     Create a new x402 wallet
-  x402 import <key> [--name]    Import wallet from private key
+  x402 init                     Create a new x402 wallet
+  x402 import <key>             Import wallet from private key
+  x402 info                     Show wallet info
   x402 sign -r <base64>         Sign payment from PAYMENT-REQUIRED header
-  x402 list                     List saved wallets
-  x402 remove [--name <name>]   Remove a wallet
+  x402 remove                   Remove the wallet
   
 Run "mcpc" without <target> to show available sessions and profiles.
 

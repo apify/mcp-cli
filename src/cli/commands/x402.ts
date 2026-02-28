@@ -7,13 +7,7 @@ import chalk from 'chalk';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import type { Hex } from 'viem';
 import { formatSuccess, formatError, formatInfo, formatJson } from '../output.js';
-import {
-  loadWallets,
-  getWallet,
-  saveWallet,
-  removeWallet,
-  resolveWalletName,
-} from '../../lib/wallets.js';
+import { getWallet, saveWallet, removeWallet } from '../../lib/wallets.js';
 import { ClientError } from '../../lib/errors.js';
 import type { OutputMode } from '../../lib/types.js';
 import { signPayment, parsePaymentRequired } from '../../lib/x402/signer.js';
@@ -22,20 +16,17 @@ import { signPayment, parsePaymentRequired } from '../../lib/x402/signer.js';
 // Constants
 // ---------------------------------------------------------------------------
 
-const DEFAULT_WALLET_NAME = 'default';
 const USDC_DECIMALS = 6;
 
 // ---------------------------------------------------------------------------
 // Command: init
 // ---------------------------------------------------------------------------
 
-async function initWallet(options: { name?: string; outputMode: OutputMode }): Promise<void> {
-  const name = resolveWalletName(options.name);
-
-  const existing = await getWallet(name);
+async function initWallet(options: { outputMode: OutputMode }): Promise<void> {
+  const existing = await getWallet();
   if (existing) {
     throw new ClientError(
-      `Wallet "${name}" already exists (address: ${existing.address}). Use "mcpc x402 remove --name ${name}" first.`
+      `Wallet already exists (address: ${existing.address}). Use "mcpc x402 remove" first.`
     );
   }
 
@@ -43,16 +34,15 @@ async function initWallet(options: { name?: string; outputMode: OutputMode }): P
   const account = privateKeyToAccount(privateKey);
 
   await saveWallet({
-    name,
     address: account.address,
     privateKey,
     createdAt: new Date().toISOString(),
   });
 
   if (options.outputMode === 'json') {
-    console.log(formatJson({ name, address: account.address }));
+    console.log(formatJson({ address: account.address }));
   } else {
-    console.log(formatSuccess(`Wallet "${name}" created`));
+    console.log(formatSuccess('Wallet created'));
     console.log(formatInfo(`Address: ${chalk.cyan(account.address)}`));
     console.log(formatInfo('Fund this address with USDC on Base to use x402 payments.'));
   }
@@ -63,16 +53,13 @@ async function initWallet(options: { name?: string; outputMode: OutputMode }): P
 // ---------------------------------------------------------------------------
 
 async function importWallet(options: {
-  name?: string;
   privateKey: string;
   outputMode: OutputMode;
 }): Promise<void> {
-  const name = resolveWalletName(options.name);
-
-  const existing = await getWallet(name);
+  const existing = await getWallet();
   if (existing) {
     throw new ClientError(
-      `Wallet "${name}" already exists (address: ${existing.address}). Use "mcpc x402 remove --name ${name}" first.`
+      `Wallet already exists (address: ${existing.address}). Use "mcpc x402 remove" first.`
     );
   }
 
@@ -89,62 +76,56 @@ async function importWallet(options: {
   }
 
   await saveWallet({
-    name,
     address: account.address,
     privateKey: key,
     createdAt: new Date().toISOString(),
   });
 
   if (options.outputMode === 'json') {
-    console.log(formatJson({ name, address: account.address }));
+    console.log(formatJson({ address: account.address }));
   } else {
-    console.log(formatSuccess(`Wallet "${name}" imported`));
+    console.log(formatSuccess('Wallet imported'));
     console.log(formatInfo(`Address: ${chalk.cyan(account.address)}`));
   }
 }
 
 // ---------------------------------------------------------------------------
-// Command: list
+// Command: info
 // ---------------------------------------------------------------------------
 
-async function listWallets(options: { outputMode: OutputMode }): Promise<void> {
-  const storage = await loadWallets();
-  const wallets = Object.values(storage.wallets);
+async function walletInfo(options: { outputMode: OutputMode }): Promise<void> {
+  const wallet = await getWallet();
 
   if (options.outputMode === 'json') {
     console.log(
-      formatJson(wallets.map((w) => ({ name: w.name, address: w.address, createdAt: w.createdAt })))
+      formatJson(wallet ? { address: wallet.address, createdAt: wallet.createdAt } : null)
     );
     return;
   }
 
-  if (wallets.length === 0) {
-    console.log(formatInfo('No wallets found. Create one with: mcpc x402 init'));
+  if (!wallet) {
+    console.log(formatInfo('No wallet configured. Create one with: mcpc x402 init'));
     return;
   }
 
-  for (const w of wallets) {
-    const isDefault = w.name === DEFAULT_WALLET_NAME ? chalk.dim(' (default)') : '';
-    console.log(`  ${chalk.bold(w.name)}${isDefault}  ${chalk.cyan(w.address)}`);
-  }
+  console.log(`  ${chalk.bold('Address')}   ${chalk.cyan(wallet.address)}`);
+  console.log(`  ${chalk.bold('Created')}   ${wallet.createdAt}`);
 }
 
 // ---------------------------------------------------------------------------
 // Command: remove
 // ---------------------------------------------------------------------------
 
-async function removeWalletCmd(options: { name?: string; outputMode: OutputMode }): Promise<void> {
-  const name = resolveWalletName(options.name);
-
-  const removed = await removeWallet(name);
+async function removeWalletCmd(options: { outputMode: OutputMode }): Promise<void> {
+  const removed = await removeWallet();
   if (!removed) {
-    throw new ClientError(`Wallet "${name}" not found.`);
+    throw new ClientError('No wallet configured.');
   }
 
   if (options.outputMode === 'json') {
-    console.log(formatJson({ name, removed: true }));
+    console.log(formatJson({ removed: true }));
   } else {
-    console.log(formatSuccess(`Wallet "${name}" removed.`));
+    console.log(formatSuccess('Wallet removed.'));
   }
 }
 
@@ -153,7 +134,6 @@ async function removeWalletCmd(options: { name?: string; outputMode: OutputMode 
 // ---------------------------------------------------------------------------
 
 interface SignOptions {
-  name?: string;
   paymentRequired: string;
   amount?: string;
   expiry?: string;
@@ -161,13 +141,9 @@ interface SignOptions {
 }
 
 async function signPaymentCommand(options: SignOptions): Promise<void> {
-  const name = resolveWalletName(options.name);
-
-  const wallet = await getWallet(name);
+  const wallet = await getWallet();
   if (!wallet) {
-    throw new ClientError(
-      `Wallet "${name}" not found. Create one with: mcpc x402 init --name ${name}`
-    );
+    throw new ClientError('No wallet configured. Create one with: mcpc x402 init');
   }
 
   // Parse PAYMENT-REQUIRED header
@@ -212,7 +188,7 @@ async function signPaymentCommand(options: SignOptions): Promise<void> {
   const resourceUrl = (header.resource?.url ?? 'https://mcp.apify.com/mcp').replace(/\?.*$/, '');
 
   console.log(formatSuccess('Payment signed'));
-  console.log(formatInfo(`Wallet    : ${chalk.bold(name)} (${result.from})`));
+  console.log(formatInfo(`Wallet    : ${result.from}`));
   console.log(formatInfo(`Network   : ${result.networkLabel}`));
   console.log(formatInfo(`To        : ${result.to}`));
   console.log(
@@ -266,47 +242,42 @@ export async function handleX402Command(args: string[]): Promise<void> {
   program
     .command('init')
     .description('Create a new x402 wallet')
-    .option('--name <name>', `Wallet name (default: "${DEFAULT_WALLET_NAME}")`)
-    .action(async (opts, cmd) => {
-      await initWallet({ name: opts.name, outputMode: resolveOutputMode(cmd) });
+    .action(async (_opts, cmd) => {
+      await initWallet({ outputMode: resolveOutputMode(cmd) });
     });
 
   program
     .command('import <private-key>')
     .description('Import an existing wallet from a private key')
-    .option('--name <name>', `Wallet name (default: "${DEFAULT_WALLET_NAME}")`)
-    .action(async (privateKey, opts, cmd) => {
-      await importWallet({ name: opts.name, privateKey, outputMode: resolveOutputMode(cmd) });
+    .action(async (privateKey, _opts, cmd) => {
+      await importWallet({ privateKey, outputMode: resolveOutputMode(cmd) });
     });
 
   program
-    .command('list')
-    .description('List saved wallets')
+    .command('info')
+    .description('Show wallet info')
     .action(async (_opts, cmd) => {
-      await listWallets({ outputMode: resolveOutputMode(cmd) });
+      await walletInfo({ outputMode: resolveOutputMode(cmd) });
     });
 
   program
     .command('remove')
-    .description('Remove a saved wallet')
-    .option('--name <name>', `Wallet name (default: "${DEFAULT_WALLET_NAME}")`)
-    .action(async (opts, cmd) => {
-      await removeWalletCmd({ name: opts.name, outputMode: resolveOutputMode(cmd) });
+    .description('Remove the wallet')
+    .action(async (_opts, cmd) => {
+      await removeWalletCmd({ outputMode: resolveOutputMode(cmd) });
     });
 
   program
     .command('sign')
-    .description('Sign a payment using a saved wallet')
+    .description('Sign a payment using the wallet')
     .requiredOption(
       '-r, --payment-required <base64>',
       'PAYMENT-REQUIRED header from a 402 response'
     )
-    .option('--name <name>', `Wallet name (default: "${DEFAULT_WALLET_NAME}")`)
     .option('--amount <usd>', 'Override amount in USD')
     .option('--expiry <seconds>', 'Override expiry in seconds')
     .action(async (opts, cmd) => {
       await signPaymentCommand({
-        name: opts.name,
         paymentRequired: opts.paymentRequired,
         amount: opts.amount,
         expiry: opts.expiry,

@@ -1,6 +1,6 @@
 /**
  * Wallet management for x402 payments
- * Stores wallet metadata and private keys in ~/.mcpc/wallets.json
+ * Stores a single wallet in ~/.mcpc/wallets.json
  */
 
 import { readFile, writeFile, rename, unlink } from 'fs/promises';
@@ -10,40 +10,32 @@ import { getWalletsFilePath, fileExists, ensureDir, getMcpcHome } from './utils.
 import { withFileLock } from './file-lock.js';
 import { ClientError } from './errors.js';
 
-const DEFAULT_WALLET_NAME = 'default';
-const WALLETS_DEFAULT_CONTENT = JSON.stringify({ wallets: {} }, null, 2);
-
-/**
- * Resolve wallet name, defaulting to "default"
- */
-export function resolveWalletName(name?: string): string {
-  return name || DEFAULT_WALLET_NAME;
-}
+const WALLETS_DEFAULT_CONTENT = JSON.stringify({ version: 1 }, null, 2);
 
 // ---------------------------------------------------------------------------
 // Internal read/write (called under file lock)
 // ---------------------------------------------------------------------------
 
-async function loadWalletsInternal(): Promise<WalletsStorage> {
+async function loadStorageInternal(): Promise<WalletsStorage> {
   const filePath = getWalletsFilePath();
 
   if (!(await fileExists(filePath))) {
-    return { wallets: {} };
+    return { version: 1 };
   }
 
   try {
     const content = await readFile(filePath, 'utf-8');
     const storage = JSON.parse(content) as WalletsStorage;
-    if (!storage.wallets || typeof storage.wallets !== 'object') {
-      return { wallets: {} };
+    if (!storage.version) {
+      return { version: 1 };
     }
     return storage;
   } catch {
-    return { wallets: {} };
+    return { version: 1 };
   }
 }
 
-async function saveWalletsInternal(storage: WalletsStorage): Promise<void> {
+async function saveStorageInternal(storage: WalletsStorage): Promise<void> {
   const filePath = getWalletsFilePath();
   await ensureDir(getMcpcHome());
 
@@ -57,7 +49,7 @@ async function saveWalletsInternal(storage: WalletsStorage): Promise<void> {
     } catch {
       /* ignore */
     }
-    throw new ClientError(`Failed to save wallets: ${(error as Error).message}`);
+    throw new ClientError(`Failed to save wallet: ${(error as Error).message}`);
   }
 }
 
@@ -65,13 +57,15 @@ async function saveWalletsInternal(storage: WalletsStorage): Promise<void> {
 // Public API (all operations hold file lock)
 // ---------------------------------------------------------------------------
 
-export async function loadWallets(): Promise<WalletsStorage> {
-  return withFileLock(getWalletsFilePath(), loadWalletsInternal, WALLETS_DEFAULT_CONTENT);
-}
-
-export async function getWallet(name: string): Promise<WalletData | undefined> {
-  const storage = await loadWallets();
-  return storage.wallets[name];
+export async function getWallet(): Promise<WalletData | undefined> {
+  return withFileLock(
+    getWalletsFilePath(),
+    async () => {
+      const storage = await loadStorageInternal();
+      return storage.wallet;
+    },
+    WALLETS_DEFAULT_CONTENT
+  );
 }
 
 export async function saveWallet(wallet: WalletData): Promise<void> {
@@ -79,23 +73,23 @@ export async function saveWallet(wallet: WalletData): Promise<void> {
   await withFileLock(
     filePath,
     async () => {
-      const storage = await loadWalletsInternal();
-      storage.wallets[wallet.name] = wallet;
-      await saveWalletsInternal(storage);
+      const storage = await loadStorageInternal();
+      storage.wallet = wallet;
+      await saveStorageInternal(storage);
     },
     WALLETS_DEFAULT_CONTENT
   );
 }
 
-export async function removeWallet(name: string): Promise<boolean> {
+export async function removeWallet(): Promise<boolean> {
   const filePath = getWalletsFilePath();
   return withFileLock(
     filePath,
     async () => {
-      const storage = await loadWalletsInternal();
-      if (!storage.wallets[name]) return false;
-      delete storage.wallets[name];
-      await saveWalletsInternal(storage);
+      const storage = await loadStorageInternal();
+      if (!storage.wallet) return false;
+      delete storage.wallet;
+      await saveStorageInternal(storage);
       return true;
     },
     WALLETS_DEFAULT_CONTENT

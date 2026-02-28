@@ -237,7 +237,7 @@ export function extractOptions(args: string[]): {
   headers?: string[];
   timeout?: number;
   profile?: string;
-  x402?: string;
+  x402?: boolean;
   verbose: boolean;
   json: boolean;
 } {
@@ -272,8 +272,8 @@ export function extractOptions(args: string[]): {
   const profile =
     profileIndex >= 0 && profileIndex + 1 < args.length ? args[profileIndex + 1] : undefined;
 
-  // Extract --x402 (boolean flag — always uses the default wallet)
-  const x402 = args.includes('--x402') ? 'default' : undefined;
+  // Extract --x402 (boolean flag)
+  const x402 = args.includes('--x402') || undefined;
 
   return {
     ...options,

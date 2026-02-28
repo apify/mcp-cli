@@ -119,7 +119,7 @@ export interface SessionData {
   name: string;
   server: ServerConfig; // Transport configuration (header values redacted to "<redacted>")
   profileName?: string; // Name of auth profile (for OAuth servers)
-  walletName?: string; // x402 wallet name for automatic payment signing
+  x402?: boolean; // x402 auto-payment enabled for this session
   pid?: number; // Bridge process PID
   protocolVersion?: string; // Negotiated MCP version
   mcpSessionId?: string; // Server-assigned MCP session ID for resumption (Streamable HTTP only)
@@ -198,10 +198,8 @@ export interface AuthCredentials {
 
 /**
  * x402 wallet credentials sent from CLI to bridge via IPC
- * Only the wallet name is sent; bridge loads the private key from wallets.json
  */
 export interface X402WalletCredentials {
-  walletName: string;
   address: string;
   privateKey: string; // Hex with 0x prefix
 }
@@ -277,9 +275,9 @@ export interface McpConfig {
 
 /**
  * x402 wallet data stored in ~/.mcpc/wallets.json
+ * Only a single wallet is supported (no names needed)
  */
 export interface WalletData {
-  name: string;
   address: string;
   privateKey: string; // Hex string starting with 0x
   createdAt: string; // ISO 8601
@@ -287,9 +285,11 @@ export interface WalletData {
 
 /**
  * Wallets storage structure (~/.mcpc/wallets.json)
+ * Versioned for future migration (e.g. multi-wallet support)
  */
 export interface WalletsStorage {
-  wallets: Record<string, WalletData>; // walletName -> WalletData
+  version: 1;
+  wallet?: WalletData;
 }
 
 /**
