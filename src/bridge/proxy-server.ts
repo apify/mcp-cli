@@ -88,7 +88,7 @@ export class ProxyServer {
     this.transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
     });
-    await this.mcpServer!.connect(this.transport as unknown as Transport);
+    await this.mcpServer.connect(this.transport as unknown as Transport);
 
     // Create HTTP server
     this.httpServer = createServer((req, res) => {
