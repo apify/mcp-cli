@@ -128,6 +128,9 @@ run_mcpc "$TEST_SERVER_URL" connect "$SESSION2" \
 assert_success
 _SESSIONS_CREATED+=("$SESSION2")
 
+# Wait for bridge to be fully ready before using session
+wait_for "$MCPC $SESSION2 ping >/dev/null 2>&1"
+
 # None of the secrets should appear in sessions.json
 sessions_content=$(cat "$sessions_file")
 if echo "$sessions_content" | grep -q "$SECRET_VALUE"; then

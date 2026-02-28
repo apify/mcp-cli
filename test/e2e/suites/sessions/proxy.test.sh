@@ -56,6 +56,9 @@ wait_for "curl -s http://127.0.0.1:$PROXY_PORT/health 2>/dev/null | grep -q ok"
 run_mcpc "127.0.0.1:$PROXY_PORT" connect "$SESSION_DOWNSTREAM"
 assert_success "connect to proxy should succeed"
 _SESSIONS_CREATED+=("$SESSION_DOWNSTREAM")
+
+# Wait for downstream bridge to be fully ready
+wait_for "$MCPC $SESSION_DOWNSTREAM ping >/dev/null 2>&1"
 test_pass
 
 # Test: proxy passes through upstream server instructions

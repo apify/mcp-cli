@@ -432,25 +432,40 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
 
   if (processAlive) {
     // Process alive, try getServerDetails (blocks until MCP connected)
-    const result = await checkBridgeHealth(socketPath);
-    if (result.healthy) {
-      logger.debug(`Bridge for ${sessionName} is healthy`);
-      return socketPath;
-    }
-    // Not healthy - check if it's a connection issue vs MCP error
-    if (result.error instanceof NetworkError) {
-      logger.warn(`Bridge process alive but socket not responding for ${sessionName}`);
-    } else if (result.error) {
-      // MCP connection error - check if it's an auth error
-      const errorMessage = result.error.message || '';
-      if (isAuthenticationError(errorMessage)) {
-        const target = session.server.url || session.server.command || sessionName;
-        throw createServerAuthError(target, { sessionName, originalError: result.error });
+    // Retry on transient socket errors (e.g. bridge event loop busy during MCP init)
+    const MAX_HEALTH_RETRIES = 3;
+    const HEALTH_RETRY_DELAY_MS = 1000;
+
+    for (let attempt = 1; attempt <= MAX_HEALTH_RETRIES; attempt++) {
+      const result = await checkBridgeHealth(socketPath);
+      if (result.healthy) {
+        logger.debug(`Bridge for ${sessionName} is healthy`);
+        return socketPath;
       }
-      // Other MCP errors - propagate
-      throw new ClientError(
-        `Bridge for ${sessionName} failed to connect to MCP server: ${result.error.message}`
-      );
+      // Not healthy - check if it's a connection issue vs MCP error
+      if (result.error instanceof NetworkError) {
+        // Socket not responding - could be transient (bridge busy with MCP init)
+        if (attempt < MAX_HEALTH_RETRIES && isProcessAlive(session.pid!)) {
+          logger.warn(
+            `Bridge socket not responding for ${sessionName} (attempt ${attempt}/${MAX_HEALTH_RETRIES}), retrying...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, HEALTH_RETRY_DELAY_MS));
+          continue;
+        }
+        logger.warn(`Bridge process alive but socket not responding for ${sessionName}`);
+      } else if (result.error) {
+        // MCP connection error - check if it's an auth error
+        const errorMessage = result.error.message || '';
+        if (isAuthenticationError(errorMessage)) {
+          const target = session.server.url || session.server.command || sessionName;
+          throw createServerAuthError(target, { sessionName, originalError: result.error });
+        }
+        // Other MCP errors - propagate
+        throw new ClientError(
+          `Bridge for ${sessionName} failed to connect to MCP server: ${result.error.message}`
+        );
+      }
+      break; // Non-retryable error, fall through to restart
     }
   } else {
     logger.debug(`Bridge process not alive for ${sessionName}, will try to restart it`);
