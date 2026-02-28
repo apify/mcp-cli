@@ -443,7 +443,7 @@ export async function closeSession(
 
     // Success!
     if (options.outputMode === 'human') {
-      console.log(formatSuccess(`Session ${name} closed successfully`));
+      console.log(formatSuccess(`Session ${name} closed successfully\n`));
     } else {
       console.log(
         formatOutput(

@@ -5,7 +5,7 @@
  * It communicates with the CLI via Unix domain sockets
  */
 
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { createServer, type Server as NetServer, type Socket } from 'net';
 import { unlink } from 'fs/promises';
 import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
@@ -36,15 +36,8 @@ const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.j
 import { ProxyServer } from './proxy-server.js';
 import type { ProxyConfig } from '../lib/types.js';
 
-// Set up HTTP proxy from environment variables (standard HTTPS_PROXY / HTTP_PROXY convention)
-const proxyUrl =
-  process.env.HTTPS_PROXY ??
-  process.env.https_proxy ??
-  process.env.HTTP_PROXY ??
-  process.env.http_proxy;
-if (proxyUrl) {
-  setGlobalDispatcher(new ProxyAgent(proxyUrl));
-}
+// Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
+setGlobalDispatcher(new EnvHttpProxyAgent());
 
 // Keepalive ping interval in milliseconds (30 seconds)
 const KEEPALIVE_INTERVAL_MS = 30_000;

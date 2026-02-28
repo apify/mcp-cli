@@ -10,7 +10,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { Command } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatHumanError, NetworkError } from '../lib/index.js';
@@ -40,15 +40,8 @@ const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.j
   version: string;
 };
 
-// Set up HTTP proxy from environment variables (standard HTTPS_PROXY / HTTP_PROXY convention)
-const proxyUrl =
-  process.env.HTTPS_PROXY ??
-  process.env.https_proxy ??
-  process.env.HTTP_PROXY ??
-  process.env.http_proxy;
-if (proxyUrl) {
-  setGlobalDispatcher(new ProxyAgent(proxyUrl));
-}
+// Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
+setGlobalDispatcher(new EnvHttpProxyAgent());
 
 /**
  * Options passed to command handlers

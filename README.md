@@ -968,6 +968,7 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 - `MCPC_VERBOSE` - Enable verbose logging (set to `1`, `true`, or `yes`, case-insensitive)
 - `MCPC_JSON` - Enable JSON output (set to `1`, `true`, or `yes`, case-insensitive)
 - `HTTPS_PROXY` / `https_proxy` / `HTTP_PROXY` / `http_proxy` - Proxy URL for outbound connections (e.g. `http://proxy.example.com:8080`); `HTTPS_PROXY` takes precedence
+- `NO_PROXY` / `no_proxy` - Comma-separated list of hostnames/IPs to bypass the proxy (e.g. `localhost,127.0.0.1`)
 
 ### Cleanup
 

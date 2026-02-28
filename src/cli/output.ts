@@ -916,7 +916,7 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
   if (options.protocolVersion) {
     parts.push('MCP: ' + options.protocolVersion);
   }
-  console.log(`[→ ${serverStr} ${chalk.dim('(' + parts.join(', ') + ')')}]\n`);
+  console.log(`[→ ${serverStr} ${chalk.dim('(' + parts.join(', ') + ')')}]`);
 }
 
 /**
