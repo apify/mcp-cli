@@ -34,7 +34,7 @@ import {
   storeKeychainSessionHeaders,
   storeKeychainProxyBearerToken,
 } from '../../lib/auth/keychain.js';
-import { ClientError } from '../../lib/index.js';
+import { AuthError, ClientError } from '../../lib/index.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
 import { parseProxyArg } from '../parser.js';
@@ -270,6 +270,10 @@ export async function connectSession(
         hideTarget: false, // Show session info prefix
       });
     } catch (detailsError) {
+      // Re-throw auth errors — these are real failures, not timing issues
+      if (detailsError instanceof AuthError) {
+        throw detailsError;
+      }
       logger.debug(
         `showServerDetails failed for new session ${name}: ${(detailsError as Error).message}`
       );
