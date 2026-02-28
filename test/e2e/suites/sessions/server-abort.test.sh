@@ -59,9 +59,6 @@ run_mcpc "$TEST_SERVER_URL" connect "$SESSION2"
 assert_success
 _SESSIONS_CREATED+=("$SESSION2")
 
-# Wait for bridge to be fully ready before running invariant checks
-wait_for "$MCPC $SESSION2 ping >/dev/null 2>&1"
-
 run_xmcpc "$SESSION2" tools-list
 assert_success
 test_pass

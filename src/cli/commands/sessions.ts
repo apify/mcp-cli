@@ -261,11 +261,19 @@ export async function connectSession(
       console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
     }
 
-    // Display server info via the new session
-    await showServerDetails(name, {
-      ...options,
-      hideTarget: false, // Show session info prefix
-    });
+    // Display server info via the new session (best-effort)
+    // If bridge is still initializing, don't fail the connect — the session is already created.
+    // The next command (e.g. ping, tools-list) will wait for the bridge to be ready.
+    try {
+      await showServerDetails(name, {
+        ...options,
+        hideTarget: false, // Show session info prefix
+      });
+    } catch (detailsError) {
+      logger.debug(
+        `showServerDetails failed for new session ${name}: ${(detailsError as Error).message}`
+      );
+    }
   } catch (error) {
     if (options.outputMode === 'human') {
       console.error(formatError((error as Error).message));
