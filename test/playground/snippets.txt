@@ -1,9 +1,9 @@
 
 
-mcpc --config ./test/fixtures/mcp-config.json fs
-mcpc --config ./test/fixtures/mcp-config.json fs session @fs
+mcpc --config ./docs/examples/mcp-config.json fs
+mcpc --config ./docs/examples/mcp-config.json fs connect @fs
 
 
-mcpc --config ./test/fixtures/mcp-config.json fs tools-list
+mcpc --config ./docs/examples/mcp-config.json fs tools-list
 
-mcpc mcp.apify.com --headers "Blah: Test" session @test5
+mcpc mcp.apify.com --headers "Blah: Test" connect @test5
