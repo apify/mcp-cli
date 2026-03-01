@@ -4,10 +4,10 @@
   "description": "Universal command-line client for the Model Context Protocol (MCP).",
   "type": "module",
   "keywords": [
-    "mcpc",
-    "MCP",
     "Model Context Protocol",
+    "MCP",
     "CLI",
+    "Code mode",
     "LLM",
     "AI"
   ],
