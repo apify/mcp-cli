@@ -164,6 +164,25 @@ CURRENT_VERSION=$(node -p "require('./package.json').version")
 echo ""
 echo "Current version: $CURRENT_VERSION"
 
+# Check CHANGELOG.md has unreleased entries
+echo ""
+UNRELEASED_CONTENT=$(awk '/^## \[Unreleased\]/{found=1; next} found && /^## \[/{exit} found{print}' CHANGELOG.md | grep -v '^[[:space:]]*$' || true)
+if [ -z "$UNRELEASED_CONTENT" ]; then
+  echo -e "${YELLOW}⚠️  The [Unreleased] section in CHANGELOG.md appears to be empty.${NC}"
+  echo ""
+  echo "   Ask Claude to update it before releasing:"
+  echo -e "   ${GREEN}Tell Claude: \"Update CHANGELOG.md [Unreleased] section for the upcoming release\"${NC}"
+  echo ""
+  read -p "   Continue anyway without changelog entries? (y/N) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Cancelled. Update the changelog and re-run."
+    exit 0
+  fi
+else
+  echo -e "${GREEN}✓ CHANGELOG.md has unreleased entries${NC}"
+fi
+
 # Bump version (without git tag - we'll do it manually)
 echo "Bumping $VERSION_TYPE version..."
 npm version "$VERSION_TYPE" --no-git-tag-version
