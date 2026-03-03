@@ -79,6 +79,7 @@
     "prettier": "^3.7.4",
     "proxy-chain": "^2.7.1",
     "ts-jest": "^29.4.6",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }

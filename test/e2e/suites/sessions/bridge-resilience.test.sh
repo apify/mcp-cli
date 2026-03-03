@@ -2,7 +2,7 @@
 # Test: Bridge resilience to MCP errors
 
 source "$(dirname "$0")/../../lib/framework.sh"
-test_init "sessions/bridge-resilience"
+test_init "sessions/bridge-resilience" --isolated
 
 # Start test server
 start_test_server

@@ -34,7 +34,7 @@ import {
   storeKeychainSessionHeaders,
   storeKeychainProxyBearerToken,
 } from '../../lib/auth/keychain.js';
-import { ClientError } from '../../lib/index.js';
+import { AuthError, ClientError } from '../../lib/index.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
 import { parseProxyArg } from '../parser.js';
@@ -261,11 +261,23 @@ export async function connectSession(
       console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
     }
 
-    // Display server info via the new session
-    await showServerDetails(name, {
-      ...options,
-      hideTarget: false, // Show session info prefix
-    });
+    // Display server info via the new session (best-effort)
+    // If bridge is still initializing, don't fail the connect — the session is already created.
+    // The next command (e.g. ping, tools-list) will wait for the bridge to be ready.
+    try {
+      await showServerDetails(name, {
+        ...options,
+        hideTarget: false, // Show session info prefix
+      });
+    } catch (detailsError) {
+      // Re-throw auth errors — these are real failures, not timing issues
+      if (detailsError instanceof AuthError) {
+        throw detailsError;
+      }
+      logger.debug(
+        `showServerDetails failed for new session ${name}: ${(detailsError as Error).message}`
+      );
+    }
   } catch (error) {
     if (options.outputMode === 'human') {
       console.error(formatError((error as Error).message));
