@@ -12,6 +12,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from 'http';
+import { randomUUID } from 'crypto';
 import { Server as MCPServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -83,6 +84,12 @@ export class ProxyServer {
     // Register handlers that forward to upstream client
     this.registerHandlers(client);
 
+    // Create transport with session management and connect MCP server once
+    this.transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+    });
+    await this.mcpServer.connect(this.transport as unknown as Transport);
+
     // Create HTTP server
     this.httpServer = createServer((req, res) => {
       this.handleRequest(req, res, bearerToken).catch((error) => {
@@ -146,27 +153,9 @@ export class ProxyServer {
       }
     }
 
-    // Handle MCP requests
-    if (method === 'POST') {
-      // Create transport for this request (stateless - no session management)
-      this.transport = new StreamableHTTPServerTransport({});
-
-      // Connect transport to MCP server (cast needed due to exactOptionalPropertyTypes)
-      await this.mcpServer!.connect(this.transport as unknown as Transport);
-
-      // Handle the request
-      await this.transport.handleRequest(req, res);
-      return;
-    }
-
-    // Handle GET for SSE (if needed)
-    if (method === 'GET') {
-      // Create transport for this request (stateless - no session management)
-      this.transport = new StreamableHTTPServerTransport({});
-
-      // Connect transport to MCP server (cast needed due to exactOptionalPropertyTypes)
-      await this.mcpServer!.connect(this.transport as unknown as Transport);
-      await this.transport.handleRequest(req, res);
+    // Handle MCP requests (POST and GET delegate to the transport)
+    if (method === 'POST' || method === 'GET') {
+      await this.transport!.handleRequest(req, res);
       return;
     }
 

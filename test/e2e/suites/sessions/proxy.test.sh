@@ -181,13 +181,13 @@ http_code=$(echo "$response" | tail -1)
 assert_eq "$http_code" "403" "should return 403 for wrong token"
 test_pass
 
-# Test: MCP request with correct token succeeds
+# Test: MCP request with correct token succeeds (send initialize as proper MCP clients do)
 test_case "proxy accepts correct bearer token"
 response=$(curl -s -w "\n%{http_code}" -X POST "http://127.0.0.1:$PROXY_PORT_AUTH/" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Authorization: Bearer $BEARER_TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"ping","id":1}' 2>/dev/null)
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}' 2>/dev/null)
 http_code=$(echo "$response" | tail -1)
 # Should be 200 (success) or 202 (accepted for streaming)
 if [[ "$http_code" != "200" && "$http_code" != "202" ]]; then

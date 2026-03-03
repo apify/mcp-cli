@@ -10,6 +10,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
+import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { Command } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatHumanError, NetworkError } from '../lib/index.js';
@@ -38,6 +39,9 @@ import { createRequire } from 'module';
 const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
   version: string;
 };
+
+// Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
+setGlobalDispatcher(new EnvHttpProxyAgent());
 
 /**
  * Options passed to command handlers
@@ -222,6 +226,18 @@ async function main(): Promise<void> {
   } finally {
     await closeFileLogger();
   }
+
+  // Flush stdout before exiting. When stdout is a pipe, Node.js uses async I/O
+  // and process.exit() would discard any data still in the stream buffer.
+  // This caused silent truncation at 64KB (the kernel pipe buffer size).
+  await new Promise<void>((resolve) => {
+    if (process.stdout.writableFinished) {
+      resolve();
+    } else {
+      process.stdout.once('finish', resolve);
+      process.stdout.end();
+    }
+  });
 
   // Explicit exit to avoid waiting for stdio child processes to close
   // (the MCP SDK's StdioClientTransport keeps handles in the event loop)
