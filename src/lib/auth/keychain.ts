@@ -1,28 +1,122 @@
 /**
  * OS Keychain integration for secure credential storage
- * Uses @napi-rs/keyring package for cross-platform keychain access
+ * Uses @napi-rs/keyring for cross-platform keychain access.
+ * Falls back to ~/.mcpc/credentials.json (mode 0600) when the OS keychain
+ * is unavailable (e.g. headless servers, containers).
  */
 
 import { Entry } from '@napi-rs/keyring';
+import { readFile, writeFile } from 'fs/promises';
+import { join } from 'path';
 import { createLogger } from '../logger.js';
-import { getServerHost } from '../utils.js';
+import { getServerHost, getMcpcHome } from '../utils.js';
+import { withFileLock } from '../file-lock.js';
 
 const logger = createLogger('keychain');
-
-// Service name for all mcpc credentials in the keychain
 const SERVICE_NAME = 'mcpc';
 
-/**
- * OAuth client information (from dynamic registration)
- */
+// =============================================================================
+// File-based fallback store
+// =============================================================================
+
+const credentialsPath = (): string => join(getMcpcHome(), 'credentials.json');
+
+async function fileGet(account: string): Promise<string | null> {
+  try {
+    const data = JSON.parse(await readFile(credentialsPath(), 'utf8')) as Record<string, string>;
+    return data[account] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fileSet(account: string, value: string): Promise<void> {
+  await withFileLock(credentialsPath(), async () => {
+    const raw = await readFile(credentialsPath(), 'utf8').catch(() => '{}');
+    const data = { ...(JSON.parse(raw) as Record<string, string>), [account]: value };
+    await writeFile(credentialsPath(), JSON.stringify(data), { mode: 0o600 });
+  });
+}
+
+async function fileDelete(account: string): Promise<boolean> {
+  return withFileLock(credentialsPath(), async () => {
+    const raw = await readFile(credentialsPath(), 'utf8').catch(() => '{}');
+    const data = JSON.parse(raw) as Record<string, string>;
+    if (!(account in data)) return false;
+    delete data[account];
+    await writeFile(credentialsPath(), JSON.stringify(data), { mode: 0o600 });
+    return true;
+  });
+}
+
+// =============================================================================
+// Keychain wrappers with automatic file fallback
+// =============================================================================
+
+let keychainAvailable: boolean | null = null; // null = untested
+
+async function keychainSet(account: string, value: string): Promise<void> {
+  if (keychainAvailable === false) return fileSet(account, value);
+  try {
+    new Entry(SERVICE_NAME, account).setPassword(value);
+    keychainAvailable = true;
+  } catch (error) {
+    if (keychainAvailable === null) {
+      logger.warn(
+        `OS keychain unavailable (${(error as Error).message}), ` +
+          `falling back to file-based credential storage (${credentialsPath()}). ` +
+          `Install a keyring daemon (e.g. gnome-keyring or kwallet) for better security.`
+      );
+    }
+    keychainAvailable = false;
+    await fileSet(account, value);
+  }
+}
+
+async function keychainGet(account: string): Promise<string | null> {
+  if (keychainAvailable === false) return fileGet(account);
+  try {
+    const result = new Entry(SERVICE_NAME, account).getPassword();
+    keychainAvailable = true;
+    return result ?? null;
+  } catch {
+    keychainAvailable = false;
+    return fileGet(account);
+  }
+}
+
+async function keychainDelete(account: string): Promise<boolean> {
+  if (keychainAvailable === false) return fileDelete(account);
+  try {
+    const result = new Entry(SERVICE_NAME, account).deletePassword();
+    keychainAvailable = true;
+    return result;
+  } catch {
+    keychainAvailable = false;
+    return fileDelete(account);
+  }
+}
+
+async function keychainGetParsed<T>(account: string, label: string): Promise<T | undefined> {
+  const raw = await keychainGet(account);
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    logger.error(`Failed to parse ${label}: ${(error as Error).message}`);
+    return undefined;
+  }
+}
+
+// =============================================================================
+// Types
+// =============================================================================
+
 export interface OAuthClientInfo {
   clientId: string;
   clientSecret?: string;
 }
 
-/**
- * OAuth tokens
- */
 export interface OAuthTokenInfo {
   accessToken: string;
   refreshToken?: string;
@@ -32,223 +126,124 @@ export interface OAuthTokenInfo {
   scope?: string;
 }
 
-/**
- * Get a keychain account name for OAuth client info
- * Uses getServerHost() to normalize the server URL to a canonical host
- */
-function buildOAuthClientAccountName(serverUrl: string, profileName: string): string {
-  const host = getServerHost(serverUrl);
-  return `auth-profile:${host}:${profileName}:client`;
-}
+// =============================================================================
+// Account name builders
+// =============================================================================
 
-/**
- * Get a keychain account name for OAuth tokens
- * Uses getServerHost() to normalize the server URL to a canonical host
- */
-function buildOAuthTokensAccountName(serverUrl: string, profileName: string): string {
-  const host = getServerHost(serverUrl);
-  return `auth-profile:${host}:${profileName}:tokens`;
-}
+const oauthClientAccount = (serverUrl: string, profileName: string): string =>
+  `auth-profile:${getServerHost(serverUrl)}:${profileName}:client`;
 
-/**
- * Get a keychain account name for session headers
- */
-function buildSessionAccountName(sessionName: string): string {
-  return `session:${sessionName}:headers`;
-}
+const oauthTokensAccount = (serverUrl: string, profileName: string): string =>
+  `auth-profile:${getServerHost(serverUrl)}:${profileName}:tokens`;
 
-/**
- * Get a keychain account name for proxy bearer token
- */
-function buildProxyBearerTokenAccountName(sessionName: string): string {
-  return `session:${sessionName}:proxy-bearer-token`;
-}
+const sessionHeadersAccount = (sessionName: string): string =>
+  `session:${sessionName}:headers`;
 
-/**
- * Store OAuth client info in keychain
- */
+const proxyBearerTokenAccount = (sessionName: string): string =>
+  `session:${sessionName}:proxy-bearer-token`;
+
+// =============================================================================
+// Public API
+// =============================================================================
+
+/** Store OAuth client registration info for an auth profile. */
 export async function storeKeychainOAuthClientInfo(
   serverUrl: string,
   profileName: string,
   client: OAuthClientInfo
 ): Promise<void> {
-  const account = buildOAuthClientAccountName(serverUrl, profileName);
-  const value = JSON.stringify(client);
-
   logger.debug(`Storing OAuth client info for ${profileName} @ ${serverUrl}`);
-  new Entry(SERVICE_NAME, account).setPassword(value);
+  await keychainSet(oauthClientAccount(serverUrl, profileName), JSON.stringify(client));
 }
 
-/**
- * Get OAuth client info from keychain
- */
+/** Read OAuth client registration info for an auth profile. */
 export async function readKeychainOAuthClientInfo(
   serverUrl: string,
   profileName: string
 ): Promise<OAuthClientInfo | undefined> {
-  const account = buildOAuthClientAccountName(serverUrl, profileName);
-
   logger.debug(`Retrieving OAuth client info for ${profileName} @ ${serverUrl}`);
-  const value = new Entry(SERVICE_NAME, account).getPassword();
-
-  if (!value) {
-    return undefined;
-  }
-
-  try {
-    return JSON.parse(value) as OAuthClientInfo;
-  } catch (error) {
-    logger.error(`Failed to parse OAuth client info from keychain: ${(error as Error).message}`);
-    return undefined;
-  }
+  return keychainGetParsed<OAuthClientInfo>(oauthClientAccount(serverUrl, profileName), 'OAuth client info');
 }
 
-/**
- * Delete OAuth client info from keychain
- */
+/** Delete OAuth client registration info for an auth profile. */
 export async function removeKeychainOAuthClientInfo(
   serverUrl: string,
   profileName: string
 ): Promise<boolean> {
-  const account = buildOAuthClientAccountName(serverUrl, profileName);
-
   logger.debug(`Deleting OAuth client info for ${profileName} @ ${serverUrl}`);
-  return new Entry(SERVICE_NAME, account).deletePassword();
+  return keychainDelete(oauthClientAccount(serverUrl, profileName));
 }
 
-/**
- * Store OAuth tokens in keychain
- * TODO: The operations on Keychain should be done under profiles file lock, to ensure atomocity...
- */
+/** Store OAuth tokens for an auth profile. */
 export async function storeKeychainOAuthTokenInfo(
   serverUrl: string,
   profileName: string,
   tokens: OAuthTokenInfo
 ): Promise<void> {
-  const account = buildOAuthTokensAccountName(serverUrl, profileName);
-  const value = JSON.stringify(tokens);
-
   logger.debug(`Storing OAuth tokens for ${profileName} @ ${serverUrl}`);
-  new Entry(SERVICE_NAME, account).setPassword(value);
+  await keychainSet(oauthTokensAccount(serverUrl, profileName), JSON.stringify(tokens));
 }
 
-/**
- * Get OAuth tokens from keychain
- */
+/** Read OAuth tokens for an auth profile. */
 export async function readKeychainOAuthTokenInfo(
   serverUrl: string,
   profileName: string
 ): Promise<OAuthTokenInfo | undefined> {
-  const account = buildOAuthTokensAccountName(serverUrl, profileName);
-
   logger.debug(`Retrieving OAuth tokens for ${profileName} @ ${serverUrl}`);
-  const value = new Entry(SERVICE_NAME, account).getPassword();
-
-  if (!value) {
-    return undefined;
-  }
-
-  try {
-    return JSON.parse(value) as OAuthTokenInfo;
-  } catch (error) {
-    logger.error(`Failed to parse OAuth tokens from keychain: ${(error as Error).message}`);
-    return undefined;
-  }
+  return keychainGetParsed<OAuthTokenInfo>(oauthTokensAccount(serverUrl, profileName), 'OAuth tokens');
 }
 
-/**
- * Delete OAuth tokens from keychain
- */
+/** Delete OAuth tokens for an auth profile. */
 export async function removeKeychainOAuthTokenInfo(
   serverUrl: string,
   profileName: string
 ): Promise<boolean> {
-  const account = buildOAuthTokensAccountName(serverUrl, profileName);
-
   logger.debug(`Deleting OAuth tokens for ${profileName} @ ${serverUrl}`);
-  return new Entry(SERVICE_NAME, account).deletePassword();
+  return keychainDelete(oauthTokensAccount(serverUrl, profileName));
 }
 
-/**
- * Store HTTP headers for a session in keychain
- * All headers from --header flags are treated as potentially sensitive
- */
+/** Store custom HTTP headers for a session. */
 export async function storeKeychainSessionHeaders(
   sessionName: string,
   headers: Record<string, string>
 ): Promise<void> {
-  const account = buildSessionAccountName(sessionName);
-  const value = JSON.stringify(headers);
-
   logger.debug(`Storing headers for session ${sessionName}`);
-  new Entry(SERVICE_NAME, account).setPassword(value);
+  await keychainSet(sessionHeadersAccount(sessionName), JSON.stringify(headers));
 }
 
-/**
- * Retrieve HTTP headers for a session from keychain
- */
+/** Read custom HTTP headers for a session. */
 export async function readKeychainSessionHeaders(
   sessionName: string
 ): Promise<Record<string, string> | undefined> {
-  const account = buildSessionAccountName(sessionName);
-
   logger.debug(`Retrieving headers for session ${sessionName}`);
-  const value = new Entry(SERVICE_NAME, account).getPassword();
-
-  if (!value) {
-    return undefined;
-  }
-
-  try {
-    return JSON.parse(value) as Record<string, string>;
-  } catch (error) {
-    logger.error(`Failed to parse headers from keychain: ${(error as Error).message}`);
-    return undefined;
-  }
+  return keychainGetParsed<Record<string, string>>(sessionHeadersAccount(sessionName), 'session headers');
 }
 
-/**
- * Delete HTTP headers for a session from keychain
- */
+/** Delete custom HTTP headers for a session. */
 export async function removeKeychainSessionHeaders(sessionName: string): Promise<boolean> {
-  const account = buildSessionAccountName(sessionName);
-
   logger.debug(`Deleting headers for session ${sessionName}`);
-  return new Entry(SERVICE_NAME, account).deletePassword();
+  return keychainDelete(sessionHeadersAccount(sessionName));
 }
 
-/**
- * Store proxy bearer token for a session in keychain
- * Used to secure the proxy MCP server with authentication
- */
+/** Store the bearer token used to authenticate requests to the proxy server. */
 export async function storeKeychainProxyBearerToken(
   sessionName: string,
   token: string
 ): Promise<void> {
-  const account = buildProxyBearerTokenAccountName(sessionName);
-
   logger.debug(`Storing proxy bearer token for session ${sessionName}`);
-  new Entry(SERVICE_NAME, account).setPassword(token);
+  await keychainSet(proxyBearerTokenAccount(sessionName), token);
 }
 
-/**
- * Retrieve proxy bearer token for a session from keychain
- */
+/** Read the bearer token used to authenticate requests to the proxy server. */
 export async function readKeychainProxyBearerToken(
   sessionName: string
 ): Promise<string | undefined> {
-  const account = buildProxyBearerTokenAccountName(sessionName);
-
   logger.debug(`Retrieving proxy bearer token for session ${sessionName}`);
-  return new Entry(SERVICE_NAME, account).getPassword() ?? undefined;
+  return (await keychainGet(proxyBearerTokenAccount(sessionName))) ?? undefined;
 }
 
-/**
- * Delete proxy bearer token for a session from keychain
- */
+/** Delete the bearer token used to authenticate requests to the proxy server. */
 export async function removeKeychainProxyBearerToken(sessionName: string): Promise<boolean> {
-  const account = buildProxyBearerTokenAccountName(sessionName);
-
   logger.debug(`Deleting proxy bearer token for session ${sessionName}`);
-  return new Entry(SERVICE_NAME, account).deletePassword();
+  return keychainDelete(proxyBearerTokenAccount(sessionName));
 }
