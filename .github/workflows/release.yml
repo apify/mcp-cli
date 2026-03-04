@@ -67,14 +67,41 @@ jobs:
         if: inputs.type == 'pre-release'
         id: prerelease
         run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
           CURRENT=$(node -p "require('./package.json').version")
 
-          # If already a prerelease version, just increment the prerelease number.
-          # Otherwise create a new prerelease from a patch bump.
-          if [[ "$CURRENT" == *-beta.* ]]; then
+          # Compute the next patch version as the beta base
+          # e.g. 0.1.10 -> 0.1.11, or 0.1.11-beta.2 -> 0.1.11
+          NEXT_PATCH=$(node -p "
+            const v = '${CURRENT}'.replace(/-beta\..*/, '').split('.');
+            v[2] = String(Number(v[2]) + (('${CURRENT}'.includes('-beta.')) ? 0 : 1));
+            v.join('.')
+          ")
+
+          # Query npm for existing betas of this patch version
+          LATEST_BETA=$(npm view "${PKG_NAME}" versions --json 2>/dev/null \
+            | node -p "
+              const all = JSON.parse(require('fs').readFileSync(0,'utf8'));
+              const betas = (Array.isArray(all) ? all : [all])
+                .filter(v => v.startsWith('${NEXT_PATCH}-beta.'))
+                .sort((a,b) => {
+                  const na = Number(a.split('-beta.')[1]);
+                  const nb = Number(b.split('-beta.')[1]);
+                  return na - nb;
+                });
+              betas.length ? betas[betas.length-1] : ''
+            " \
+          ) || true
+
+          if [[ -n "$LATEST_BETA" && "$LATEST_BETA" == ${NEXT_PATCH}-beta.* ]]; then
+            # Existing beta found — increment from it
+            echo "Found existing beta on npm: $LATEST_BETA — incrementing"
+            npm version "$LATEST_BETA" --no-git-tag-version --allow-same-version
             npm version prerelease --preid=beta --no-git-tag-version
           else
-            npm version prepatch --preid=beta --no-git-tag-version
+            # No beta yet — start at beta.0
+            echo "No existing beta for ${NEXT_PATCH} — creating ${NEXT_PATCH}-beta.0"
+            npm version "${NEXT_PATCH}-beta.0" --no-git-tag-version --allow-same-version
           fi
 
           NEW_VERSION=$(node -p "require('./package.json').version")
