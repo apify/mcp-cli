@@ -55,11 +55,12 @@ async function fileDelete(account: string): Promise<boolean> {
 
 let keychainAvailable: boolean | null = null; // null = untested
 
-async function keychainSet(account: string, value: string): Promise<void> {
-  if (keychainAvailable === false) return fileSet(account, value);
+function withKeychain<T>(keychainOp: () => T, fallback: () => Promise<T>): Promise<T> {
+  if (keychainAvailable === false) return fallback();
   try {
-    new Entry(SERVICE_NAME, account).setPassword(value);
+    const result = keychainOp();
     keychainAvailable = true;
+    return Promise.resolve(result);
   } catch (error) {
     if (keychainAvailable === null) {
       logger.warn(
@@ -69,32 +70,20 @@ async function keychainSet(account: string, value: string): Promise<void> {
       );
     }
     keychainAvailable = false;
-    await fileSet(account, value);
+    return fallback();
   }
 }
 
-async function keychainGet(account: string): Promise<string | null> {
-  if (keychainAvailable === false) return fileGet(account);
-  try {
-    const result = new Entry(SERVICE_NAME, account).getPassword();
-    keychainAvailable = true;
-    return result ?? null;
-  } catch {
-    keychainAvailable = false;
-    return fileGet(account);
-  }
+function keychainSet(account: string, value: string): Promise<void> {
+  return withKeychain(() => { new Entry(SERVICE_NAME, account).setPassword(value); }, () => fileSet(account, value));
 }
 
-async function keychainDelete(account: string): Promise<boolean> {
-  if (keychainAvailable === false) return fileDelete(account);
-  try {
-    const result = new Entry(SERVICE_NAME, account).deletePassword();
-    keychainAvailable = true;
-    return result;
-  } catch {
-    keychainAvailable = false;
-    return fileDelete(account);
-  }
+function keychainGet(account: string): Promise<string | null> {
+  return withKeychain(() => new Entry(SERVICE_NAME, account).getPassword() ?? null, () => fileGet(account));
+}
+
+function keychainDelete(account: string): Promise<boolean> {
+  return withKeychain(() => new Entry(SERVICE_NAME, account).deletePassword(), () => fileDelete(account));
 }
 
 async function keychainGetParsed<T>(account: string, label: string): Promise<T | undefined> {
