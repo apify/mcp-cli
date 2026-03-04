@@ -39,7 +39,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           # Use the default GITHUB_TOKEN — it has write access via permissions above
