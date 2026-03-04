@@ -1,0 +1,175 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - pre-release
+          - release
+      version:
+        description: 'Version bump (release only)'
+        required: false
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    name: Publish ${{ inputs.type }}
+    runs-on: ubuntu-latest
+    # Release must be from main; pre-release can be from any branch
+    if: inputs.type == 'pre-release' || github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Validate inputs
+        run: |
+          if [[ "${{ inputs.type }}" == "release" && "${{ github.ref }}" != "refs/heads/main" ]]; then
+            echo "::error::Releases must be published from the main branch."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use the default GITHUB_TOKEN — it has write access via permissions above
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # ── Pre-release ────────────────────────────────────────────────
+      - name: Bump pre-release version
+        if: inputs.type == 'pre-release'
+        id: prerelease
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+
+          # If already a prerelease version, just increment the prerelease number.
+          # Otherwise create a new prerelease from a patch bump.
+          if [[ "$CURRENT" == *-beta.* ]]; then
+            npm version prerelease --preid=beta --no-git-tag-version
+          else
+            npm version prepatch --preid=beta --no-git-tag-version
+          fi
+
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "### Pre-release version: \`$NEW_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and tag pre-release
+        if: inputs.type == 'pre-release'
+        run: |
+          VERSION="${{ steps.prerelease.outputs.version }}"
+          git add package.json package-lock.json
+          git commit -m "v${VERSION}"
+          git tag -a "v${VERSION}" -m "Pre-release v${VERSION}"
+          git push origin HEAD
+          git push origin "v${VERSION}"
+
+      - name: Publish pre-release to npm
+        if: inputs.type == 'pre-release'
+        run: MCPC_RELEASE=1 npm publish --access public --tag beta --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub pre-release
+        if: inputs.type == 'pre-release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.prerelease.outputs.version }}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --prerelease \
+            --generate-notes
+
+      # ── Release ────────────────────────────────────────────────────
+      - name: Bump release version
+        if: inputs.type == 'release'
+        id: release
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+
+          npm version "${{ inputs.version }}" --no-git-tag-version
+
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "### Release version: \`$NEW_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update CHANGELOG.md
+        if: inputs.type == 'release'
+        run: |
+          NEW_VERSION="${{ steps.release.outputs.version }}"
+          CURRENT="${{ steps.release.outputs.current }}"
+          TODAY=$(date +%Y-%m-%d)
+
+          if [ -f CHANGELOG.md ] && grep -q "^## \[Unreleased\]" CHANGELOG.md; then
+            sed -i "s/^## \[Unreleased\]/## [Unreleased]\n\n## [$NEW_VERSION] - $TODAY/" CHANGELOG.md
+
+            if grep -q "^\[Unreleased\]:" CHANGELOG.md; then
+              sed -i "s|\[Unreleased\]: \(.*\)/compare/v[0-9.]*\.\.\.HEAD|[Unreleased]: \1/compare/v$NEW_VERSION...HEAD\n[$NEW_VERSION]: \1/compare/v$CURRENT...v$NEW_VERSION|" CHANGELOG.md
+            fi
+          fi
+
+      - name: Update README
+        if: inputs.type == 'release'
+        run: npm run build:readme || true
+
+      - name: Commit and tag release
+        if: inputs.type == 'release'
+        run: |
+          VERSION="${{ steps.release.outputs.version }}"
+          git add package.json package-lock.json CHANGELOG.md README.md || true
+          git commit -m "v${VERSION}"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin main
+          git push origin "v${VERSION}"
+
+      - name: Publish release to npm
+        if: inputs.type == 'release'
+        run: MCPC_RELEASE=1 npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub release
+        if: inputs.type == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.release.outputs.version }}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --generate-notes
