@@ -18,7 +18,7 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 - 🤖 **AI sandboxing** - MCP proxy server to securely access authenticated sessions from AI-generated code.
 - 🔒 **Secure** - Full OAuth 2.1 support, OS keychain for credentials storage.
 - 🪶 **Lightweight** - Minimal dependencies, works on Mac/Win/Linux, doesn't use LLMs on its own.
-- 💸 **[Agentic payments (x402)](#agentic-payments-x402)** - Experimental support for the [x402](https://www.x402.org/) payment protocol, enabling AI agents to pay for MCP tool calls with USDC on Base.
+- 💸 **[Agentic payments (x402)](#agentic-payments-x402)** - Experimental support for the [x402](https://www.x402.org/) payment protocol, enabling AI agents to pay for MCP tool calls with USDC on [Base](https://www.base.org/).
 
 ## Table of contents
 
@@ -683,7 +683,7 @@ To help Claude Code use `mcpc`, you can install this [Claude skill](./docs/claud
 
 ## Agentic payments (x402)
 
-> **Experimental.** This feature is under active development and may change.
+> ⚠️ **Experimental.** This feature is under active development and may change.
 
 `mcpc` has experimental support for the [x402 payment protocol](https://www.x402.org/),
 which enables AI agents to autonomously pay for MCP tool calls using cryptocurrency.
