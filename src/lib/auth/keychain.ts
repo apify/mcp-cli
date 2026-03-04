@@ -75,15 +75,26 @@ function withKeychain<T>(keychainOp: () => T, fallback: () => Promise<T>): Promi
 }
 
 function keychainSet(account: string, value: string): Promise<void> {
-  return withKeychain(() => { new Entry(SERVICE_NAME, account).setPassword(value); }, () => fileSet(account, value));
+  return withKeychain(
+    () => {
+      new Entry(SERVICE_NAME, account).setPassword(value);
+    },
+    () => fileSet(account, value)
+  );
 }
 
 function keychainGet(account: string): Promise<string | null> {
-  return withKeychain(() => new Entry(SERVICE_NAME, account).getPassword() ?? null, () => fileGet(account));
+  return withKeychain(
+    () => new Entry(SERVICE_NAME, account).getPassword() ?? null,
+    () => fileGet(account)
+  );
 }
 
 function keychainDelete(account: string): Promise<boolean> {
-  return withKeychain(() => new Entry(SERVICE_NAME, account).deletePassword(), () => fileDelete(account));
+  return withKeychain(
+    () => new Entry(SERVICE_NAME, account).deletePassword(),
+    () => fileDelete(account)
+  );
 }
 
 async function keychainGetParsed<T>(account: string, label: string): Promise<T | undefined> {
@@ -125,8 +136,7 @@ const oauthClientAccount = (serverUrl: string, profileName: string): string =>
 const oauthTokensAccount = (serverUrl: string, profileName: string): string =>
   `auth-profile:${getServerHost(serverUrl)}:${profileName}:tokens`;
 
-const sessionHeadersAccount = (sessionName: string): string =>
-  `session:${sessionName}:headers`;
+const sessionHeadersAccount = (sessionName: string): string => `session:${sessionName}:headers`;
 
 const proxyBearerTokenAccount = (sessionName: string): string =>
   `session:${sessionName}:proxy-bearer-token`;
@@ -151,7 +161,10 @@ export async function readKeychainOAuthClientInfo(
   profileName: string
 ): Promise<OAuthClientInfo | undefined> {
   logger.debug(`Retrieving OAuth client info for ${profileName} @ ${serverUrl}`);
-  return keychainGetParsed<OAuthClientInfo>(oauthClientAccount(serverUrl, profileName), 'OAuth client info');
+  return keychainGetParsed<OAuthClientInfo>(
+    oauthClientAccount(serverUrl, profileName),
+    'OAuth client info'
+  );
 }
 
 /** Delete OAuth client registration info for an auth profile. */
@@ -179,7 +192,10 @@ export async function readKeychainOAuthTokenInfo(
   profileName: string
 ): Promise<OAuthTokenInfo | undefined> {
   logger.debug(`Retrieving OAuth tokens for ${profileName} @ ${serverUrl}`);
-  return keychainGetParsed<OAuthTokenInfo>(oauthTokensAccount(serverUrl, profileName), 'OAuth tokens');
+  return keychainGetParsed<OAuthTokenInfo>(
+    oauthTokensAccount(serverUrl, profileName),
+    'OAuth tokens'
+  );
 }
 
 /** Delete OAuth tokens for an auth profile. */
@@ -205,7 +221,10 @@ export async function readKeychainSessionHeaders(
   sessionName: string
 ): Promise<Record<string, string> | undefined> {
   logger.debug(`Retrieving headers for session ${sessionName}`);
-  return keychainGetParsed<Record<string, string>>(sessionHeadersAccount(sessionName), 'session headers');
+  return keychainGetParsed<Record<string, string>>(
+    sessionHeadersAccount(sessionName),
+    'session headers'
+  );
 }
 
 /** Delete custom HTTP headers for a session. */
