@@ -73,7 +73,7 @@
     "@typescript-eslint/parser": "^8.50.0",
     "c8": "^11.0.0",
     "doctoc": "^2.2.1",
-    "eslint": "^8.57.1",
+    "eslint": "^10.0.0",
     "jest": "^30.2.0",
     "markdown-link-check": "^3.14.2",
     "nyc": "^18.0.0",
