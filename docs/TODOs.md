@@ -18,8 +18,6 @@
     - Use https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool for inspiration/compatibility?
   - Consider adding support for something like `mcp-cli @session/tool [args]` to make it easier to use
 
-- Add CI/CD unit testing for other Node versions, maybe proper release management?
-- Add GitHub packages?
 
 ## Later
 
@@ -47,12 +45,6 @@
 - Show protocolVersion also for stdio - but for that we need to update the SDK to save it! See setProtocolVersion
 
 ## E2E test scenarios
-
-- On "npm run release", make the two skippable OAuth e2e tests mandatory
-
-- Test auth profiles work long-term and sessions too - basically when running some tests the
-  next day they should use old saved auths and sessions.
-  We could have some special dir for long-term testing...
 
 
 # Questions
