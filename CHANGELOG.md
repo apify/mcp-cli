@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
 
 ### Changed
-- OS keychain now falls back to `~/.mcpc/credentials.json` (mode 0600) when no keyring daemon is available (e.g. headless Linux servers, containers)
+- `@napi-rs/keyring` native addon is now loaded lazily: `mcpc` starts and works normally even when `libsecret` (Linux) or the addon itself is missing; a one-time warning is emitted and credentials fall back to `~/.mcpc/credentials.json` (mode 0600)
 
 ## [0.1.10] - 2026-03-01
 

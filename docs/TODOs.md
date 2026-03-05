@@ -32,7 +32,6 @@
 - nit: show also header / open auth statuses for HTTP servers?
 - ux: consider forking "alive" session state to "alive" and "diconnected", to indicate the remove server is not responding but bridge 
   runs fine. We can use lastSeenAt + ping interval info for that, or status of last ping.
-- perf: make the libsecret dependency soft - only load it when using keychain, but skip for auth-less (AI sandbox) use
 - ux: Be even more forgiving with `args:=x`, when we know from tools/prompt schema the text is compatible with `x` even if the exact type is not - 
   just re-type it dynamically to make it work.
 - nit: Cooler OAuth flow finish web page with CSS animation, add Apify example there, show mcpc info. E.g. next step - check Apify rather than close
