@@ -22,6 +22,7 @@ import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
 import * as utilities from './commands/utilities.js';
 import * as auth from './commands/auth.js';
+import { handleX402Command } from './commands/x402.js';
 import { clean } from './commands/clean.js';
 import type { OutputMode } from '../lib/index.js';
 import {
@@ -53,6 +54,7 @@ interface HandlerOptions {
   timeout?: number;
   verbose?: boolean;
   profile?: string;
+  x402?: boolean;
   schema?: string;
   schemaMode?: 'strict' | 'compatible' | 'ignore';
   full?: boolean;
@@ -88,6 +90,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
   if (opts.profile) options.profile = opts.profile;
   if (verbose) options.verbose = verbose;
+  if (opts.x402) options.x402 = true;
   if (opts.schema) options.schema = opts.schema;
   if (opts.schemaMode) {
     const mode = opts.schemaMode as string;
@@ -203,6 +206,14 @@ async function main(): Promise<void> {
     ...args.slice(targetIndex + 1),
   ];
 
+  // Handle x402 as a top-level command (not a server target)
+  if (target === 'x402') {
+    const x402Args = args.slice(targetIndex + 1);
+    await handleX402Command(x402Args);
+    await closeFileLogger();
+    return;
+  }
+
   // Handle commands
   try {
     await handleCommands(target, modifiedArgs);
@@ -272,6 +283,7 @@ function createProgram(): Command {
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session (with "connect" command)')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
+    .option('--x402', 'Enable x402 auto-payment using the configured wallet')
     .option('--clean[=types]', 'Clean up mcpc data (types: sessions, logs, profiles, all)');
 
   // Add help text to match README
@@ -311,6 +323,13 @@ MCP server commands:
   resources-templates-list
   logging-set-level <level>
   ping
+
+x402 payment commands (no target needed):
+  x402 init                     Create a new x402 wallet
+  x402 import <key>             Import wallet from private key
+  x402 info                     Show wallet info
+  x402 sign -r <base64>         Sign payment from PAYMENT-REQUIRED header
+  x402 remove                   Remove the wallet
   
 Run "mcpc" without <target> to show available sessions and profiles.
 
@@ -383,6 +402,7 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
         ...getOptionsFromCommand(command),
         proxy: opts.proxy,
         proxyBearerToken: opts.proxyBearerToken,
+        x402: opts.x402,
       });
     });
 

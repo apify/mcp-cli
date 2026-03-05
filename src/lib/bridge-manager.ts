@@ -16,7 +16,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { unlink } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import type { ServerConfig, AuthCredentials, ProxyConfig } from './types.js';
+import type { ServerConfig, AuthCredentials, ProxyConfig, X402WalletCredentials } from './types.js';
 import { getSocketPath, waitForFile, isProcessAlive, fileExists, getLogsDir } from './utils.js';
 import { updateSession, getSession } from './sessions.js';
 import { createLogger } from './logger.js';
@@ -33,6 +33,7 @@ import {
   readKeychainSessionHeaders,
 } from './auth/keychain.js';
 import { getAuthProfile } from './auth/profiles.js';
+import { getWallet } from './wallets.js';
 
 const logger = createLogger('bridge-manager');
 
@@ -55,6 +56,7 @@ export interface StartBridgeOptions {
   headers?: Record<string, string>; // Headers to send via IPC (caller stores in keychain)
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
+  x402?: boolean; // Enable x402 auto-payment using the wallet
 }
 
 export interface StartBridgeResult {
@@ -77,8 +79,16 @@ export interface StartBridgeResult {
  * @returns Bridge process PID
  */
 export async function startBridge(options: StartBridgeOptions): Promise<StartBridgeResult> {
-  const { sessionName, serverConfig, verbose, profileName, headers, proxyConfig, mcpSessionId } =
-    options;
+  const {
+    sessionName,
+    serverConfig,
+    verbose,
+    profileName,
+    headers,
+    proxyConfig,
+    mcpSessionId,
+    x402,
+  } = options;
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
 
@@ -128,6 +138,12 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
     logger.debug(`Passing MCP session ID for resumption: ${mcpSessionId}`);
   }
 
+  // Pass x402 flag (if enabled)
+  if (x402) {
+    args.push('--x402');
+    logger.debug('Passing x402 flag to bridge');
+  }
+
   logger.debug('Bridge executable:', bridgeExecutable);
   logger.debug('Bridge args:', args);
 
@@ -172,6 +188,11 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
       profileName,
       headers
     );
+  }
+
+  // Send x402 wallet credentials to bridge via IPC
+  if (x402) {
+    await sendX402WalletToBridge(socketPath);
   }
 
   logger.debug(`Bridge started successfully for session: ${sessionName}`);
@@ -261,7 +282,7 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
     logger.debug(`Retrieved ${expectedHeaderKeys.length} headers from keychain for failover`);
   }
 
-  // Start a new bridge, preserving auth profile, proxy config, and MCP session ID
+  // Start a new bridge, preserving auth profile, proxy config, MCP session ID, and wallet
   const bridgeOptions: StartBridgeOptions = {
     sessionName,
     serverConfig: serverConfig,
@@ -278,6 +299,10 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   if (session.mcpSessionId) {
     bridgeOptions.mcpSessionId = session.mcpSessionId;
     logger.debug(`Using saved MCP session ID for resumption: ${session.mcpSessionId}`);
+  }
+  if (session.x402) {
+    bridgeOptions.x402 = session.x402;
+    logger.debug('Using saved x402 flag');
   }
 
   const { pid } = await startBridge(bridgeOptions);
@@ -356,6 +381,36 @@ async function sendAuthCredentialsToBridge(
     await client.connect();
     client.sendAuthCredentials(credentials);
     logger.debug('Auth credentials sent to bridge successfully');
+  } finally {
+    await client.close();
+  }
+}
+
+/**
+ * Send x402 wallet credentials to a bridge process via IPC
+ * Loads wallet data from wallets.json and sends it to bridge
+ *
+ * @param socketPath - Path to bridge's Unix socket
+ */
+async function sendX402WalletToBridge(socketPath: string): Promise<void> {
+  const wallet = await getWallet();
+
+  if (!wallet) {
+    throw new ClientError('x402 wallet not found. Create one with: mcpc x402 init');
+  }
+
+  logger.debug(`Sending x402 wallet (${wallet.address}) to bridge`);
+
+  const credentials: X402WalletCredentials = {
+    address: wallet.address,
+    privateKey: wallet.privateKey,
+  };
+
+  const client = new BridgeClient(socketPath);
+  try {
+    await client.connect();
+    client.sendX402Wallet(credentials);
+    logger.debug('x402 wallet sent to bridge successfully');
   } finally {
     await client.close();
   }
