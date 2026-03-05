@@ -8,7 +8,7 @@
 import { Entry } from '@napi-rs/keyring';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { createLogger } from '../logger.js';
+import { createLogger, getJsonMode } from '../logger.js';
 import { getServerHost, getMcpcHome } from '../utils.js';
 import { withFileLock } from '../file-lock.js';
 
@@ -62,7 +62,7 @@ function withKeychain<T>(keychainOp: () => T, fallback: () => Promise<T>): Promi
     keychainAvailable = true;
     return Promise.resolve(result);
   } catch (error) {
-    if (keychainAvailable === null) {
+    if (keychainAvailable === null && !getJsonMode()) {
       logger.warn(
         `OS keychain unavailable (${(error as Error).message}), ` +
           `falling back to file-based credential storage (${credentialsPath()}). ` +
