@@ -45,6 +45,9 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 
 ```bash
 npm install -g @apify/mcpc
+
+# Or with Bun
+bun install -g @apify/mcpc
 ```
 
 **Linux users:** `mcpc` uses the OS keychain for secure credential storage via the
@@ -66,7 +69,7 @@ npm install -g @apify/mcpc
    by gnome-keyring or KWallet. On headless/server/CI environments you need to install and start one:
    ```bash
    # Debian/Ubuntu
-   sudo apt-get install gnome-keyring
+   sudo apt-get install gnome-keyring dbus
 
    # Then start it (e.g. in CI):
    dbus-run-session -- bash -c "echo -n 'password' | gnome-keyring-daemon --unlock && your-command"

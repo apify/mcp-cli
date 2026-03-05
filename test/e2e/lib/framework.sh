@@ -179,7 +179,8 @@ _cleanup_keychain() {
 # ============================================================================
 
 # Path to mcpc
-MCPC="node $PROJECT_ROOT/dist/cli/index.js"
+# Runtime can be overridden via E2E_RUNTIME env var (e.g. E2E_RUNTIME=bun)
+MCPC="${E2E_RUNTIME:-node} $PROJECT_ROOT/dist/cli/index.js"
 
 # Run mcpc and capture output
 # Sets: STDOUT, STDERR, EXIT_CODE
