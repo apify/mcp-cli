@@ -54,6 +54,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: E2E tests
         # Run without gnome-keyring: @napi-rs/keyring fails fast when no D-Bus secret
         # service is available, and keychain.ts automatically falls back to encrypted
