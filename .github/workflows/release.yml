@@ -42,8 +42,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # Use the default GITHUB_TOKEN — it has write access via permissions above
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -64,39 +62,51 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
       # ── Pre-release ────────────────────────────────────────────────
       - name: Bump pre-release version
         if: inputs.type == 'pre-release'
         id: prerelease
         run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
           CURRENT=$(node -p "require('./package.json').version")
 
-          # If already a prerelease version, just increment the prerelease number.
-          # Otherwise create a new prerelease from a patch bump.
-          if [[ "$CURRENT" == *-beta.* ]]; then
+          # Compute the next patch version as the beta base
+          # e.g. 0.1.10 -> 0.1.11, or 0.1.11-beta.2 -> 0.1.11
+          NEXT_PATCH=$(node -p "
+            const v = '${CURRENT}'.replace(/-beta\..*/, '').split('.');
+            v[2] = String(Number(v[2]) + (('${CURRENT}'.includes('-beta.')) ? 0 : 1));
+            v.join('.')
+          ")
+
+          # Query npm for existing betas of this patch version
+          LATEST_BETA=$(npm view "${PKG_NAME}" versions --json 2>/dev/null \
+            | node -p "
+              const all = JSON.parse(require('fs').readFileSync(0,'utf8'));
+              const betas = (Array.isArray(all) ? all : [all])
+                .filter(v => v.startsWith('${NEXT_PATCH}-beta.'))
+                .sort((a,b) => {
+                  const na = Number(a.split('-beta.')[1]);
+                  const nb = Number(b.split('-beta.')[1]);
+                  return na - nb;
+                });
+              betas.length ? betas[betas.length-1] : ''
+            " \
+          ) || true
+
+          if [[ -n "$LATEST_BETA" && "$LATEST_BETA" == ${NEXT_PATCH}-beta.* ]]; then
+            # Existing beta found — increment from it
+            echo "Found existing beta on npm: $LATEST_BETA — incrementing"
+            npm version "$LATEST_BETA" --no-git-tag-version --allow-same-version
             npm version prerelease --preid=beta --no-git-tag-version
           else
-            npm version prepatch --preid=beta --no-git-tag-version
+            # No beta yet — start at beta.0
+            echo "No existing beta for ${NEXT_PATCH} — creating ${NEXT_PATCH}-beta.0"
+            npm version "${NEXT_PATCH}-beta.0" --no-git-tag-version --allow-same-version
           fi
 
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "### Pre-release version: \`$NEW_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Commit and tag pre-release
-        if: inputs.type == 'pre-release'
-        run: |
-          VERSION="${{ steps.prerelease.outputs.version }}"
-          git add package.json package-lock.json
-          git commit -m "v${VERSION}"
-          git tag -a "v${VERSION}" -m "Pre-release v${VERSION}"
-          git push origin HEAD
-          git push origin "v${VERSION}"
 
       - name: Publish pre-release to npm
         if: inputs.type == 'pre-release'
@@ -113,7 +123,8 @@ jobs:
           gh release create "v${VERSION}" \
             --title "v${VERSION}" \
             --prerelease \
-            --generate-notes
+            --generate-notes \
+            --target "${{ github.sha }}"
 
       # ── Release ────────────────────────────────────────────────────
       - name: Bump release version
@@ -129,35 +140,6 @@ jobs:
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "### Release version: \`$NEW_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Update CHANGELOG.md
-        if: inputs.type == 'release'
-        run: |
-          NEW_VERSION="${{ steps.release.outputs.version }}"
-          CURRENT="${{ steps.release.outputs.current }}"
-          TODAY=$(date +%Y-%m-%d)
-
-          if [ -f CHANGELOG.md ] && grep -q "^## \[Unreleased\]" CHANGELOG.md; then
-            sed -i "s/^## \[Unreleased\]/## [Unreleased]\n\n## [$NEW_VERSION] - $TODAY/" CHANGELOG.md
-
-            if grep -q "^\[Unreleased\]:" CHANGELOG.md; then
-              sed -i "s|\[Unreleased\]: \(.*\)/compare/v[0-9.]*\.\.\.HEAD|[Unreleased]: \1/compare/v$NEW_VERSION...HEAD\n[$NEW_VERSION]: \1/compare/v$CURRENT...v$NEW_VERSION|" CHANGELOG.md
-            fi
-          fi
-
-      - name: Update README
-        if: inputs.type == 'release'
-        run: npm run build:readme || true
-
-      - name: Commit and tag release
-        if: inputs.type == 'release'
-        run: |
-          VERSION="${{ steps.release.outputs.version }}"
-          git add package.json package-lock.json CHANGELOG.md README.md || true
-          git commit -m "v${VERSION}"
-          git tag -a "v${VERSION}" -m "Release v${VERSION}"
-          git push origin main
-          git push origin "v${VERSION}"
-
       - name: Publish release to npm
         if: inputs.type == 'release'
         run: MCPC_RELEASE=1 npm publish --access public --provenance
@@ -172,4 +154,5 @@ jobs:
           VERSION="${{ steps.release.outputs.version }}"
           gh release create "v${VERSION}" \
             --title "v${VERSION}" \
-            --generate-notes
+            --generate-notes \
+            --target "${{ github.sha }}"

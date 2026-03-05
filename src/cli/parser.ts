@@ -56,6 +56,7 @@ const KNOWN_OPTIONS = [
   '--verbose',
   '--clean',
   '--full',
+  '--x402',
 ];
 
 // Valid --clean types
@@ -87,13 +88,14 @@ export const KNOWN_COMMANDS = [
   'prompts-get',
   'logging-set-level',
   'ping',
+  'x402',
 ];
 
 // Valid --schema-mode values
 const VALID_SCHEMA_MODES = ['strict', 'compatible', 'ignore'];
 
 /**
- * Check if an option takes a value
+ * Check if an option always takes a value
  */
 export function optionTakesValue(arg: string): boolean {
   const optionName = arg.includes('=') ? arg.substring(0, arg.indexOf('=')) : arg;
@@ -235,6 +237,7 @@ export function extractOptions(args: string[]): {
   headers?: string[];
   timeout?: number;
   profile?: string;
+  x402?: boolean;
   verbose: boolean;
   json: boolean;
 } {
@@ -269,12 +272,16 @@ export function extractOptions(args: string[]): {
   const profile =
     profileIndex >= 0 && profileIndex + 1 < args.length ? args[profileIndex + 1] : undefined;
 
+  // Extract --x402 (boolean flag)
+  const x402 = args.includes('--x402') || undefined;
+
   return {
     ...options,
     ...(config && { config }),
     ...(headers.length > 0 && { headers }),
     ...(timeout !== undefined && { timeout }),
     ...(profile && { profile }),
+    ...(x402 && { x402 }),
   };
 }
 

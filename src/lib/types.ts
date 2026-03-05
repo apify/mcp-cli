@@ -119,6 +119,7 @@ export interface SessionData {
   name: string;
   server: ServerConfig; // Transport configuration (header values redacted to "<redacted>")
   profileName?: string; // Name of auth profile (for OAuth servers)
+  x402?: boolean; // x402 auto-payment enabled for this session
   pid?: number; // Bridge process PID
   protocolVersion?: string; // Negotiated MCP version
   mcpSessionId?: string; // Server-assigned MCP session ID for resumption (Streamable HTTP only)
@@ -178,7 +179,8 @@ export type IpcMessageType =
   | 'response'
   | 'shutdown'
   | 'notification'
-  | 'set-auth-credentials';
+  | 'set-auth-credentials'
+  | 'set-x402-wallet';
 
 /**
  * Auth credentials sent from CLI to bridge via IPC
@@ -192,6 +194,14 @@ export interface AuthCredentials {
   refreshToken?: string;
   // HTTP headers (from --header flags, stored in keychain)
   headers?: Record<string, string>;
+}
+
+/**
+ * x402 wallet credentials sent from CLI to bridge via IPC
+ */
+export interface X402WalletCredentials {
+  address: string;
+  privateKey: string; // Hex with 0x prefix
 }
 
 /**
@@ -224,6 +234,7 @@ export interface IpcMessage {
   result?: unknown; // Response result
   notification?: NotificationData; // Notification data (for type='notification')
   authCredentials?: AuthCredentials; // Auth credentials (for type='set-auth-credentials')
+  x402Wallet?: X402WalletCredentials; // x402 wallet (for type='set-x402-wallet')
   error?: {
     code: number;
     message: string;
@@ -260,6 +271,25 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
  */
 export interface McpConfig {
   mcpServers: Record<string, ServerConfig>;
+}
+
+/**
+ * x402 wallet data stored in ~/.mcpc/wallets.json
+ * Only a single wallet is supported (no names needed)
+ */
+export interface WalletData {
+  address: string;
+  privateKey: string; // Hex string starting with 0x
+  createdAt: string; // ISO 8601
+}
+
+/**
+ * Wallets storage structure (~/.mcpc/wallets.json)
+ * Versioned for future migration (e.g. multi-wallet support)
+ */
+export interface WalletsStorage {
+  version: 1;
+  wallet?: WalletData;
 }
 
 /**

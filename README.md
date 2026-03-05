@@ -10,6 +10,7 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 ![mcpc screenshot](https://raw.githubusercontent.com/apify/mcpc/main/docs/images/mcpc-demo.gif)
 
 **Key features:**
+
 - 🌎 **Compatible** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
 - 🔧 **Strong MCP support** - Instructions, tools, resources, prompts, dynamic discovery.
@@ -17,7 +18,7 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 - 🤖 **AI sandboxing** - MCP proxy server to securely access authenticated sessions from AI-generated code.
 - 🔒 **Secure** - Full OAuth 2.1 support, OS keychain for credentials storage.
 - 🪶 **Lightweight** - Minimal dependencies, works on Mac/Win/Linux, doesn't use LLMs on its own.
-
+- 💸 **[Agentic payments (x402)](#agentic-payments-x402)** - Experimental support for the [x402](https://www.x402.org/) payment protocol, enabling AI agents to pay for MCP tool calls with USDC on [Base](https://www.base.org/).
 
 ## Table of contents
 
@@ -31,6 +32,7 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 - [Authentication](#authentication)
 - [MCP proxy](#mcp-proxy)
 - [AI agents](#ai-agents)
+- [Agentic payments (x402)](#agentic-payments-x402)
 - [MCP support](#mcp-support)
 - [Configuration](#configuration)
 - [Security](#security)
@@ -48,29 +50,29 @@ npm install -g @apify/mcpc
 ```
 
 **Linux users:** `mcpc` uses the OS keychain for secure credential storage via the
-[Secret Service API](https://specifications.freedesktop.org/secret-service/). Two things are required:
+[Secret Service API](https://specifications.freedesktop.org/secret-service/).
+On desktop systems (GNOME, KDE) this works out of the box. On headless/server/CI environments
+without a keyring daemon, `mcpc` automatically falls back to a file-based credential store
+(`~/.mcpc/credentials`, mode `0600`).
 
-1. **`libsecret`** — the shared library (client side):
-   ```bash
-   # Debian/Ubuntu
-   sudo apt-get install libsecret-1-0
+To use the OS keychain on a headless system, install `libsecret` and a secret service daemon:
 
-   # Fedora/RHEL/CentOS
-   sudo dnf install libsecret
+```bash
+# Debian/Ubuntu
+sudo apt-get install libsecret-1-0 gnome-keyring
 
-   # Arch Linux
-   sudo pacman -S libsecret
-   ```
+# Fedora/RHEL/CentOS
+sudo dnf install libsecret gnome-keyring
 
-2. **A running secret service daemon** — on desktop systems (GNOME, KDE) this is already provided
-   by gnome-keyring or KWallet. On headless/server/CI environments you need to install and start one:
-   ```bash
-   # Debian/Ubuntu
-   sudo apt-get install gnome-keyring
+# Arch Linux
+sudo pacman -S libsecret gnome-keyring
+```
 
-   # Then start it (e.g. in CI):
-   dbus-run-session -- bash -c "echo -n 'password' | gnome-keyring-daemon --unlock && your-command"
-   ```
+And then run `mcpc` as follows:
+
+```
+dbus-run-session -- bash -c "echo -n 'password' | gnome-keyring-daemon --unlock && mcpc ..."
+```
 
 ## Quickstart
 
@@ -117,6 +119,7 @@ Options:
   --timeout <seconds>           Request timeout in seconds (default: 300)
   --proxy <[host:]port>         Start proxy MCP server for session (with "connect" command)
   --proxy-bearer-token <token>  Require authentication for access to proxy server
+  --x402                        Enable x402 auto-payment using the configured wallet
   --clean[=types]               Clean up mcpc data (types: sessions, logs, profiles, all)
   -h, --help                    Display general help
 
@@ -148,7 +151,14 @@ MCP server commands:
   resources-templates-list
   logging-set-level <level>
   ping
-  
+
+x402 payment commands (no target needed):
+  x402 init                     Create a new x402 wallet
+  x402 import <key>             Import wallet from private key
+  x402 info                     Show wallet info
+  x402 sign -r <base64>         Sign payment from PAYMENT-REQUIRED header
+  x402 remove                   Remove the wallet
+
 Run "mcpc" without <target> to show available sessions and profiles.
 ```
 
@@ -181,6 +191,7 @@ To connect and interact with an MCP server, you need to specify a `<target>`, wh
 connects, and enables you to interact with it.
 
 **URL handling:**
+
 - URLs without a scheme (e.g. `mcp.apify.com`) default to `https://`
 - `localhost` and `127.0.0.1` addresses without a scheme default to `http://` (for local dev/proxy servers)
 - To override the default, specify the scheme explicitly (e.g. `http://example.com`)
@@ -229,6 +240,7 @@ cat args.json | mcpc <target> tools-call <tool-name>
 ```
 
 **Rules:**
+
 - All arguments use `:=` syntax: `key:=value`
 - Values are auto-parsed: valid JSON becomes that type, otherwise treated as string
   - `count:=10` → number `10`
@@ -257,6 +269,7 @@ echo "{\"query\": \"${QUERY}\", \"limit\": 10}" | mcpc @server tools-call search
 ```
 
 **Common pitfall:** Don't put spaces around `:=` - it won't work:
+
 ```bash
 # Wrong - spaces around :=
 mcpc @server tools-call search query := "hello world"
@@ -329,7 +342,7 @@ Still, sessions can fail due to network disconnects, bridge process crash, or se
 **Session states:**
 
 | State            | Meaning                                                                                       |
-|------------------|-----------------------------------------------------------------------------------------------|
+| ---------------- | --------------------------------------------------------------------------------------------- |
 | 🟢 **`live`**    | Bridge process is running; server might or might not be operational                           |
 | 🟡 **`crashed`** | Bridge process crashed or was killed; will auto-restart on next use                           |
 | 🔴 **`expired`** | Server rejected the session (auth failed, session ID invalid); requires `close` and reconnect |
@@ -364,7 +377,6 @@ and opens new connection with new `MCP-Session-Id`, by running:
 ```bash
 mcpc @apify restart
 ```
-
 
 ## Authentication
 
@@ -404,8 +416,8 @@ mcpc @apify tools-list
 
 ### OAuth profiles
 
-For OAuth-enabled remote MCP servers, `mcpc` implements the full OAuth 2.1 flow with PKCE, 
-including `WWW-Authenticate` header discovery, server metadata discovery, client ID metadata documents, 
+For OAuth-enabled remote MCP servers, `mcpc` implements the full OAuth 2.1 flow with PKCE,
+including `WWW-Authenticate` header discovery, server metadata discovery, client ID metadata documents,
 dynamic client registration, and automatic token refresh.
 
 The OAuth authentication **always** needs to be initiated by the user calling the `login` command,
@@ -413,11 +425,13 @@ which opens a web browser with login screen. `mcpc` never opens the web browser 
 
 The OAuth credentials to specific servers are securely stored as **authentication profiles** - reusable
 credentials that allow you to:
+
 - Authenticate once, use credentials across multiple commands or sessions
 - Use different accounts (profiles) with the same server
 - Manage credentials independently from sessions
 
 Key concepts:
+
 - **Authentication profile**: Named set of OAuth credentials for a specific server (stored in `~/.mcpc/profiles.json` + OS keychain)
 - **Session**: Active connection to a server that may reference an authentication profile (stored in `~/.mcpc/sessions.json`)
 - **Default profile**: When `--profile` is not specified, `mcpc` uses the authentication profile named `default`
@@ -456,7 +470,6 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
 3. **Config file headers** - Headers from `--config` file for the server
 4. **No authentication** - Attempts unauthenticated connection
 
-
 `mcpc` automatically handles authentication based on whether you specify a profile:
 
 **When `--profile <name>` is specified:**
@@ -478,6 +491,7 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
 On failure, the error message includes instructions on how to login and save the profile, so you know what to do.
 
 This flow ensures:
+
 - You only authenticate when necessary
 - Credentials are never silently mixed up (personal → work) or downgraded (authenticated → unauthenticated)
 - You can mix authenticated sessions (with named profiles) and public access on the same server
@@ -499,7 +513,6 @@ mcpc mcp.apify.com connect @apify-personal
 # Public server - no authentication needed:
 mcpc mcp.apify.com\?tools=docs tools-list
 ```
-
 
 ## MCP proxy
 
@@ -534,7 +547,7 @@ mcpc localhost:8081 connect @sandboxed2 --header "Authorization: Bearer secret12
 **Proxy options for `connect` command:**
 
 | Option                         | Description                                                                    |
-|--------------------------------|--------------------------------------------------------------------------------|
+| ------------------------------ | ------------------------------------------------------------------------------ |
 | `--proxy [host:]port`          | Start proxy MCP server. Default host: `127.0.0.1` (localhost only)             |
 | `--proxy-bearer-token <token>` | Requires `Authorization: Bearer <token>` header to access the proxy MCP server |
 
@@ -564,7 +577,6 @@ When listing sessions, proxy info is displayed prominently:
 mcpc
 # @relay → https://mcp.apify.com (HTTP, OAuth: default) [proxy: 127.0.0.1:8080]
 ```
-
 
 ## AI agents
 
@@ -635,6 +647,7 @@ mcpc @apify tools-call search-actors --schema expected.json keywords:="test"
 ```
 
 Available schema validation modes (`--schema-mode`):
+
 - `compatible` (default)
   - Input schema: new optional fields OK, required fields must have the same type.
   - Output schema: new fields OK, removed required fields cause error.
@@ -668,6 +681,73 @@ To help Claude Code use `mcpc`, you can install this [Claude skill](./docs/claud
 
 <!-- TODO: Add also AGENTS.md, GitHub skills etc. -->
 
+## Agentic payments (x402)
+
+> ⚠️ **Experimental.** This feature is under active development and may change.
+
+`mcpc` has experimental support for the [x402 payment protocol](https://www.x402.org/),
+which enables AI agents to autonomously pay for MCP tool calls using cryptocurrency.
+When an MCP server charges for a tool call (HTTP 402), `mcpc` automatically signs a USDC payment
+on the [Base](https://base.org/) blockchain and retries the request — no human intervention needed.
+
+This is entirely **opt-in**: existing functionality is unaffected unless you explicitly pass the `--x402` flag.
+
+### How it works
+
+1. **Server returns HTTP 402** with a `PAYMENT-REQUIRED` header describing the price and payment details.
+2. `mcpc` parses the header, signs an [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009) `TransferWithAuthorization` using your local wallet.
+3. `mcpc` retries the request with a `PAYMENT-SIGNATURE` header containing the signed payment.
+4. The server verifies the signature and fulfills the request.
+
+For tools that advertise pricing in their `_meta.x402` metadata, `mcpc` can **proactively sign** payments
+on the first request, avoiding the 402 round-trip entirely.
+
+### Wallet setup
+
+`mcpc` stores a single wallet in `~/.mcpc/wallets.json` (file permissions `0600`).
+You need to create or import a wallet before using x402 payments.
+
+```bash
+# Create a new wallet (generates a random private key)
+mcpc x402 init
+
+# Or import an existing wallet from a private key
+mcpc x402 import <private-key>
+
+# Show wallet address and creation date
+mcpc x402 info
+
+# Remove the wallet
+mcpc x402 remove
+```
+
+After creating a wallet, **fund it with USDC on Base** (mainnet or Sepolia testnet) to enable payments.
+
+### Using x402 with MCP servers
+
+Pass the `--x402` flag when connecting to a session or running direct commands:
+
+```bash
+# Create a session with x402 payment support
+mcpc mcp.apify.com connect @apify --x402
+
+# The session now automatically handles 402 responses
+mcpc @apify tools-call expensive-tool query:="hello"
+
+# Restart a session with x402 enabled
+mcpc @apify restart --x402
+```
+
+When `--x402` is active, a fetch middleware wraps all HTTP requests to the MCP server.
+If any request returns HTTP 402, the middleware transparently signs and retries.
+
+### Supported networks
+
+| Network              | Status       |
+| -------------------- | ------------ |
+| Base Mainnet         | ✅ Supported |
+| Base Sepolia testnet | ✅ Supported |
+
 ## MCP support
 
 `mcpc` is built on the official [MCP SDK for TypeScript](https://github.com/modelcontextprotocol/typescript-sdk) and supports most [MCP protocol features](https://modelcontextprotocol.io/specification/latest).
@@ -688,6 +768,7 @@ To help Claude Code use `mcpc`, you can install this [Claude skill](./docs/claud
 ### MCP session
 
 The bridge process manages the full MCP session lifecycle:
+
 - Performs initialization handshake (`initialize` → `initialized`)
 - Negotiates protocol version and capabilities
 - Fetches server-provided `instructions`
@@ -698,21 +779,21 @@ The bridge process manages the full MCP session lifecycle:
 
 ### MCP feature support
 
-| **Feature**                                        | **Status**                         |
-|:---------------------------------------------------|:-----------------------------------|
-| 📖 [**Instructions**](#server-instructions)        | ✅ Supported                        |
-| 🔧 [**Tools**](#tools)                             | ✅ Supported                        |
-| 💬 [**Prompts**](#prompts)                         | ✅ Supported                        |
-| 📦 [**Resources**](#resources)                     | ✅ Supported                        |
-| 📝 [**Logging**](#server-logs)                     | ✅ Supported                        |
-| 🔔 [**Notifications**](#list-change-notifications) | ✅ Supported                        |
-| 📄 [**Pagination**](#pagination)                   | ✅ Supported                        |
-| 🏓 [**Ping**](#ping)                               | ✅ Supported                        |
-| ⏳ **Async tasks**                                  | 🚧 Planned                         |
-| 📁 **Roots**                                       | 🚧 Planned                         |
-| ❓ **Elicitation**                                  | 🚧 Planned                         |
-| 🔤 **Completion**                                  | 🚧 Planned                         |
-| 🤖 **Sampling**                                    | ❌ Not applicable (no LLM access)   |
+| **Feature**                                        | **Status**                        |
+| :------------------------------------------------- | :-------------------------------- |
+| 📖 [**Instructions**](#server-instructions)        | ✅ Supported                      |
+| 🔧 [**Tools**](#tools)                             | ✅ Supported                      |
+| 💬 [**Prompts**](#prompts)                         | ✅ Supported                      |
+| 📦 [**Resources**](#resources)                     | ✅ Supported                      |
+| 📝 [**Logging**](#server-logs)                     | ✅ Supported                      |
+| 🔔 [**Notifications**](#list-change-notifications) | ✅ Supported                      |
+| 📄 [**Pagination**](#pagination)                   | ✅ Supported                      |
+| 🏓 [**Ping**](#ping)                               | ✅ Supported                      |
+| ⏳ **Async tasks**                                 | 🚧 Planned                        |
+| 📁 **Roots**                                       | 🚧 Planned                        |
+| ❓ **Elicitation**                                 | 🚧 Planned                        |
+| 🔤 **Completion**                                  | 🚧 Planned                        |
+| 🤖 **Sampling**                                    | ❌ Not applicable (no LLM access) |
 
 #### Server instructions
 
@@ -865,6 +946,7 @@ mcpc @apify ping --json
 You can configure `mcpc` using a config file, environment variables, or command-line flags.
 
 **Precedence** (highest to lowest):
+
 1. Command-line flags (including `--config` option)
 2. Environment variables
 3. Built-in defaults
@@ -912,11 +994,13 @@ mcpc --config .vscode/mcp.json apify connect @my-apify
 **Server configuration properties:**
 
 For **Streamable HTTP servers:**
+
 - `url` (required) - MCP server endpoint URL
 - `headers` (optional) - HTTP headers to include with requests
 - `timeout` (optional) - Request timeout in seconds
 
 For **stdio servers:**
+
 - `command` (required) - Command to execute (e.g., `node`, `npx`, `python`)
 - `args` (optional) - Array of command arguments
 - `env` (optional) - Environment variables for the process
@@ -958,6 +1042,7 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 
 - `~/.mcpc/sessions.json` - Active sessions with references to authentication profiles (file-locked for concurrent access)
 - `~/.mcpc/profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
+- `~/.mcpc/wallets.json` - x402 wallet data (file permissions `0600`)
 - `~/.mcpc/bridges/` - Unix domain socket files for each bridge process
 - `~/.mcpc/logs/bridge-*.log` - Log files for each bridge process
 - OS keychain - Sensitive credentials (OAuth tokens, bearer tokens, client secrets)
@@ -1000,11 +1085,12 @@ MCP enables arbitrary tool execution and data access - treat servers like you tr
 ### Credential protection
 
 | What                   | How                                             |
-|------------------------|-------------------------------------------------|
+| ---------------------- | ----------------------------------------------- |
 | **OAuth tokens**       | Stored in OS keychain, never on disk            |
 | **HTTP headers**       | Stored in OS keychain per-session               |
 | **Bridge credentials** | Passed via Unix socket IPC, kept in memory only |
 | **Process arguments**  | No secrets visible in `ps aux`                  |
+| **x402 private key**   | Stored in `wallets.json` (`0600` permissions)   |
 | **Config files**       | Contain only metadata, never tokens             |
 | **File permissions**   | `0600` (user-only) for all config files         |
 
@@ -1055,19 +1141,21 @@ The main `mcpc` process doesn't save log files, but supports [verbose mode](#ver
 ### Troubleshooting
 
 **"Cannot connect to bridge"**
+
 - Bridge may have crashed. Try: `mcpc @<session-name> tools-list` to restart the bridge
 - Check bridge is running: `ps aux | grep -e 'mcpc-bridge' -e '[m]cpc/dist/bridge'`
 - Check socket exists: `ls ~/.mcpc/bridges/`
 
 **"Session not found"**
+
 - List existing sessions: `mcpc`
 - Create new session if expired: `mcpc @<session-name> close` and `mcpc <target> connect @<session-name>`
 
 **"Authentication failed"**
+
 - List saved OAuth profiles: `mcpc`
 - Re-authenticate: `mcpc <server> login [--profile <name>]`
 - For bearer tokens: provide `--header "Authorization: Bearer ${TOKEN}"` again
-
 
 ## Development
 
@@ -1099,8 +1187,6 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 - Other
   - https://github.com/TeamSparkAI/mcpGraph
 
-
 ## License
 
 Apache-2.0 - see [LICENSE](./LICENSE) for details.
-
