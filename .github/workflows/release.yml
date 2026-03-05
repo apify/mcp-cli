@@ -1,0 +1,158 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - pre-release
+          - release
+      version:
+        description: 'Version bump (release only)'
+        required: false
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    name: Publish ${{ inputs.type }}
+    runs-on: ubuntu-latest
+    # Release must be from main; pre-release can be from any branch
+    if: inputs.type == 'pre-release' || github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Validate inputs
+        run: |
+          if [[ "${{ inputs.type }}" == "release" && "${{ github.ref }}" != "refs/heads/main" ]]; then
+            echo "::error::Releases must be published from the main branch."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      # ── Pre-release ────────────────────────────────────────────────
+      - name: Bump pre-release version
+        if: inputs.type == 'pre-release'
+        id: prerelease
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          CURRENT=$(node -p "require('./package.json').version")
+
+          # Compute the next patch version as the beta base
+          # e.g. 0.1.10 -> 0.1.11, or 0.1.11-beta.2 -> 0.1.11
+          NEXT_PATCH=$(node -p "
+            const v = '${CURRENT}'.replace(/-beta\..*/, '').split('.');
+            v[2] = String(Number(v[2]) + (('${CURRENT}'.includes('-beta.')) ? 0 : 1));
+            v.join('.')
+          ")
+
+          # Query npm for existing betas of this patch version
+          LATEST_BETA=$(npm view "${PKG_NAME}" versions --json 2>/dev/null \
+            | node -p "
+              const all = JSON.parse(require('fs').readFileSync(0,'utf8'));
+              const betas = (Array.isArray(all) ? all : [all])
+                .filter(v => v.startsWith('${NEXT_PATCH}-beta.'))
+                .sort((a,b) => {
+                  const na = Number(a.split('-beta.')[1]);
+                  const nb = Number(b.split('-beta.')[1]);
+                  return na - nb;
+                });
+              betas.length ? betas[betas.length-1] : ''
+            " \
+          ) || true
+
+          if [[ -n "$LATEST_BETA" && "$LATEST_BETA" == ${NEXT_PATCH}-beta.* ]]; then
+            # Existing beta found — increment from it
+            echo "Found existing beta on npm: $LATEST_BETA — incrementing"
+            npm version "$LATEST_BETA" --no-git-tag-version --allow-same-version
+            npm version prerelease --preid=beta --no-git-tag-version
+          else
+            # No beta yet — start at beta.0
+            echo "No existing beta for ${NEXT_PATCH} — creating ${NEXT_PATCH}-beta.0"
+            npm version "${NEXT_PATCH}-beta.0" --no-git-tag-version --allow-same-version
+          fi
+
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "### Pre-release version: \`$NEW_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish pre-release to npm
+        if: inputs.type == 'pre-release'
+        run: MCPC_RELEASE=1 npm publish --access public --tag beta --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub pre-release
+        if: inputs.type == 'pre-release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.prerelease.outputs.version }}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --prerelease \
+            --generate-notes \
+            --target "${{ github.sha }}"
+
+      # ── Release ────────────────────────────────────────────────────
+      - name: Bump release version
+        if: inputs.type == 'release'
+        id: release
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+
+          npm version "${{ inputs.version }}" --no-git-tag-version
+
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "### Release version: \`$NEW_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish release to npm
+        if: inputs.type == 'release'
+        run: MCPC_RELEASE=1 npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub release
+        if: inputs.type == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.release.outputs.version }}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --generate-notes \
+            --target "${{ github.sha }}"

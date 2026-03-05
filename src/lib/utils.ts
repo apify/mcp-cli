@@ -93,6 +93,13 @@ export function getAuthProfilesFilePath(): string {
 }
 
 /**
+ * Get the wallets file path (~/.mcpc/wallets.json)
+ */
+export function getWalletsFilePath(): string {
+  return join(getMcpcHome(), 'wallets.json');
+}
+
+/**
  * Ensure a directory exists, creating it if necessary
  */
 export async function ensureDir(dirPath: string): Promise<void> {

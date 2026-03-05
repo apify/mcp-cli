@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
+
+### Changed
+- OS keychain now falls back to `~/.mcpc/credentials.json` (mode 0600) when no keyring daemon is available (e.g. headless Linux servers, containers)
+
 ## [0.1.10] - 2026-03-01
+
+### Added
+- Support for `HTTPS_PROXY`, `HTTP_PROXY`, and `NO_PROXY` / lowercase variants env vars for outbound connections
+- CI/CD automated test pipeline
+
+### Changed
+- Replaced deprecated `keytar` package with `@napi-rs/keyring` for OS keychain integration
+- Temp files now written to `~/.mcpc/` instead of `/tmp/` to avoid cross-device rename errors on Linux
+- Improved error messages for invalid server hostnames and mistyped commands (e.g. `mcpc login`)
+- Added `prettier` formatting check to lint step
+
+### Fixed
+- Fixed `ExperimentalWarning: Importing JSON modules is an experimental feature` on Node.js 22+
+- Fixed OAuth token refresh for servers with root-based discovery (`.well-known` at `/`)
+- Fixed OAuth errors incorrectly expiring the session instead of failing gracefully
 
 ## [0.1.9] - 2026-02-02
 

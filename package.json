@@ -32,7 +32,7 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "build:readme": "./scripts/update-readme.sh",
-    "test": "npm run build && npm run test:unit && ./test/e2e/run.sh --no-build --parallel 4",
+    "test": "npm run build && npm run test:unit && ./test/e2e/run.sh --no-build --parallel 4 && ./test/e2e/run.sh --no-build --runtime bun",
     "test:unit": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "npm run test:coverage:unit && npm run test:coverage:e2e && npm run test:coverage:merge",
@@ -40,6 +40,7 @@
     "test:coverage:e2e": "./test/e2e/run.sh --coverage",
     "test:coverage:merge": "test/coverage/coverage-merge.sh",
     "test:e2e": "./test/e2e/run.sh --keep",
+    "test:e2e:bun": "./test/e2e/run.sh --no-build --runtime bun",
     "lint": "eslint src/**/*.ts && prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint:fix": "eslint src/**/*.ts --fix && prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -61,7 +62,8 @@
     "ora": "^9.0.0",
     "proper-lockfile": "^4.1.2",
     "undici": "^7.22.0",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "viem": "^2.46.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -79,6 +81,7 @@
     "prettier": "^3.7.4",
     "proxy-chain": "^2.7.1",
     "ts-jest": "^29.4.6",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }

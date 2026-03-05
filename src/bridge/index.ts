@@ -22,7 +22,7 @@ import {
 } from '../lib/index.js';
 import { ClientError, NetworkError, isAuthenticationError } from '../lib/index.js';
 import { loadSessions, updateSession } from '../lib/sessions.js';
-import type { AuthCredentials } from '../lib/types.js';
+import type { AuthCredentials, X402WalletCredentials } from '../lib/types.js';
 import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
 import { OAuthProvider } from '../lib/auth/oauth-provider.js';
 import { storeKeychainOAuthTokenInfo, readKeychainOAuthTokenInfo } from '../lib/auth/keychain.js';
@@ -35,6 +35,9 @@ const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.j
 };
 import { ProxyServer } from './proxy-server.js';
 import type { ProxyConfig } from '../lib/types.js';
+import { createX402FetchMiddleware } from '../lib/x402/fetch-middleware.js';
+import type { SignerWallet } from '../lib/x402/signer.js';
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 // Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
 setGlobalDispatcher(new EnvHttpProxyAgent());
@@ -51,6 +54,7 @@ interface BridgeOptions {
   profileName?: string; // Auth profile name for token refresh
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
+  x402?: boolean; // Enable x402 auto-payment
 }
 
 /**
@@ -76,9 +80,19 @@ class BridgeProcess {
   // HTTP headers (received via IPC, stored in memory only)
   private headers: Record<string, string> | null = null;
 
+  // x402 wallet for automatic payment signing (received via IPC, stored in memory only)
+  private x402Wallet: SignerWallet | null = null;
+
+  // Cached tools list for x402 proactive signing (updated via listChanged notifications)
+  private cachedTools: Tool[] | null = null;
+
   // Promise to track when auth credentials are received (for startup sequencing)
   private authCredentialsReceived: Promise<void> | null = null;
   private authCredentialsResolver: (() => void) | null = null;
+
+  // Promise to track when x402 wallet is received (for startup sequencing)
+  private x402WalletReceived: Promise<void> | null = null;
+  private x402WalletResolver: (() => void) | null = null;
 
   // Promise to track when MCP client is connected (for blocking requests until ready)
   private mcpClientReady: Promise<void>;
@@ -205,6 +219,25 @@ class BridgeProcess {
   }
 
   /**
+   * Set x402 wallet received from CLI via IPC
+   * The wallet private key is used for automatic payment signing
+   */
+  setX402Wallet(credentials: X402WalletCredentials): void {
+    logger.info(`Received x402 wallet: ${credentials.address}`);
+    this.x402Wallet = {
+      privateKey: credentials.privateKey,
+      address: credentials.address,
+    };
+    logger.debug('x402 wallet stored in memory');
+
+    // Signal that wallet has been received (unblocks startup)
+    if (this.x402WalletResolver) {
+      this.x402WalletResolver();
+      this.x402WalletResolver = null;
+    }
+  }
+
+  /**
    * Get a valid access token, refreshing if necessary,
    * and update transport config with headers
    *
@@ -298,23 +331,33 @@ class BridgeProcess {
       // 3. Create Unix socket server FIRST (so CLI can send auth credentials)
       await this.createSocketServer();
 
-      // 4. Wait for auth credentials from CLI if auth profile is specified
-      // The CLI sends credentials via IPC immediately after detecting the socket file
+      // 4. Wait for auth credentials and/or x402 wallet from CLI via IPC
+      // The CLI sends these immediately after detecting the socket file
+      const ipcWaiters: Promise<void>[] = [];
+
       if (this.options.profileName) {
         logger.debug(`Waiting for auth credentials (profile: ${this.options.profileName})...`);
-
-        // Create a promise that resolves when credentials are received
         this.authCredentialsReceived = new Promise<void>((resolve) => {
           this.authCredentialsResolver = resolve;
         });
+        ipcWaiters.push(this.authCredentialsReceived);
+      }
 
+      if (this.options.x402) {
+        logger.debug('Waiting for x402 wallet...');
+        this.x402WalletReceived = new Promise<void>((resolve) => {
+          this.x402WalletResolver = resolve;
+        });
+        ipcWaiters.push(this.x402WalletReceived);
+      }
+
+      if (ipcWaiters.length > 0) {
         // Wait with timeout (5 seconds should be plenty for local IPC)
         const timeout = new Promise<void>((_, reject) => {
-          setTimeout(() => reject(new Error('Timeout waiting for auth credentials')), 5000);
+          setTimeout(() => reject(new Error('Timeout waiting for IPC credentials')), 5000);
         });
-
-        await Promise.race([this.authCredentialsReceived, timeout]);
-        logger.debug('Auth credentials received, proceeding with MCP connection');
+        await Promise.race([Promise.all(ipcWaiters), timeout]);
+        logger.debug('IPC credentials received, proceeding with MCP connection');
       }
 
       // 5. Connect to MCP server (now with auth credentials if provided)
@@ -445,8 +488,23 @@ class BridgeProcess {
 
     logger.debug('Building MCP client config...');
     logger.debug(`  this.authProvider is set: ${!!this.authProvider}`);
+    logger.debug(`  this.x402Wallet is set: ${!!this.x402Wallet}`);
     if (this.authProvider) {
       logger.debug(`  authProvider type: ${this.authProvider.constructor.name}`);
+    }
+
+    // Build x402 fetch middleware if wallet is configured
+    let customFetch: FetchLike | undefined;
+    if (this.x402Wallet && serverConfig.url) {
+      logger.debug('Creating x402 fetch middleware for payment signing');
+      // We use a closure that defers tool lookup to the connected client
+      // The client may not have tools cached yet at this point, but will
+      // after it connects and receives the auto-refreshed tools list
+      const wallet = this.x402Wallet;
+      const getToolByName = (name: string): Tool | undefined => {
+        return this.cachedTools?.find((t: Tool) => t.name === name);
+      };
+      customFetch = createX402FetchMiddleware(fetch, { wallet, getToolByName });
     }
 
     const clientConfig: CreateMcpClientOptions = {
@@ -460,6 +518,8 @@ class BridgeProcess {
       ...(this.authProvider && { authProvider: this.authProvider }),
       // Pass session ID for resumption (HTTP transport only)
       ...(this.options.mcpSessionId && { mcpSessionId: this.options.mcpSessionId }),
+      // Pass x402 fetch middleware (HTTP transport only)
+      ...(customFetch && { customFetch }),
       listChanged: {
         tools: {
           // Let SDK auto-fetch the tools on list changed notification.
@@ -467,6 +527,11 @@ class BridgeProcess {
           autoRefresh: true,
           onChanged: (error: Error | null, tools: Tool[] | null) => {
             logger.debug('Tools list changed', { error, count: tools?.length });
+            // Update local tools cache (used by x402 middleware for proactive signing)
+            if (tools) {
+              this.cachedTools = tools;
+              logger.debug(`Updated cached tools list (${tools.length} tools)`);
+            }
             // Broadcast notification to all connected clients
             this.broadcastNotification('tools/list_changed');
             // Update session with notification timestamp
@@ -539,6 +604,20 @@ class BridgeProcess {
     // Note: Token refresh is handled automatically by the SDK
     // The SDK calls authProvider.tokens() before each request,
     // which triggers OAuthTokenManager.getValidAccessToken() to refresh if needed
+
+    // Pre-populate tools cache for x402 proactive signing
+    if (this.x402Wallet) {
+      try {
+        const toolsResult = await this.client.listTools();
+        if (toolsResult.tools) {
+          this.cachedTools = toolsResult.tools;
+          logger.debug(`Pre-populated tools cache (${this.cachedTools.length} tools) for x402`);
+        }
+      } catch (error) {
+        // Non-fatal: 402 fallback will still work without proactive signing
+        logger.warn('Failed to pre-populate tools cache for x402:', error);
+      }
+    }
   }
 
   /**
@@ -772,6 +851,21 @@ class BridgeProcess {
             }
           } else {
             throw new ClientError('Missing authCredentials in set-auth-credentials message');
+          }
+          break;
+
+        case 'set-x402-wallet':
+          if (message.x402Wallet) {
+            this.setX402Wallet(message.x402Wallet);
+            if (message.id) {
+              this.sendResponse(socket, {
+                type: 'response',
+                id: message.id,
+                result: { success: true },
+              });
+            }
+          } else {
+            throw new ClientError('Missing x402Wallet in set-x402-wallet message');
           }
           break;
 
@@ -1043,7 +1137,7 @@ async function main(): Promise<void> {
 
   if (args.length < 2) {
     console.error(
-      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>]'
+      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--x402]'
     );
     process.exit(1);
   }
@@ -1078,6 +1172,9 @@ async function main(): Promise<void> {
     mcpSessionId = args[mcpSessionIdIndex + 1];
   }
 
+  // Parse --x402 flag (for x402 payment signing)
+  const x402 = args.includes('--x402');
+
   try {
     const bridgeOptions: BridgeOptions = {
       sessionName,
@@ -1092,6 +1189,9 @@ async function main(): Promise<void> {
     }
     if (mcpSessionId) {
       bridgeOptions.mcpSessionId = mcpSessionId;
+    }
+    if (x402) {
+      bridgeOptions.x402 = true;
     }
 
     const bridge = new BridgeProcess(bridgeOptions);

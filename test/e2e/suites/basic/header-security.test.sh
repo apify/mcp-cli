@@ -26,8 +26,8 @@ run_mcpc "$TEST_SERVER_URL" connect "$SESSION" --header "$SECRET_HEADER: Bearer 
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
-# Give the bridge process time to start
-sleep 1
+# Wait for bridge to be fully ready
+wait_for "$MCPC $SESSION ping >/dev/null 2>&1"
 
 # Check that the secret is not visible in process list
 # This tests that we're not passing credentials as command-line arguments
@@ -127,6 +127,9 @@ run_mcpc "$TEST_SERVER_URL" connect "$SESSION2" \
   --header "X-Public: public-value"
 assert_success
 _SESSIONS_CREATED+=("$SESSION2")
+
+# Wait for bridge to be fully ready before using session
+wait_for "$MCPC $SESSION2 ping >/dev/null 2>&1"
 
 # None of the secrets should appear in sessions.json
 sessions_content=$(cat "$sessions_file")

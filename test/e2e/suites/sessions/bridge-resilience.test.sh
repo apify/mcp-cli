@@ -2,7 +2,7 @@
 # Test: Bridge resilience to MCP errors
 
 source "$(dirname "$0")/../../lib/framework.sh"
-test_init "sessions/bridge-resilience"
+test_init "sessions/bridge-resilience" --isolated
 
 # Start test server
 start_test_server
@@ -69,7 +69,9 @@ test_case "server failure doesn't kill bridge"
 # Use control endpoint to make next request fail
 curl -s -X POST "$TEST_SERVER_URL/control/fail-next?count=1" >/dev/null
 
-run_xmcpc "$SESSION" tools-list
+# Use run_mcpc (not run_xmcpc) here: the controlled server failure would cause
+# run_xmcpc's 4 variants to consume the fail counter inconsistently, breaking invariant checks.
+run_mcpc "$SESSION" tools-list
 assert_failure  # This request should fail
 
 # Reset server and verify session recovers
@@ -82,10 +84,11 @@ test_pass
 test_case "multiple consecutive failures don't kill bridge"
 curl -s -X POST "$TEST_SERVER_URL/control/fail-next?count=3" >/dev/null
 
-# These should all fail
-run_xmcpc "$SESSION" tools-list
-run_xmcpc "$SESSION" resources-list
-run_xmcpc "$SESSION" prompts-list
+# These should all fail — use run_mcpc (not run_xmcpc) to avoid consuming the fail
+# counter inconsistently across run_xmcpc's 4 invariant-check variants.
+run_mcpc "$SESSION" tools-list
+run_mcpc "$SESSION" resources-list
+run_mcpc "$SESSION" prompts-list
 
 # Reset and verify
 curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
