@@ -1031,7 +1031,7 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
     "secure-server": {
       "url": "https://mcp.apify.com",
       "headers": {
-        "Authorization": "Bearer ${API_TOKEN}",
+        "Authorization": "Bearer ${APIFY_TOKEN}",
         "X-User-ID": "${USER_ID}"
       }
     }

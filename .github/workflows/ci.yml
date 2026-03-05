@@ -65,6 +65,6 @@ jobs:
           dbus-run-session -- bash -c "
             rm -f \$HOME/.local/share/keyrings/* &&
             echo -n 'test' | gnome-keyring-daemon --unlock &&
-            ./test/e2e/run.sh --no-build &&
-            ./test/e2e/run.sh --no-build --runtime bun
+            ./test/e2e/run.sh --no-build --parallel 4 &&
+            ./test/e2e/run.sh --no-build --parallel 4 --runtime bun
           "
