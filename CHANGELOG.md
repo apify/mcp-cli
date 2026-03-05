@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
+
 ### Changed
 - OS keychain now falls back to `~/.mcpc/credentials.json` (mode 0600) when no keyring daemon is available (e.g. headless Linux servers, containers)
 

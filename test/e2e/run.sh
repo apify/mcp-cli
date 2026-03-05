@@ -29,6 +29,7 @@ KEEP_RUNS=false
 VERBOSE=false
 LIST_ONLY=false
 SKIP_BUILD=false
+RUNTIME="node"
 PATTERNS=()
 
 # Colors
@@ -66,6 +67,10 @@ while [[ $# -gt 0 ]]; do
       LIST_ONLY=true
       shift
       ;;
+    -r|--runtime)
+      RUNTIME="$2"
+      shift 2
+      ;;
     -b|--no-build)
       SKIP_BUILD=true
       shift
@@ -75,6 +80,7 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "Options:"
       echo "  -p, --parallel N   Max parallel tests (default: 16)"
+      echo "  -r, --runtime <r>  Runtime for mcpc: node (default) or bun"
       echo "  -i, --isolated     Force all tests to use isolated home directories"
       echo "  -c, --coverage     Collect code coverage"
       echo "  -b, --no-build     Skip building mcpc (assumes dist/ is up to date)"
@@ -163,6 +169,25 @@ if [[ ${#TESTS[@]} -eq 0 ]]; then
   exit 1
 fi
 
+# Validate runtime and resolve version string
+case "$RUNTIME" in
+  node)
+    RUNTIME_VERSION="node $(node --version)"
+    ;;
+  bun)
+    if ! command -v bun &>/dev/null; then
+      echo "bun is not installed; skipping bun runtime tests"
+      exit 0
+    fi
+    RUNTIME_VERSION="bun $(bun --version)"
+    ;;
+  *)
+    echo "Unknown runtime: $RUNTIME (valid options: node, bun)" >&2
+    exit 1
+    ;;
+esac
+export E2E_RUNTIME="$RUNTIME"
+
 # List mode
 if [[ "$LIST_ONLY" == "true" ]]; then
   echo "Available tests:"
@@ -190,6 +215,7 @@ echo "Run ID:    $E2E_RUN_ID"
 echo "Run dir:   $RUN_DIR"
 echo "Tests:     ${#TESTS[@]}"
 echo "Parallel:  $PARALLEL"
+echo "Runtime:   $RUNTIME_VERSION"
 if [[ "$ISOLATED_ALL" == "true" ]]; then
   echo "Home dirs: isolated (per-test)"
 else
@@ -252,7 +278,7 @@ run_test() {
 }
 
 export -f run_test test_name
-export SCRIPT_DIR SUITES_DIR E2E_RUN_ID E2E_RUNS_DIR E2E_SHARED_HOME E2E_ISOLATED_ALL PROJECT_ROOT NODE_V8_COVERAGE
+export SCRIPT_DIR SUITES_DIR E2E_RUN_ID E2E_RUNS_DIR E2E_SHARED_HOME E2E_ISOLATED_ALL E2E_RUNTIME PROJECT_ROOT NODE_V8_COVERAGE
 
 # Run tests
 echo -e "${BLUE}Running tests...${NC}"
