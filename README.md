@@ -48,29 +48,29 @@ npm install -g @apify/mcpc
 ```
 
 **Linux users:** `mcpc` uses the OS keychain for secure credential storage via the
-[Secret Service API](https://specifications.freedesktop.org/secret-service/). Two things are required:
+[Secret Service API](https://specifications.freedesktop.org/secret-service/).
+On desktop systems (GNOME, KDE) this works out of the box. On headless/server/CI environments
+without a keyring daemon, `mcpc` automatically falls back to a file-based credential store
+(`~/.mcpc/credentials`, mode `0600`).
 
-1. **`libsecret`** — the shared library (client side):
-   ```bash
-   # Debian/Ubuntu
-   sudo apt-get install libsecret-1-0
+To use the OS keychain on a headless system, install `libsecret` and a secret service daemon:
 
-   # Fedora/RHEL/CentOS
-   sudo dnf install libsecret
+```bash
+# Debian/Ubuntu
+sudo apt-get install libsecret-1-0 gnome-keyring
 
-   # Arch Linux
-   sudo pacman -S libsecret
-   ```
+# Fedora/RHEL/CentOS
+sudo dnf install libsecret gnome-keyring
 
-2. **A running secret service daemon** — on desktop systems (GNOME, KDE) this is already provided
-   by gnome-keyring or KWallet. On headless/server/CI environments you need to install and start one:
-   ```bash
-   # Debian/Ubuntu
-   sudo apt-get install gnome-keyring
+# Arch Linux
+sudo pacman -S libsecret gnome-keyring
+```
 
-   # Then start it (e.g. in CI):
-   dbus-run-session -- bash -c "echo -n 'password' | gnome-keyring-daemon --unlock && your-command"
-   ```
+And then run `mcpc` as follows:
+
+```
+dbus-run-session -- bash -c "echo -n 'password' | gnome-keyring-daemon --unlock && mcpc ..."
+```
 
 ## Quickstart
 
