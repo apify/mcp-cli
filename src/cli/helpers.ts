@@ -21,6 +21,8 @@ import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
 import { getAuthProfile, listAuthProfiles } from '../lib/auth/profiles.js';
 import { readKeychainOAuthTokenInfo, readKeychainOAuthClientInfo } from '../lib/auth/keychain.js';
 import { logTarget } from './output.js';
+import { getWallet } from '../lib/wallets.js';
+import { createX402FetchMiddleware } from '../lib/x402/fetch-middleware.js';
 import { createRequire } from 'module';
 const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
   version: string;
@@ -256,6 +258,7 @@ export async function withMcpClient<T>(
     verbose?: boolean;
     hideTarget?: boolean;
     profile?: string;
+    x402?: boolean;
   },
   callback: (client: IMcpClient, context: McpClientContext) => Promise<T>
 ): Promise<T> {
@@ -318,6 +321,21 @@ export async function withMcpClient<T>(
     if (authProvider) {
       clientConfig.authProvider = authProvider;
       logger.debug(`Using auth profile: ${profileName}`);
+    }
+
+    // Set up x402 fetch middleware for automatic payment signing
+    if (options.x402) {
+      const wallet = await getWallet();
+      if (!wallet) {
+        throw new ClientError('x402 wallet not found. Create one with: mcpc x402 init');
+      }
+      logger.debug(`Using x402 wallet: ${wallet.address}`);
+      clientConfig.customFetch = createX402FetchMiddleware(fetch, {
+        wallet: { privateKey: wallet.privateKey, address: wallet.address },
+        // No getToolByName for direct connections — proactive signing requires
+        // a tools list cache which direct connections don't maintain.
+        // The 402 fallback will still work.
+      });
     }
   }
 

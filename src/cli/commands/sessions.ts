@@ -35,6 +35,7 @@ import {
   storeKeychainProxyBearerToken,
 } from '../../lib/auth/keychain.js';
 import { AuthError, ClientError } from '../../lib/index.js';
+import { getWallet } from '../../lib/wallets.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
 import { parseProxyArg } from '../parser.js';
@@ -83,6 +84,7 @@ export async function connectSession(
     profile?: string;
     proxy?: string;
     proxyBearerToken?: string;
+    x402?: boolean;
   }
 ): Promise<void> {
   try {
@@ -193,6 +195,15 @@ export async function connectSession(
       await storeKeychainProxyBearerToken(name, options.proxyBearerToken);
     }
 
+    // Validate x402 wallet (if provided)
+    if (options.x402) {
+      const wallet = await getWallet();
+      if (!wallet) {
+        throw new ClientError('x402 wallet not found. Create one with: mcpc x402 init');
+      }
+      logger.debug(`Using x402 wallet: ${wallet.address}`);
+    }
+
     // Create or update session record (without pid - that comes from startBridge)
     // Store serverConfig with headers redacted (actual values in keychain)
     const isReconnect = !!existingSession;
@@ -206,6 +217,7 @@ export async function connectSession(
       server: sessionTransportConfig,
       ...(profileName && { profileName }),
       ...(proxyConfig && { proxy: proxyConfig }),
+      ...(options.x402 && { x402: true }),
     };
 
     if (isReconnect) {
@@ -235,6 +247,9 @@ export async function connectSession(
       }
       if (proxyConfig) {
         bridgeOptions.proxyConfig = proxyConfig;
+      }
+      if (options.x402) {
+        bridgeOptions.x402 = true;
       }
 
       const { pid } = await startBridge(bridgeOptions);
@@ -590,6 +605,10 @@ export async function restartSession(
 
     if (session.proxy) {
       bridgeOptions.proxyConfig = session.proxy;
+    }
+
+    if (session.x402) {
+      bridgeOptions.x402 = session.x402;
     }
 
     // NOTE: Do NOT pass mcpSessionId on explicit restart.

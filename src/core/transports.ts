@@ -26,7 +26,7 @@ export {
 // Re-export auth-related types if needed
 export type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { Transport, FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import {
   StdioClientTransport,
@@ -62,7 +62,7 @@ export function createStdioTransport(config: StdioServerParameters): Transport {
  */
 export function createStreamableHttpTransport(
   url: string,
-  options: Omit<StreamableHTTPClientTransportOptions, 'fetch'> = {}
+  options: StreamableHTTPClientTransportOptions = {}
 ): Transport {
   const logger = createLogger('StreamableHttpTransport');
   logger.debug('Creating Streamable HTTP transport', { url });
@@ -119,6 +119,12 @@ export interface CreateTransportOptions {
    * If provided, the transport will include this in the MCP-Session-Id header
    */
   mcpSessionId?: string;
+
+  /**
+   * Custom fetch function (HTTP transport only)
+   * Used by x402 middleware to intercept and modify requests
+   */
+  customFetch?: FetchLike;
 }
 
 /**
@@ -178,6 +184,12 @@ export function createTransportFromConfig(
         ...transportOptions.requestInit,
         signal: AbortSignal.timeout(config.timeout * 1000),
       };
+    }
+
+    // Set custom fetch function (e.g., x402 payment middleware)
+    if (options.customFetch) {
+      transportOptions.fetch = options.customFetch;
+      logger.debug('Setting custom fetch function on transport');
     }
 
     return createStreamableHttpTransport(config.url, transportOptions);

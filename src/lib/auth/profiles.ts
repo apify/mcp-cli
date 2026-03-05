@@ -62,7 +62,6 @@ async function saveAuthProfilesInternal(storage: AuthProfilesStorage): Promise<v
   // Ensure the directory exists
   await ensureDir(getMcpcHome());
 
-  // Write to a temp file first (atomic operation)
   // Write temp file in the same directory as the target to avoid EXDEV on Linux
   // (rename() fails across filesystem boundaries, e.g. /tmp vs ~/.mcpc)
   const tempFile = join(getMcpcHome(), `.profiles-${Date.now()}-${process.pid}.tmp`);
