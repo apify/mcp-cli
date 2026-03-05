@@ -54,13 +54,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install keychain dependencies
-        run: sudo apt-get install -y gnome-keyring dbus dbus-x11
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: E2E tests
-        run: |
-          dbus-run-session -- bash -c "
-            rm -f \$HOME/.local/share/keyrings/* &&
-            echo -n 'test' | gnome-keyring-daemon --unlock &&
-            ./test/e2e/run.sh --no-build
-          "
+        # Run without gnome-keyring: @napi-rs/keyring fails fast when no D-Bus secret
+        # service is available, and keychain.ts automatically falls back to encrypted
+        # file storage (~/.mcpc/credentials.json, mode 0600).  The keychain code paths
+        # are covered by unit tests; e2e tests only need credentials to work, not a
+        # specific storage backend.
+        run: ./test/e2e/run.sh --no-build --parallel 4
