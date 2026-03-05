@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- OS keychain now falls back to `~/.mcpc/credentials.json` (mode 0600) when no keyring daemon is available (e.g. headless Linux servers, containers)
+
 ## [0.1.10] - 2026-03-01
 
 ### Added

@@ -58,8 +58,8 @@ test_pass
 # Test: OAuth-enabled remote server without profile hints at login
 # =============================================================================
 
-# Use mcp.sentry.dev which requires OAuth authentication
-OAUTH_SERVER="https://mcp.sentry.dev/mcp"
+# Use mcp.slack.com which requires OAuth authentication
+OAUTH_SERVER="https://mcp.slack.com/mcp"
 
 test_case "OAuth server without profile shows login hint"
 run_mcpc "$OAUTH_SERVER" tools-list

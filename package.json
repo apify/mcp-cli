@@ -61,7 +61,8 @@
     "ora": "^9.0.0",
     "proper-lockfile": "^4.1.2",
     "undici": "^7.22.0",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "viem": "^2.46.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
