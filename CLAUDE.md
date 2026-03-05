@@ -322,7 +322,7 @@ Uses standard MCP config format (compatible with Claude Desktop):
     "http-server": {
       "url": "https://mcp.apify.com",
       "headers": {
-        "Authorization": "Bearer ${API_TOKEN}"
+        "Authorization": "Bearer ${APIFY_TOKEN}"
       },
       "timeout": 300
     },
