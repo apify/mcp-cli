@@ -47,6 +47,9 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 
 ```bash
 npm install -g @apify/mcpc
+
+# Or with Bun
+bun install -g @apify/mcpc
 ```
 
 **Linux users:** `mcpc` uses the OS keychain for secure credential storage via the
