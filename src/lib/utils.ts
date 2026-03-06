@@ -6,7 +6,7 @@
 import { createHash } from 'crypto';
 import { homedir } from 'os';
 import { join, resolve, isAbsolute } from 'path';
-import { mkdir, access, constants, stat } from 'fs/promises';
+import { mkdir, access, constants } from 'fs/promises';
 import { ClientError } from './errors.js';
 
 /**
@@ -120,30 +120,6 @@ export async function fileExists(filepath: string): Promise<boolean> {
   try {
     await access(filepath, constants.F_OK);
     return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Check if a path is a file
- */
-export async function isFile(filepath: string): Promise<boolean> {
-  try {
-    const stats = await stat(filepath);
-    return stats.isFile();
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Check if a path is a directory
- */
-export async function isDirectory(filepath: string): Promise<boolean> {
-  try {
-    const stats = await stat(filepath);
-    return stats.isDirectory();
   } catch {
     return false;
   }

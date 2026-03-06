@@ -458,7 +458,7 @@ Subcommands:
   program
     .command('help [command]')
     .description('Show help for a specific command')
-    .action(async (cmdName?: string) => {
+    .action((cmdName?: string) => {
       if (!cmdName) {
         program.outputHelp();
         return;

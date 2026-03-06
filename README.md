@@ -106,63 +106,49 @@ mcpc --config ~/.vscode/mcp.json filesystem tools-list
 <!-- AUTO-GENERATED: mcpc --help -->
 
 ```
-Usage: mcpc [options] <target> [command]
+Usage: mcpc [options] [<@session>] [<command>]
 
 Universal command-line client for the Model Context Protocol (MCP).
 
 Options:
-  -j, --json                    Output in JSON format for scripting
-  -c, --config <file>           Path to MCP config JSON file (e.g. ".vscode/mcp.json")
-  -H, --header <header>         HTTP header for remote MCP server (can be repeated)
-  -v, --version                 Output the version number
-  --verbose                     Enable debug logging
-  --profile <name>              OAuth profile for the server ("default" if not provided)
-  --schema <file>               Validate tool/prompt schema against expected schema
-  --schema-mode <mode>          Schema validation mode: strict, compatible (default), ignore
-  --timeout <seconds>           Request timeout in seconds (default: 300)
-  --proxy <[host:]port>         Start proxy MCP server for session (with "connect" command)
-  --proxy-bearer-token <token>  Require authentication for access to proxy server
-  --x402                        Enable x402 auto-payment using the configured wallet
-  --clean[=types]               Clean up mcpc data (types: sessions, logs, profiles, all)
-  -h, --help                    Display general help
+  -j, --json                             Output in JSON format for scripting
+  -H, --header <header>                  HTTP header (can be repeated)
+  --verbose                              Enable debug logging
+  --profile <name>                       OAuth profile for the server ("default" if not provided)
+  --schema <file>                        Validate tool/prompt schema against expected schema
+  --schema-mode <mode>                   Schema validation mode: strict, compatible (default),
+                                         ignore
+  --timeout <seconds>                    Request timeout in seconds (default: 300)
+  -v, --version                          Output the version number
+  -h, --help                             Display general help
 
-Targets:
-  @<session>                    Named persistent session (e.g. "@apify")
-  <config-entry>                Entry in MCP config file specified by --config (e.g. "fs")
-  <server-url>                  Remote MCP server URL (e.g. "mcp.apify.com")
+Commands:
+  connect [options] <server> <@session>  Connect to an MCP server and create a named session
+  login [options] <server>               Authenticate to server using OAuth and save the profile
+  logout [options] <server>              Delete an authentication profile for a server
+  clean [resources...]                   Clean up mcpc data (sessions, profiles, logs, sockets, all)
+  x402 [subcommand] [args...]            Manage x402 payment wallet (EXPERIMENTAL)
+  help [command]                         Show help for a specific command
 
-Management commands:
-  login                         Create OAuth profile with credentials for remote server
-  logout                        Remove OAuth profile for remote server
-  connect @<session>            Connect to server and create named persistent session
-  restart                       Kill and restart a session
-  close                         Close a session
+Session commands (after connecting):
+  <@session>                             Show MCP server info and capabilities
+  <@session> shell                       Open interactive shell
+  <@session> close                       Close the session
+  <@session> restart                     Kill and restart the session
+  <@session> tools-list [--full]         List MCP tools
+  <@session> tools-get <name>
+  <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
+  <@session> prompts-list
+  <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
+  <@session> resources-list
+  <@session> resources-read <uri>
+  <@session> resources-subscribe <uri>
+  <@session> resources-unsubscribe <uri>
+  <@session> resources-templates-list
+  <@session> logging-set-level <level>
+  <@session> ping
 
-MCP server commands:
-  help                          Show server info ("help" can be omitted)
-  shell                         Open interactive shell
-  tools-list [--full]           Send "tools/list" MCP request...
-  tools-get <tool-name>
-  tools-call <tool-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
-  prompts-list
-  prompts-get <prompt-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
-  resources
-  resources-list
-  resources-read <uri>
-  resources-subscribe <uri>
-  resources-unsubscribe <uri>
-  resources-templates-list
-  logging-set-level <level>
-  ping
-
-EXPERIMENTAL: x402 payment commands (no target needed):
-  x402 init                     Create a new x402 wallet
-  x402 import <key>             Import wallet from private key
-  x402 info                     Show wallet info
-  x402 sign -r <base64>         Sign payment from PAYMENT-REQUIRED header
-  x402 remove                   Remove the wallet
-  
-Run "mcpc" without <target> to show available sessions and profiles.
+Run "mcpc" without arguments to show active sessions and OAuth profiles.
 ```
 
 ### General actions
