@@ -21,7 +21,13 @@
 
 ## Later
 
+- add support for OAuth `--client-id XXX` and `--client-secret YYY` for servers that don't have DCR !!!
+  and equally, we should add `--header XXX` to save logins via HTTP header
+
+
 - Emit tools to dirs ("codegen" variant?) - see https://cursor.com/blog/dynamic-context-discovery - generate skills file too?
+- feature: enable generation of TypeScript stubs based on the server schema, with access to session and schema validation, for TS code mode.
+  For simplicity they an just "mcpc" command, later we can use IPC for more efficiency.
 
 - Support for Markdown generation with shebang?
 
@@ -39,8 +45,8 @@
 - later: Add unique Session.id and Profile.id and use it for OS keychain keys, to truly enable using multiple independent mcpc profiles. Use cry
 - nit: Implement typing completions (e.g. "mcpc @ap...") - not sure if that's even possible
 - later: maybe add --no-color option to disable chalk
-- feature: enable generation of TypeScript stubs based on the server schema, with access to session and schema validation, for TS code mode.
-  For simplicity they an just "mcpc" command, later we can use IPC for more efficiency.
+- Consider adding --dry-run https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/ 
+- Auto-discovery of existing MCP configs like mcporter
 - Show protocolVersion also for stdio - but for that we need to update the SDK to save it! See setProtocolVersion
 
 ## E2E test scenarios

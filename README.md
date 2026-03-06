@@ -1174,14 +1174,14 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
   - https://github.com/wong2/mcp-cli
   - https://github.com/f/mcptools
   - https://github.com/adhikasp/mcp-client-cli
-  - https://github.com/mattzcarey/cloudflare-mcp
   - https://github.com/thellimist/clihub (see https://news.ycombinator.com/item?id=47157398)
   - https://github.com/EstebanForge/mcp-cli-ent
-  - https://github.com/assimelha/cmcp
 - Code mode
   - https://blog.cloudflare.com/code-mode/
   - https://www.anthropic.com/engineering/code-execution-with-mcp
   - https://github.com/steipete/mcporter
+  - https://github.com/mattzcarey/cloudflare-mcp
+  - https://github.com/assimelha/cmcp
 - Dynamic tool discovery
   - https://www.anthropic.com/engineering/advanced-tool-use
     - https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool
