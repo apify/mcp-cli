@@ -282,6 +282,11 @@ function createTopLevelProgram(): Command {
     getErrHelpWidth: () => 100,
   });
 
+  // Strip [options] from the commands list (options are shown per-command via `mcpc help <cmd>`)
+  program.configureHelp({
+    subcommandTerm: (cmd) => `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
+  });
+
   // Use raw Markdown URL for pipes (AI agents), GitHub UI for TTY (humans)
   const docsUrl = process.stdout.isTTY
     ? `https://github.com/apify/mcpc/tree/v${mcpcVersion}`
@@ -301,17 +306,17 @@ function createTopLevelProgram(): Command {
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .version(mcpcVersion, '-v, --version', 'Output the version number')
-    .helpOption('-h, --help', 'Display general help');
+    .helpOption('-h, --help', 'Display help');
 
   program.addHelpText(
     'after',
     `
 Session commands (after connecting):
-  <@session>                             Show MCP server info and capabilities
-  <@session> shell                       Open interactive shell
-  <@session> close                       Close the session
-  <@session> restart                     Kill and restart the session
-  <@session> tools-list [--full]         List MCP tools
+  <@session>                   Show MCP server info and capabilities
+  <@session> shell             Open interactive shell
+  <@session> close             Close the session
+  <@session> restart           Kill and restart the session
+  <@session> tools-list        List MCP tools
   <@session> tools-get <name>
   <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
   <@session> prompts-list
@@ -340,8 +345,7 @@ Full docs: ${docsUrl}`
     .addHelpText('after', `
 Server formats:
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
-  https://mcp.apify.com         Full URL
-  ~/.vscode/mcp.json:filesystem Config file entry (file:entry-name)
+  ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
 `)
     .action(async (server, sessionName, opts, command) => {
       const globalOpts = getOptionsFromCommand(command);
@@ -402,7 +406,7 @@ Server formats:
   // clean command: mcpc clean [resources...]
   program
     .command('clean [resources...]')
-    .description('Clean up mcpc data (sessions, profiles, logs, sockets, all)')
+    .description('Clean up mcpc data (sessions, profiles, logs, all)')
     .addHelpText('after', `
 Resources:
   sessions    Remove stale/crashed session records
@@ -442,7 +446,7 @@ Without arguments, performs safe cleanup of stale data only.
   // Note: x402 is handled before Commander in main() — this registration exists only for help text
   program
     .command('x402 [subcommand] [args...]')
-    .description('Manage x402 payment wallet (EXPERIMENTAL)')
+    .description('Configure an x402 payment wallet (EXPERIMENTAL)')
     .addHelpText('after', `
 Subcommands:
   init          Create a new x402 wallet
@@ -684,8 +688,8 @@ function createSessionProgram(): Command {
   program
     .name('mcpc <@session>')
     .helpOption('-h, --help', 'Display help')
-    .option('-j, --json', 'Output in JSON format for scripting')
-    .option('-H, --header <header>', 'HTTP header (can be repeated)')
+    .option('-j, --json', 'Output in JSON format for scripting and code mode')
+    .option('-H, --header <header>', 'Custom HTTP header (can be repeated)')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile override')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
