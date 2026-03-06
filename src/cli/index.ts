@@ -336,8 +336,9 @@ Full docs: ${docsUrl}`
 
   // connect command: mcpc connect <server> @<name>
   program
-    .command('connect <server> <@session>')
-    .description('Connect to an MCP server and create a named session')
+    .command('connect [server] [@session]')
+    .usage('<server> <@session>')
+    .description('Connect to an MCP server and start a new named @session')
     .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
@@ -348,6 +349,16 @@ Server formats:
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
 `)
     .action(async (server, sessionName, opts, command) => {
+      if (!server) {
+        throw new ClientError(
+          'Missing required argument: server\n\nExample: mcpc connect mcp.apify.com @myapp'
+        );
+      }
+      if (!sessionName) {
+        throw new ClientError(
+          'Missing required argument: @session\n\nExample: mcpc connect mcp.apify.com @myapp'
+        );
+      }
       const globalOpts = getOptionsFromCommand(command);
       const parsed = parseServerArg(server);
 
@@ -379,11 +390,15 @@ Server formats:
 
   // login command: mcpc login <server>
   program
-    .command('login <server>')
+    .command('login [server]')
+    .usage('<server>')
     .description('Authenticate to server using OAuth and save the profile')
     .option('--profile <name>', 'Profile name (default: "default")')
     .option('--scope <scope>', 'OAuth scope(s) to request')
     .action(async (server, opts, command) => {
+      if (!server) {
+        throw new ClientError('Missing required argument: server\n\nExample: mcpc login mcp.apify.com');
+      }
       await auth.login(server, {
         profile: opts.profile,
         scope: opts.scope,
@@ -393,10 +408,14 @@ Server formats:
 
   // logout command: mcpc logout <server>
   program
-    .command('logout <server>')
+    .command('logout [server]')
+    .usage('<server>')
     .description('Delete an authentication profile for a server')
     .option('--profile <name>', 'Profile name (default: "default")')
     .action(async (server, opts, command) => {
+      if (!server) {
+        throw new ClientError('Missing required argument: server\n\nExample: mcpc logout mcp.apify.com');
+      }
       await auth.logout(server, {
         profile: opts.profile,
         ...getOptionsFromCommand(command),
