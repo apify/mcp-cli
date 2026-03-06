@@ -14,7 +14,7 @@ SESSION=$(session_name "json-schema")
 
 # Create session for testing
 test_case "setup: create session"
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION" --header "X-Test: true"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass

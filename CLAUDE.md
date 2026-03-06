@@ -53,23 +53,22 @@ npm run format
 # List all active sessions and saved authentication profiles
 mcpc
 
-# Use a local server package referenced by MCP config file
-mcpc --config ~/.vscode/mcp.json filesystem tools-list
-
 # Login to OAuth-enabled MCP server and save authentication for future use
-mcpc mcp.apify.com login
+mcpc login mcp.apify.com
 
-# Show information about a remote MCP server and open interactive shell
-mcpc mcp.apify.com
-mcpc mcp.apify.com shell
+# Create a persistent session
+mcpc connect mcp.apify.com @test
+mcpc @test                               # show session info
+mcpc @test tools-list                    # list available tools
+mcpc @test tools-call search-actors query:="web crawler"
+mcpc @test shell                         # interactive shell
 
 # Use JSON mode for scripting
-mcpc --json mcp.apify.com tools-list
+mcpc --json @test tools-list
 
-# Create a persistent session (or reconnect if it exists but bridge is dead)
-mcpc mcp.apify.com connect @test
-mcpc @test tools-call search-actors query:="web crawler"
-mcpc @test shell
+# Use a local server package referenced by MCP config file
+mcpc connect ~/.vscode/mcp.json:filesystem @fs
+mcpc @fs tools-list
 ```
 
 ## Design Principles
@@ -143,17 +142,18 @@ mcpc/
 **CLI Command Structure:**
 - All MCP commands use hyphenated format: `tools-list`, `tools-call`, `resources-read`, etc.
 - `mcpc` - List all sessions and authentication profiles
-- `mcpc <target>` - Show server info, instructions, and capabilities
 - `mcpc @<session>` - Show session info, server capabilities, and authentication details
-- `mcpc <target> help` - Alias for `mcpc <target>`
-- `mcpc <target> <command>` - Execute MCP command
-- Session creation: `mcpc <target> connect @<session-name> [--profile <name>]`
-- Authentication: `mcpc <server> login [--profile <name>]` and `mcpc <server> logout [--profile <name>]`
+- `mcpc @<session> <command>` - Execute MCP command (e.g., `mcpc @apify tools-list`)
+- `mcpc connect <server> @<name>` - Create a named persistent session
+- `mcpc login <server> [--profile <name>]` - Login via OAuth and save auth profile
+- `mcpc logout <server> [--profile <name>]` - Delete an authentication profile
+- `mcpc clean [sessions|profiles|logs|all ...]` - Clean up mcpc data
+- `mcpc help [command]` - Show help for a specific command
 
-**Target Types:**
+**Server formats for `connect`, `login`, `logout`:**
 - `@<name>` - Named session (e.g., `@apify`) - persistent connection via bridge
-- `<url>` - Server URL (e.g., `mcp.apify.com` or `https://mcp.apify.com`) - URL scheme optional, defaults to `https://`
-- `<config-entry>` - Config file entry (requires `--config` flag) - local or remote server
+- `<url>` - Remote HTTP server (e.g., `mcp.apify.com` or `https://mcp.apify.com`) - scheme optional, defaults to `https://`
+- `<file>:<entry>` - Config file entry (e.g., `~/.vscode/mcp.json:filesystem`)
 
 **Output Utilities** (`src/cli/output.ts`):
 - `logTarget(target, outputMode)` - Shows `[Using session: @name]` prefix (human mode only)
@@ -164,7 +164,7 @@ mcpc/
 
 ### Session Lifecycle
 
-1. User creates session: `mcpc mcp.apify.com connect @apify`
+1. User creates session: `mcpc connect mcp.apify.com @apify`
 2. CLI creates entry in `sessions.json`, spawns bridge process
 3. Bridge creates Unix socket at `~/.mcpc/bridges/apify.sock`
 4. Bridge performs MCP initialization:
@@ -390,13 +390,13 @@ Environment variable substitution supported: `${VAR_NAME}`
 **CLI Commands:**
 ```bash
 # Login and save authentication profile
-mcpc <server> login [--profile <name>]
+mcpc login <server> [--profile <name>]
 
 # Logout and delete authentication profile
-mcpc <server> logout [--profile <name>]
+mcpc logout <server> [--profile <name>]
 
 # Create session with specific profile
-mcpc <server> connect @<name> --profile <profile>
+mcpc connect <server> @<name> --profile <profile>
 ```
 
 **Authentication Behavior:**
@@ -415,7 +415,7 @@ On failure, the error message includes instructions on how to login. This ensure
 - You can mix authenticated sessions and public access on the same server
 
 **OAuth Flow:**
-1. User runs `mcpc <server> login --profile personal`
+1. User runs `mcpc login <server> --profile personal`
 2. CLI discovers OAuth metadata via `WWW-Authenticate` header or well-known URIs
 3. CLI creates local HTTP callback server on `http://localhost:<random-port>/callback`
 4. CLI opens browser to authorization URL with PKCE challenge

@@ -52,29 +52,35 @@ assert_json_valid "$STDOUT"
 assert_json "$STDOUT" '.version'
 test_pass
 
-# Test: tools-list via direct connection
-test_case "bun: tools-list (direct connection)"
-run_xmcpc "$TEST_SERVER_URL" tools-list
+# Create a session to use for session-based tests
+BUN_SESSION=$(session_name "bun")
+run_mcpc connect "$TEST_SERVER_URL" "$BUN_SESSION" --header "X-Test: true"
+assert_success
+_SESSIONS_CREATED+=("$BUN_SESSION")
+
+# Test: tools-list via session
+test_case "bun: tools-list (session)"
+run_xmcpc "$BUN_SESSION" tools-list
 assert_success
 assert_contains "$STDOUT" "echo"
 test_pass
 
-# Test: tools-call via direct connection
-test_case "bun: tools-call (direct connection)"
-run_mcpc "$TEST_SERVER_URL" tools-call echo 'message:=hello from bun'
+# Test: tools-call via session
+test_case "bun: tools-call (session)"
+run_mcpc "$BUN_SESSION" tools-call echo 'message:=hello from bun'
 assert_success
 assert_contains "$STDOUT" "hello from bun"
 test_pass
 
-# Test: resources-list via direct connection
-test_case "bun: resources-list (direct connection)"
-run_xmcpc "$TEST_SERVER_URL" resources-list
+# Test: resources-list via session
+test_case "bun: resources-list (session)"
+run_xmcpc "$BUN_SESSION" resources-list
 assert_success
 test_pass
 
-# Test: JSON mode via direct connection
-test_case "bun: tools-list --json (direct connection)"
-run_mcpc --json "$TEST_SERVER_URL" tools-list
+# Test: JSON mode via session
+test_case "bun: tools-list --json (session)"
+run_mcpc --json "$BUN_SESSION" tools-list
 assert_success
 assert_json_valid "$STDOUT"
 test_pass
@@ -88,7 +94,7 @@ test_pass
 
 test_case "bun: session with bearer token (keychain write)"
 SESSION=$(session_name "bearer")
-run_mcpc "$TEST_SERVER_URL" --header "Authorization: Bearer testtoken-bun-$$" connect "$SESSION"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION" --header "X-Test: true" --header "Authorization: Bearer testtoken-bun-$$"
 assert_success
 test_pass
 

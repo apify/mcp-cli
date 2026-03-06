@@ -51,8 +51,8 @@ OAuth E2E tests require authentication profiles to be configured.
 
 To set up the required profiles, run:
 
-  mcpc $REMOTE_SERVER login --profile $PROFILE1
-  mcpc $REMOTE_SERVER login --profile $PROFILE2
+  mcpc login $REMOTE_SERVER --profile $PROFILE1
+  mcpc login $REMOTE_SERVER --profile $PROFILE2
 
 You'll need a free Apify account: https://console.apify.com/sign-up
 EOF
@@ -78,7 +78,7 @@ OAuth E2E tests require authentication profiles to be configured.
 
 To set up the required profiles, run:
 
-  mcpc $REMOTE_SERVER login --profile $PROFILE2
+  mcpc login $REMOTE_SERVER --profile $PROFILE2
 
 You'll need a free Apify account: https://console.apify.com/sign-up
 EOF
@@ -104,96 +104,13 @@ fi
 test_pass
 
 # =============================================================================
-# Test: One-shot commands (direct connection, no session)
-# =============================================================================
-
-test_case "one-shot: server info with OAuth profile"
-run_mcpc "$REMOTE_SERVER" --profile "$PROFILE1"
-assert_success
-assert_contains "$STDOUT" "Apify"
-assert_contains "$STDOUT" "Capabilities:"
-test_pass
-
-test_case "one-shot: ping with OAuth"
-run_mcpc "$REMOTE_SERVER" ping --profile "$PROFILE1"
-assert_success
-assert_contains "$STDOUT" "Ping successful"
-test_pass
-
-test_case "one-shot: ping --json returns valid JSON"
-run_mcpc --json "$REMOTE_SERVER" ping --profile "$PROFILE1"
-assert_success
-assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '.durationMs'
-test_pass
-
-test_case "one-shot: tools-list with OAuth"
-# Note: Using run_mcpc instead of run_xmcpc because remote server output
-# may vary between calls (non-deterministic ordering, dynamic data)
-run_mcpc "$REMOTE_SERVER" tools-list --profile "$PROFILE1"
-assert_success
-assert_not_empty "$STDOUT"
-test_pass
-
-test_case "one-shot: tools-list --json returns valid array"
-run_mcpc --json "$REMOTE_SERVER" tools-list --profile "$PROFILE1"
-assert_success
-assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '. | type == "array"'
-assert_json "$STDOUT" '. | length > 0'
-test_pass
-
-test_case "one-shot: resources-list with OAuth"
-run_mcpc "$REMOTE_SERVER" resources-list --profile "$PROFILE1"
-assert_success
-# May have resources or be empty, just check it doesn't error
-test_pass
-
-test_case "one-shot: resources-list --json returns valid array"
-run_mcpc --json "$REMOTE_SERVER" resources-list --profile "$PROFILE1"
-assert_success
-assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '. | type == "array"'
-test_pass
-
-test_case "one-shot: prompts-list with OAuth"
-run_mcpc "$REMOTE_SERVER" prompts-list --profile "$PROFILE1"
-assert_success
-# May have prompts or be empty, just check it doesn't error
-test_pass
-
-test_case "one-shot: prompts-list --json returns valid array"
-run_mcpc --json "$REMOTE_SERVER" prompts-list --profile "$PROFILE1"
-assert_success
-assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '. | type == "array"'
-test_pass
-
-test_case "one-shot: help shows available commands"
-run_mcpc "$REMOTE_SERVER" help --profile "$PROFILE1"
-assert_success
-assert_contains "$STDOUT" "Available commands:"
-test_pass
-
-test_case "one-shot: different profile works independently"
-if [[ "$SINGLE_PROFILE_MODE" == "true" ]]; then
-  test_skip "Single profile mode enabled"
-else
-  # Verify that using a different profile also works
-  run_mcpc "$REMOTE_SERVER" ping --profile "$PROFILE2"
-  assert_success
-  assert_contains "$STDOUT" "Ping successful"
-  test_pass
-fi
-
-# =============================================================================
 # Test: Session with OAuth profile
 # =============================================================================
 
 test_case "create session with OAuth profile (verbose)"
 SESSION1=$(session_name "oauth1")
 # Create session with verbose mode to check for credential leaks
-run_mcpc --verbose "$REMOTE_SERVER" connect "$SESSION1" --profile "$PROFILE1"
+run_mcpc --verbose connect "$REMOTE_SERVER" "$SESSION1" --profile "$PROFILE1"
 assert_success
 _SESSIONS_CREATED+=("$SESSION1")
 
@@ -248,7 +165,7 @@ if [[ "$SINGLE_PROFILE_MODE" == "true" ]]; then
 else
   SESSION2=$(session_name "oauth2")
   # Create session with verbose mode to check for credential leaks
-  run_mcpc --verbose "$REMOTE_SERVER" connect "$SESSION2" --profile "$PROFILE2"
+  run_mcpc --verbose connect "$REMOTE_SERVER" "$SESSION2" --profile "$PROFILE2"
   assert_success
   _SESSIONS_CREATED+=("$SESSION2")
 
@@ -391,30 +308,6 @@ if [[ -f "$BRIDGE_LOG" ]]; then
     test_fail "Bridge log contains Authorization header with token"
     exit 1
   fi
-fi
-test_pass
-
-test_case "verbose direct command does not leak OAuth tokens"
-# Test direct connection (no session) with verbose mode
-run_mcpc --verbose "$REMOTE_SERVER" ping --profile "$PROFILE1"
-assert_success
-
-ALL_OUTPUT="$STDOUT$STDERR"
-
-# Check for token leaks in direct mode
-if echo "$ALL_OUTPUT" | grep -iE 'Bearer [A-Za-z0-9_-]{20,}' >/dev/null 2>&1; then
-  test_fail "Verbose direct command output contains Bearer token"
-  exit 1
-fi
-
-if echo "$ALL_OUTPUT" | grep -iE '"access_token"\s*:\s*"[^"]{20,}"' >/dev/null 2>&1; then
-  test_fail "Verbose direct command output contains access_token"
-  exit 1
-fi
-
-if echo "$ALL_OUTPUT" | grep -iE 'Authorization:\s*[A-Za-z]+\s+[A-Za-z0-9_-]{20,}' >/dev/null 2>&1; then
-  test_fail "Verbose direct command output contains Authorization header"
-  exit 1
 fi
 test_pass
 

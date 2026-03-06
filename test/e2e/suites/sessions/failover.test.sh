@@ -12,7 +12,7 @@ SESSION=$(session_name "failover")
 
 # Test: create session for failover test
 test_case "create session for failover test"
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION" --header "X-Test: true"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass

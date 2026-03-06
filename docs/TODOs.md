@@ -55,3 +55,35 @@
 # Questions
 
 - mcpc mcp.apify.com shell --- do we also open "virtual" session, how does it work exactly? Let's explain this in README.
+
+
+# Bugs
+
+
+
+
+
+Unauthenticated session to sentry MCP keeps showing as live, but it should be expired.
+
+$ mcpc @dumy**                                                                                                            ✔
+[@dumy → https://mcp.sentry.dev/mcp (HTTP)]
+
+Error: Authentication required by server.
+
+To authenticate, run:
+mcpc https://mcp.sentry.dev/mcp login
+
+Then recreate the session:
+mcpc https://mcp.sentry.dev/mcp session @dumy
+
+$ mcpc                                                                                                                4 ✘
+MCP sessions:
+@fss → npx -y @modelcontextprotocol/server-filesystem /Users/jancurn/Projects/mcpc (stdio) ● live
+@fs → npx -y @modelcontextprotocol/server-filesystem /Users/jancurn/Projects/mcpc (stdio) ● live
+@dumy → https://mcp.sentry.dev/mcp (HTTP) ● live
+
+Available OAuth profiles:
+mcp.notion.com / default, refreshed 1 weeks ago
+mcp.apify.com / default, created 58m ago
+
+Run "mcpc --help" for usage information.

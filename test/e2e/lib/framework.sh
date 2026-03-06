@@ -184,27 +184,12 @@ MCPC="${E2E_RUNTIME:-node} $PROJECT_ROOT/dist/cli/index.js"
 
 # Run mcpc and capture output
 # Sets: STDOUT, STDERR, EXIT_CODE
-# Note: Automatically adds --header for test server connections to satisfy auth requirement
 run_mcpc() {
   local stdout_file="$TEST_TMP/stdout.$$.$RANDOM"
   local stderr_file="$TEST_TMP/stderr.$$.$RANDOM"
 
-  # Build command args, adding test header if connecting to test server
-  local -a args=()
-  local first_arg="${1:-}"
-  if [[ -n "${TEST_SERVER_URL:-}" && "$first_arg" == "$TEST_SERVER_URL" ]]; then
-    # Add dummy header to satisfy auth credential requirement
-    args=("$first_arg" "--header" "X-Test: true")
-    shift
-    for arg in "$@"; do
-      args+=("$arg")
-    done
-  else
-    args=("$@")
-  fi
-
   set +e
-  $MCPC ${args[@]+"${args[@]}"} >"$stdout_file" 2>"$stderr_file"
+  $MCPC "$@" >"$stdout_file" 2>"$stderr_file"
   EXIT_CODE=$?
   set -e
 
@@ -344,12 +329,17 @@ session_name() {
 
 # Create a session and track it for cleanup
 # Usage: create_session <target> [session-suffix]
+# Automatically adds X-Test header when connecting to TEST_SERVER_URL
 create_session() {
   local target="$1"
   local suffix="${2:-default}"
   local session=$(session_name "$suffix")
 
-  run_mcpc "$target" connect "$session"
+  if [[ -n "${TEST_SERVER_URL:-}" && "$target" == "$TEST_SERVER_URL" ]]; then
+    run_mcpc connect "$target" "$session" --header "X-Test: true"
+  else
+    run_mcpc connect "$target" "$session"
+  fi
   if [[ $EXIT_CODE -eq 0 ]]; then
     _SESSIONS_CREATED+=("$session")
   fi

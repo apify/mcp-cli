@@ -31,8 +31,6 @@ export function getJsonFromEnv(): boolean {
 
 // Options that take a value (not boolean flags)
 const OPTIONS_WITH_VALUES = [
-  '-c',
-  '--config',
   '-H',
   '--header',
   '--timeout',
@@ -54,23 +52,31 @@ const KNOWN_OPTIONS = [
   '-h',
   '--help',
   '--verbose',
-  '--clean',
   '--full',
   '--x402',
 ];
 
-// Valid --clean types
-const VALID_CLEAN_TYPES = ['sessions', 'profiles', 'logs', 'all'];
+// Valid --schema-mode values
+const VALID_SCHEMA_MODES = ['strict', 'compatible', 'ignore'];
 
 /**
- * All known MCP subcommands (used to detect when user forgets to specify a target)
+ * All known top-level commands
  */
 export const KNOWN_COMMANDS = [
   'help',
-  'shell',
   'login',
   'logout',
   'connect',
+  'clean',
+  'x402',
+];
+
+/**
+ * All known session subcommands (used in help and error messages)
+ */
+export const KNOWN_SESSION_COMMANDS = [
+  'help',
+  'shell',
   'close',
   'restart',
   'tools',
@@ -88,11 +94,7 @@ export const KNOWN_COMMANDS = [
   'prompts-get',
   'logging-set-level',
   'ping',
-  'x402',
 ];
-
-// Valid --schema-mode values
-const VALID_SCHEMA_MODES = ['strict', 'compatible', 'ignore'];
 
 /**
  * Check if an option always takes a value
@@ -134,20 +136,6 @@ export function validateOptions(args: string[]): void {
 }
 
 /**
- * Validate --clean types
- * @throws ClientError if invalid clean type is found
- */
-export function validateCleanTypes(types: string[]): void {
-  for (const type of types) {
-    if (type && !VALID_CLEAN_TYPES.includes(type)) {
-      throw new ClientError(
-        `Invalid --clean type: "${type}". Valid types are: ${VALID_CLEAN_TYPES.join(', ')}`
-      );
-    }
-  }
-}
-
-/**
  * Validate argument values (--schema-mode, --timeout, etc.)
  * @throws ClientError if invalid value is found
  */
@@ -176,14 +164,6 @@ export function validateArgValues(args: string[]): void {
       }
     }
 
-    // Validate --config file exists
-    if ((arg === '--config' || arg === '-c') && nextArg) {
-      const configPath = resolvePath(nextArg);
-      if (!existsSync(configPath)) {
-        throw new ClientError(`Config file not found: ${nextArg}`);
-      }
-    }
-
     // Validate --schema file exists
     if (arg === '--schema' && nextArg) {
       const schemaPath = resolvePath(nextArg);
@@ -204,36 +184,10 @@ export function validateArgValues(args: string[]): void {
 }
 
 /**
- * Find the first non-option argument (the target)
- * Returns { target, targetIndex } or undefined if no target found
- */
-export function findTarget(args: string[]): { target: string; targetIndex: number } | undefined {
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (!arg) continue;
-
-    // Skip options and their values
-    if (arg.startsWith('-')) {
-      // If option takes a value and value is not inline (no =), skip next arg
-      if (optionTakesValue(arg) && !arg.includes('=') && i + 1 < args.length) {
-        i++; // Skip the value
-      }
-      continue;
-    }
-
-    // Found first non-option argument
-    return { target: arg, targetIndex: i };
-  }
-
-  return undefined;
-}
-
-/**
  * Extract option values from args
  * Environment variables MCPC_VERBOSE and MCPC_JSON are used as defaults
  */
 export function extractOptions(args: string[]): {
-  config?: string;
   headers?: string[];
   timeout?: number;
   profile?: string;
@@ -245,11 +199,6 @@ export function extractOptions(args: string[]): {
     verbose: args.includes('--verbose') || getVerboseFromEnv(),
     json: args.includes('--json') || args.includes('-j') || getJsonFromEnv(),
   };
-
-  // Extract --config
-  const configIndex = args.findIndex((arg) => arg === '--config' || arg === '-c');
-  const config =
-    configIndex >= 0 && configIndex + 1 < args.length ? args[configIndex + 1] : undefined;
 
   // Extract --header (can be repeated)
   const headers: string[] = [];
@@ -277,7 +226,6 @@ export function extractOptions(args: string[]): {
 
   return {
     ...options,
-    ...(config && { config }),
     ...(headers.length > 0 && { headers }),
     ...(timeout !== undefined && { timeout }),
     ...(profile && { profile }),
@@ -286,26 +234,38 @@ export function extractOptions(args: string[]): {
 }
 
 /**
- * Check if there's a command after the target in args
+ * Parse a server argument: URL or config file entry (file.json:entry)
+ *
+ * Config format: <file-path>:<entry-name>
+ * - Must contain `:` but NOT `://`
+ * - The part before `:` must look like a file path:
+ *   starts with `~`, `/`, `.`, or has a `.json`/`.yaml`/`.yml` extension
+ *
+ * URL format: anything else (normalised to https:// if no scheme)
  */
-export function hasCommandAfterTarget(args: string[]): boolean {
-  // Start from index 2 (skip node and script path)
-  for (let i = 2; i < args.length; i++) {
-    const arg = args[i];
-    if (!arg) continue;
+export function parseServerArg(
+  arg: string
+): { type: 'url'; url: string } | { type: 'config'; file: string; entry: string } {
+  // Check if it could be a config file entry (contains : but not ://)
+  const colonIndex = arg.indexOf(':');
+  if (colonIndex > 0 && !arg.includes('://')) {
+    const beforeColon = arg.substring(0, colonIndex);
+    const afterColon = arg.substring(colonIndex + 1);
 
-    // Skip options and their values
-    if (arg.startsWith('-')) {
-      if (optionTakesValue(arg) && !arg.includes('=')) {
-        i++; // Skip the value
-      }
-      continue;
+    // Check if the part before colon looks like a file path
+    const looksLikeFilePath =
+      beforeColon.startsWith('~') ||
+      beforeColon.startsWith('/') ||
+      beforeColon.startsWith('.') ||
+      /\.(json|yaml|yml)$/.test(beforeColon);
+
+    if (looksLikeFilePath && afterColon.length > 0) {
+      return { type: 'config', file: beforeColon, entry: afterColon };
     }
-
-    // Found a non-option arg (this is a command)
-    return true;
   }
-  return false;
+
+  // Otherwise treat as URL
+  return { type: 'url', url: arg };
 }
 
 /**
