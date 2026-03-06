@@ -2,6 +2,10 @@
 # TODOs
 
 
+
+sign -r <b64> Sign payment from PAYMENT-REQUIRED header  - why the "-r" is needed?
+
+
 - mcpc @apify tools-get fetch-actor-details => should print also "object" properties in human mode
 
 - `--capabilities '{"tools":...,"prompts":...}"` to limit access to selected MCP features and tools,

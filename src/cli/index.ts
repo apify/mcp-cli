@@ -253,7 +253,7 @@ async function main(): Promise<void> {
       console.error(formatJsonError(new Error(`Missing session target for command: ${firstNonOption}`), 1));
     } else {
       console.error(`Error: Missing session target for command: ${firstNonOption}`);
-      console.error(`\nDid you mean: mcpc @<session> ${firstNonOption}`);
+      console.error(`\nDid you mean: mcpc <@session> ${firstNonOption}`);
       console.error(`Run "mcpc --help" for usage information.\n`);
     }
   } else {
@@ -292,44 +292,37 @@ function createTopLevelProgram(): Command {
     .description(
       `${rainbow('Universal')} command-line client for the Model Context Protocol (MCP).`
     )
-    .usage('[options] [@session | <command>] [args]')
-    .helpOption('-h, --help', 'Display general help')
+    .usage('[options] [<@session>] [<command>]')
     .option('-j, --json', 'Output in JSON format for scripting')
     .option('-H, --header <header>', 'HTTP header (can be repeated)')
-    .version(mcpcVersion, '-v, --version', 'Output the version number')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
-    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)');
+    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .version(mcpcVersion, '-v, --version', 'Output the version number')
+    .helpOption('-h, --help', 'Display general help');
 
   program.addHelpText(
     'after',
     `
 Session commands (after connecting):
-  @<session>                    Show session info
-  @<session> shell              Open interactive shell
-  @<session> close              Close a session
-  @<session> restart            Kill and restart a session
-  @<session> tools-list [--full]
-  @<session> tools-get <name>
-  @<session> tools-call <name> [arg:=val ... | <json> | stdin]
-  @<session> prompts-list
-  @<session> prompts-get <name> [arg:=val ... | <json> | stdin]
-  @<session> resources-list
-  @<session> resources-read <uri>
-  @<session> resources-subscribe <uri>
-  @<session> resources-unsubscribe <uri>
-  @<session> resources-templates-list
-  @<session> logging-set-level <level>
-  @<session> ping
-
-EXPERIMENTAL: x402 payment commands:
-  x402 init                     Create a new x402 wallet
-  x402 import <key>             Import wallet from private key
-  x402 info                     Show wallet info
-  x402 sign -r <base64>         Sign payment from PAYMENT-REQUIRED header
-  x402 remove                   Remove the wallet
+  <@session>                             Show MCP server info and capabilities
+  <@session> shell                       Open interactive shell
+  <@session> close                       Close the session
+  <@session> restart                     Kill and restart the session
+  <@session> tools-list [--full]         List MCP tools
+  <@session> tools-get <name>
+  <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
+  <@session> prompts-list
+  <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
+  <@session> resources-list
+  <@session> resources-read <uri>
+  <@session> resources-subscribe <uri>
+  <@session> resources-unsubscribe <uri>
+  <@session> resources-templates-list
+  <@session> logging-set-level <level>
+  <@session> ping
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
 
@@ -338,8 +331,8 @@ Full docs: ${docsUrl}`
 
   // connect command: mcpc connect <server> @<name>
   program
-    .command('connect <server> @<session>')
-    .description('Connect to an MCP server and create a named persistent session')
+    .command('connect <server> <@session>')
+    .description('Connect to an MCP server and create a named session')
     .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
@@ -383,7 +376,7 @@ Server formats:
   // login command: mcpc login <server>
   program
     .command('login <server>')
-    .description('Login to a server using OAuth and save authentication profile.')
+    .description('Authenticate to server using OAuth and save the profile')
     .option('--profile <name>', 'Profile name (default: "default")')
     .option('--scope <scope>', 'OAuth scope(s) to request')
     .action(async (server, opts, command) => {
@@ -397,7 +390,7 @@ Server formats:
   // logout command: mcpc logout <server>
   program
     .command('logout <server>')
-    .description('Delete an authentication profile for a server.')
+    .description('Delete an authentication profile for a server')
     .option('--profile <name>', 'Profile name (default: "default")')
     .action(async (server, opts, command) => {
       await auth.logout(server, {
@@ -449,7 +442,7 @@ Without arguments, performs safe cleanup of stale data only.
   // Note: x402 is handled before Commander in main() — this registration exists only for help text
   program
     .command('x402 [subcommand] [args...]')
-    .description('Manage x402 payment wallet (EXPERIMENTAL).')
+    .description('Manage x402 payment wallet (EXPERIMENTAL)')
     .addHelpText('after', `
 Subcommands:
   init          Create a new x402 wallet
@@ -689,7 +682,7 @@ function createSessionProgram(): Command {
   });
 
   program
-    .name('mcpc @<session>')
+    .name('mcpc <@session>')
     .helpOption('-h, --help', 'Display help')
     .option('-j, --json', 'Output in JSON format for scripting')
     .option('-H, --header <header>', 'HTTP header (can be repeated)')
