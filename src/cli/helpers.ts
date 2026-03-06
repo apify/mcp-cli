@@ -131,6 +131,7 @@ export async function resolveTarget(
     url = normalizeServerUrl(target);
   } catch (error) {
     throw new ClientError(
+      // TODO: or config file?
       `Failed to resolve target: ${target}\n` +
         `Target must be a server URL (e.g., mcp.apify.com or https://mcp.apify.com)\n\n` +
         `Error: ${(error as Error).message}`

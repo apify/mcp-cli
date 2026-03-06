@@ -105,6 +105,25 @@ export function optionTakesValue(arg: string): boolean {
 }
 
 /**
+ * Check if there is a non-option argument in args starting from index 2
+ * (index 0 = node, index 1 = script path — mirrors process.argv format)
+ */
+export function hasSubcommand(args: string[]): boolean {
+  for (let i = 2; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg) continue;
+    if (arg.startsWith('-')) {
+      if (optionTakesValue(arg) && !arg.includes('=')) {
+        i++; // skip value
+      }
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
  * Check if an option is known
  */
 function isKnownOption(arg: string): boolean {
@@ -234,38 +253,51 @@ export function extractOptions(args: string[]): {
 }
 
 /**
- * Parse a server argument: URL or config file entry (file.json:entry)
+ * Returns true if str is a valid URL with a non-empty host
+ */
+function isValidUrlWithHost(str: string): boolean {
+  try {
+    return new URL(str).host.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Parse a server argument into a URL or config file entry.
  *
- * Config format: <file-path>:<entry-name>
- * - Must contain `:` but NOT `://`
- * - The part before `:` must look like a file path:
- *   starts with `~`, `/`, `.`, or has a `.json`/`.yaml`/`.yml` extension
- *
- * URL format: anything else (normalised to https:// if no scheme)
+ * 1. URL: arg (as-is, or prefixed with https:// or http://) is a valid URL with a non-empty host.
+ *    Args that start with a path character (/, ~, .) skip the prefix check to avoid false positives
+ *    (e.g. https://~/ or https:///// parse with unusual hosts but are clearly file paths).
+ * 2. Config entry: colon present with non-empty text on both sides  →  file:entry
+ * 3. Otherwise: returns null (caller should report an error)
  */
 export function parseServerArg(
   arg: string
-): { type: 'url'; url: string } | { type: 'config'; file: string; entry: string } {
-  // Check if it could be a config file entry (contains : but not ://)
-  const colonIndex = arg.indexOf(':');
-  if (colonIndex > 0 && !arg.includes('://')) {
-    const beforeColon = arg.substring(0, colonIndex);
-    const afterColon = arg.substring(colonIndex + 1);
+): { type: 'url'; url: string } | { type: 'config'; file: string; entry: string } | null {
+  // Step 1a: try arg as-is (covers full URLs like https://... or ftp://...)
+  if (isValidUrlWithHost(arg)) {
+    return { type: 'url', url: arg };
+  }
 
-    // Check if the part before colon looks like a file path
-    const looksLikeFilePath =
-      beforeColon.startsWith('~') ||
-      beforeColon.startsWith('/') ||
-      beforeColon.startsWith('.') ||
-      /\.(json|yaml|yml)$/.test(beforeColon);
-
-    if (looksLikeFilePath && afterColon.length > 0) {
-      return { type: 'config', file: beforeColon, entry: afterColon };
+  // Step 1b: try adding https:// / http:// prefix for bare hostnames and host:port combos.
+  // Skip if arg starts with a path character — those are file paths, not hostnames.
+  // Skip if arg ends with ':' — dangling colon is not a valid hostname.
+  const startsWithPathChar = arg.startsWith('/') || arg.startsWith('~') || arg.startsWith('.');
+  if (!startsWithPathChar && !arg.endsWith(':')) {
+    if (isValidUrlWithHost('https://' + arg) || isValidUrlWithHost('http://' + arg)) {
+      return { type: 'url', url: arg };
     }
   }
 
-  // Otherwise treat as URL
-  return { type: 'url', url: arg };
+  // Step 2: config file entry — colon with non-empty text on both sides
+  const colonIndex = arg.indexOf(':');
+  if (colonIndex > 0 && colonIndex < arg.length - 1) {
+    return { type: 'config', file: arg.substring(0, colonIndex), entry: arg.substring(colonIndex + 1) };
+  }
+
+  // Step 3: unrecognised
+  return null;
 }
 
 /**

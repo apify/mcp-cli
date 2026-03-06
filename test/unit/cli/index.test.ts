@@ -2,22 +2,63 @@
  * Unit tests for CLI argument parsing functions
  */
 
-import { extractOptions, parseServerArg } from '../../../src/cli/parser.js';
+import { extractOptions, parseServerArg, hasSubcommand } from '../../../src/cli/parser.js';
+
+// args format mirrors process.argv: [node, script, ...actual_args]
+const A = (...args: string[]) => ['node', 'script', ...args];
+
+describe('hasSubcommand', () => {
+  it('returns true when a subcommand is present', () => {
+    expect(hasSubcommand(A('tools-list'))).toBe(true);
+  });
+
+  it('returns true when subcommand follows options', () => {
+    expect(hasSubcommand(A('--json', 'tools-list'))).toBe(true);
+  });
+
+  it('returns true when subcommand follows an option with value', () => {
+    expect(hasSubcommand(A('--timeout', '30', 'ping'))).toBe(true);
+  });
+
+  it('returns false when only options are present', () => {
+    expect(hasSubcommand(A('--json', '--verbose'))).toBe(false);
+  });
+
+  it('returns false for empty args', () => {
+    expect(hasSubcommand(A())).toBe(false);
+  });
+
+  it('does not treat option values as subcommands', () => {
+    expect(hasSubcommand(A('--timeout', '30'))).toBe(false);
+  });
+});
 
 describe('parseServerArg', () => {
   it('should parse a bare domain as URL', () => {
     const result = parseServerArg('mcp.apify.com');
     expect(result).toEqual({ type: 'url', url: 'mcp.apify.com' });
+
+    const result2 = parseServerArg('example.com');
+    expect(result2).toEqual({ type: 'url', url: 'example.com' });
+
+    const result3 = parseServerArg('example');
+    expect(result3).toEqual({ type: 'url', url: 'example' });
   });
 
   it('should parse a full URL as URL', () => {
     const result = parseServerArg('https://mcp.apify.com');
     expect(result).toEqual({ type: 'url', url: 'https://mcp.apify.com' });
+
+    const result2 = parseServerArg('http://mcp.apify.com');
+    expect(result2).toEqual({ type: 'url', url: 'http://mcp.apify.com' });
   });
 
   it('should parse a URL with path (no colon-entry) as URL', () => {
     const result = parseServerArg('https://mcp.apify.com/v1');
     expect(result).toEqual({ type: 'url', url: 'https://mcp.apify.com/v1' });
+
+    const result2 = parseServerArg('mcp.apify.com/v1');
+    expect(result2).toEqual({ type: 'url', url: 'mcp.apify.com/v1' });
   });
 
   it('should parse ~/.vscode/mcp.json:filesystem as config', () => {
@@ -49,11 +90,23 @@ describe('parseServerArg', () => {
     // 127.0.0.1:8080 — does not look like a file path
     const result = parseServerArg('127.0.0.1:8080');
     expect(result).toEqual({ type: 'url', url: '127.0.0.1:8080' });
+
+    const result2 = parseServerArg('mcp.example.com:8080');
+    expect(result2).toEqual({ type: 'url', url: 'mcp.example.com:8080' });
   });
 
   it('should NOT parse URL with :// as config', () => {
     const result = parseServerArg('https://example.com');
     expect(result).toEqual({ type: 'url', url: 'https://example.com' });
+  });
+
+  it('should return null for colon-only or leading-colon input', () => {
+    expect(parseServerArg(':')).toBeNull();
+    expect(parseServerArg(':entry')).toBeNull();
+  });
+
+  it('should return null for trailing-colon input', () => {
+    expect(parseServerArg('file:')).toBeNull();
   });
 });
 

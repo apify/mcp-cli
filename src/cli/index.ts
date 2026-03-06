@@ -13,7 +13,7 @@
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { Command } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
-import { isMcpError, formatHumanError } from '../lib/index.js';
+import { isMcpError, formatHumanError, ClientError } from '../lib/index.js';
 import { formatJson, formatJsonError, rainbow } from './output.js';
 import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
@@ -32,6 +32,7 @@ import {
   validateOptions,
   validateArgValues,
   parseServerArg,
+  hasSubcommand,
   optionTakesValue,
   KNOWN_COMMANDS,
   KNOWN_SESSION_COMMANDS,
@@ -102,24 +103,6 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   return options;
 }
 
-/**
- * Check if there is a non-option argument in args starting from index 2
- * (index 0 = node, index 1 = script path)
- */
-function hasSubcommand(args: string[]): boolean {
-  for (let i = 2; i < args.length; i++) {
-    const arg = args[i];
-    if (!arg) continue;
-    if (arg.startsWith('-')) {
-      if (optionTakesValue(arg) && !arg.includes('=')) {
-        i++; // skip value
-      }
-      continue;
-    }
-    return true;
-  }
-  return false;
-}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -355,9 +338,9 @@ Full docs: ${docsUrl}`
 
   // connect command: mcpc connect <server> @<name>
   program
-    .command('connect <server> <session>')
+    .command('connect <server> @<session>')
     .description('Connect to an MCP server and create a named persistent session')
-    .option('--profile <name>', 'OAuth profile to use (default: "default")')
+    .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
@@ -370,6 +353,13 @@ Server formats:
     .action(async (server, sessionName, opts, command) => {
       const globalOpts = getOptionsFromCommand(command);
       const parsed = parseServerArg(server);
+
+      if (!parsed) {
+        throw new ClientError(
+          `Invalid server: "${server}"\n\n` +
+            `Expected a URL (e.g. mcp.apify.com) or a config file entry (e.g. ~/.vscode/mcp.json:filesystem)`
+        );
+      }
 
       if (parsed.type === 'config') {
         // Config file entry: pass entry name as target with config file path
@@ -393,7 +383,7 @@ Server formats:
   // login command: mcpc login <server>
   program
     .command('login <server>')
-    .description('Login to a server using OAuth and save authentication profile')
+    .description('Login to a server using OAuth and save authentication profile.')
     .option('--profile <name>', 'Profile name (default: "default")')
     .option('--scope <scope>', 'OAuth scope(s) to request')
     .action(async (server, opts, command) => {
@@ -407,7 +397,7 @@ Server formats:
   // logout command: mcpc logout <server>
   program
     .command('logout <server>')
-    .description('Delete an authentication profile for a server')
+    .description('Delete an authentication profile for a server.')
     .option('--profile <name>', 'Profile name (default: "default")')
     .action(async (server, opts, command) => {
       await auth.logout(server, {
@@ -454,6 +444,22 @@ Without arguments, performs safe cleanup of stale data only.
         all: resources.includes('all'),
       });
     });
+
+  // x402 command: mcpc x402 <subcommand>
+  // Note: x402 is handled before Commander in main() — this registration exists only for help text
+  program
+    .command('x402 [subcommand] [args...]')
+    .description('Manage x402 payment wallet (EXPERIMENTAL).')
+    .addHelpText('after', `
+Subcommands:
+  init          Create a new x402 wallet
+  import <key>  Import wallet from private key
+  info          Show wallet info
+  sign -r <b64> Sign payment from PAYMENT-REQUIRED header
+  remove        Remove the wallet
+`)
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    .action(() => {});
 
   // help command: mcpc help [command]
   program
