@@ -38,6 +38,8 @@ Run "mcpc --help" for usage information.
 - parseServerArg() splits config entries using the first : (arg.indexOf(':')). This breaks Windows paths with drive letters (e.g. C:\Users\me\mcp.json:filesystem), which would be parsed as file=C entry=\Users\.... Consider special-casing ^[A-Za-z]:[\\/] and/or using lastIndexOf(':') for the file/entry delimiter to keep Windows paths working
 
 
+- validateOptions() relies on KNOWN_OPTIONS, but several options used by subcommands are missing (e.g. --scope on login, -r/--payment-required, --amount, --expiry for x402 sign, and session flags like -o/--output, --max-size). This will cause valid commands to fail early with "Unknown option" before routing to the correct Commander program. Either expand KNOWN_OPTIONS to cover all CLI flags (including subcommand-specific ones) or change validation to only check global options (e.g. only scan args before the first non-option command token
+
 ## x402
 - sign -r <b64> Sign payment from PAYMENT-REQUIRED header  - why the "-r" is needed?
 
