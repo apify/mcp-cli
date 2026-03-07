@@ -319,9 +319,7 @@ export async function performOAuthFlow(
     // Delete existing OAuth client info from keychain before re-authenticating
     // This ensures we get a fresh client-id with the correct redirect URI
     // (old client-id might have been registered with different redirect URI)
-    logger.debug(
-      `Removing existing OAuth client info for ${profileName} @ ${normalizedServerUrl}`
-    );
+    logger.debug(`Removing existing OAuth client info for ${profileName} @ ${normalizedServerUrl}`);
     await removeKeychainOAuthClientInfo(normalizedServerUrl, profileName);
   }
 

@@ -45,7 +45,12 @@ export async function login(
     if (options.clientSecret) {
       clientCredentials.clientSecret = options.clientSecret;
     }
-    const result = await performOAuthFlow(normalizedUrl, profileName, options.scope, clientCredentials);
+    const result = await performOAuthFlow(
+      normalizedUrl,
+      profileName,
+      options.scope,
+      clientCredentials
+    );
 
     if (options.outputMode === 'human') {
       console.log(formatSuccess('Authentication successful!'));
