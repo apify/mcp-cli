@@ -31,6 +31,13 @@ Run "mcpc --help" for usage information.
 
 
 
+- mcpc @session --timeout ... / mcpc @session <cmd> --timeout ... has no effect
+
+- createSessionProgram() advertises --header and --profile options for mcpc @session ..., but these values are never applied: withMcpClient()/SessionClient ignore headers/profile overrides and always use the session’s stored config. This is misleading for users and makes it easy to think a command is authenticated/modified when it isn’t. Either wire these options into session execution (e.g. by updating/restarting the session/bridge) or remove them from the session program/help.
+
+- parseServerArg() splits config entries using the first : (arg.indexOf(':')). This breaks Windows paths with drive letters (e.g. C:\Users\me\mcp.json:filesystem), which would be parsed as file=C entry=\Users\.... Consider special-casing ^[A-Za-z]:[\\/] and/or using lastIndexOf(':') for the file/entry delimiter to keep Windows paths working
+
+
 ## x402
 - sign -r <b64> Sign payment from PAYMENT-REQUIRED header  - why the "-r" is needed?
 
@@ -109,7 +116,7 @@ $ mcpc connect
 - "login" and "logout" commands could work also with file:entry, just use the remote server URL
 
 - maybe introduce new session status: auth failed or unauthed
-- ux: consider forking "alive" session state to "alive" and "diconnected", to indicate the remove server is not responding but bridge 
+  ux: consider forking "alive" session state to "alive" and "disconnected", to indicate the remote server is not responding but bridge 
   runs fine. We can use lastSeenAt + ping interval info for that, or status of last ping.
 - ux: Be even more forgiving with `args:=x`, when we know from tools/prompt schema the text is compatible with `x` even if the exact type is not - 
   just re-type it dynamically to make it work.

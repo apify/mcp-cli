@@ -86,7 +86,15 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
     // Always convert to array for consistent handling
     options.headers = Array.isArray(opts.header) ? opts.header : [opts.header];
   }
-  if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
+  if (opts.timeout) {
+    const timeout = parseInt(opts.timeout as string, 10);
+    if (isNaN(timeout) || timeout <= 0) {
+      throw new Error(
+        `Invalid --timeout value: "${opts.timeout as string}". Must be a positive number (seconds).`
+      );
+    }
+    options.timeout = timeout;
+  }
   if (opts.profile) options.profile = opts.profile;
   if (verbose) options.verbose = verbose;
   if (opts.x402) options.x402 = true;
@@ -94,7 +102,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.schemaMode) {
     const mode = opts.schemaMode as string;
     if (mode !== 'strict' && mode !== 'compatible' && mode !== 'ignore') {
-      throw new Error(`Invalid schema mode: ${mode}. Must be 'strict', 'compatible', or 'ignore'.`);
+      throw new Error(`Invalid --schema-mode value: "${mode}". Valid modes are: strict, compatible, ignore`);
     }
     options.schemaMode = mode;
   }
