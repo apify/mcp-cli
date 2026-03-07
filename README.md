@@ -123,6 +123,9 @@ Options:
 
 Commands:
   connect <server> <@session>  Connect to an MCP server and start a new named @session
+  close <@session>             Close a session (same as: mcpc <@session> close)
+  restart <@session>           Restart a session (same as: mcpc <@session> restart)
+  shell <@session>             Open interactive shell for a session (same as: mcpc <@session> shell)
   login <server>               Authenticate to server using OAuth and save the profile
   logout <server>              Delete an authentication profile for a server
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
@@ -131,9 +134,9 @@ Commands:
 
 Session commands (after connecting):
   <@session>                   Show MCP server info and capabilities
-  <@session> shell             Open interactive shell
-  <@session> close             Close the session
-  <@session> restart           Kill and restart the session
+  <@session> shell             Open interactive shell (or: mcpc shell <@session>)
+  <@session> close             Close the session (or: mcpc close <@session>)
+  <@session> restart           Kill and restart the session (or: mcpc restart <@session>)
   <@session> tools-list        List MCP tools
   <@session> tools-get <name>
   <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
@@ -296,10 +299,10 @@ mcpc @apify tools-list
 mcpc @apify shell
 
 # Restart the session (kills and restarts the bridge process)
-mcpc @apify restart
+mcpc @apify restart    # or: mcpc restart @apify
 
 # Close the session, terminates bridge process
-mcpc @apify close
+mcpc @apify close      # or: mcpc close @apify
 
 # ...now session name "@apify" is forgotten and available for future use
 ```
@@ -340,14 +343,14 @@ and any future attempts to use them will fail.
 To **remove the session from the list**, you need to explicitly close it:
 
 ```bash
-mcpc @apify close
+mcpc @apify close    # or: mcpc close @apify
 ```
 
 You can restart a session anytime, which kills the bridge process
 and opens new connection with new `MCP-Session-Id`, by running:
 
 ```bash
-mcpc @apify restart
+mcpc @apify restart  # or: mcpc restart @apify
 ```
 
 ## Authentication

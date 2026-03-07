@@ -62,7 +62,17 @@ const VALID_SCHEMA_MODES = ['strict', 'compatible', 'ignore'];
 /**
  * All known top-level commands
  */
-export const KNOWN_COMMANDS = ['help', 'login', 'logout', 'connect', 'clean', 'x402'];
+export const KNOWN_COMMANDS = [
+  'help',
+  'login',
+  'logout',
+  'connect',
+  'close',
+  'restart',
+  'shell',
+  'clean',
+  'x402',
+];
 
 /**
  * All known session subcommands (used in help and error messages)
