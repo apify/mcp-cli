@@ -134,9 +134,9 @@ Commands:
 
 Session commands (after connecting):
   <@session>                   Show MCP server info and capabilities
-  <@session> shell             Open interactive shell (or: mcpc shell <@session>)
-  <@session> close             Close the session (or: mcpc close <@session>)
-  <@session> restart           Kill and restart the session (or: mcpc restart <@session>)
+  <@session> shell             Open interactive shell
+  <@session> close             Close the session
+  <@session> restart           Kill and restart the session
   <@session> tools-list        List MCP tools
   <@session> tools-get <name>
   <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
