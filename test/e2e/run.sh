@@ -118,37 +118,27 @@ done
 # Suites directory
 SUITES_DIR="$SCRIPT_DIR/suites"
 
-# Find all test files matching patterns
+# Find all test files matching patterns (outputs newline-separated paths)
 find_tests() {
-  local tests=()
-
   if [[ ${#PATTERNS[@]} -eq 0 ]]; then
     # No pattern - find all tests in suites/
-    while IFS= read -r -d '' test; do
-      tests+=("$test")
-    done < <(find "$SUITES_DIR" -name "*.test.sh" -print0 | sort -z)
+    find "$SUITES_DIR" -name "*.test.sh" | sort
   else
     for pattern in "${PATTERNS[@]}"; do
       if [[ -f "$SUITES_DIR/$pattern" ]]; then
         # Specific file
-        tests+=("$SUITES_DIR/$pattern")
+        echo "$SUITES_DIR/$pattern"
       elif [[ -d "$SUITES_DIR/$pattern" ]]; then
         # Directory - find all tests in it
-        while IFS= read -r -d '' test; do
-          tests+=("$test")
-        done < <(find "$SUITES_DIR/$pattern" -name "*.test.sh" -print0 | sort -z)
+        find "$SUITES_DIR/$pattern" -name "*.test.sh" | sort
       elif [[ -d "$SUITES_DIR/${pattern%/}" ]]; then
         # Directory without trailing slash
-        while IFS= read -r -d '' test; do
-          tests+=("$test")
-        done < <(find "$SUITES_DIR/${pattern%/}" -name "*.test.sh" -print0 | sort -z)
+        find "$SUITES_DIR/${pattern%/}" -name "*.test.sh" | sort
       else
         echo "Warning: No tests match pattern: $pattern" >&2
       fi
     done
   fi
-
-  printf '%s\n' "${tests[@]}"
 }
 
 # Get test name from path (relative to suites dir, without .test.sh)
@@ -158,11 +148,11 @@ test_name() {
   echo "${rel%.test.sh}"
 }
 
-# Collect tests (compatible with bash 3.x on macOS)
+# Collect tests
 TESTS=()
 while IFS= read -r test; do
   [[ -n "$test" ]] && TESTS+=("$test")
-done < <(find_tests)
+done <<< "$(find_tests)"
 
 if [[ ${#TESTS[@]} -eq 0 ]]; then
   echo "No tests found" >&2
@@ -362,9 +352,9 @@ fi
 
 # Check for setup requirements (tests that were skipped due to missing configuration)
 SETUP_FILES=()
-while IFS= read -r -d '' setup_file; do
-  SETUP_FILES+=("$setup_file")
-done < <(find "$RUN_DIR" -name ".setup_required" -print0 2>/dev/null)
+while IFS= read -r setup_file; do
+  [[ -n "$setup_file" ]] && SETUP_FILES+=("$setup_file")
+done <<< "$(find "$RUN_DIR" -name ".setup_required" 2>/dev/null)"
 
 if [[ ${#SETUP_FILES[@]} -gt 0 ]]; then
   echo ""
