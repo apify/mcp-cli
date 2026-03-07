@@ -107,6 +107,14 @@ export class McpClient implements IMcpClient {
   }
 
   /**
+   * Override request timeout for subsequent requests (in milliseconds)
+   * Used by bridge to apply per-request timeout from CLI --timeout flag
+   */
+  setRequestTimeout(timeoutMs: number): void {
+    this.requestTimeout = timeoutMs;
+  }
+
+  /**
    * Get request options with timeout if configured
    */
   private getRequestOptions(): { timeout?: number } | undefined {
