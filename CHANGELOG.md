@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
 
 ### Fixed
+- `validateOptions()` no longer includes subcommand-specific options (`--full`, `--x402`, `--proxy`, etc.) in global known-options list; misplaced flags now produce clear "Unknown option" errors instead of confusing Commander rejections
 - `--timeout` flag now correctly propagates to MCP requests via session bridge
 - `parseServerArg()` now handles well Windows drive-letter config paths as well as other ambiguous cases
 
