@@ -97,7 +97,7 @@ mcpc @test shell
 mcpc --json @test tools-list
 
 # Use a local MCP server package (stdio) referenced from config file
-mcpc connect ~/.vscode/mcp.json:filesystem @fs
+mcpc connect ./.vscode/mcp.json:filesystem @fs
 mcpc @fs tools-list
 ```
 
