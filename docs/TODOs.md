@@ -36,20 +36,22 @@ Run "mcpc --help" for usage information.
 
 ## NEW
 
-- mcpc @apify tools-get fetch-actor-details => should print also "object" properties in human mode
-
 - mcp-cli inspiration
-  - Add glob-based tool search across all servers like `mcpc grep *mail*` or `mcpc grep *@session/mail*`.
+Add glob-based tool search across all servers like `mcpc grep *mail*` or `mcpc grep *@session/mail*`.
     Consider making `tools-list` more succinct for discovery.
-    - Use https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool for inspiration/compatibility?
+  Use https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool for inspiration/compatibility?
       $ mcpc grep "*file*"
-      @github/get_file_contents
+      $ mcpc grep "@github/*"
+      $ mcpc grep -F "anything really"
+  
+RETURNS
       @github/create_or_update_file
       @filesystem/read_file
       @filesystem/write_file
-  - OR get_file_contents@github
-    - 
-  - Consider adding support for something like `mcpc @session/tool [args]` to make it easier to use
+
+Then we can have
+$ mcpc call @github/get_file_contents arg:="yes"
+$ mcpc @session/tool arg:="yes"
 
 
 
@@ -94,6 +96,10 @@ $ mcpc connect
 
 
 ## Nice to have
+
+- Add support for "mcpc close @session", "mcpc restart @session" and "mcpc shell @session" - add to docs
+
+- mcpc @apify tools-get fetch-actor-details => should print also "object" properties in human mode
 
 - Add ASCII diagrams to README to help explain major concepts: tool calling, auth, bridge process, etc.
 
