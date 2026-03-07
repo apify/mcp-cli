@@ -455,7 +455,7 @@ export class McpClient implements IMcpClient {
 
     // Access the transport's internal requestInit to update headers
     // StreamableHTTPClientTransport stores headers in _requestInit
-    const t = this.transport as Record<string, unknown>;
+    const t = this.transport as unknown as Record<string, unknown>;
     const requestInit = t._requestInit as Record<string, unknown> | undefined;
 
     if (requestInit !== undefined) {
