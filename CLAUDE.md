@@ -517,8 +517,10 @@ Example: `mcpc @apify logging-set-level debug`
 
 ## Common Implementation Patterns
 
-After making any code changes, always run `npm run lint` and fix all errors before finishing. The lint command checks both ESLint rules and 
+After making any code changes, always run `npm run lint` and fix all errors before finishing. The lint command checks both ESLint rules and
 Prettier formatting; run `npx prettier --write` on any files flagged for formatting issues or `npm run lint` to fix the entire repo.
+
+For any non-trivial change (new feature, bug fix, behaviour change, or notable refactor), add an entry to the `[Unreleased]` section of `CHANGELOG.md` before finishing. Use the appropriate category (`Added`, `Changed`, `Fixed`, `Removed`). Skip purely internal changes such as test-only edits or code style fixes.
 
 When implementing features:
 
