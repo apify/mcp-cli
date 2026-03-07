@@ -517,6 +517,9 @@ Example: `mcpc @apify logging-set-level debug`
 
 ## Common Implementation Patterns
 
+After making any code changes, always run `npm run lint` and fix all errors before finishing. The lint command checks both ESLint rules and 
+Prettier formatting; run `npx prettier --write` on any files flagged for formatting issues or `npm run lint` to fix the entire repo.
+
 When implementing features:
 
 1. **Keep core runtime-agnostic** - Use native APIs, avoid runtime-specific dependencies
