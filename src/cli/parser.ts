@@ -62,14 +62,7 @@ const VALID_SCHEMA_MODES = ['strict', 'compatible', 'ignore'];
 /**
  * All known top-level commands
  */
-export const KNOWN_COMMANDS = [
-  'help',
-  'login',
-  'logout',
-  'connect',
-  'clean',
-  'x402',
-];
+export const KNOWN_COMMANDS = ['help', 'login', 'logout', 'connect', 'clean', 'x402'];
 
 /**
  * All known session subcommands (used in help and error messages)
@@ -293,7 +286,11 @@ export function parseServerArg(
   // Step 2: config file entry — colon with non-empty text on both sides
   const colonIndex = arg.indexOf(':');
   if (colonIndex > 0 && colonIndex < arg.length - 1) {
-    return { type: 'config', file: arg.substring(0, colonIndex), entry: arg.substring(colonIndex + 1) };
+    return {
+      type: 'config',
+      file: arg.substring(0, colonIndex),
+      entry: arg.substring(colonIndex + 1),
+    };
   }
 
   // Step 3: unrecognised

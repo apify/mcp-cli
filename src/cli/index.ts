@@ -103,7 +103,6 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   return options;
 }
 
-
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -250,7 +249,9 @@ async function main(): Promise<void> {
   if (allCommands.includes(firstNonOption)) {
     // It's a session subcommand used without @session
     if (outputMode === 'json') {
-      console.error(formatJsonError(new Error(`Missing session target for command: ${firstNonOption}`), 1));
+      console.error(
+        formatJsonError(new Error(`Missing session target for command: ${firstNonOption}`), 1)
+      );
     } else {
       console.error(`Error: Missing session target for command: ${firstNonOption}`);
       console.error(`\nDid you mean: mcpc <@session> ${firstNonOption}`);
@@ -284,7 +285,8 @@ function createTopLevelProgram(): Command {
 
   // Strip [options] from the commands list (options are shown per-command via `mcpc help <cmd>`)
   program.configureHelp({
-    subcommandTerm: (cmd) => `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
+    subcommandTerm: (cmd) =>
+      `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
   });
 
   // Use raw Markdown URL for pipes (AI agents), GitHub UI for TTY (humans)
@@ -343,11 +345,14 @@ Full docs: ${docsUrl}`
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
-    .addHelpText('after', `
+    .addHelpText(
+      'after',
+      `
 Server formats:
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
-`)
+`
+    )
     .action(async (server, sessionName, opts, command) => {
       if (!server) {
         throw new ClientError(
@@ -397,7 +402,9 @@ Server formats:
     .option('--scope <scope>', 'OAuth scope(s) to request')
     .action(async (server, opts, command) => {
       if (!server) {
-        throw new ClientError('Missing required argument: server\n\nExample: mcpc login mcp.apify.com');
+        throw new ClientError(
+          'Missing required argument: server\n\nExample: mcpc login mcp.apify.com'
+        );
       }
       await auth.login(server, {
         profile: opts.profile,
@@ -414,7 +421,9 @@ Server formats:
     .option('--profile <name>', 'Profile name (default: "default")')
     .action(async (server, opts, command) => {
       if (!server) {
-        throw new ClientError('Missing required argument: server\n\nExample: mcpc logout mcp.apify.com');
+        throw new ClientError(
+          'Missing required argument: server\n\nExample: mcpc logout mcp.apify.com'
+        );
       }
       await auth.logout(server, {
         profile: opts.profile,
@@ -426,7 +435,9 @@ Server formats:
   program
     .command('clean [resources...]')
     .description('Clean up mcpc data (sessions, profiles, logs, all)')
-    .addHelpText('after', `
+    .addHelpText(
+      'after',
+      `
 Resources:
   sessions    Remove stale/crashed session records
   profiles    Remove authentication profiles
@@ -434,7 +445,8 @@ Resources:
   all         Remove all of the above
 
 Without arguments, performs safe cleanup of stale data only.
-`)
+`
+    )
     .action(async (resources: string[], _opts, command) => {
       const globalOpts = getOptionsFromCommand(command);
 
@@ -444,7 +456,9 @@ Without arguments, performs safe cleanup of stale data only.
         if (!VALID_CLEAN_TYPES.includes(r)) {
           console.error(
             formatHumanError(
-              new Error(`Invalid clean resource: "${r}". Valid resources are: ${VALID_CLEAN_TYPES.join(', ')}`),
+              new Error(
+                `Invalid clean resource: "${r}". Valid resources are: ${VALID_CLEAN_TYPES.join(', ')}`
+              ),
               false
             )
           );
@@ -466,14 +480,17 @@ Without arguments, performs safe cleanup of stale data only.
   program
     .command('x402 [subcommand] [args...]')
     .description('Configure an x402 payment wallet (EXPERIMENTAL)')
-    .addHelpText('after', `
+    .addHelpText(
+      'after',
+      `
 Subcommands:
   init          Create a new x402 wallet
   import <key>  Import wallet from private key
   info          Show wallet info
   sign -r <b64> Sign payment from PAYMENT-REQUIRED header
   remove        Remove the wallet
-`)
+`
+    )
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     .action(() => {});
 
