@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - `--timeout` flag now correctly propagates to MCP requests via session bridge
 - `parseServerArg()` now handles well Windows drive-letter config paths as well as other ambiguous cases
+- `logging-set-level` JSON output no longer includes redundant `success` field
 
 ### Changed
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.

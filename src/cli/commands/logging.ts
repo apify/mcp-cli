@@ -40,15 +40,7 @@ export async function setLogLevel(
     if (options.outputMode === 'human') {
       console.log(formatSuccess(`Server log level set to: ${level}`));
     } else {
-      console.log(
-        formatOutput(
-          {
-            level,
-            success: true,
-          },
-          'json'
-        )
-      );
+      console.log(formatOutput({ level }, 'json'));
     }
   });
 }
