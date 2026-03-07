@@ -136,7 +136,9 @@ function isKnownOption(arg: string): boolean {
 }
 
 /**
- * Validate that all options in args are known
+ * Validate that all global options (before the first command token) are known.
+ * Stops at the first non-option argument so subcommand-specific options
+ * (e.g. --scope, --payment-required, -o/--output) are never checked here.
  * @throws ClientError if unknown option is found
  */
 export function validateOptions(args: string[]): void {
@@ -144,7 +146,6 @@ export function validateOptions(args: string[]): void {
     const arg = args[i];
     if (!arg) continue;
 
-    // Only check arguments that start with -
     if (arg.startsWith('-')) {
       if (!isKnownOption(arg)) {
         throw new ClientError(`Unknown option: ${arg}`);
@@ -153,12 +154,17 @@ export function validateOptions(args: string[]): void {
       if (optionTakesValue(arg) && !arg.includes('=') && i + 1 < args.length) {
         i++;
       }
+    } else {
+      // Stop at the first non-option argument (command token).
+      // Options after this point are subcommand-specific and are handled by Commander.
+      break;
     }
   }
 }
 
 /**
- * Validate argument values (--schema-mode, --timeout, etc.)
+ * Validate argument values (--schema-mode, --timeout, etc.) for global options only.
+ * Stops at the first non-option argument so subcommand-specific options are ignored.
  * @throws ClientError if invalid value is found
  */
 export function validateArgValues(args: string[]): void {
@@ -166,6 +172,11 @@ export function validateArgValues(args: string[]): void {
     const arg = args[i];
     const nextArg = args[i + 1];
     if (!arg) continue;
+
+    if (!arg.startsWith('-')) {
+      // Stop at the first non-option argument (command token)
+      break;
+    }
 
     // Validate --schema-mode value
     if (arg === '--schema-mode' && nextArg) {
