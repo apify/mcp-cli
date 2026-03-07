@@ -71,8 +71,8 @@ Should skip `structuredContent` in results if there is `content` with "type": "t
 
 - MAYBE LATER:
 Connects to all entries from file - the
+NOW: $ mcpc connect ~/.vscode/mcp.json:puppeteer @puppeteer
 $ mcpc connect ~/.vscode/mcp.json
-$ mcpc connect ~/.vscode/mcp.json@puppeteer
 $ mcpc connect
 
 
@@ -94,6 +94,8 @@ $ mcpc connect
 
 
 ## Nice to have
+
+- Add ASCII diagrams to README to help explain major concepts: tool calling, auth, bridge process, etc.
 
 - "login" and "logout" commands could work also with file:entry, just use the remote server URL
 
