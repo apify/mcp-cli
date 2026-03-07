@@ -180,7 +180,17 @@ export type IpcMessageType =
   | 'shutdown'
   | 'notification'
   | 'set-auth-credentials'
-  | 'set-x402-wallet';
+  | 'set-x402-wallet'
+  | 'set-request-options';
+
+/**
+ * Per-command request options sent from CLI to bridge via IPC
+ * These override the session's stored config transiently (in-memory only)
+ * Note: timeout is handled per-request via the IPC message timeout field (see PR #38)
+ */
+export interface RequestOptionsOverride {
+  headers?: Record<string, string>;
+}
 
 /**
  * Auth credentials sent from CLI to bridge via IPC
@@ -236,6 +246,7 @@ export interface IpcMessage {
   notification?: NotificationData; // Notification data (for type='notification')
   authCredentials?: AuthCredentials; // Auth credentials (for type='set-auth-credentials')
   x402Wallet?: X402WalletCredentials; // x402 wallet (for type='set-x402-wallet')
+  requestOptions?: RequestOptionsOverride; // Request options (for type='set-request-options')
   error?: {
     code: number;
     message: string;

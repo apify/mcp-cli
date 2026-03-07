@@ -15,7 +15,12 @@
 
 import { connect, type Socket } from 'net';
 import { EventEmitter } from 'events';
-import type { IpcMessage, NotificationData, X402WalletCredentials } from './types.js';
+import type {
+  IpcMessage,
+  NotificationData,
+  X402WalletCredentials,
+  RequestOptionsOverride,
+} from './types.js';
 import { createLogger } from './logger.js';
 import { NetworkError, ClientError, ServerError, AuthError } from './errors.js';
 import { generateRequestId } from './utils.js';
@@ -258,6 +263,17 @@ export class BridgeClient extends EventEmitter {
     this.send({
       type: 'set-x402-wallet',
       x402Wallet: wallet,
+    });
+  }
+
+  /**
+   * Send request options override to bridge (one-way, no response expected)
+   * Updates headers on the bridge's MCP client in-memory
+   */
+  sendRequestOptions(options: RequestOptionsOverride): void {
+    this.send({
+      type: 'set-request-options',
+      requestOptions: options,
     });
   }
 

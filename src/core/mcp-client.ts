@@ -112,6 +112,7 @@ export class McpClient implements IMcpClient {
    */
   setRequestTimeout(timeoutMs: number): void {
     this.requestTimeout = timeoutMs;
+    this.logger.debug(`Request timeout updated to ${timeoutMs}ms`);
   }
 
   /**
@@ -438,6 +439,35 @@ export class McpClient implements IMcpClient {
       throw new ServerError(`Failed to set log level: ${(error as Error).message}`, {
         originalError: error,
       });
+    }
+  }
+
+  /**
+   * Update transport headers at runtime
+   * Merges new headers with existing transport requestInit headers
+   * Only works for HTTP transports (StreamableHTTPClientTransport)
+   */
+  updateTransportHeaders(headers: Record<string, string>): void {
+    if (!this.transport) {
+      this.logger.debug('No transport to update headers on');
+      return;
+    }
+
+    // Access the transport's internal requestInit to update headers
+    // StreamableHTTPClientTransport stores headers in _requestInit
+    const t = this.transport as Record<string, unknown>;
+    const requestInit = t._requestInit as Record<string, unknown> | undefined;
+
+    if (requestInit !== undefined) {
+      const existingHeaders = (requestInit.headers || {}) as Record<string, string>;
+      requestInit.headers = { ...existingHeaders, ...headers };
+      this.logger.debug(`Transport headers updated: ${Object.keys(headers).join(', ')}`);
+    } else {
+      // Transport doesn't have _requestInit (e.g., stdio transport) — set it
+      t._requestInit = { headers };
+      this.logger.debug(
+        `Transport requestInit created with headers: ${Object.keys(headers).join(', ')}`
+      );
     }
   }
 

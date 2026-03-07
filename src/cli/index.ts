@@ -768,7 +768,6 @@ function createSessionProgram(): Command {
     .option('-j, --json', 'Output in JSON format for scripting and code mode')
     .option('-H, --header <header>', 'Custom HTTP header (can be repeated)')
     .option('--verbose', 'Enable debug logging')
-    .option('--profile <name>', 'OAuth profile override')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)');
