@@ -179,7 +179,7 @@ export async function withMcpClient<T>(
       `Invalid session name: ${target}\n` +
         `Session names must start with @ (e.g. @apify).\n\n` +
         `To create a session, run:\n` +
-        `  mcpc connect <server> ${target}`
+        `  mcpc connect <server> @my-session`
     );
   }
 
