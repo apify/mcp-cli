@@ -499,6 +499,10 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
       // MCP connection error - check if it's an auth error
       const errorMessage = result.error.message || '';
       if (isAuthenticationError(errorMessage)) {
+        // Mark session as expired so it shows correctly in session list
+        await updateSession(sessionName, { status: 'expired' }).catch((e) =>
+          logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
+        );
         const target = session.server.url || session.server.command || sessionName;
         throw createServerAuthError(target, { sessionName, originalError: result.error });
       }
@@ -524,6 +528,10 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   // Not healthy after restart - check if it's an auth error
   const errorMsg = result.error?.message || 'unknown error';
   if (isAuthenticationError(errorMsg)) {
+    // Mark session as expired so it shows correctly in session list
+    await updateSession(sessionName, { status: 'expired' }).catch((e) =>
+      logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
+    );
     const target = session.server.url || session.server.command || sessionName;
     throw createServerAuthError(target, {
       sessionName,
