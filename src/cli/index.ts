@@ -456,13 +456,9 @@ Without arguments, performs safe cleanup of stale data only.
         if (!VALID_CLEAN_TYPES.includes(r)) {
           console.error(
             formatHumanError(
-              new Error(
-                `Invalid clean resource: "${r}". Valid resources are: ${VALID_CLEAN_TYPES.join(', ')}`
-              ),
-              false
-            )
+          throw new ClientError(
+            `Invalid clean resource: "${r}". Valid resources are: ${VALID_CLEAN_TYPES.join(', ')}`
           );
-          process.exit(1);
         }
       }
 
