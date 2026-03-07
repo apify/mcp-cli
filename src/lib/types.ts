@@ -231,6 +231,7 @@ export interface IpcMessage {
   id?: string; // Request ID for correlation
   method?: string; // MCP method name
   params?: unknown; // Method parameters
+  timeout?: number; // Per-request timeout in seconds (overrides default)
   result?: unknown; // Response result
   notification?: NotificationData; // Notification data (for type='notification')
   authCredentials?: AuthCredentials; // Auth credentials (for type='set-auth-credentials')

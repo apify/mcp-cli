@@ -42,12 +42,20 @@ const logger = createLogger('session-client');
 export class SessionClient extends EventEmitter implements IMcpClient {
   private bridgeClient: BridgeClient;
   private sessionName: string;
+  private requestTimeout?: number; // Per-request timeout in seconds
 
   constructor(sessionName: string, bridgeClient: BridgeClient) {
     super();
     this.sessionName = sessionName;
     this.bridgeClient = bridgeClient;
     this.setupNotificationForwarding();
+  }
+
+  /**
+   * Set request timeout for all subsequent requests (in seconds)
+   */
+  setRequestTimeout(timeout: number): void {
+    this.requestTimeout = timeout;
   }
 
   /**
@@ -112,19 +120,32 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   // Server info (single IPC call for all server information)
   async getServerDetails(): Promise<ServerDetails> {
     return this.withRetry(
-      () => this.bridgeClient.request('getServerDetails') as Promise<ServerDetails>,
+      () =>
+        this.bridgeClient.request(
+          'getServerDetails',
+          undefined,
+          this.requestTimeout
+        ) as Promise<ServerDetails>,
       'getServerDetails'
     );
   }
 
   // MCP operations
   async ping(): Promise<void> {
-    return this.withRetry(() => this.bridgeClient.request('ping').then(() => undefined), 'ping');
+    return this.withRetry(
+      () => this.bridgeClient.request('ping', undefined, this.requestTimeout).then(() => undefined),
+      'ping'
+    );
   }
 
   async listTools(cursor?: string): Promise<ListToolsResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('listTools', cursor) as Promise<ListToolsResult>,
+      () =>
+        this.bridgeClient.request(
+          'listTools',
+          cursor,
+          this.requestTimeout
+        ) as Promise<ListToolsResult>,
       'listTools'
     );
   }
@@ -132,14 +153,23 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   async callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult> {
     return this.withRetry(
       () =>
-        this.bridgeClient.request('callTool', { name, arguments: args }) as Promise<CallToolResult>,
+        this.bridgeClient.request(
+          'callTool',
+          { name, arguments: args },
+          this.requestTimeout
+        ) as Promise<CallToolResult>,
       'callTool'
     );
   }
 
   async listResources(cursor?: string): Promise<ListResourcesResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('listResources', cursor) as Promise<ListResourcesResult>,
+      () =>
+        this.bridgeClient.request(
+          'listResources',
+          cursor,
+          this.requestTimeout
+        ) as Promise<ListResourcesResult>,
       'listResources'
     );
   }
@@ -149,7 +179,8 @@ export class SessionClient extends EventEmitter implements IMcpClient {
       () =>
         this.bridgeClient.request(
           'listResourceTemplates',
-          cursor
+          cursor,
+          this.requestTimeout
         ) as Promise<ListResourceTemplatesResult>,
       'listResourceTemplates'
     );
@@ -157,28 +188,44 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
   async readResource(uri: string): Promise<ReadResourceResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('readResource', { uri }) as Promise<ReadResourceResult>,
+      () =>
+        this.bridgeClient.request(
+          'readResource',
+          { uri },
+          this.requestTimeout
+        ) as Promise<ReadResourceResult>,
       'readResource'
     );
   }
 
   async subscribeResource(uri: string): Promise<void> {
     return this.withRetry(
-      () => this.bridgeClient.request('subscribeResource', { uri }).then(() => undefined),
+      () =>
+        this.bridgeClient
+          .request('subscribeResource', { uri }, this.requestTimeout)
+          .then(() => undefined),
       'subscribeResource'
     );
   }
 
   async unsubscribeResource(uri: string): Promise<void> {
     return this.withRetry(
-      () => this.bridgeClient.request('unsubscribeResource', { uri }).then(() => undefined),
+      () =>
+        this.bridgeClient
+          .request('unsubscribeResource', { uri }, this.requestTimeout)
+          .then(() => undefined),
       'unsubscribeResource'
     );
   }
 
   async listPrompts(cursor?: string): Promise<ListPromptsResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('listPrompts', cursor) as Promise<ListPromptsResult>,
+      () =>
+        this.bridgeClient.request(
+          'listPrompts',
+          cursor,
+          this.requestTimeout
+        ) as Promise<ListPromptsResult>,
       'listPrompts'
     );
   }
@@ -186,17 +233,24 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   async getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult> {
     return this.withRetry(
       () =>
-        this.bridgeClient.request('getPrompt', {
-          name,
-          arguments: args,
-        }) as Promise<GetPromptResult>,
+        this.bridgeClient.request(
+          'getPrompt',
+          {
+            name,
+            arguments: args,
+          },
+          this.requestTimeout
+        ) as Promise<GetPromptResult>,
       'getPrompt'
     );
   }
 
   async setLoggingLevel(level: LoggingLevel): Promise<void> {
     return this.withRetry(
-      () => this.bridgeClient.request('setLoggingLevel', level).then(() => undefined),
+      () =>
+        this.bridgeClient
+          .request('setLoggingLevel', level, this.requestTimeout)
+          .then(() => undefined),
       'setLoggingLevel'
     );
   }
@@ -231,9 +285,14 @@ export async function createSessionClient(sessionName: string): Promise<SessionC
  */
 export async function withSessionClient<T>(
   sessionName: string,
-  callback: (client: IMcpClient) => Promise<T>
+  callback: (client: IMcpClient) => Promise<T>,
+  options?: { timeout?: number }
 ): Promise<T> {
   const client = await createSessionClient(sessionName);
+
+  if (options?.timeout !== undefined) {
+    client.setRequestTimeout(options.timeout);
+  }
 
   try {
     return await callback(client);

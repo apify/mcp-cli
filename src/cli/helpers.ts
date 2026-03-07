@@ -171,6 +171,7 @@ export async function withMcpClient<T>(
     outputMode?: OutputMode;
     verbose?: boolean;
     hideTarget?: boolean;
+    timeout?: number;
   },
   callback: (client: IMcpClient, context: McpClientContext) => Promise<T>
 ): Promise<T> {
@@ -205,5 +206,6 @@ export async function withMcpClient<T>(
   }
 
   // Use session client (SessionClient implements IMcpClient interface)
-  return await withSessionClient(target, (client) => callback(client, context));
+  const sessionOpts = options.timeout !== undefined ? { timeout: options.timeout } : undefined;
+  return await withSessionClient(target, (client) => callback(client, context), sessionOpts);
 }
