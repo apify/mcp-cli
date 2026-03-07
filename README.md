@@ -123,17 +123,17 @@ Options:
 
 Commands:
   connect <server> <@session>  Connect to an MCP server and start a new named @session
-  login <server>               Authenticate to server using OAuth and save the profile
+  close <@session>             Close a session
+  restart <@session>           Restart a session (losing all state)
+  shell <@session>             Open interactive shell for a session
+  login <server>               Interactively login to a server using OAuth and save profile
   logout <server>              Delete an authentication profile for a server
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
   x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
   help [command]               Show help for a specific command
 
-Session commands (after connecting):
+MCP session commands (after connecting):
   <@session>                   Show MCP server info and capabilities
-  <@session> shell             Open interactive shell
-  <@session> close             Close the session
-  <@session> restart           Kill and restart the session
   <@session> tools-list        List MCP tools
   <@session> tools-get <name>
   <@session> tools-call <name> [arg:=val ... | <json> | <stdin]

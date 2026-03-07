@@ -442,9 +442,12 @@ Server formats:
   program
     .command('login [server]')
     .usage('<server>')
-    .description('Open web browser for interactive login to a server using OAuth')
+    .description('Interactively login to a server using OAuth and save profile')
     .option('--profile <name>', 'Profile name (default: "default")')
-    .option('--scope <scope>', 'OAuth scope(s) to request')
+    .option(
+      '--scope <scopes>',
+      'OAuth scopes to request, quoted and space-separated (e.g. --scope "read write")'
+    )
     .option('--client-id <id>', 'OAuth client ID (for servers without dynamic client registration)')
     .option(
       '--client-secret <secret>',
