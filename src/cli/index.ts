@@ -13,7 +13,7 @@
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { Command } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
-import { isMcpError, formatHumanError, NetworkError } from '../lib/index.js';
+import { isMcpError, formatHumanError, ClientError } from '../lib/index.js';
 import { formatJson, formatJsonError, rainbow } from './output.js';
 import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
@@ -26,15 +26,16 @@ import { handleX402Command } from './commands/x402.js';
 import { clean } from './commands/clean.js';
 import type { OutputMode } from '../lib/index.js';
 import {
-  findTarget,
   extractOptions,
-  hasCommandAfterTarget,
   getVerboseFromEnv,
   getJsonFromEnv,
   validateOptions,
-  validateCleanTypes,
   validateArgValues,
+  parseServerArg,
+  hasSubcommand,
+  optionTakesValue,
   KNOWN_COMMANDS,
+  KNOWN_SESSION_COMMANDS,
 } from './parser.js';
 import { createRequire } from 'module';
 const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
@@ -49,7 +50,6 @@ setGlobalDispatcher(new EnvHttpProxyAgent());
  */
 interface HandlerOptions {
   outputMode: OutputMode;
-  config?: string;
   headers?: string[];
   timeout?: number;
   verbose?: boolean;
@@ -81,13 +81,20 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   };
 
   // Only include optional properties if they're present
-  if (opts.config) options.config = opts.config;
   if (opts.header) {
     // Commander stores repeated options as arrays, but single values as strings
     // Always convert to array for consistent handling
     options.headers = Array.isArray(opts.header) ? opts.header : [opts.header];
   }
-  if (opts.timeout) options.timeout = parseInt(opts.timeout, 10);
+  if (opts.timeout) {
+    const timeout = parseInt(opts.timeout as string, 10);
+    if (isNaN(timeout) || timeout <= 0) {
+      throw new Error(
+        `Invalid --timeout value: "${opts.timeout as string}". Must be a positive number (seconds).`
+      );
+    }
+    options.timeout = timeout;
+  }
   if (opts.profile) options.profile = opts.profile;
   if (verbose) options.verbose = verbose;
   if (opts.x402) options.x402 = true;
@@ -95,7 +102,9 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.schemaMode) {
     const mode = opts.schemaMode as string;
     if (mode !== 'strict' && mode !== 'compatible' && mode !== 'ignore') {
-      throw new Error(`Invalid schema mode: ${mode}. Must be 'strict', 'compatible', or 'ignore'.`);
+      throw new Error(
+        `Invalid --schema-mode value: "${mode}". Valid modes are: strict, compatible, ignore`
+      );
     }
     options.schemaMode = mode;
   }
@@ -135,7 +144,7 @@ async function main(): Promise<void> {
 
   // Check for help flag
   if (args.includes('--help') || args.includes('-h')) {
-    const program = createProgram();
+    const program = createTopLevelProgram();
     await program.parseAsync(process.argv);
     return;
   }
@@ -150,112 +159,131 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Handle --clean option (global command, no target needed)
-  const cleanArg = args.find((arg) => arg === '--clean' || arg.startsWith('--clean='));
-  if (cleanArg) {
-    const options = extractOptions(args);
-    if (options.verbose) setVerbose(true);
-    if (options.json) setJsonMode(true);
-
-    // Parse --clean value: --clean or --clean=all,sessions,profiles,logs
-    const cleanValue = cleanArg.includes('=') ? cleanArg.split('=')[1] : '';
-    const cleanTypes = cleanValue ? cleanValue.split(',').map((s) => s.trim()) : [];
-
-    // Validate clean types (argument validation - always plain text)
-    try {
-      validateCleanTypes(cleanTypes);
-    } catch (error) {
-      console.error(formatHumanError(error as Error, false));
-      process.exit(1);
+  // Find the first non-option argument to determine routing
+  let firstNonOption: string | undefined;
+  let firstNonOptionIndex = -1;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg) continue;
+    if (arg.startsWith('-')) {
+      if (optionTakesValue(arg) && !arg.includes('=') && i + 1 < args.length) {
+        i++; // skip value
+      }
+      continue;
     }
-
-    await clean({
-      outputMode: options.json ? 'json' : 'human',
-      sessions: cleanTypes.includes('sessions'),
-      profiles: cleanTypes.includes('profiles'),
-      logs: cleanTypes.includes('logs'),
-      all: cleanTypes.includes('all'),
-    });
-
-    await closeFileLogger();
-    return;
+    firstNonOption = arg;
+    firstNonOptionIndex = i;
+    break;
   }
 
-  // Find the target
-  const targetInfo = findTarget(args);
-
-  // If no target found, list sessions
-  if (!targetInfo) {
+  // No args → list sessions
+  if (!firstNonOption) {
     const { json } = extractOptions(args);
     if (json) setJsonMode(true);
     await sessions.listSessionsAndAuthProfiles({ outputMode: json ? 'json' : 'human' });
     if (!json) {
       console.log('\nRun "mcpc --help" for usage information.\n');
     }
-
     await closeFileLogger();
     return;
   }
 
-  const { target, targetIndex } = targetInfo;
+  // Session command: @name [subcommand]
+  if (firstNonOption.startsWith('@')) {
+    const session = firstNonOption;
+    const modifiedArgs = [
+      ...process.argv.slice(0, 2),
+      ...args.slice(0, firstNonOptionIndex),
+      ...args.slice(firstNonOptionIndex + 1),
+    ];
 
-  // Build modified argv without the target
-  const modifiedArgs = [
-    ...process.argv.slice(0, 2),
-    ...args.slice(0, targetIndex),
-    ...args.slice(targetIndex + 1),
-  ];
-
-  // Handle x402 as a top-level command (not a server target)
-  if (target === 'x402') {
-    const x402Args = args.slice(targetIndex + 1);
-    await handleX402Command(x402Args);
-    await closeFileLogger();
-    return;
-  }
-
-  // Handle commands
-  try {
-    await handleCommands(target, modifiedArgs);
-  } catch (error) {
-    if (isMcpError(error)) {
-      const opts = extractOptions(args);
-      const outputMode: OutputMode = opts.json ? 'json' : 'human';
-      if (outputMode === 'json') {
-        console.error(formatJsonError(error, error.code));
-      } else {
-        console.error(formatHumanError(error, opts.verbose));
-        if (error instanceof NetworkError && KNOWN_COMMANDS.includes(target)) {
-          console.error(`\nDid you mean "mcpc <target> ${target}" ?`);
-          console.error(`Run "mcpc --help" for usage information.\n`);
-          process.exit(error.code);
+    try {
+      await handleSessionCommands(session, modifiedArgs);
+    } catch (error) {
+      if (isMcpError(error)) {
+        const opts = extractOptions(args);
+        const outputMode: OutputMode = opts.json ? 'json' : 'human';
+        if (outputMode === 'json') {
+          console.error(formatJsonError(error, error.code));
+        } else {
+          console.error(formatHumanError(error, opts.verbose));
         }
+        process.exit(error.code);
       }
-      process.exit(error.code);
+      throw error;
+    } finally {
+      await closeFileLogger();
     }
-    throw error;
-  } finally {
-    await closeFileLogger();
+
+    // Flush stdout before exiting
+    await flushStdout();
+    process.exit(0);
   }
 
-  // Flush stdout before exiting. When stdout is a pipe, Node.js uses async I/O
-  // and process.exit() would discard any data still in the stream buffer.
-  // This caused silent truncation at 64KB (the kernel pipe buffer size).
-  await new Promise<void>((resolve) => {
-    if (process.stdout.writableFinished) {
-      resolve();
-    } else {
-      process.stdout.once('finish', resolve);
-      process.stdout.end();
+  // Top-level commands: login, logout, connect, clean, help, x402
+  if (KNOWN_COMMANDS.includes(firstNonOption)) {
+    // Handle x402 separately (legacy standalone handler)
+    if (firstNonOption === 'x402') {
+      const x402Args = args.slice(firstNonOptionIndex + 1);
+      await handleX402Command(x402Args);
+      await closeFileLogger();
+      return;
     }
-  });
 
-  // Explicit exit to avoid waiting for stdio child processes to close
-  // (the MCP SDK's StdioClientTransport keeps handles in the event loop)
-  process.exit(0);
+    try {
+      const program = createTopLevelProgram();
+      await program.parseAsync(process.argv);
+    } catch (error) {
+      if (isMcpError(error)) {
+        const opts = extractOptions(args);
+        const outputMode: OutputMode = opts.json ? 'json' : 'human';
+        if (outputMode === 'json') {
+          console.error(formatJsonError(error, error.code));
+        } else {
+          console.error(formatHumanError(error, opts.verbose));
+        }
+        process.exit(error.code);
+      }
+      throw error;
+    } finally {
+      await closeFileLogger();
+    }
+    return;
+  }
+
+  // Unknown command — provide helpful error
+  const opts = extractOptions(args);
+  const outputMode: OutputMode = opts.json ? 'json' : 'human';
+
+  const allCommands = [...KNOWN_COMMANDS, ...KNOWN_SESSION_COMMANDS];
+  if (allCommands.includes(firstNonOption)) {
+    // It's a session subcommand used without @session
+    if (outputMode === 'json') {
+      console.error(
+        formatJsonError(new Error(`Missing session target for command: ${firstNonOption}`), 1)
+      );
+    } else {
+      console.error(`Error: Missing session target for command: ${firstNonOption}`);
+      console.error(`\nDid you mean: mcpc <@session> ${firstNonOption}`);
+      console.error(`Run "mcpc --help" for usage information.\n`);
+    }
+  } else {
+    if (outputMode === 'json') {
+      console.error(formatJsonError(new Error(`Unknown command: ${firstNonOption}`), 1));
+    } else {
+      console.error(`Error: Unknown command: ${firstNonOption}`);
+      console.error(`Run "mcpc --help" for usage information.\n`);
+    }
+  }
+  await closeFileLogger();
+  process.exit(1);
 }
 
-function createProgram(): Command {
+/**
+ * Create the top-level Commander program with global commands
+ * (login, logout, connect, clean, help)
+ */
+function createTopLevelProgram(): Command {
   const program = new Command();
 
   // Configure help output width to avoid wrapping (default is 80)
@@ -265,114 +293,317 @@ function createProgram(): Command {
     getErrHelpWidth: () => 100,
   });
 
-  program
-    .name('mcpc')
-    .description(
-      `${rainbow('Universal')} command-line client for the Model Context Protocol (MCP).`
-    )
-    .usage('[options] <target> [command]')
-    .helpOption('-h, --help', 'Display general help')
-    .option('-j, --json', 'Output in JSON format for scripting')
-    .option('-c, --config <file>', 'Path to MCP config JSON file (e.g. ".vscode/mcp.json")')
-    .option('-H, --header <header>', 'HTTP header for remote MCP server (can be repeated)')
-    .version(mcpcVersion, '-v, --version', 'Output the version number')
-    .option('--verbose', 'Enable debug logging')
-    .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
-    .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
-    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
-    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
-    .option('--proxy <[host:]port>', 'Start proxy MCP server for session (with "connect" command)')
-    .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
-    .option('--x402', 'Enable x402 auto-payment using the configured wallet')
-    .option('--clean[=types]', 'Clean up mcpc data (types: sessions, logs, profiles, all)');
+  // Strip [options] from the commands list (options are shown per-command via `mcpc help <cmd>`)
+  program.configureHelp({
+    subcommandTerm: (cmd) =>
+      `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
+  });
 
-  // Add help text to match README
   // Use raw Markdown URL for pipes (AI agents), GitHub UI for TTY (humans)
   const docsUrl = process.stdout.isTTY
     ? `https://github.com/apify/mcpc/tree/v${mcpcVersion}`
     : `https://raw.githubusercontent.com/apify/mcpc/v${mcpcVersion}/README.md`;
 
+  program
+    .name('mcpc')
+    .description(
+      `${rainbow('Universal')} command-line client for the Model Context Protocol (MCP).`
+    )
+    .usage('[options] [<@session>] [<command>]')
+    .option('-j, --json', 'Output in JSON format for scripting')
+    .option('-H, --header <header>', 'HTTP header (can be repeated)')
+    .option('--verbose', 'Enable debug logging')
+    .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
+    .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
+    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
+    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .version(mcpcVersion, '-v, --version', 'Output the version number')
+    .helpOption('-h, --help', 'Display help');
+
   program.addHelpText(
     'after',
     `
-Targets:
-  @<session>                    Named persistent session (e.g. "@apify")
-  <config-entry>                Entry in MCP config file specified by --config (e.g. "fs")
-  <server-url>                  Remote MCP server URL (e.g. "mcp.apify.com")
+Session commands (after connecting):
+  <@session>                   Show MCP server info and capabilities
+  <@session> shell             Open interactive shell
+  <@session> close             Close the session
+  <@session> restart           Kill and restart the session
+  <@session> tools-list        List MCP tools
+  <@session> tools-get <name>
+  <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
+  <@session> prompts-list
+  <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
+  <@session> resources-list
+  <@session> resources-read <uri>
+  <@session> resources-subscribe <uri>
+  <@session> resources-unsubscribe <uri>
+  <@session> resources-templates-list
+  <@session> logging-set-level <level>
+  <@session> ping
 
-Management commands:
-  login                         Create OAuth profile with credentials for remote server
-  logout                        Remove OAuth profile for remote server
-  connect @<session>            Connect to server and create named persistent session
-  restart                       Kill and restart a session
-  close                         Close a session
-
-MCP server commands:
-  help                          Show server info ("help" can be omitted)
-  shell                         Open interactive shell
-  tools-list [--full]           Send "tools/list" MCP request...
-  tools-get <tool-name>
-  tools-call <tool-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
-  prompts-list
-  prompts-get <prompt-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
-  resources
-  resources-list
-  resources-read <uri>
-  resources-subscribe <uri>
-  resources-unsubscribe <uri>
-  resources-templates-list
-  logging-set-level <level>
-  ping
-
-EXPERIMENTAL: x402 payment commands (no target needed):
-  x402 init                     Create a new x402 wallet
-  x402 import <key>             Import wallet from private key
-  x402 info                     Show wallet info
-  x402 sign -r <base64>         Sign payment from PAYMENT-REQUIRED header
-  x402 remove                   Remove the wallet
-  
-Run "mcpc" without <target> to show available sessions and profiles.
+Run "mcpc" without arguments to show active sessions and OAuth profiles.
 
 Full docs: ${docsUrl}`
   );
 
+  // connect command: mcpc connect <server> @<name>
+  program
+    .command('connect [server] [@session]')
+    .usage('<server> <@session>')
+    .description('Connect to an MCP server and start a new named @session')
+    .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
+    .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
+    .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
+    .option('--x402', 'Enable x402 auto-payment using the configured wallet')
+    .addHelpText(
+      'after',
+      `
+Server formats:
+  mcp.apify.com                 Remote HTTP server (https:// added automatically)
+  ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
+`
+    )
+    .action(async (server, sessionName, opts, command) => {
+      if (!server) {
+        throw new ClientError(
+          'Missing required argument: server\n\nExample: mcpc connect mcp.apify.com @myapp'
+        );
+      }
+      if (!sessionName) {
+        throw new ClientError(
+          'Missing required argument: @session\n\nExample: mcpc connect mcp.apify.com @myapp'
+        );
+      }
+      const globalOpts = getOptionsFromCommand(command);
+      const parsed = parseServerArg(server);
+
+      if (!parsed) {
+        throw new ClientError(
+          `Invalid server: "${server}"\n\n` +
+            `Expected a URL (e.g. mcp.apify.com) or a config file entry (e.g. ~/.vscode/mcp.json:filesystem)`
+        );
+      }
+
+      if (parsed.type === 'config') {
+        // Config file entry: pass entry name as target with config file path
+        await sessions.connectSession(parsed.entry, sessionName, {
+          ...globalOpts,
+          config: parsed.file,
+          proxy: opts.proxy,
+          proxyBearerToken: opts.proxyBearerToken,
+          x402: opts.x402,
+        });
+      } else {
+        await sessions.connectSession(server, sessionName, {
+          ...globalOpts,
+          proxy: opts.proxy,
+          proxyBearerToken: opts.proxyBearerToken,
+          x402: opts.x402,
+        });
+      }
+    });
+
+  // close command: mcpc close @<session>
+  program
+    .command('close [@session]', { hidden: true })
+    .usage('<@session>')
+    .description('Close a session')
+    .action(async (sessionName, _opts, command) => {
+      if (!sessionName) {
+        throw new ClientError('Missing required argument: @session\n\nExample: mcpc close @myapp');
+      }
+      await sessions.closeSession(sessionName, getOptionsFromCommand(command));
+    });
+
+  // restart command: mcpc restart @<session>
+  program
+    .command('restart [@session]', { hidden: true })
+    .usage('<@session>')
+    .description('Restart a session')
+    .action(async (sessionName, _opts, command) => {
+      if (!sessionName) {
+        throw new ClientError(
+          'Missing required argument: @session\n\nExample: mcpc restart @myapp'
+        );
+      }
+      await sessions.restartSession(sessionName, getOptionsFromCommand(command));
+    });
+
+  // shell command: mcpc shell @<session>
+  program
+    .command('shell [@session]', { hidden: true })
+    .usage('<@session>')
+    .description('Open interactive shell for a session')
+    .action(async (sessionName) => {
+      if (!sessionName) {
+        throw new ClientError('Missing required argument: @session\n\nExample: mcpc shell @myapp');
+      }
+      await sessions.openShell(sessionName);
+    });
+
+  // login command: mcpc login <server>
+  program
+    .command('login [server]')
+    .usage('<server>')
+    .description('Authenticate to server using OAuth and save the profile')
+    .option('--profile <name>', 'Profile name (default: "default")')
+    .option('--scope <scope>', 'OAuth scope(s) to request')
+    .action(async (server, opts, command) => {
+      if (!server) {
+        throw new ClientError(
+          'Missing required argument: server\n\nExample: mcpc login mcp.apify.com'
+        );
+      }
+      await auth.login(server, {
+        profile: opts.profile,
+        scope: opts.scope,
+        ...getOptionsFromCommand(command),
+      });
+    });
+
+  // logout command: mcpc logout <server>
+  program
+    .command('logout [server]')
+    .usage('<server>')
+    .description('Delete an authentication profile for a server')
+    .option('--profile <name>', 'Profile name (default: "default")')
+    .action(async (server, opts, command) => {
+      if (!server) {
+        throw new ClientError(
+          'Missing required argument: server\n\nExample: mcpc logout mcp.apify.com'
+        );
+      }
+      await auth.logout(server, {
+        profile: opts.profile,
+        ...getOptionsFromCommand(command),
+      });
+    });
+
+  // clean command: mcpc clean [resources...]
+  program
+    .command('clean [resources...]')
+    .description('Clean up mcpc data (sessions, profiles, logs, all)')
+    .addHelpText(
+      'after',
+      `
+Resources:
+  sessions    Remove stale/crashed session records
+  profiles    Remove authentication profiles
+  logs        Remove bridge log files
+  all         Remove all of the above
+
+Without arguments, performs safe cleanup of stale data only.
+`
+    )
+    .action(async (resources: string[], _opts, command) => {
+      const globalOpts = getOptionsFromCommand(command);
+
+      // Validate clean types
+      const VALID_CLEAN_TYPES = ['sessions', 'profiles', 'logs', 'all'];
+      for (const r of resources) {
+        if (!VALID_CLEAN_TYPES.includes(r)) {
+          throw new ClientError(
+            `Invalid clean resource: "${r}". Valid resources are: ${VALID_CLEAN_TYPES.join(', ')}`
+          );
+        }
+      }
+
+      await clean({
+        outputMode: globalOpts.outputMode,
+        sessions: resources.includes('sessions'),
+        profiles: resources.includes('profiles'),
+        logs: resources.includes('logs'),
+        all: resources.includes('all'),
+      });
+    });
+
+  // x402 command: mcpc x402 <subcommand>
+  // Note: x402 is handled before Commander in main() — this registration exists only for help text
+  program
+    .command('x402 [subcommand] [args...]')
+    .description('Configure an x402 payment wallet (EXPERIMENTAL)')
+    .addHelpText(
+      'after',
+      `
+Subcommands:
+  init          Create a new x402 wallet
+  import <key>  Import wallet from private key
+  info          Show wallet info
+  sign -r <b64> Sign payment from PAYMENT-REQUIRED header
+  remove        Remove the wallet
+`
+    )
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    .action(() => {});
+
+  // help command: mcpc help [command]
+  program
+    .command('help [command]')
+    .description('Show help for a specific command')
+    .action((cmdName?: string) => {
+      if (!cmdName) {
+        program.outputHelp();
+        return;
+      }
+
+      // Check top-level commands
+      const topLevelCmd = program.commands.find(
+        (c) => c.name() === cmdName || c.aliases().includes(cmdName)
+      );
+      if (topLevelCmd) {
+        topLevelCmd.outputHelp();
+        return;
+      }
+
+      // Check session subcommands
+      const dummyProgram = new Command();
+      registerSessionCommands(dummyProgram, '@dummy');
+      const sessionCmd = dummyProgram.commands.find(
+        (c) => c.name() === cmdName || c.aliases().includes(cmdName)
+      );
+      if (sessionCmd) {
+        sessionCmd.outputHelp();
+        return;
+      }
+
+      console.error(`Unknown command: ${cmdName}`);
+      console.error(`Run "mcpc --help" for usage information.`);
+      process.exit(1);
+    });
+
+  // Default action (no args) — list sessions
+  program.action(async () => {
+    const opts = program.opts();
+    const json = opts.json || getJsonFromEnv();
+    if (json) setJsonMode(true);
+    await sessions.listSessionsAndAuthProfiles({ outputMode: json ? 'json' : 'human' });
+    if (!json) {
+      console.log('\nRun "mcpc --help" for usage information.\n');
+    }
+  });
+
   return program;
 }
 
-async function handleCommands(target: string, args: string[]): Promise<void> {
-  const program = createProgram();
-  program.argument('<target>', 'Target (session @name, MCP config entry, or server URL)');
-
-  // Check if no command provided - show server info and instructions
-  if (!hasCommandAfterTarget(args)) {
-    const options = extractOptions(args);
-    if (options.verbose) setVerbose(true);
-    if (options.json) setJsonMode(true);
-
-    await sessions.showServerDetails(target, {
-      outputMode: options.json ? 'json' : 'human',
-      ...(options.verbose && { verbose: true }),
-      ...(options.config && { config: options.config }),
-      ...(options.headers && { headers: options.headers }),
-      ...(options.timeout !== undefined && { timeout: options.timeout }),
-    });
-    return;
-  }
-
+/**
+ * Register all session subcommands on a Commander program
+ * Extracted so it can be reused for both execution and help lookup
+ */
+function registerSessionCommands(program: Command, session: string): void {
   // Help command
   program
     .command('help')
     .description('Show server instructions and available capabilities')
     .action(async (_options, command) => {
-      await sessions.showHelp(target, getOptionsFromCommand(command));
+      await sessions.showHelp(session, getOptionsFromCommand(command));
     });
 
   // Shell command
   program
     .command('shell')
-    .description('Interactive shell for the target')
+    .description('Interactive shell for the session')
     .action(async () => {
-      await sessions.openShell(target);
+      await sessions.openShell(session);
     });
 
   // Close command
@@ -380,7 +611,7 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     .command('close')
     .description('Close the session')
     .action(async (_options, command) => {
-      await sessions.closeSession(target, getOptionsFromCommand(command));
+      await sessions.closeSession(session, getOptionsFromCommand(command));
     });
 
   // Restart command
@@ -388,56 +619,16 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     .command('restart')
     .description('Restart the session (stop and start the bridge)')
     .action(async (_options, command) => {
-      await sessions.restartSession(target, getOptionsFromCommand(command));
+      await sessions.restartSession(session, getOptionsFromCommand(command));
     });
 
-  // Connect command: mcpc <target> connect @<name>
-  // Creates a new session or reconnects if session exists but bridge has crashed
-  program
-    .command('connect <name>')
-    .description('Create or reconnect a named session to an MCP server')
-    .action(async (name, _options, command) => {
-      const opts = command.optsWithGlobals();
-      await sessions.connectSession(name, target, {
-        ...getOptionsFromCommand(command),
-        proxy: opts.proxy,
-        proxyBearerToken: opts.proxyBearerToken,
-        x402: opts.x402,
-      });
-    });
-
-  // Authentication commands
-  program
-    .command('login')
-    .description('Login to a server using OAuth and save authentication profile')
-    .option('--profile <name>', 'Profile name (default: default)')
-    .option('--scope <scope>', 'OAuth scope(s) to request')
-    .action(async (options, command) => {
-      await auth.login(target, {
-        profile: options.profile,
-        scope: options.scope,
-        ...getOptionsFromCommand(command),
-      });
-    });
-
-  program
-    .command('logout')
-    .description('Delete an authentication profile')
-    .option('--profile <name>', 'Profile name (default: default)')
-    .action(async (options, command) => {
-      await auth.logout(target, {
-        profile: options.profile,
-        ...getOptionsFromCommand(command),
-      });
-    });
-
-  // Tools commands (keep these short aliases undocumented, they serve just as fallback)
+  // Tools commands
   program
     .command('tools')
     .description('List available tools (shorthand for tools-list)')
     .option('--full', 'Show full tool details including complete input schema')
     .action(async (_options, command) => {
-      await tools.listTools(target, getOptionsFromCommand(command));
+      await tools.listTools(session, getOptionsFromCommand(command));
     });
 
   program
@@ -445,39 +636,39 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     .description('List available tools')
     .option('--full', 'Show full tool details including complete input schema')
     .action(async (_options, command) => {
-      await tools.listTools(target, getOptionsFromCommand(command));
+      await tools.listTools(session, getOptionsFromCommand(command));
     });
 
   program
     .command('tools-get <name>')
     .description('Get information about a specific tool')
     .action(async (name, _options, command) => {
-      await tools.getTool(target, name, getOptionsFromCommand(command));
+      await tools.getTool(session, name, getOptionsFromCommand(command));
     });
 
   program
     .command('tools-call <name> [args...]')
     .description('Call a tool with arguments (key:=value pairs or JSON)')
     .action(async (name, args, _options, command) => {
-      await tools.callTool(target, name, {
+      await tools.callTool(session, name, {
         args,
         ...getOptionsFromCommand(command),
       });
     });
 
-  // Resources commands (keep these short aliases undocumented, they serve just as fallback)
+  // Resources commands
   program
     .command('resources')
     .description('List available resources (shorthand for resources-list)')
     .action(async (_options, command) => {
-      await resources.listResources(target, getOptionsFromCommand(command));
+      await resources.listResources(session, getOptionsFromCommand(command));
     });
 
   program
     .command('resources-list')
     .description('List available resources')
     .action(async (_options, command) => {
-      await resources.listResources(target, getOptionsFromCommand(command));
+      await resources.listResources(session, getOptionsFromCommand(command));
     });
 
   program
@@ -486,9 +677,8 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     .option('-o, --output <file>', 'Write resource to file')
     .option('--max-size <bytes>', 'Maximum resource size in bytes')
     .action(async (uri, options, command) => {
-      await resources.getResource(target, uri, {
+      await resources.getResource(session, uri, {
         output: options.output,
-        raw: options.raw,
         maxSize: options.maxSize,
         ...getOptionsFromCommand(command),
       });
@@ -498,43 +688,43 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     .command('resources-subscribe <uri>')
     .description('Subscribe to resource updates')
     .action(async (uri, _options, command) => {
-      await resources.subscribeResource(target, uri, getOptionsFromCommand(command));
+      await resources.subscribeResource(session, uri, getOptionsFromCommand(command));
     });
 
   program
     .command('resources-unsubscribe <uri>')
     .description('Unsubscribe from resource updates')
     .action(async (uri, _options, command) => {
-      await resources.unsubscribeResource(target, uri, getOptionsFromCommand(command));
+      await resources.unsubscribeResource(session, uri, getOptionsFromCommand(command));
     });
 
   program
     .command('resources-templates-list')
     .description('List available resource templates')
     .action(async (_options, command) => {
-      await resources.listResourceTemplates(target, getOptionsFromCommand(command));
+      await resources.listResourceTemplates(session, getOptionsFromCommand(command));
     });
 
-  // Prompts commands (keep these short aliases undocumented, they serve just as fallback)
+  // Prompts commands
   program
     .command('prompts')
     .description('List available prompts (shorthand for prompts-list)')
     .action(async (_options, command) => {
-      await prompts.listPrompts(target, getOptionsFromCommand(command));
+      await prompts.listPrompts(session, getOptionsFromCommand(command));
     });
 
   program
     .command('prompts-list')
     .description('List available prompts')
     .action(async (_options, command) => {
-      await prompts.listPrompts(target, getOptionsFromCommand(command));
+      await prompts.listPrompts(session, getOptionsFromCommand(command));
     });
 
   program
     .command('prompts-get <name> [args...]')
     .description('Get a prompt by name with arguments (key:=value pairs or JSON)')
     .action(async (name, args, _options, command) => {
-      await prompts.getPrompt(target, name, {
+      await prompts.getPrompt(session, name, {
         args,
         ...getOptionsFromCommand(command),
       });
@@ -547,7 +737,7 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
       'Set server logging level (debug, info, notice, warning, error, critical, alert, emergency)'
     )
     .action(async (level, _options, command) => {
-      await logging.setLogLevel(target, level, getOptionsFromCommand(command));
+      await logging.setLogLevel(session, level, getOptionsFromCommand(command));
     });
 
   // Server commands
@@ -555,8 +745,59 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     .command('ping')
     .description('Ping the MCP server to check if it is alive')
     .action(async (_options, command) => {
-      await utilities.ping(target, getOptionsFromCommand(command));
+      await utilities.ping(session, getOptionsFromCommand(command));
     });
+}
+
+/**
+ * Create a Commander program for session subcommands
+ * Separate from top-level program to avoid command name conflicts
+ */
+function createSessionProgram(): Command {
+  const program = new Command();
+
+  program.configureOutput({
+    outputError: (str, write) => write(str),
+    getOutHelpWidth: () => 100,
+    getErrHelpWidth: () => 100,
+  });
+
+  program
+    .name('mcpc <@session>')
+    .helpOption('-h, --help', 'Display help')
+    .option('-j, --json', 'Output in JSON format for scripting and code mode')
+    .option('-H, --header <header>', 'Custom HTTP header (can be repeated)')
+    .option('--verbose', 'Enable debug logging')
+    .option('--profile <name>', 'OAuth profile override')
+    .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
+    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
+    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)');
+
+  return program;
+}
+
+/**
+ * Handle commands for a session target (@name)
+ */
+async function handleSessionCommands(session: string, args: string[]): Promise<void> {
+  // Check if no subcommand provided - show server info
+  if (!hasSubcommand(args)) {
+    const options = extractOptions(args);
+    if (options.verbose) setVerbose(true);
+    if (options.json) setJsonMode(true);
+
+    await sessions.showServerDetails(session, {
+      outputMode: options.json ? 'json' : 'human',
+      ...(options.verbose && { verbose: true }),
+      ...(options.timeout !== undefined && { timeout: options.timeout }),
+    });
+    return;
+  }
+
+  const program = createSessionProgram();
+
+  // Register all session subcommands
+  registerSessionCommands(program, session);
 
   // Parse and execute
   try {
@@ -582,6 +823,20 @@ async function handleCommands(target: string, args: string[]): Promise<void> {
     );
     process.exit(1);
   }
+}
+
+/**
+ * Flush stdout before exiting to prevent truncation with pipes
+ */
+async function flushStdout(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    if (process.stdout.writableFinished) {
+      resolve();
+    } else {
+      process.stdout.once('finish', resolve);
+      process.stdout.end();
+    }
+  });
 }
 
 // Run main function

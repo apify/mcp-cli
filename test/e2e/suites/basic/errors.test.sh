@@ -23,15 +23,15 @@ run_mcpc @test invalid-command-$RANDOM
 assert_failure
 test_pass
 
-# Test: missing required argument for session command (Commander.js handles this)
-test_case "missing required argument for session"
-run_mcpc example.com session
+# Test: connect command missing required arguments (Commander.js handles this)
+test_case "connect command missing required arguments"
+run_mcpc connect
 assert_failure
 test_pass
 
-# Test: invalid URL scheme
+# Test: invalid URL scheme passed to connect
 test_case "invalid URL scheme"
-run_xmcpc "ftp://example.com" tools-list
+run_mcpc connect "ftp://example.com" "@test-$RANDOM"
 assert_failure
 test_pass
 
@@ -98,11 +98,10 @@ assert_failure
 assert_contains "$STDERR" "Unknown option"
 test_pass
 
-# Test: invalid --clean type should fail
-test_case "invalid --clean type fails"
-run_mcpc --clean=invalid
+# Test: invalid clean resource type should fail
+test_case "invalid clean resource type fails"
+run_mcpc clean invalid-type-$RANDOM
 assert_failure
-assert_contains "$STDERR" "Invalid --clean type"
 test_pass
 
 # Test: option that looks like --clean but isn't should fail
@@ -114,35 +113,35 @@ test_pass
 
 # Test: invalid --header format (missing colon)
 test_case "invalid --header format fails"
-run_mcpc example.com tools-list --header "InvalidHeader"
+run_mcpc connect example.com "@test-$RANDOM" --header "InvalidHeader"
 assert_failure
 assert_contains "$STDERR" "Invalid header format"
 test_pass
 
 # Test: invalid --schema-mode value
 test_case "invalid --schema-mode fails"
-run_mcpc example.com tools-list --schema-mode invalid
+run_mcpc @nonexistent tools-list --schema-mode invalid
 assert_failure
 assert_contains "$STDERR" "Invalid --schema-mode"
 test_pass
 
 # Test: non-numeric --timeout value
 test_case "non-numeric --timeout fails"
-run_mcpc example.com tools-list --timeout notanumber
+run_mcpc @nonexistent tools-list --timeout notanumber
 assert_failure
 assert_contains "$STDERR" "Invalid --timeout"
 test_pass
 
-# Test: non-existent --config file
-test_case "non-existent --config file fails"
-run_mcpc --config /nonexistent/config-$RANDOM.json fs tools-list
+# Test: non-existent config file via connect command
+test_case "non-existent config file fails"
+run_mcpc connect "/nonexistent/config-$RANDOM.json:fs" "@test-session-$RANDOM"
 assert_failure
 assert_contains "$STDERR" "not found"
 test_pass
 
 # Test: non-existent --schema file
 test_case "non-existent --schema file fails"
-run_mcpc example.com tools-list --schema /nonexistent/schema-$RANDOM.json
+run_mcpc @nonexistent tools-list --schema /nonexistent/schema-$RANDOM.json
 assert_failure
 assert_contains "$STDERR" "not found"
 test_pass

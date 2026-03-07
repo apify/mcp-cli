@@ -3,96 +3,17 @@
  * Provides target resolution and MCP client management
  */
 
-import { createMcpClient } from '../core/factory.js';
 import type { IMcpClient, OutputMode, ServerConfig } from '../lib/types.js';
-import {
-  ClientError,
-  NetworkError,
-  AuthError,
-  McpError,
-  isAuthenticationError,
-  createServerAuthError,
-} from '../lib/errors.js';
+import { ClientError } from '../lib/errors.js';
 import { normalizeServerUrl, isValidSessionName, getServerHost } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
-import { OAuthProvider } from '../lib/auth/oauth-provider.js';
-import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
 import { getAuthProfile, listAuthProfiles } from '../lib/auth/profiles.js';
-import { readKeychainOAuthTokenInfo, readKeychainOAuthClientInfo } from '../lib/auth/keychain.js';
 import { logTarget } from './output.js';
-import { getWallet } from '../lib/wallets.js';
-import { createX402FetchMiddleware } from '../lib/x402/fetch-middleware.js';
-import { createRequire } from 'module';
-const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
-  version: string;
-};
 import { DEFAULT_AUTH_PROFILE } from '../lib/auth/oauth-utils.js';
 import { parseHeaderFlags } from './parser.js';
 
 const logger = createLogger('cli');
-
-/**
- * Create an OAuthProvider for a server URL if auth profile exists
- * Returns undefined if no auth profile or tokens are available
- */
-async function createAuthProviderForServer(
-  url: string,
-  profileName: string = DEFAULT_AUTH_PROFILE
-): Promise<OAuthProvider | undefined> {
-  try {
-    // Check if auth profile exists
-    const profile = await getAuthProfile(url, profileName);
-    if (!profile) {
-      logger.debug(`No auth profile found for ${url} (profile: ${profileName})`);
-      return undefined;
-    }
-
-    // Load tokens from keychain
-    const tokens = await readKeychainOAuthTokenInfo(url, profileName);
-    if (!tokens?.refreshToken) {
-      logger.debug(`No refresh token in keychain for profile: ${profileName}`);
-      return undefined;
-    }
-
-    // Load client info from keychain
-    const clientInfo = await readKeychainOAuthClientInfo(url, profileName);
-    if (!clientInfo?.clientId) {
-      logger.warn(`OAuth client ID not found in keychain for profile: ${profileName}`);
-      return undefined;
-    }
-
-    // Create token manager with tokens from keychain
-    const tokenManagerOptions: ConstructorParameters<typeof OAuthTokenManager>[0] = {
-      serverUrl: url,
-      profileName,
-      clientId: clientInfo.clientId,
-      refreshToken: tokens.refreshToken,
-      accessToken: tokens.accessToken,
-    };
-    if (tokens.expiresAt !== undefined) {
-      tokenManagerOptions.accessTokenExpiresAt = tokens.expiresAt;
-    }
-    const tokenManager = new OAuthTokenManager(tokenManagerOptions);
-
-    // Create and return OAuthProvider in runtime mode
-    logger.debug(`Created OAuthProvider for profile: ${profileName}`);
-    return new OAuthProvider({
-      serverUrl: url,
-      profileName,
-      tokenManager,
-      clientId: clientInfo.clientId,
-    });
-  } catch (error) {
-    // Re-throw AuthError (expired token, refresh failed, etc.)
-    if (error instanceof AuthError) {
-      throw error;
-    }
-    // Log other errors but don't fail the connection
-    logger.warn(`Failed to create auth provider: ${(error as Error).message}`);
-    return undefined;
-  }
-}
 
 /**
  * Resolve which auth profile to use for an HTTP server
@@ -121,7 +42,7 @@ export async function resolveAuthProfile(
       throw new ClientError(
         `Authentication profile "${specifiedProfile}" not found for ${host}.\n\n` +
           `To create this profile, run:\n` +
-          `  mcpc ${target} login --profile ${specifiedProfile}`
+          `  mcpc login ${target} --profile ${specifiedProfile}`
       );
     }
     return specifiedProfile;
@@ -147,8 +68,8 @@ export async function resolveAuthProfile(
     // Profiles exist but no default - suggest using --profile
     const profileNames = serverProfiles.map((p) => p.name).join(', ');
     const commandHint = context?.sessionName
-      ? `mcpc ${target} connect ${context.sessionName} --profile <name>`
-      : `mcpc ${target} <command> --profile <name>`;
+      ? `mcpc connect ${target} ${context.sessionName} --profile <name>`
+      : `mcpc login ${target} --profile <name>`;
     throw new ClientError(
       `No default authentication profile for ${host}.\n\n` +
         `Available profiles: ${profileNames}\n\n` +
@@ -210,11 +131,9 @@ export async function resolveTarget(
     url = normalizeServerUrl(target);
   } catch (error) {
     throw new ClientError(
+      // TODO: or config file?
       `Failed to resolve target: ${target}\n` +
-        `Target must be one of:\n` +
-        `  - Named session (@name)\n` +
-        `  - Server URL (e.g., mcp.apify.com or https://mcp.apify.com)\n` +
-        `  - Entry in JSON config file specified by --config flag\n\n` +
+        `Target must be a server URL (e.g., mcp.apify.com or https://mcp.apify.com)\n\n` +
         `Error: ${(error as Error).message}`
     );
   }
@@ -239,179 +158,52 @@ export interface McpClientContext {
 }
 
 /**
- * Execute an operation with an MCP client
- * Handles connection, execution, and cleanup
- * Automatically detects and uses sessions (targets starting with @)
- * Logs the target prefix before executing the operation
+ * Execute an operation with an MCP client via a named session
+ * The target must be a valid session name (starts with @)
  *
- * @param target - Target string (URL, @session, package, etc.)
- * @param options - CLI options (verbose, config, headers, etc.)
+ * @param target - Session name (e.g. @apify)
+ * @param options - CLI options (verbose, outputMode, etc.)
  * @param callback - Async function that receives the connected client and context
  */
 export async function withMcpClient<T>(
   target: string,
   options: {
     outputMode?: OutputMode;
-    config?: string;
-    headers?: string[];
-    timeout?: number;
     verbose?: boolean;
     hideTarget?: boolean;
-    profile?: string;
-    x402?: boolean;
   },
   callback: (client: IMcpClient, context: McpClientContext) => Promise<T>
 ): Promise<T> {
-  // Check if this is a session target (@name, not @scope/package)
-  if (isValidSessionName(target)) {
-    const { withSessionClient } = await import('../lib/session-client.js');
-    const { getSession } = await import('../lib/sessions.js');
-
-    logger.debug('Using session:', target);
-
-    // Get session data to include in context
-    // TODO: getSession() is called also in withSessionClient() => createSessionClient() => ensureBridgeReady()
-    //  if we could reuse it, we'd save extra file lock and read operation
-    const session = await getSession(target);
-    const context: McpClientContext = {
-      sessionName: session?.name,
-      profileName: session?.profileName,
-      serverConfig: session?.server,
-    };
-
-    // Log target prefix (unless hidden)
-    if (options.outputMode) {
-      await logTarget(target, {
-        outputMode: options.outputMode,
-        hide: options.hideTarget,
-      });
-    }
-
-    // Use session client (SessionClient implements IMcpClient interface)
-    return await withSessionClient(target, (client) => callback(client, context));
+  if (!isValidSessionName(target)) {
+    throw new ClientError(
+      `Invalid session name: ${target}\n` +
+        `Session names must start with @ (e.g. @apify).\n\n` +
+        `To create a session, run:\n` +
+        `  mcpc connect <server> @my-session`
+    );
   }
 
-  // Regular direct connection
-  const serverConfig = await resolveTarget(target, options);
+  const { withSessionClient } = await import('../lib/session-client.js');
+  const { getSession } = await import('../lib/sessions.js');
 
-  logger.debug('Resolved target:', { target, serverConfig });
+  logger.debug('Using session:', target);
 
-  // Create and connect client
-  const clientConfig: Parameters<typeof createMcpClient>[0] = {
-    clientInfo: { name: 'mcpc', version: mcpcVersion },
-    serverConfig,
-    capabilities: {
-      // Declare client capabilities
-      roots: { listChanged: true },
-      sampling: {},
-    },
-    autoConnect: true,
+  // Get session data to include in context
+  const session = await getSession(target);
+  const context: McpClientContext = {
+    sessionName: session?.name,
+    profileName: session?.profileName,
+    serverConfig: session?.server,
   };
 
-  // Only include verbose if it's true
-  if (options.verbose) {
-    clientConfig.verbose = true;
-  }
-
-  // For HTTP transports, resolve auth profile and create authProvider
-  let profileName: string | undefined;
-  if (serverConfig.url) {
-    profileName = await resolveAuthProfile(serverConfig.url, target, options.profile);
-    const authProvider = await createAuthProviderForServer(serverConfig.url, profileName);
-    if (authProvider) {
-      clientConfig.authProvider = authProvider;
-      logger.debug(`Using auth profile: ${profileName}`);
-    }
-
-    // Set up x402 fetch middleware for automatic payment signing
-    if (options.x402) {
-      const wallet = await getWallet();
-      if (!wallet) {
-        throw new ClientError('x402 wallet not found. Create one with: mcpc x402 init');
-      }
-      logger.debug(`Using x402 wallet: ${wallet.address}`);
-      clientConfig.customFetch = createX402FetchMiddleware(fetch, {
-        wallet: { privateKey: wallet.privateKey, address: wallet.address },
-        // No getToolByName for direct connections — proactive signing requires
-        // a tools list cache which direct connections don't maintain.
-        // The 402 fallback will still work.
-      });
-    }
-  }
-
-  let client: IMcpClient;
-  try {
-    client = await createMcpClient(clientConfig);
-  } catch (error) {
-    // Check if this is an authentication error from the server (check before McpError guard)
-    const errorMessage = (error as Error).message || '';
-    if (isAuthenticationError(errorMessage)) {
-      throw createServerAuthError(target, { originalError: error as Error });
-    }
-    // NetworkError from mcp-client.ts — re-throw with server URL in message
-    if (error instanceof NetworkError) {
-      const serverUrl = serverConfig.url ?? target;
-      const causeMsg = error.message.replace(/^Failed to connect to MCP server: /, '');
-      throw new NetworkError(
-        `Failed to connect to MCP server "${serverUrl}": ${causeMsg}`,
-        error.details
-      );
-    }
-    if (error instanceof McpError) throw error;
-    throw new NetworkError(`Failed to connect to ${serverConfig.url ?? target}: ${errorMessage}`, {
-      originalError: error,
+  // Log target prefix (unless hidden)
+  if (options.outputMode) {
+    await logTarget(target, {
+      outputMode: options.outputMode,
+      hide: options.hideTarget,
     });
   }
 
-  try {
-    logger.debug('Connected successfully');
-
-    // Log target prefix (unless hidden)
-    if (options.outputMode) {
-      // Get protocol version for display
-      const serverDetails = await client.getServerDetails();
-      await logTarget(target, {
-        outputMode: options.outputMode,
-        hide: options.hideTarget,
-        profileName,
-        serverConfig,
-        protocolVersion: serverDetails.protocolVersion,
-      });
-    }
-
-    // Execute callback with connected client and context
-    const context: McpClientContext = { serverConfig, profileName };
-    const result = await callback(client, context);
-
-    return result;
-  } catch (error) {
-    logger.error('MCP operation failed:', error);
-
-    if (
-      error instanceof NetworkError ||
-      error instanceof ClientError ||
-      error instanceof AuthError
-    ) {
-      throw error;
-    }
-
-    // Check if this is an authentication error from the server
-    const errorMessage = (error as Error).message || '';
-    if (isAuthenticationError(errorMessage)) {
-      throw createServerAuthError(target, { originalError: error as Error });
-    }
-
-    throw new NetworkError(`Failed to communicate with MCP server: ${(error as Error).message}`, {
-      originalError: error,
-    });
-  } finally {
-    // Always clean up
-    try {
-      logger.debug('Closing connection...');
-      await client.close();
-      logger.debug('Connection closed');
-    } catch (error) {
-      logger.warn('Error closing connection:', error);
-    }
-  }
+  // Use session client (SessionClient implements IMcpClient interface)
+  return await withSessionClient(target, (client) => callback(client, context));
 }

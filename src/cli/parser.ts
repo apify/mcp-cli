@@ -31,8 +31,6 @@ export function getJsonFromEnv(): boolean {
 
 // Options that take a value (not boolean flags)
 const OPTIONS_WITH_VALUES = [
-  '-c',
-  '--config',
   '-H',
   '--header',
   '--timeout',
@@ -54,23 +52,34 @@ const KNOWN_OPTIONS = [
   '-h',
   '--help',
   '--verbose',
-  '--clean',
   '--full',
   '--x402',
 ];
 
-// Valid --clean types
-const VALID_CLEAN_TYPES = ['sessions', 'profiles', 'logs', 'all'];
+// Valid --schema-mode values
+const VALID_SCHEMA_MODES = ['strict', 'compatible', 'ignore'];
 
 /**
- * All known MCP subcommands (used to detect when user forgets to specify a target)
+ * All known top-level commands
  */
 export const KNOWN_COMMANDS = [
   'help',
-  'shell',
   'login',
   'logout',
   'connect',
+  'close',
+  'restart',
+  'shell',
+  'clean',
+  'x402',
+];
+
+/**
+ * All known session subcommands (used in help and error messages)
+ */
+export const KNOWN_SESSION_COMMANDS = [
+  'help',
+  'shell',
   'close',
   'restart',
   'tools',
@@ -88,11 +97,7 @@ export const KNOWN_COMMANDS = [
   'prompts-get',
   'logging-set-level',
   'ping',
-  'x402',
 ];
-
-// Valid --schema-mode values
-const VALID_SCHEMA_MODES = ['strict', 'compatible', 'ignore'];
 
 /**
  * Check if an option always takes a value
@@ -100,6 +105,25 @@ const VALID_SCHEMA_MODES = ['strict', 'compatible', 'ignore'];
 export function optionTakesValue(arg: string): boolean {
   const optionName = arg.includes('=') ? arg.substring(0, arg.indexOf('=')) : arg;
   return OPTIONS_WITH_VALUES.includes(optionName);
+}
+
+/**
+ * Check if there is a non-option argument in args starting from index 2
+ * (index 0 = node, index 1 = script path — mirrors process.argv format)
+ */
+export function hasSubcommand(args: string[]): boolean {
+  for (let i = 2; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg) continue;
+    if (arg.startsWith('-')) {
+      if (optionTakesValue(arg) && !arg.includes('=')) {
+        i++; // skip value
+      }
+      continue;
+    }
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -112,7 +136,9 @@ function isKnownOption(arg: string): boolean {
 }
 
 /**
- * Validate that all options in args are known
+ * Validate that all global options (before the first command token) are known.
+ * Stops at the first non-option argument so subcommand-specific options
+ * (e.g. --scope, --payment-required, -o/--output) are never checked here.
  * @throws ClientError if unknown option is found
  */
 export function validateOptions(args: string[]): void {
@@ -120,7 +146,6 @@ export function validateOptions(args: string[]): void {
     const arg = args[i];
     if (!arg) continue;
 
-    // Only check arguments that start with -
     if (arg.startsWith('-')) {
       if (!isKnownOption(arg)) {
         throw new ClientError(`Unknown option: ${arg}`);
@@ -129,26 +154,17 @@ export function validateOptions(args: string[]): void {
       if (optionTakesValue(arg) && !arg.includes('=') && i + 1 < args.length) {
         i++;
       }
+    } else {
+      // Stop at the first non-option argument (command token).
+      // Options after this point are subcommand-specific and are handled by Commander.
+      break;
     }
   }
 }
 
 /**
- * Validate --clean types
- * @throws ClientError if invalid clean type is found
- */
-export function validateCleanTypes(types: string[]): void {
-  for (const type of types) {
-    if (type && !VALID_CLEAN_TYPES.includes(type)) {
-      throw new ClientError(
-        `Invalid --clean type: "${type}". Valid types are: ${VALID_CLEAN_TYPES.join(', ')}`
-      );
-    }
-  }
-}
-
-/**
- * Validate argument values (--schema-mode, --timeout, etc.)
+ * Validate argument values (--schema-mode, --timeout, etc.) for global options only.
+ * Stops at the first non-option argument so subcommand-specific options are ignored.
  * @throws ClientError if invalid value is found
  */
 export function validateArgValues(args: string[]): void {
@@ -156,6 +172,11 @@ export function validateArgValues(args: string[]): void {
     const arg = args[i];
     const nextArg = args[i + 1];
     if (!arg) continue;
+
+    if (!arg.startsWith('-')) {
+      // Stop at the first non-option argument (command token)
+      break;
+    }
 
     // Validate --schema-mode value
     if (arg === '--schema-mode' && nextArg) {
@@ -173,14 +194,6 @@ export function validateArgValues(args: string[]): void {
         throw new ClientError(
           `Invalid --timeout value: "${nextArg}". Must be a positive number (seconds).`
         );
-      }
-    }
-
-    // Validate --config file exists
-    if ((arg === '--config' || arg === '-c') && nextArg) {
-      const configPath = resolvePath(nextArg);
-      if (!existsSync(configPath)) {
-        throw new ClientError(`Config file not found: ${nextArg}`);
       }
     }
 
@@ -204,36 +217,10 @@ export function validateArgValues(args: string[]): void {
 }
 
 /**
- * Find the first non-option argument (the target)
- * Returns { target, targetIndex } or undefined if no target found
- */
-export function findTarget(args: string[]): { target: string; targetIndex: number } | undefined {
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (!arg) continue;
-
-    // Skip options and their values
-    if (arg.startsWith('-')) {
-      // If option takes a value and value is not inline (no =), skip next arg
-      if (optionTakesValue(arg) && !arg.includes('=') && i + 1 < args.length) {
-        i++; // Skip the value
-      }
-      continue;
-    }
-
-    // Found first non-option argument
-    return { target: arg, targetIndex: i };
-  }
-
-  return undefined;
-}
-
-/**
  * Extract option values from args
  * Environment variables MCPC_VERBOSE and MCPC_JSON are used as defaults
  */
 export function extractOptions(args: string[]): {
-  config?: string;
   headers?: string[];
   timeout?: number;
   profile?: string;
@@ -245,11 +232,6 @@ export function extractOptions(args: string[]): {
     verbose: args.includes('--verbose') || getVerboseFromEnv(),
     json: args.includes('--json') || args.includes('-j') || getJsonFromEnv(),
   };
-
-  // Extract --config
-  const configIndex = args.findIndex((arg) => arg === '--config' || arg === '-c');
-  const config =
-    configIndex >= 0 && configIndex + 1 < args.length ? args[configIndex + 1] : undefined;
 
   // Extract --header (can be repeated)
   const headers: string[] = [];
@@ -277,7 +259,6 @@ export function extractOptions(args: string[]): {
 
   return {
     ...options,
-    ...(config && { config }),
     ...(headers.length > 0 && { headers }),
     ...(timeout !== undefined && { timeout }),
     ...(profile && { profile }),
@@ -286,26 +267,55 @@ export function extractOptions(args: string[]): {
 }
 
 /**
- * Check if there's a command after the target in args
+ * Returns true if str is a valid URL with a non-empty host
  */
-export function hasCommandAfterTarget(args: string[]): boolean {
-  // Start from index 2 (skip node and script path)
-  for (let i = 2; i < args.length; i++) {
-    const arg = args[i];
-    if (!arg) continue;
-
-    // Skip options and their values
-    if (arg.startsWith('-')) {
-      if (optionTakesValue(arg) && !arg.includes('=')) {
-        i++; // Skip the value
-      }
-      continue;
-    }
-
-    // Found a non-option arg (this is a command)
-    return true;
+function isValidUrlWithHost(str: string): boolean {
+  try {
+    return new URL(str).host.length > 0;
+  } catch {
+    return false;
   }
-  return false;
+}
+
+/**
+ * Parse a server argument into a URL or config file entry.
+ *
+ * 1. URL: arg (as-is, or prefixed with https:// or http://) is a valid URL with a non-empty host.
+ *    Args that start with a path character (/, ~, .) skip the prefix check to avoid false positives
+ *    (e.g. https://~/ or https:///// parse with unusual hosts but are clearly file paths).
+ * 2. Config entry: colon present with non-empty text on both sides  →  file:entry
+ * 3. Otherwise: returns null (caller should report an error)
+ */
+export function parseServerArg(
+  arg: string
+): { type: 'url'; url: string } | { type: 'config'; file: string; entry: string } | null {
+  // Step 1a: try arg as-is (covers full URLs like https://... or ftp://...)
+  if (isValidUrlWithHost(arg)) {
+    return { type: 'url', url: arg };
+  }
+
+  // Step 1b: try adding https:// / http:// prefix for bare hostnames and host:port combos.
+  // Skip if arg starts with a path character — those are file paths, not hostnames.
+  // Skip if arg ends with ':' — dangling colon is not a valid hostname.
+  const startsWithPathChar = arg.startsWith('/') || arg.startsWith('~') || arg.startsWith('.');
+  if (!startsWithPathChar && !arg.endsWith(':')) {
+    if (isValidUrlWithHost('https://' + arg) || isValidUrlWithHost('http://' + arg)) {
+      return { type: 'url', url: arg };
+    }
+  }
+
+  // Step 2: config file entry — colon with non-empty text on both sides
+  const colonIndex = arg.indexOf(':');
+  if (colonIndex > 0 && colonIndex < arg.length - 1) {
+    return {
+      type: 'config',
+      file: arg.substring(0, colonIndex),
+      entry: arg.substring(colonIndex + 1),
+    };
+  }
+
+  // Step 3: unrecognised
+  return null;
 }
 
 /**

@@ -18,7 +18,7 @@ PROXY_PORT=$((8100 + RANDOM % 100))
 
 # Test: connect with --proxy option creates session with proxy server
 test_case "connect with --proxy creates session"
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION_UPSTREAM" --proxy "$PROXY_PORT"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION_UPSTREAM" --header "X-Test: true" --proxy "$PROXY_PORT"
 assert_success "connect with --proxy should succeed"
 assert_contains "$STDOUT" "created"
 _SESSIONS_CREATED+=("$SESSION_UPSTREAM")
@@ -53,7 +53,7 @@ test_pass
 test_case "connect to proxy server"
 # Ensure proxy is still healthy before connecting downstream
 wait_for "curl -s http://127.0.0.1:$PROXY_PORT/health 2>/dev/null | grep -q ok"
-run_mcpc "127.0.0.1:$PROXY_PORT" connect "$SESSION_DOWNSTREAM"
+run_mcpc connect "127.0.0.1:$PROXY_PORT" "$SESSION_DOWNSTREAM"
 assert_success "connect to proxy should succeed"
 _SESSIONS_CREATED+=("$SESSION_DOWNSTREAM")
 
@@ -114,7 +114,7 @@ PROXY_PORT_CONFLICT=$((8300 + RANDOM % 100))
 
 # Test: create first session with proxy
 test_case "create first session with proxy for conflict test"
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION_CONFLICT1" --proxy "$PROXY_PORT_CONFLICT"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION_CONFLICT1" --header "X-Test: true" --proxy "$PROXY_PORT_CONFLICT"
 assert_success
 _SESSIONS_CREATED+=("$SESSION_CONFLICT1")
 test_pass
@@ -124,7 +124,7 @@ wait_for "curl -s http://127.0.0.1:$PROXY_PORT_CONFLICT/health 2>/dev/null | gre
 
 # Test: second session on same port should fail
 test_case "second session on same port fails"
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION_CONFLICT2" --proxy "$PROXY_PORT_CONFLICT"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION_CONFLICT2" --header "X-Test: true" --proxy "$PROXY_PORT_CONFLICT"
 assert_failure "should fail when port is already in use"
 assert_contains "$STDERR" "already in use" "error should mention port in use"
 test_pass
@@ -146,7 +146,7 @@ BEARER_TOKEN="test-secret-token-12345"
 
 # Test: create session with proxy and bearer token
 test_case "connect with --proxy-bearer-token"
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION_AUTH" --proxy "$PROXY_PORT_AUTH" --proxy-bearer-token "$BEARER_TOKEN"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION_AUTH" --header "X-Test: true" --proxy "$PROXY_PORT_AUTH" --proxy-bearer-token "$BEARER_TOKEN"
 assert_success "connect with --proxy-bearer-token should succeed"
 _SESSIONS_CREATED+=("$SESSION_AUTH")
 test_pass

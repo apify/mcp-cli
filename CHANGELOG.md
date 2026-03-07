@@ -8,9 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `mcpc close @session`, `mcpc restart @session`, and `mcpc shell @session` command-first syntax as alternatives to `mcpc @session close/restart/shell`
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
 
 ### Changed
+- **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
+
+  | Before                                        | After |
+  |-----------------------------------------------|-------|
+  | `mcpc <server> tools-list`                    | `mcpc connect <server> @name` then `mcpc @name tools-list` |
+  | `mcpc <server> connect @name`                    | `mcpc connect <server> @name` |
+  | `mcpc <server> login`                            | `mcpc login <server>` |
+  | `mcpc <server> logout`                           | `mcpc logout <server>` |
+  | `mcpc --clean=sessions`                       | `mcpc clean sessions` |
+  | `mcpc --config file.json entry connect @name` | `mcpc connect file.json:entry @name` |
+
+  Direct one-shot URL access (e.g. `mcpc mcp.apify.com tools-list`) is removed; create a session first with `mcpc connect`.
+
 - `@napi-rs/keyring` native addon is now loaded lazily: `mcpc` starts and works normally even when `libsecret` (Linux) or the addon itself is missing; a one-time warning is emitted and credentials fall back to `~/.mcpc/credentials.json` (mode 0600)
 
 ## [0.1.10] - 2026-03-01

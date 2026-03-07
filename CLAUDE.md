@@ -53,23 +53,22 @@ npm run format
 # List all active sessions and saved authentication profiles
 mcpc
 
-# Use a local server package referenced by MCP config file
-mcpc --config ~/.vscode/mcp.json filesystem tools-list
-
 # Login to OAuth-enabled MCP server and save authentication for future use
-mcpc mcp.apify.com login
+mcpc login mcp.apify.com
 
-# Show information about a remote MCP server and open interactive shell
-mcpc mcp.apify.com
-mcpc mcp.apify.com shell
+# Create a persistent session
+mcpc connect mcp.apify.com @test
+mcpc @test                               # show session info
+mcpc @test tools-list                    # list available tools
+mcpc @test tools-call search-actors query:="web crawler"
+mcpc @test shell                         # interactive shell
 
 # Use JSON mode for scripting
-mcpc --json mcp.apify.com tools-list
+mcpc --json @test tools-list
 
-# Create a persistent session (or reconnect if it exists but bridge is dead)
-mcpc mcp.apify.com connect @test
-mcpc @test tools-call search-actors query:="web crawler"
-mcpc @test shell
+# Use a local server package referenced by MCP config file
+mcpc connect ~/.vscode/mcp.json:filesystem @fs
+mcpc @fs tools-list
 ```
 
 ## Design Principles
@@ -81,7 +80,6 @@ mcpc @test shell
 - Be forgiving, always help users make progress (great errors + guidance)
 - Be consistent with the [MCP specification](https://modelcontextprotocol.io/specification/latest), with `--json` strictly
 - Minimal and portable (few deps, cross-platform)
-- Keep backwards compatibility as much as possible
 - No slop!
 
 ## Architecture
@@ -138,22 +136,22 @@ mcpc/
 - Bridge lifecycle: start/connect/stop, auto-restart on crash
 - Interactive shell using Node.js `readline` with command history (`~/.mcpc/history`, last 1000 commands)
 - Configuration file loading (standard MCP JSON format, compatible with Claude Desktop)
-- Credential management via OS keychain (`keytar` package)
+- Credential management via OS keychain (`@napi-rs/keyring` package)
 
 **CLI Command Structure:**
 - All MCP commands use hyphenated format: `tools-list`, `tools-call`, `resources-read`, etc.
 - `mcpc` - List all sessions and authentication profiles
-- `mcpc <target>` - Show server info, instructions, and capabilities
 - `mcpc @<session>` - Show session info, server capabilities, and authentication details
-- `mcpc <target> help` - Alias for `mcpc <target>`
-- `mcpc <target> <command>` - Execute MCP command
-- Session creation: `mcpc <target> connect @<session-name> [--profile <name>]`
-- Authentication: `mcpc <server> login [--profile <name>]` and `mcpc <server> logout [--profile <name>]`
+- `mcpc @<session> <command>` - Execute MCP command (e.g., `mcpc @apify tools-list`)
+- `mcpc connect <server> @<name>` - Create a named persistent session
+- `mcpc login <server> [--profile <name>]` - Login via OAuth and save auth profile
+- `mcpc logout <server> [--profile <name>]` - Delete an authentication profile
+- `mcpc clean [sessions|profiles|logs|all ...]` - Clean up mcpc data
+- `mcpc help [command]` - Show help for a specific command
 
-**Target Types:**
-- `@<name>` - Named session (e.g., `@apify`) - persistent connection via bridge
-- `<url>` - Server URL (e.g., `mcp.apify.com` or `https://mcp.apify.com`) - URL scheme optional, defaults to `https://`
-- `<config-entry>` - Config file entry (requires `--config` flag) - local or remote server
+**Server formats for `connect`, `login`, `logout`:**
+- `<url>` - Remote HTTP server (e.g., `mcp.apify.com` or `https://mcp.apify.com`) - scheme optional, defaults to `https://`
+- `<file>:<entry>` - Config file entry (e.g., `~/.vscode/mcp.json:filesystem`)
 
 **Output Utilities** (`src/cli/output.ts`):
 - `logTarget(target, outputMode)` - Shows `[Using session: @name]` prefix (human mode only)
@@ -164,7 +162,7 @@ mcpc/
 
 ### Session Lifecycle
 
-1. User creates session: `mcpc mcp.apify.com connect @apify`
+1. User creates session: `mcpc connect mcp.apify.com @apify`
 2. CLI creates entry in `sessions.json`, spawns bridge process
 3. Bridge creates Unix socket at `~/.mcpc/bridges/apify.sock`
 4. Bridge performs MCP initialization:
@@ -366,7 +364,7 @@ Environment variable substitution supported: `${VAR_NAME}`
 - **Node.js:** ≥18.0.0 (for native `fetch` API)
 - **Bun:** ≥1.0.0 (alternative runtime)
 - **OS support:** macOS, Linux, Windows
-- **Linux dependency:** `libsecret` (for OS keychain access via `keytar`)
+- **Linux dependency:** `libsecret` (for OS keychain access via `@napi-rs/keyring`)
 
 ## Authentication Architecture
 
@@ -390,13 +388,13 @@ Environment variable substitution supported: `${VAR_NAME}`
 **CLI Commands:**
 ```bash
 # Login and save authentication profile
-mcpc <server> login [--profile <name>]
+mcpc login <server> [--profile <name>]
 
 # Logout and delete authentication profile
-mcpc <server> logout [--profile <name>]
+mcpc logout <server> [--profile <name>]
 
 # Create session with specific profile
-mcpc <server> connect @<name> --profile <profile>
+mcpc connect <server> @<name> --profile <profile>
 ```
 
 **Authentication Behavior:**
@@ -415,7 +413,7 @@ On failure, the error message includes instructions on how to login. This ensure
 - You can mix authenticated sessions and public access on the same server
 
 **OAuth Flow:**
-1. User runs `mcpc <server> login --profile personal`
+1. User runs `mcpc login <server> --profile personal`
 2. CLI discovers OAuth metadata via `WWW-Authenticate` header or well-known URIs
 3. CLI creates local HTTP callback server on `http://localhost:<random-port>/callback`
 4. CLI opens browser to authorization URL with PKCE challenge
@@ -484,7 +482,7 @@ All state files are stored in `~/.mcpc/` directory (unless overridden by `MCPC_H
 - `@modelcontextprotocol/sdk` - Official MCP SDK for client/server implementation
 - `commander` - Command-line argument parsing and CLI framework
 - `chalk` - Terminal string styling and colors
-- `keytar` - OS keychain integration for secure credential storage
+- `@napi-rs/keyring` - OS keychain integration for secure credential storage
 - `proper-lockfile` - File locking for concurrent session access
 - `@inquirer/input`, `@inquirer/select` - Interactive prompts for login flows
 - `ora` - Spinner animations for progress indication
@@ -530,7 +528,7 @@ When implementing features:
 7. **Protocol compliance** - Follow MCP specification strictly; handle all notification types
 8. **Session management** - Always clean up resources; handle orphaned processes; provide reconnection
 9. **Hyphenated commands** - All MCP commands use hyphens: `tools-list`, `resources-read`, `prompts-list`
-10. **Target-first syntax** - Commands follow `mcpc <target> <command>` pattern consistently
+10. **Command-first syntax** - Top-level commands come first (`connect`, `login`, `clean`); MCP operations always go through a named session (`mcpc @session <command>`)
 11. **JSON field naming** - Use consistent field names in JSON output:
     - `sessionName` (not `name`) for session identifiers
     - `server` (not `target`) for server URLs/addresses
@@ -599,7 +597,7 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
   - Authentication profiles (reusable credentials)
   - Token refresh with automatic persistence
   - Integration with session management
-- **Keychain Integration**: OS keychain via `keytar` for secure credential storage
+- **Keychain Integration**: OS keychain via `@napi-rs/keyring` for secure credential storage
 
 ### 🚧 Deferred / Nice-to-have
 - **Package Resolution**: Find and run local MCP packages automatically
@@ -608,23 +606,19 @@ Bridge logs location: `~/.mcpc/logs/bridge-<session>.log`
 
 ### 📋 Implementation Approach
 
-`mcpc` implements a **hybrid architecture** supporting both direct connections and persistent sessions:
+All MCP operations go through named sessions. Sessions are persistent bridge processes that maintain the MCP connection.
 
-**Direct Connection** (for one-off commands without sessions):
-- CLI creates `McpClient` on-demand via `withMcpClient()` helper
-- Connect → Execute → Close for each command
-- Used when target is a URL or config entry (not a session name)
-- Good for ephemeral usage and scripts
-
-**Bridge Process Architecture** (for persistent sessions):
+**Bridge Process Architecture:**
 - Persistent bridge maintains MCP connection and state
 - CLI communicates via Unix socket IPC
 - Supports sessions, notifications, caching, and better performance
 - Used when target is a session name (e.g., `@apify`)
 - Bridge handles automatic reconnection and error recovery
 
-This hybrid approach provides flexibility: use direct connections for quick one-off commands,
-or create sessions for interactive use and long-running workflows.
+**Session workflow:**
+1. `mcpc connect <server> @name` — creates session and starts bridge
+2. `mcpc @name <command>` — all MCP operations routed through the bridge
+3. `mcpc @name close` — tears down session and bridge
 
 ## References
 

@@ -2,73 +2,111 @@
  * Unit tests for CLI argument parsing functions
  */
 
-import { findTarget, extractOptions } from '../../../src/cli/parser.js';
+import { extractOptions, parseServerArg, hasSubcommand } from '../../../src/cli/parser.js';
 
-describe('findTarget', () => {
-  it('should find simple target without options', () => {
-    const result = findTarget(['apify']);
-    expect(result).toEqual({ target: 'apify', targetIndex: 0 });
+// args format mirrors process.argv: [node, script, ...actual_args]
+const A = (...args: string[]) => ['node', 'script', ...args];
+
+describe('hasSubcommand', () => {
+  it('returns true when a subcommand is present', () => {
+    expect(hasSubcommand(A('tools-list'))).toBe(true);
   });
 
-  it('should find target after boolean flags', () => {
-    const result = findTarget(['--json', '--verbose', 'apify']);
-    expect(result).toEqual({ target: 'apify', targetIndex: 2 });
+  it('returns true when subcommand follows options', () => {
+    expect(hasSubcommand(A('--json', 'tools-list'))).toBe(true);
   });
 
-  it('should skip options with values', () => {
-    const result = findTarget(['--config', 'file.json', 'apify']);
-    expect(result).toEqual({ target: 'apify', targetIndex: 2 });
+  it('returns true when subcommand follows an option with value', () => {
+    expect(hasSubcommand(A('--timeout', '30', 'ping'))).toBe(true);
   });
 
-  it('should skip multiple options with values', () => {
-    const result = findTarget([
-      '--config',
-      'file.json',
-      '--header',
-      'Auth: Bearer token',
-      '--timeout',
-      '60',
-      'apify',
-    ]);
-    expect(result).toEqual({ target: 'apify', targetIndex: 6 });
+  it('returns false when only options are present', () => {
+    expect(hasSubcommand(A('--json', '--verbose'))).toBe(false);
   });
 
-  it('should handle options with inline values (=)', () => {
-    const result = findTarget(['--config=file.json', '--timeout=60', 'apify']);
-    expect(result).toEqual({ target: 'apify', targetIndex: 2 });
+  it('returns false for empty args', () => {
+    expect(hasSubcommand(A())).toBe(false);
   });
 
-  it('should return undefined when no target found', () => {
-    const result = findTarget(['--json', '--verbose']);
-    expect(result).toBeUndefined();
+  it('does not treat option values as subcommands', () => {
+    expect(hasSubcommand(A('--timeout', '30'))).toBe(false);
+  });
+});
+
+describe('parseServerArg', () => {
+  it('should parse a bare domain as URL', () => {
+    const result = parseServerArg('mcp.apify.com');
+    expect(result).toEqual({ type: 'url', url: 'mcp.apify.com' });
+
+    const result2 = parseServerArg('example.com');
+    expect(result2).toEqual({ type: 'url', url: 'example.com' });
+
+    const result3 = parseServerArg('example');
+    expect(result3).toEqual({ type: 'url', url: 'example' });
   });
 
-  it('should return undefined for empty args', () => {
-    const result = findTarget([]);
-    expect(result).toBeUndefined();
+  it('should parse a full URL as URL', () => {
+    const result = parseServerArg('https://mcp.apify.com');
+    expect(result).toEqual({ type: 'url', url: 'https://mcp.apify.com' });
+
+    const result2 = parseServerArg('http://mcp.apify.com');
+    expect(result2).toEqual({ type: 'url', url: 'http://mcp.apify.com' });
   });
 
-  it('should handle mixed boolean and value options', () => {
-    const result = findTarget([
-      '--json',
-      '--config',
-      'file.json',
-      '--verbose',
-      '--header',
-      'X-Key: value',
-      'apify',
-    ]);
-    expect(result).toEqual({ target: 'apify', targetIndex: 6 });
+  it('should parse a URL with path (no colon-entry) as URL', () => {
+    const result = parseServerArg('https://mcp.apify.com/v1');
+    expect(result).toEqual({ type: 'url', url: 'https://mcp.apify.com/v1' });
+
+    const result2 = parseServerArg('mcp.apify.com/v1');
+    expect(result2).toEqual({ type: 'url', url: 'mcp.apify.com/v1' });
   });
 
-  it('should find target that looks like a file path', () => {
-    const result = findTarget(['--config', './config.json', './my-file.txt']);
-    expect(result).toEqual({ target: './my-file.txt', targetIndex: 2 });
+  it('should parse ~/.vscode/mcp.json:filesystem as config', () => {
+    const result = parseServerArg('~/.vscode/mcp.json:filesystem');
+    expect(result).toEqual({ type: 'config', file: '~/.vscode/mcp.json', entry: 'filesystem' });
   });
 
-  it('should handle session names (@name)', () => {
-    const result = findTarget(['--json', '@apify']);
-    expect(result).toEqual({ target: '@apify', targetIndex: 1 });
+  it('should parse ./mcp.json:server as config', () => {
+    const result = parseServerArg('./mcp.json:server');
+    expect(result).toEqual({ type: 'config', file: './mcp.json', entry: 'server' });
+  });
+
+  it('should parse /absolute/path.json:entry as config', () => {
+    const result = parseServerArg('/absolute/path.json:entry');
+    expect(result).toEqual({ type: 'config', file: '/absolute/path.json', entry: 'entry' });
+  });
+
+  it('should parse .yaml extension as config', () => {
+    const result = parseServerArg('./config.yaml:myserver');
+    expect(result).toEqual({ type: 'config', file: './config.yaml', entry: 'myserver' });
+  });
+
+  it('should parse .yml extension as config', () => {
+    const result = parseServerArg('config.yml:myserver');
+    expect(result).toEqual({ type: 'config', file: 'config.yml', entry: 'myserver' });
+  });
+
+  it('should NOT parse hostname:port as config', () => {
+    // 127.0.0.1:8080 — does not look like a file path
+    const result = parseServerArg('127.0.0.1:8080');
+    expect(result).toEqual({ type: 'url', url: '127.0.0.1:8080' });
+
+    const result2 = parseServerArg('mcp.example.com:8080');
+    expect(result2).toEqual({ type: 'url', url: 'mcp.example.com:8080' });
+  });
+
+  it('should NOT parse URL with :// as config', () => {
+    const result = parseServerArg('https://example.com');
+    expect(result).toEqual({ type: 'url', url: 'https://example.com' });
+  });
+
+  it('should return null for colon-only or leading-colon input', () => {
+    expect(parseServerArg(':')).toBeNull();
+    expect(parseServerArg(':entry')).toBeNull();
+  });
+
+  it('should return null for trailing-colon input', () => {
+    expect(parseServerArg('file:')).toBeNull();
   });
 });
 
@@ -81,16 +119,6 @@ describe('extractOptions', () => {
   it('should extract --json short form (-j)', () => {
     const result = extractOptions(['-j']);
     expect(result).toEqual({ json: true, verbose: false });
-  });
-
-  it('should extract --config', () => {
-    const result = extractOptions(['--config', 'file.json']);
-    expect(result).toEqual({ json: false, verbose: false, config: 'file.json' });
-  });
-
-  it('should extract --config short form (-c)', () => {
-    const result = extractOptions(['-c', 'file.json']);
-    expect(result).toEqual({ json: false, verbose: false, config: 'file.json' });
   });
 
   it('should extract multiple --header options', () => {
@@ -120,8 +148,6 @@ describe('extractOptions', () => {
     const result = extractOptions([
       '--json',
       '--verbose',
-      '--config',
-      'config.json',
       '--header',
       'Auth: token',
       '--timeout',
@@ -130,7 +156,6 @@ describe('extractOptions', () => {
     expect(result).toEqual({
       json: true,
       verbose: true,
-      config: 'config.json',
       headers: ['Auth: token'],
       timeout: 60,
     });
@@ -138,11 +163,6 @@ describe('extractOptions', () => {
 
   it('should handle empty args', () => {
     const result = extractOptions([]);
-    expect(result).toEqual({ json: false, verbose: false });
-  });
-
-  it('should ignore options without values', () => {
-    const result = extractOptions(['--config']);
     expect(result).toEqual({ json: false, verbose: false });
   });
 
@@ -159,17 +179,5 @@ describe('extractOptions', () => {
   it('should handle NaN timeout gracefully', () => {
     const result = extractOptions(['--timeout', 'invalid']);
     expect(result.timeout).toBeNaN();
-  });
-
-  it('should handle args with target mixed in', () => {
-    // Target should be ignored - extractOptions only cares about options
-    const result = extractOptions(['--json', 'apify', '--config', 'file.json', 'tools-list']);
-    expect(result).toEqual({ json: true, verbose: false, config: 'file.json' });
-  });
-
-  it('should handle repeated config (last one wins)', () => {
-    const result = extractOptions(['--config', 'first.json', '--config', 'second.json']);
-    // Only checks for first occurrence, so first.json wins
-    expect(result).toEqual({ json: false, verbose: false, config: 'first.json' });
   });
 });

@@ -46,44 +46,12 @@ EOF
 test_pass
 
 # =============================================================================
-# Test: Direct connection without authentication
-# =============================================================================
-
-test_case "connect to open remote server"
-# Note: Using run_mcpc instead of run_xmcpc because remote server output
-# may vary between calls (non-deterministic ordering, dynamic data)
-run_mcpc "$REMOTE_SERVER"
-assert_success
-assert_contains "$STDOUT" "Apify"
-test_pass
-
-test_case "tools-list returns tools"
-run_mcpc "$REMOTE_SERVER" tools-list
-assert_success
-assert_not_empty "$STDOUT"
-test_pass
-
-test_case "tools-list --json returns valid JSON array"
-run_mcpc --json "$REMOTE_SERVER" tools-list
-assert_success
-assert_json_valid "$STDOUT"
-# JSON output is a direct array of tools
-assert_json "$STDOUT" '. | type == "array"'
-assert_json "$STDOUT" '. | length > 0'
-test_pass
-
-test_case "ping succeeds"
-run_mcpc "$REMOTE_SERVER" ping
-assert_success
-test_pass
-
-# =============================================================================
 # Test: Session with open server
 # =============================================================================
 
 test_case "create session without authentication"
 SESSION=$(session_name "open")
-run_mcpc "$REMOTE_SERVER" connect "$SESSION"
+run_mcpc connect "$REMOTE_SERVER" "$SESSION"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass

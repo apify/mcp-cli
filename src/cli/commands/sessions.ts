@@ -73,8 +73,8 @@ async function checkPortAvailable(host: string, port: number): Promise<boolean> 
  * If session already exists with crashed bridge, reconnects it automatically
  */
 export async function connectSession(
-  name: string,
   target: string,
+  name: string,
   options: {
     outputMode: OutputMode;
     verbose?: boolean;

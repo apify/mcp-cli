@@ -7,18 +7,24 @@ test_init "basic/auth-errors"
 # Start test server with auth required
 start_test_server REQUIRE_AUTH=true
 
-# Test: tools-list without auth fails with 401
+# Create a session without proper auth credentials (no auth header)
+# Session creation may or may not succeed depending on timing
+AUTH_SESSION=$(session_name "auth")
+run_mcpc connect "$TEST_SERVER_URL" "$AUTH_SESSION"
+# Don't assert here - session creation might fail immediately (auth error) or succeed
+# Either way, subsequent commands on the session should fail
+
+# Test: tools-list without auth fails
 test_case "tools-list without auth fails"
-run_xmcpc "$TEST_SERVER_URL" tools-list
+run_xmcpc "$AUTH_SESSION" tools-list
 assert_failure
 # Should contain some indication of auth failure (401, unauthorized, etc.)
-# Just verify we get an error - exact message depends on implementation
 assert_not_empty "$STDERR" "should have error message"
 test_pass
 
 # Test: JSON error output for auth failure
 test_case "auth failure returns JSON error"
-run_mcpc "$TEST_SERVER_URL" tools-list --json
+run_mcpc "$AUTH_SESSION" tools-list --json
 assert_failure
 assert_json_valid "$STDERR"
 test_pass
@@ -26,7 +32,7 @@ test_pass
 # Test: auth error with session
 test_case "session without auth fails on first use"
 SESSION=$(session_name "auth-fail")
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION"
 # Session creation might succeed (just stores config)
 # But using it should fail due to auth
 run_xmcpc "$SESSION" tools-list
@@ -38,21 +44,24 @@ run_mcpc "$SESSION" close 2>/dev/null || true
 
 # Test: tools-call without auth fails
 test_case "tools-call without auth fails"
-run_xmcpc "$TEST_SERVER_URL" tools-call echo '{"message":"test"}'
+run_xmcpc "$AUTH_SESSION" tools-call echo '{"message":"test"}'
 assert_failure
 test_pass
 
 # Test: resources-list without auth fails
 test_case "resources-list without auth fails"
-run_xmcpc "$TEST_SERVER_URL" resources-list
+run_xmcpc "$AUTH_SESSION" resources-list
 assert_failure
 test_pass
 
 # Test: prompts-list without auth fails
 test_case "prompts-list without auth fails"
-run_xmcpc "$TEST_SERVER_URL" prompts-list
+run_xmcpc "$AUTH_SESSION" prompts-list
 assert_failure
 test_pass
+
+# Clean up auth session
+run_mcpc "$AUTH_SESSION" close 2>/dev/null || true
 
 # =============================================================================
 # Test: OAuth-enabled remote server without profile hints at login
@@ -61,16 +70,17 @@ test_pass
 # Use mcp.slack.com which requires OAuth authentication
 OAUTH_SERVER="https://mcp.slack.com/mcp"
 
-test_case "OAuth server without profile shows login hint"
-run_mcpc "$OAUTH_SERVER" tools-list
+test_case "OAuth server session creation without profile shows login hint"
+SESSION=$(session_name "oauth-noprof")
+run_mcpc connect "$OAUTH_SERVER" "$SESSION"
 assert_failure
 # Should hint at login command
 assert_contains "$STDERR" "login"
-assert_contains "$STDERR" "authenticate"
 test_pass
 
-test_case "OAuth server without profile (JSON) shows login hint"
-run_mcpc --json "$OAUTH_SERVER" tools-list
+test_case "OAuth server session creation without profile (JSON) shows login hint"
+SESSION=$(session_name "oauth-noprof2")
+run_mcpc --json connect "$OAUTH_SERVER" "$SESSION"
 assert_failure
 assert_json_valid "$STDERR"
 # JSON error should also contain login hint
@@ -79,14 +89,6 @@ if [[ -z "$error_msg" ]] || ! echo "$error_msg" | grep -qi "login"; then
   test_fail "JSON error should contain login hint"
   exit 1
 fi
-test_pass
-
-test_case "OAuth server session creation without profile shows login hint"
-SESSION=$(session_name "oauth-noprof")
-run_mcpc "$OAUTH_SERVER" connect "$SESSION"
-assert_failure
-# Should hint at login command
-assert_contains "$STDERR" "login"
 test_pass
 
 test_done
