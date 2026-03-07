@@ -51,8 +51,11 @@ RETURNS
 
 Then we can have
 $ mcpc call @github/get_file_contents arg:="yes"
-$ mcpc @session/tool arg:="yes"
 
+or maybe just?
+$ mcpc @session/tool arg:="yes"
+support also (undocumented)
+$ mcpc @session:tool
 
 
 
