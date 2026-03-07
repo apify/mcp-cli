@@ -278,13 +278,33 @@ function isValidUrlWithHost(str: string): boolean {
 }
 
 /**
+ * Returns true if s looks like a filesystem path rather than a hostname.
+ * Used to decide whether the left side of a colon is a file path or a host.
+ */
+function looksLikeFilePath(s: string): boolean {
+  // Unix absolute or home-relative paths
+  if (s.startsWith('/') || s.startsWith('~')) return true;
+  // Explicit relative paths
+  if (s.startsWith('./') || s.startsWith('../')) return true;
+  // Windows absolute paths: C:\ or C:/
+  if (/^[A-Za-z]:[/\\]/.test(s)) return true;
+  // Contains a directory separator (e.g. subdir/file.json)
+  if (s.includes('/') || s.includes('\\')) return true;
+  // Known config file extensions without any path prefix
+  if (/\.(json|yaml|yml)$/i.test(s)) return true;
+  return false;
+}
+
+/**
  * Parse a server argument into a URL or config file entry.
  *
  * 1. URL: arg (as-is, or prefixed with https:// or http://) is a valid URL with a non-empty host.
  *    Args that start with a path character (/, ~, .) skip the prefix check to avoid false positives
  *    (e.g. https://~/ or https:///// parse with unusual hosts but are clearly file paths).
- * 2. Config entry: colon present with non-empty text on both sides  →  file:entry
- * 3. Otherwise: returns null (caller should report an error)
+ * 2. If arg contains "://" but failed URL validation above → null (invalid full-URL syntax).
+ * 3. Config entry: colon present, entry non-empty, AND left side looks like a file path.
+ *    Windows drive-letter paths (C:\...) use lastIndexOf(':') so the drive colon is skipped.
+ * 4. Otherwise: returns null (caller should report an error)
  */
 export function parseServerArg(
   arg: string
@@ -294,27 +314,39 @@ export function parseServerArg(
     return { type: 'url', url: arg };
   }
 
-  // Step 1b: try adding https:// / http:// prefix for bare hostnames and host:port combos.
+  // Step 1b: if arg contains "://" it's clearly intended as a full URL — don't fall through to
+  // the config-entry heuristic (e.g. "https://host:badport" should not become file="https").
+  if (arg.includes('://')) {
+    return null;
+  }
+
+  // Step 2: try adding https:// prefix for bare hostnames and host:port combos.
   // Skip if arg starts with a path character — those are file paths, not hostnames.
   // Skip if arg ends with ':' — dangling colon is not a valid hostname.
-  const startsWithPathChar = arg.startsWith('/') || arg.startsWith('~') || arg.startsWith('.');
+  const isWindowsDrive = /^[A-Za-z]:[/\\]/.test(arg);
+  const startsWithPathChar =
+    arg.startsWith('/') || arg.startsWith('~') || arg.startsWith('.') || isWindowsDrive;
   if (!startsWithPathChar && !arg.endsWith(':')) {
-    if (isValidUrlWithHost('https://' + arg) || isValidUrlWithHost('http://' + arg)) {
+    if (isValidUrlWithHost('https://' + arg)) {
       return { type: 'url', url: arg };
     }
   }
 
-  // Step 2: config file entry — colon with non-empty text on both sides
-  const colonIndex = arg.indexOf(':');
+  // Step 3: config file entry — colon separates file path from entry name.
+  // The left side must look like a file path (not a bare hostname).
+  // Special case: Windows drive-letter paths (C:\...) have a colon at position 1;
+  // use lastIndexOf(':') so we skip that drive colon and find the entry separator.
+  const colonIndex = isWindowsDrive ? arg.lastIndexOf(':') : arg.indexOf(':');
+
   if (colonIndex > 0 && colonIndex < arg.length - 1) {
-    return {
-      type: 'config',
-      file: arg.substring(0, colonIndex),
-      entry: arg.substring(colonIndex + 1),
-    };
+    const file = arg.substring(0, colonIndex);
+    const entry = arg.substring(colonIndex + 1);
+    if (looksLikeFilePath(file)) {
+      return { type: 'config', file, entry };
+    }
   }
 
-  // Step 3: unrecognised
+  // Step 4: unrecognised
   return null;
 }
 
