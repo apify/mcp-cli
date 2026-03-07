@@ -633,7 +633,6 @@ function registerSessionCommands(program: Command, session: string): void {
     .action(async (uri, options, command) => {
       await resources.getResource(session, uri, {
         output: options.output,
-        raw: options.raw,
         maxSize: options.maxSize,
         ...getOptionsFromCommand(command),
       });
