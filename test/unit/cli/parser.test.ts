@@ -2,7 +2,13 @@
  * Tests for argument parsing utilities
  */
 
-import { parseCommandArgs, getVerboseFromEnv, getJsonFromEnv } from '../../../src/cli/parser.js';
+import {
+  parseCommandArgs,
+  getVerboseFromEnv,
+  getJsonFromEnv,
+  validateOptions,
+  validateArgValues,
+} from '../../../src/cli/parser.js';
 import { ClientError } from '../../../src/lib/errors.js';
 
 describe('parseCommandArgs', () => {
@@ -311,5 +317,84 @@ describe('getJsonFromEnv', () => {
     expect(getJsonFromEnv()).toBe(false);
     process.env.MCPC_JSON = 'false';
     expect(getJsonFromEnv()).toBe(false);
+  });
+});
+
+describe('validateOptions', () => {
+  it('should not throw for known global options', () => {
+    expect(() => validateOptions(['--verbose', '--json'])).not.toThrow();
+    expect(() => validateOptions(['--json', '--verbose'])).not.toThrow();
+    expect(() => validateOptions(['-j'])).not.toThrow();
+  });
+
+  it('should not throw for known value options with separate values', () => {
+    expect(() => validateOptions(['--header', 'Authorization: Bearer token'])).not.toThrow();
+    expect(() => validateOptions(['--timeout', '30'])).not.toThrow();
+    expect(() => validateOptions(['--profile', 'personal'])).not.toThrow();
+  });
+
+  it('should not throw for subcommand-specific options after a command token', () => {
+    // --scope appears after 'login' command token — must not be rejected
+    expect(() => validateOptions(['login', 'mcp.apify.com', '--scope', 'read'])).not.toThrow();
+    // --payment-required, --amount, --expiry for x402 sign
+    expect(() =>
+      validateOptions(['x402', 'sign', '--payment-required', 'data', '--amount', '1.0'])
+    ).not.toThrow();
+    // -o/--output, --max-size for resources-read
+    expect(() =>
+      validateOptions(['@session', 'resources-read', 'uri', '-o', 'out.txt', '--max-size', '1024'])
+    ).not.toThrow();
+  });
+
+  it('should not throw for unknown options that appear after @session (non-option token)', () => {
+    expect(() =>
+      validateOptions(['--json', '@mysession', '--unknown-subcommand-flag'])
+    ).not.toThrow();
+  });
+
+  it('should throw for unknown options that appear before any command token', () => {
+    // No command token at all
+    expect(() => validateOptions(['--unknown'])).toThrow(ClientError);
+    expect(() => validateOptions(['--unknown'])).toThrow('Unknown option: --unknown');
+    // Unknown option before a command token
+    expect(() => validateOptions(['--bad-flag', 'login'])).toThrow(ClientError);
+    expect(() => validateOptions(['--bad-flag', 'login'])).toThrow('Unknown option: --bad-flag');
+  });
+
+  it('should accept empty args array', () => {
+    expect(() => validateOptions([])).not.toThrow();
+  });
+});
+
+describe('validateArgValues', () => {
+  it('should not throw for valid --schema-mode values', () => {
+    expect(() => validateArgValues(['--schema-mode', 'strict'])).not.toThrow();
+    expect(() => validateArgValues(['--schema-mode', 'compatible'])).not.toThrow();
+    expect(() => validateArgValues(['--schema-mode', 'ignore'])).not.toThrow();
+  });
+
+  it('should throw for invalid --schema-mode value before command token', () => {
+    expect(() => validateArgValues(['--schema-mode', 'bad'])).toThrow(ClientError);
+    expect(() => validateArgValues(['--schema-mode', 'bad'])).toThrow('Invalid --schema-mode value');
+  });
+
+  it('should not validate --schema-mode value after command token', () => {
+    // Even an invalid value is not checked once we are past a command token
+    expect(() =>
+      validateArgValues(['connect', 'example.com', '--schema-mode', 'bad'])
+    ).not.toThrow();
+  });
+
+  it('should throw for invalid --timeout value before command token', () => {
+    expect(() => validateArgValues(['--timeout', 'notanumber'])).toThrow(ClientError);
+    expect(() => validateArgValues(['--timeout', 'notanumber'])).toThrow(
+      'Invalid --timeout value'
+    );
+  });
+
+  it('should not validate --timeout after command token', () => {
+    expect(() =>
+      validateArgValues(['connect', 'example.com', '--timeout', 'notanumber'])
+    ).not.toThrow();
   });
 });
