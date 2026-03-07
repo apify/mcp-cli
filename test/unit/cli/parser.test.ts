@@ -375,7 +375,9 @@ describe('validateArgValues', () => {
 
   it('should throw for invalid --schema-mode value before command token', () => {
     expect(() => validateArgValues(['--schema-mode', 'bad'])).toThrow(ClientError);
-    expect(() => validateArgValues(['--schema-mode', 'bad'])).toThrow('Invalid --schema-mode value');
+    expect(() => validateArgValues(['--schema-mode', 'bad'])).toThrow(
+      'Invalid --schema-mode value'
+    );
   });
 
   it('should not validate --schema-mode value after command token', () => {
@@ -387,9 +389,7 @@ describe('validateArgValues', () => {
 
   it('should throw for invalid --timeout value before command token', () => {
     expect(() => validateArgValues(['--timeout', 'notanumber'])).toThrow(ClientError);
-    expect(() => validateArgValues(['--timeout', 'notanumber'])).toThrow(
-      'Invalid --timeout value'
-    );
+    expect(() => validateArgValues(['--timeout', 'notanumber'])).toThrow('Invalid --timeout value');
   });
 
   it('should not validate --timeout after command token', () => {
