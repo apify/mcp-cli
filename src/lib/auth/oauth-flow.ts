@@ -7,11 +7,11 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import type { Socket } from 'net';
 import { URL } from 'url';
 import { auth as sdkAuth } from '@modelcontextprotocol/sdk/client/auth.js';
-import { OAuthProvider } from './oauth-provider.js';
+import { OAuthProvider, type OAuthProviderOptions } from './oauth-provider.js';
 import { normalizeServerUrl } from '../utils.js';
 import { ClientError } from '../errors.js';
 import { createLogger } from '../logger.js';
-import { removeKeychainOAuthClientInfo } from './keychain.js';
+import { removeKeychainOAuthClientInfo, storeKeychainOAuthClientInfo } from './keychain.js';
 import type { AuthProfile } from '../types.js';
 
 const logger = createLogger('oauth-flow');
@@ -281,7 +281,8 @@ async function openBrowser(url: string): Promise<void> {
 export async function performOAuthFlow(
   serverUrl: string,
   profileName: string,
-  scope?: string
+  scope?: string,
+  clientCredentials?: { clientId?: string; clientSecret?: string }
 ): Promise<OAuthFlowResult> {
   logger.debug(`Starting OAuth flow for ${serverUrl} (profile: ${profileName})`);
 
@@ -304,21 +305,39 @@ export async function performOAuthFlow(
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);
 
-  // Delete existing OAuth client info from keychain before re-authenticating
-  // This ensures we get a fresh client-id with the correct redirect URI
-  // (old client-id might have been registered with different redirect URI)
-  logger.debug(`Removing existing OAuth client info for ${profileName} @ ${normalizedServerUrl}`);
-  await removeKeychainOAuthClientInfo(normalizedServerUrl, profileName);
+  // When client credentials are provided, skip deleting existing client info
+  // and pre-store the credentials so the provider uses them instead of dynamic registration
+  let resolvedClientCredentials: { clientId: string; clientSecret?: string } | undefined;
+  if (clientCredentials?.clientId) {
+    logger.debug(`Using provided client credentials for ${profileName} @ ${normalizedServerUrl}`);
+    resolvedClientCredentials = { clientId: clientCredentials.clientId };
+    if (clientCredentials.clientSecret) {
+      resolvedClientCredentials.clientSecret = clientCredentials.clientSecret;
+    }
+    await storeKeychainOAuthClientInfo(normalizedServerUrl, profileName, resolvedClientCredentials);
+  } else {
+    // Delete existing OAuth client info from keychain before re-authenticating
+    // This ensures we get a fresh client-id with the correct redirect URI
+    // (old client-id might have been registered with different redirect URI)
+    logger.debug(
+      `Removing existing OAuth client info for ${profileName} @ ${normalizedServerUrl}`
+    );
+    await removeKeychainOAuthClientInfo(normalizedServerUrl, profileName);
+  }
 
   // Create OAuth provider in auth flow mode with forceReauth=true
   // This allows users to change scope or switch accounts
   // Old tokens are only overwritten after successful authentication
-  const provider = new OAuthProvider({
+  const providerOptions: OAuthProviderOptions = {
     serverUrl: normalizedServerUrl,
     profileName,
     redirectUrl,
     forceReauth: true,
-  });
+  };
+  if (resolvedClientCredentials) {
+    providerOptions.clientCredentials = resolvedClientCredentials;
+  }
+  const provider = new OAuthProvider(providerOptions);
 
   // Start callback server
   const { server, codePromise, destroyConnections } = startCallbackServer(port);

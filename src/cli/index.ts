@@ -448,6 +448,11 @@ Server formats:
     .description('Authenticate to server using OAuth and save the profile')
     .option('--profile <name>', 'Profile name (default: "default")')
     .option('--scope <scope>', 'OAuth scope(s) to request')
+    .option('--client-id <id>', 'OAuth client ID (for servers without dynamic client registration)')
+    .option(
+      '--client-secret <secret>',
+      'OAuth client secret (for servers without dynamic client registration)'
+    )
     .action(async (server, opts, command) => {
       if (!server) {
         throw new ClientError(
@@ -457,6 +462,8 @@ Server formats:
       await auth.login(server, {
         profile: opts.profile,
         scope: opts.scope,
+        clientId: opts.clientId,
+        clientSecret: opts.clientSecret,
         ...getOptionsFromCommand(command),
       });
     });
