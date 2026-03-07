@@ -323,11 +323,8 @@ function createTopLevelProgram(): Command {
   program.addHelpText(
     'after',
     `
-Session commands (after connecting):
+MCP session commands (after connecting):
   <@session>                   Show MCP server info and capabilities
-  <@session> shell             Open interactive shell
-  <@session> close             Close the session
-  <@session> restart           Kill and restart the session
   <@session> tools-list        List MCP tools
   <@session> tools-get <name>
   <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
@@ -405,7 +402,7 @@ Server formats:
 
   // close command: mcpc close @<session>
   program
-    .command('close [@session]', { hidden: true })
+    .command('close [@session]')
     .usage('<@session>')
     .description('Close a session')
     .action(async (sessionName, _opts, command) => {
@@ -417,9 +414,9 @@ Server formats:
 
   // restart command: mcpc restart @<session>
   program
-    .command('restart [@session]', { hidden: true })
+    .command('restart [@session]')
     .usage('<@session>')
-    .description('Restart a session')
+    .description('Restart a session (losing all state)')
     .action(async (sessionName, _opts, command) => {
       if (!sessionName) {
         throw new ClientError(
@@ -431,7 +428,7 @@ Server formats:
 
   // shell command: mcpc shell @<session>
   program
-    .command('shell [@session]', { hidden: true })
+    .command('shell [@session]')
     .usage('<@session>')
     .description('Open interactive shell for a session')
     .action(async (sessionName) => {
@@ -445,9 +442,17 @@ Server formats:
   program
     .command('login [server]')
     .usage('<server>')
-    .description('Authenticate to server using OAuth and save the profile')
+    .description('Interactively login to a server using OAuth and save profile')
     .option('--profile <name>', 'Profile name (default: "default")')
-    .option('--scope <scope>', 'OAuth scope(s) to request')
+    .option(
+      '--scope <scopes>',
+      'OAuth scopes to request, quoted and space-separated (e.g. --scope "read write")'
+    )
+    .option('--client-id <id>', 'OAuth client ID (for servers without dynamic client registration)')
+    .option(
+      '--client-secret <secret>',
+      'OAuth client secret (for servers without dynamic client registration)'
+    )
     .action(async (server, opts, command) => {
       if (!server) {
         throw new ClientError(
@@ -457,6 +462,8 @@ Server formats:
       await auth.login(server, {
         profile: opts.profile,
         scope: opts.scope,
+        clientId: opts.clientId,
+        clientSecret: opts.clientSecret,
         ...getOptionsFromCommand(command),
       });
     });
@@ -608,7 +615,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   // Close command
   program
-    .command('close')
+    .command('close', { hidden: true })
     .description('Close the session')
     .action(async (_options, command) => {
       await sessions.closeSession(session, getOptionsFromCommand(command));
