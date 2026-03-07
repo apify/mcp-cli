@@ -1,31 +1,10 @@
 #!/bin/bash
-# Test: hidden top-level commands (shell, close, restart)
-# These commands are hidden from --help but must remain fully functional
+# Test: session management commands (shell, close, restart)
 
 source "$(dirname "$0")/../../lib/framework.sh"
-test_init "basic/hidden-commands"
+test_init "basic/session-commands"
 
 start_test_server
-
-# =============================================================================
-# shell, close, restart are NOT shown in --help
-# =============================================================================
-
-test_case "shell not listed in --help"
-run_mcpc --help
-assert_success
-assert_not_contains "$STDOUT" "  shell " "shell should be hidden from help"
-test_pass
-
-test_case "close not listed in --help"
-run_mcpc --help
-assert_not_contains "$STDOUT" "  close " "close should be hidden from help"
-test_pass
-
-test_case "restart not listed in --help"
-run_mcpc --help
-assert_not_contains "$STDOUT" "  restart " "restart should be hidden from help"
-test_pass
 
 # =============================================================================
 # mcpc close @session  (top-level form)
