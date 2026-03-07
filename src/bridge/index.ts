@@ -905,6 +905,11 @@ class BridgeProcess {
     }
 
     try {
+      // Apply per-request timeout if provided (from CLI --timeout flag, in seconds → milliseconds)
+      if (message.timeout !== undefined) {
+        this.client.setRequestTimeout(message.timeout * 1000);
+      }
+
       let result: unknown;
 
       // Route to appropriate client method

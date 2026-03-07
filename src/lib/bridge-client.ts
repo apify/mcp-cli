@@ -184,9 +184,9 @@ export class BridgeClient extends EventEmitter {
 
   /**
    * Send a request to the bridge and wait for response
-   * Uses 3-minute timeout for MCP operations
+   * Uses 3-minute timeout for MCP operations by default, or custom timeout if provided
    */
-  async request(method: string, params?: unknown): Promise<unknown> {
+  async request(method: string, params?: unknown, timeout?: number): Promise<unknown> {
     if (!this.socket) {
       throw new NetworkError('Not connected to bridge');
     }
@@ -198,16 +198,20 @@ export class BridgeClient extends EventEmitter {
       id,
       method,
       params,
+      ...(timeout !== undefined && { timeout }),
     };
 
     logger.debug('Sending request:', { id, method });
+
+    // Use custom timeout (in seconds, convert to ms) or default
+    const timeoutMs = timeout !== undefined ? timeout * 1000 : REQUEST_TIMEOUT;
 
     // Create promise for response
     const promise = new Promise<unknown>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         this.pendingRequests.delete(id);
         reject(new NetworkError(`Request timeout: ${method}`));
-      }, REQUEST_TIMEOUT);
+      }, timeoutMs);
 
       this.pendingRequests.set(id, { resolve, reject, timeoutId });
     });
