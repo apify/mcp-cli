@@ -102,7 +102,9 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.schemaMode) {
     const mode = opts.schemaMode as string;
     if (mode !== 'strict' && mode !== 'compatible' && mode !== 'ignore') {
-      throw new Error(`Invalid --schema-mode value: "${mode}". Valid modes are: strict, compatible, ignore`);
+      throw new Error(
+        `Invalid --schema-mode value: "${mode}". Valid modes are: strict, compatible, ignore`
+      );
     }
     options.schemaMode = mode;
   }

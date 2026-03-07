@@ -36,9 +36,10 @@ Run "mcpc --help" for usage information.
 - createSessionProgram() advertises --header and --profile options for mcpc @session ..., but these values are never applied: withMcpClient()/SessionClient ignore headers/profile overrides and always use the session’s stored config. This is misleading for users and makes it easy to think a command is authenticated/modified when it isn’t. Either wire these options into session execution (e.g. by updating/restarting the session/bridge) or remove them from the session program/help.
 
 - parseServerArg() splits config entries using the first : (arg.indexOf(':')). This breaks Windows paths with drive letters (e.g. C:\Users\me\mcp.json:filesystem), which would be parsed as file=C entry=\Users\.... Consider special-casing ^[A-Za-z]:[\\/] and/or using lastIndexOf(':') for the file/entry delimiter to keep Windows paths working
-
+- parseServerArg() treats any string containing : (that wasn’t recognized as a URL) as a config file:entry. This will misclassify inputs like example.com:foo (invalid host:port) as a config file named example.com. Consider tightening the config heuristic (e.g. require the left side to look like a file path or have a known config extension) and return null for ambiguous/invalid host:port inputs.
 
 - validateOptions() relies on KNOWN_OPTIONS, but several options used by subcommands are missing (e.g. --scope on login, -r/--payment-required, --amount, --expiry for x402 sign, and session flags like -o/--output, --max-size). This will cause valid commands to fail early with "Unknown option" before routing to the correct Commander program. Either expand KNOWN_OPTIONS to cover all CLI flags (including subcommand-specific ones) or change validation to only check global options (e.g. only scan args before the first non-option command token
+- login introduces a --scope option here, but the pre-parse validateOptions() step uses KNOWN_OPTIONS from parser.ts, which currently does not include --scope. As a result, mcpc login <server> --scope ... will fail early with "Unknown option: --scope" before Commander runs. Add --scope to the known options list or make option validation command-aware.
 
 ## x402
 - sign -r <b64> Sign payment from PAYMENT-REQUIRED header  - why the "-r" is needed?
