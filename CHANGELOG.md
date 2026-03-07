@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mcpc close @session`, `mcpc restart @session`, and `mcpc shell @session` command-first syntax as alternatives to `mcpc @session close/restart/shell`
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
 
+### Fixed
+- `parseServerArg()` now handles well Windows drive-letter config paths as well as other ambiguous cases
+
 ### Changed
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
 

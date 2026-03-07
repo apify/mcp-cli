@@ -51,6 +51,9 @@ describe('parseServerArg', () => {
 
     const result2 = parseServerArg('http://mcp.apify.com');
     expect(result2).toEqual({ type: 'url', url: 'http://mcp.apify.com' });
+
+    const result3 = parseServerArg('http://mcp.apify.com:8000');
+    expect(result3).toEqual({ type: 'url', url: 'http://mcp.apify.com:8000' });
   });
 
   it('should parse a URL with path (no colon-entry) as URL', () => {
@@ -59,6 +62,9 @@ describe('parseServerArg', () => {
 
     const result2 = parseServerArg('mcp.apify.com/v1');
     expect(result2).toEqual({ type: 'url', url: 'mcp.apify.com/v1' });
+
+    const result3 = parseServerArg('mcp.apify.com:8000/v1');
+    expect(result3).toEqual({ type: 'url', url: 'mcp.apify.com:8000/v1' });
   });
 
   it('should parse ~/.vscode/mcp.json:filesystem as config', () => {
@@ -76,14 +82,31 @@ describe('parseServerArg', () => {
     expect(result).toEqual({ type: 'config', file: '/absolute/path.json', entry: 'entry' });
   });
 
+  it('should parse .json extension as config', () => {
+    const result = parseServerArg('./config.json:myserver');
+    expect(result).toEqual({ type: 'config', file: './config.json', entry: 'myserver' });
+
+    const result2 = parseServerArg('config.json:myserver');
+    expect(result2).toEqual({ type: 'config', file: 'config.json', entry: 'myserver' });
+  });
+
   it('should parse .yaml extension as config', () => {
     const result = parseServerArg('./config.yaml:myserver');
     expect(result).toEqual({ type: 'config', file: './config.yaml', entry: 'myserver' });
+
+    const result2 = parseServerArg('config.yaml:myserver');
+    expect(result2).toEqual({ type: 'config', file: 'config.yaml', entry: 'myserver' });
   });
 
   it('should parse .yml extension as config', () => {
-    const result = parseServerArg('config.yml:myserver');
-    expect(result).toEqual({ type: 'config', file: 'config.yml', entry: 'myserver' });
+    const result = parseServerArg('./config.yml:myserver');
+    expect(result).toEqual({ type: 'config', file: './config.yml', entry: 'myserver' });
+
+    const result2 = parseServerArg('config.yml:myserver');
+    expect(result2).toEqual({ type: 'config', file: 'config.yml', entry: 'myserver' });
+
+    const result3 = parseServerArg('../config.yml:myserver');
+    expect(result3).toEqual({ type: 'config', file: '../config.yml', entry: 'myserver' });
   });
 
   it('should NOT parse hostname:port as config', () => {
@@ -107,6 +130,32 @@ describe('parseServerArg', () => {
 
   it('should return null for trailing-colon input', () => {
     expect(parseServerArg('file:')).toBeNull();
+  });
+
+  it('should return null for hostname:non-numeric-port (not a valid URL or file path)', () => {
+    expect(parseServerArg('example.com:foo')).toBeNull();
+    expect(parseServerArg('myhost:notaport')).toBeNull();
+  });
+
+  it('should return null for https:// URL with invalid port', () => {
+    expect(parseServerArg('https://mcp.apify.com:invalid')).toBeNull();
+    expect(parseServerArg('http://example.com:badport')).toBeNull();
+  });
+
+  it('should return null for other invalid full-URL syntax', () => {
+    expect(parseServerArg('https://host:badport/path')).toBeNull();
+  });
+
+  it('should parse Windows drive-letter config paths correctly', () => {
+    const result = parseServerArg('C:\\Users\\me\\mcp.json:filesystem');
+    expect(result).toEqual({
+      type: 'config',
+      file: 'C:\\Users\\me\\mcp.json',
+      entry: 'filesystem',
+    });
+
+    const result2 = parseServerArg('D:/projects/config.yaml:myserver');
+    expect(result2).toEqual({ type: 'config', file: 'D:/projects/config.yaml', entry: 'myserver' });
   });
 });
 
