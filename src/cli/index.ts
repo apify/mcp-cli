@@ -476,9 +476,7 @@ Without arguments, performs safe cleanup of stale data only.
     .description('Close a session (same as: mcpc <@session> close)')
     .action(async (sessionName, _opts, command) => {
       if (!sessionName) {
-        throw new ClientError(
-          'Missing required argument: @session\n\nExample: mcpc close @myapp'
-        );
+        throw new ClientError('Missing required argument: @session\n\nExample: mcpc close @myapp');
       }
       await sessions.closeSession(sessionName, getOptionsFromCommand(command));
     });
@@ -504,9 +502,7 @@ Without arguments, performs safe cleanup of stale data only.
     .description('Open interactive shell for a session (same as: mcpc <@session> shell)')
     .action(async (sessionName) => {
       if (!sessionName) {
-        throw new ClientError(
-          'Missing required argument: @session\n\nExample: mcpc shell @myapp'
-        );
+        throw new ClientError('Missing required argument: @session\n\nExample: mcpc shell @myapp');
       }
       await sessions.openShell(sessionName);
     });
