@@ -123,9 +123,6 @@ Options:
 
 Commands:
   connect <server> <@session>  Connect to an MCP server and start a new named @session
-  close <@session>             Close a session (same as: mcpc <@session> close)
-  restart <@session>           Restart a session (same as: mcpc <@session> restart)
-  shell <@session>             Open interactive shell for a session (same as: mcpc <@session> shell)
   login <server>               Authenticate to server using OAuth and save the profile
   logout <server>              Delete an authentication profile for a server
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)

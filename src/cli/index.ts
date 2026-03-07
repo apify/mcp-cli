@@ -393,6 +393,44 @@ Server formats:
       }
     });
 
+  // close command: mcpc close @<session>
+  program
+    .command('close [@session]', { hidden: true })
+    .usage('<@session>')
+    .description('Close a session')
+    .action(async (sessionName, _opts, command) => {
+      if (!sessionName) {
+        throw new ClientError('Missing required argument: @session\n\nExample: mcpc close @myapp');
+      }
+      await sessions.closeSession(sessionName, getOptionsFromCommand(command));
+    });
+
+  // restart command: mcpc restart @<session>
+  program
+    .command('restart [@session]', { hidden: true })
+    .usage('<@session>')
+    .description('Restart a session')
+    .action(async (sessionName, _opts, command) => {
+      if (!sessionName) {
+        throw new ClientError(
+          'Missing required argument: @session\n\nExample: mcpc restart @myapp'
+        );
+      }
+      await sessions.restartSession(sessionName, getOptionsFromCommand(command));
+    });
+
+  // shell command: mcpc shell @<session>
+  program
+    .command('shell [@session]', { hidden: true })
+    .usage('<@session>')
+    .description('Open interactive shell for a session')
+    .action(async (sessionName) => {
+      if (!sessionName) {
+        throw new ClientError('Missing required argument: @session\n\nExample: mcpc shell @myapp');
+      }
+      await sessions.openShell(sessionName);
+    });
+
   // login command: mcpc login <server>
   program
     .command('login [server]')
@@ -467,44 +505,6 @@ Without arguments, performs safe cleanup of stale data only.
         logs: resources.includes('logs'),
         all: resources.includes('all'),
       });
-    });
-
-  // close command: mcpc close @<session>
-  program
-    .command('close [@session]')
-    .usage('<@session>')
-    .description('Close a session (same as: mcpc <@session> close)')
-    .action(async (sessionName, _opts, command) => {
-      if (!sessionName) {
-        throw new ClientError('Missing required argument: @session\n\nExample: mcpc close @myapp');
-      }
-      await sessions.closeSession(sessionName, getOptionsFromCommand(command));
-    });
-
-  // restart command: mcpc restart @<session>
-  program
-    .command('restart [@session]')
-    .usage('<@session>')
-    .description('Restart a session (same as: mcpc <@session> restart)')
-    .action(async (sessionName, _opts, command) => {
-      if (!sessionName) {
-        throw new ClientError(
-          'Missing required argument: @session\n\nExample: mcpc restart @myapp'
-        );
-      }
-      await sessions.restartSession(sessionName, getOptionsFromCommand(command));
-    });
-
-  // shell command: mcpc shell @<session>
-  program
-    .command('shell [@session]')
-    .usage('<@session>')
-    .description('Open interactive shell for a session (same as: mcpc <@session> shell)')
-    .action(async (sessionName) => {
-      if (!sessionName) {
-        throw new ClientError('Missing required argument: @session\n\nExample: mcpc shell @myapp');
-      }
-      await sessions.openShell(sessionName);
     });
 
   // x402 command: mcpc x402 <subcommand>
