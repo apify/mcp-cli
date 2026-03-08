@@ -314,7 +314,7 @@ export async function connectSession(
 }
 
 /** Threshold for considering a session disconnected (bridge alive but server unreachable) */
-const DISCONNECTED_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes (~4 missed pings at 30s interval)
+const DISCONNECTED_THRESHOLD_MS = 2 * 30 * 1000 + 5000; // 2:05 minutes (~2 missed pings at 30s interval)
 
 type DisplayStatus = 'live' | 'disconnected' | 'crashed' | 'unauthorized' | 'expired';
 
