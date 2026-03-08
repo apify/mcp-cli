@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `validateOptions()` no longer includes subcommand-specific options (`--full`, `--x402`, `--proxy`, etc.) in global known-options list; misplaced flags now produce clear "Unknown option" errors instead of confusing Commander rejections
+- Sessions requiring authentication now correctly show as `expired` instead of `live` when the server rejects unauthenticated connections
+- Auth errors wrapped in `NetworkError` by bridge IPC are now detected on first health check, avoiding unnecessary bridge restart
+- Fixed flaky E2E invariant check that failed when `lastSeenAt` changed between `--json` and `--json --verbose` calls
 - `--timeout` flag now correctly propagates to MCP requests via session bridge
 - `parseServerArg()` now handles well Windows drive-letter config paths as well as other ambiguous cases
 
