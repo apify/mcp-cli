@@ -11,6 +11,7 @@ import { unlink } from 'fs/promises';
 import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
 import type { McpClient } from '../core/index.js';
 import type { ServerConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
+import { KEEPALIVE_INTERVAL_MS } from '../lib/types.js';
 import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
 import {
   fileExists,
@@ -42,8 +43,7 @@ import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 // Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
 setGlobalDispatcher(new EnvHttpProxyAgent());
 
-// Keepalive ping interval in milliseconds (30 seconds)
-const KEEPALIVE_INTERVAL_MS = 30_000;
+// KEEPALIVE_INTERVAL_MS imported from ../lib/types.js
 
 // Maximum IPC buffer size (10 MB) — destroy socket if exceeded
 const MAX_BUFFER_SIZE = 10 * 1024 * 1024;

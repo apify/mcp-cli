@@ -11,6 +11,7 @@ import {
   getServerHost,
   redactHeaders,
 } from '../../lib/index.js';
+import { DISCONNECTED_THRESHOLD_MS } from '../../lib/types.js';
 import type { ServerConfig, ProxyConfig } from '../../lib/types.js';
 import {
   formatOutput,
@@ -313,8 +314,7 @@ export async function connectSession(
   }
 }
 
-/** Threshold for considering a session disconnected (bridge alive but server unreachable) */
-const DISCONNECTED_THRESHOLD_MS = 2 * 30 * 1000 + 5000; // 2:05 minutes (~2 missed pings at 30s interval)
+// DISCONNECTED_THRESHOLD_MS imported from ../../lib/types.js
 
 type DisplayStatus = 'live' | 'disconnected' | 'crashed' | 'unauthorized' | 'expired';
 

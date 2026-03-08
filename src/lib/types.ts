@@ -65,6 +65,12 @@ export type {
 // Re-export protocol version constants
 export { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 
+/** Keepalive ping interval in milliseconds (30 seconds) */
+export const KEEPALIVE_INTERVAL_MS = 30_000;
+
+/** Threshold for considering a session disconnected (bridge alive but server unreachable) */
+export const DISCONNECTED_THRESHOLD_MS = 2 * KEEPALIVE_INTERVAL_MS + 5000; // ~2 missed pings + 5s buffer
+
 /**
  * Configuration for a connection to MCP server
  * Used both for config file format and internal representation
