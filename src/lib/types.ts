@@ -91,10 +91,11 @@ export interface ProxyConfig {
 /**
  * Session status
  * - active: Session is healthy and can be used
- * - expired: Server indicated session is no longer valid (e.g., 404 response)
+ * - unauthorized: Server rejected authentication (401/403) or token refresh failed. Recovery: login then restart.
+ * - expired: Server indicated session is no longer valid (e.g., 404 response). Recovery: restart.
  * - crashed: Bridge process crashed, session might or might not be usable. Bridge will be restarted on next command.
  */
-export type SessionStatus = 'active' | 'expired' | 'crashed';
+export type SessionStatus = 'active' | 'unauthorized' | 'expired' | 'crashed';
 
 /**
  * Notification timestamps for list change events

@@ -177,9 +177,11 @@ mcpc/
    - CLI formats and displays output
 
 **Session States:**
-- 🟢 **live** - Bridge process running; server might or might not be responding
+- 🟢 **live** - Bridge process running and server responding (lastSeenAt within 2 minutes)
+- 🟡 **disconnected** - Bridge process running but server unreachable (lastSeenAt stale >2min); auto-recovers when server responds
 - 🟡 **crashed** - Bridge process crashed or killed; auto-restarts on next use
-- 🔴 **expired** - Server rejected session (auth failed, session ID invalid); requires `close` and reconnect
+- 🔴 **unauthorized** - Server rejected authentication (401/403) or token refresh failed; requires `login` then `restart`
+- 🔴 **expired** - Server rejected session ID (404); requires `restart`
 
 ### Transport Implementation
 
