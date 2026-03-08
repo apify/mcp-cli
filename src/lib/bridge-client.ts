@@ -28,6 +28,10 @@ const REQUEST_TIMEOUT = 3 * 60 * 1000;
 // Timeout for initial socket connection (5 seconds)
 const CONNECT_TIMEOUT = 5 * 1000;
 
+// Maximum allowed IPC message buffer size (10 MB)
+// Protects against unbounded memory growth from malformed messages
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
+
 export class BridgeClient extends EventEmitter {
   private socket: Socket | null = null;
   private socketPath: string;
@@ -107,6 +111,13 @@ export class BridgeClient extends EventEmitter {
 
     this.socket.on('data', (data) => {
       this.buffer += data.toString();
+
+      // Guard against unbounded buffer growth from malformed/oversized messages
+      if (this.buffer.length > MAX_BUFFER_SIZE) {
+        logger.error(`IPC buffer exceeded ${MAX_BUFFER_SIZE / 1024 / 1024} MB, disconnecting`);
+        this.cleanup();
+        return;
+      }
 
       // Process complete JSON messages (newline-delimited)
       let newlineIndex: number;

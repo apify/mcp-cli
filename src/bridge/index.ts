@@ -45,6 +45,10 @@ setGlobalDispatcher(new EnvHttpProxyAgent());
 // Keepalive ping interval in milliseconds (30 seconds)
 const KEEPALIVE_INTERVAL_MS = 30_000;
 
+// Maximum allowed IPC message buffer size (10 MB)
+// Protects against unbounded memory growth from malformed messages
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
+
 const logger = createLogger('bridge');
 
 interface BridgeOptions {
@@ -788,6 +792,16 @@ class BridgeProcess {
 
     socket.on('data', (data) => {
       buffer += data.toString();
+
+      // Guard against unbounded buffer growth from malformed/oversized messages
+      if (buffer.length > MAX_BUFFER_SIZE) {
+        logger.error(
+          `IPC buffer exceeded ${MAX_BUFFER_SIZE / 1024 / 1024} MB, disconnecting client`
+        );
+        socket.destroy();
+        this.connections.delete(socket);
+        return;
+      }
 
       // Process complete JSON messages (newline-delimited)
       let newlineIndex: number;

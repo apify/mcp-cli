@@ -224,11 +224,7 @@ export async function signPayment(input: SignPaymentInput): Promise<SignPaymentR
   // Build x402 payload
   const paymentPayload = {
     x402Version: X402_VERSION,
-    resource: resource ?? {
-      url: 'https://mcp.apify.com/mcp',
-      description: 'MCP Server',
-      mimeType: 'application/json',
-    },
+    ...(resource !== undefined && { resource }),
     payload: {
       signature,
       authorization: {

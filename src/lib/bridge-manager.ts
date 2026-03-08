@@ -37,6 +37,10 @@ import { getWallet } from './wallets.js';
 
 const logger = createLogger('bridge-manager');
 
+// Placeholder profile name used when HTTP headers are provided without an OAuth profile.
+// The bridge waits for credentials via IPC before connecting to the MCP server.
+const HEADERS_ONLY_PROFILE_PLACEHOLDER = 'dummy';
+
 // Get the path to the bridge executable
 function getBridgeExecutable(): string {
   // In development, use the compiled bridge in dist/
@@ -118,12 +122,12 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
   }
 
   // Pass auth profile to bridge
-  // Use dummy placeholder also when headers are provided (no OAuth profile),
+  // Use placeholder also when headers are provided (no OAuth profile),
   // so the bridge process waits for headers before connecting to server
   if (profileName) {
     args.push('--profile', profileName);
   } else if (headers && Object.keys(headers).length > 0) {
-    args.push('--profile', 'dummy');
+    args.push('--profile', HEADERS_ONLY_PROFILE_PLACEHOLDER);
   }
 
   // Pass proxy config to bridge (if enabled)
@@ -333,8 +337,7 @@ async function sendAuthCredentialsToBridge(
   // Build credentials object
   const credentials: AuthCredentials = {
     serverUrl,
-    // TODO: do we need this dummy hack for anything? I don't think so...
-    profileName: profileName || 'dummy', // Use 'dummy' as placeholder for headers-only auth
+    profileName: profileName || HEADERS_ONLY_PROFILE_PLACEHOLDER,
   };
 
   // Try to get OAuth tokens and client info if profile is specified

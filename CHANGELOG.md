@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed flaky E2E invariant check that failed when `lastSeenAt` changed between `--json` and `--json --verbose` calls
 - `--timeout` flag now correctly propagates to MCP requests via session bridge
 - `parseServerArg()` now handles well Windows drive-letter config paths as well as other ambiguous cases
+- Fixed hardcoded `https://mcp.apify.com/mcp` fallback resource URL in x402 payment signing; resource is now omitted when not provided by the server
+- Proxy server now reports the correct `mcpc` version instead of the placeholder string `yolo`
+- IPC buffers now have a 10 MB size limit to prevent unbounded memory growth from malformed messages
 
 ### Changed
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.

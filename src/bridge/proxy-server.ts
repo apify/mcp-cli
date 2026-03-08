@@ -29,6 +29,10 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { McpClient } from '../core/mcp-client.js';
 import { createLogger } from '../lib/logger.js';
+import { createRequire } from 'module';
+const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
+  version: string;
+};
 
 const logger = createLogger('proxy-server');
 
@@ -67,7 +71,7 @@ export class ProxyServer {
     this.mcpServer = new MCPServer(
       {
         name: `mcpc-proxy${sessionName}`,
-        version: 'yolo',
+        version: mcpcVersion,
       },
       {
         capabilities: {
