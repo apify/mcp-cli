@@ -5,28 +5,28 @@
 ## NEW
 
 
-- add "mcpc @session/tool" as a shortcut for tools-call, add info to help about it
-
 - mcp-cli inspiration
 Add glob-based tool search across all servers like `mcpc grep *mail*` or `mcpc grep *@session/mail*`.
     Consider making `tools-list` more succinct for discovery.
   Use https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool for inspiration/compatibility?
+- 
+
       $ mcpc grep "*file*"
       $ mcpc grep "@github/*"
       $ mcpc grep -F "anything really"
   
 RETURNS
-      @github/create_or_update_file
-      @filesystem/read_file
-      @filesystem/write_file
+      @github
+        - create_or_update_file(name: string, )
+      @filesystem
+        - read_file
+      @filesystem
+        - write_file
 
 Then we can have
-$ mcpc call @github/get_file_contents arg:="yes"
+$ mcpc @github tools-call get_file_contents arg:="yes" # NOW
+$ mcpc @github/get_file_contents arg:="yes"  # NEW
 
-or maybe just?
-$ mcpc @session/tool arg:="yes"
-support also (undocumented)
-$ mcpc @session:tool
 
 
 ## Bugs !
@@ -36,18 +36,19 @@ $ mcpc @session:tool
 
 ## UX/AX
 
-- mcpc @apify tools-get fetch-actor-details => should print also "object" properties in human mode
-
 - MAYBE LATER:
   Connects to all entries from file - the
-  NOW: $ mcpc connect ~/.vscode/mcp.json:puppeteer @puppeteer
+  $ mcpc connect ~/.vscode/mcp.json:puppeteer @puppeteer
   $ mcpc connect ~/.vscode/mcp.json
+  $ mcpc connect  # Auto-discovery of existing MCP configs like mcporter
 
-Auto-discovery of existing MCP configs like mcporter
-- $ mcpc connect
+- Make "mcpc connect mcp.apify.com" work without @session, and generate session name on best effort basis (e.g. use the main hostname without TLD 
++ suffix)
 
-- $ mcpc @apify tools-call search-apify-docs query:="test"
-  Should skip `structuredContent` in results if there is `content` with "type": "text", and print it as text. AI agents can use --json
+
+- Show tools also when running just "mcpc @apify"
+
+- mcpc @apify tools-get fetch-actor-details => should print also "object" properties in human mode
 
 
 ## Later
@@ -67,28 +68,28 @@ Auto-discovery of existing MCP configs like mcporter
 
 # Misc
 
-- Ensure "logging-set-level" works well
-
-- Restart of expires OAuth session is too many steps - why not add "mcpc <session> login" to refresh?
-- Tool list server refresh - let's print it to stderr on first time after it happens, so the agent/user would notice there are new tools
 
 - sign -r <b64> Sign payment from PAYMENT-REQUIRED header  - why the "-r" is needed?
 
 
 ## Nice to have
 
-- Add support for "mcpc close @session", "mcpc restart @session" and "mcpc shell @session" - add to docs
+- $ mcpc @apify tools-call search-apify-docs query:="test"
+  Should skip `structuredContent` in results if there is `content` with "type": "text", and print it as text. AI agents can use --json
+
 
 - Implement resources-subscribe/resources-unsubscribe, --o file command properly, --max-size
   automatically update the -o file on changes, without it just keep track of changed files in
   bridge process' cache, and report in resources-list/resources-read operatio
 
+- Add support for "mcpc close @session", "mcpc restart @session" and "mcpc shell @session" - add to docs
   
 - Add ASCII diagrams to README to help explain major concepts: tool calling, auth, bridge process, etc.
   For inspiration, see https://github.com/philschmid/mcp-cli
 
-- "login" and "logout" commands could work also with file:entry, just use the remote server URL from the config file.
-  it would make "connect" and "login" command consistent
+- "login" and "logout" commands could work also with file:entry and @session, just use the remote server URL from the config file or session host.
+  it would make "connect" and "login" command consistent.
+- Restart of expired OAuth session is too many steps - why not add "mcpc login  <session>" to refresh? 
 
 - revise the session states: maybe introduce new session status `auth-failed` or `unauthed` (or some better name?)
   consider forking "alive" session state to "alive" and "disconnected", to indicate the remote server is not responding but bridge 
