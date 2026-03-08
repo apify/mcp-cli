@@ -386,8 +386,14 @@ function formatToolsSummary(tools: Tool[]): string[] {
   // Summary list of tools
   const bullet = chalk.dim('*');
   for (const tool of tools) {
+    const parts: string[] = [];
     const annotationsStr = formatToolAnnotations(tool.annotations);
-    const annotationsSuffix = annotationsStr ? ` ${chalk.gray(`[${annotationsStr}]`)}` : '';
+    if (annotationsStr) parts.push(annotationsStr);
+    const toolAny = tool as Record<string, unknown>;
+    const execution = toolAny.execution as Record<string, unknown> | undefined;
+    const taskSupport = execution?.taskSupport as string | undefined;
+    if (taskSupport === 'optional' || taskSupport === 'required') parts.push('async');
+    const annotationsSuffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
     lines.push(`${bullet} ${inBackticks(tool.name)}${annotationsSuffix}`);
   }
 
