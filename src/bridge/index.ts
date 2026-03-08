@@ -45,6 +45,9 @@ setGlobalDispatcher(new EnvHttpProxyAgent());
 // Keepalive ping interval in milliseconds (30 seconds)
 const KEEPALIVE_INTERVAL_MS = 30_000;
 
+// Maximum IPC buffer size (10 MB) — destroy socket if exceeded
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
+
 const logger = createLogger('bridge');
 
 interface BridgeOptions {
@@ -788,6 +791,13 @@ class BridgeProcess {
 
     socket.on('data', (data) => {
       buffer += data.toString();
+
+      if (buffer.length > MAX_BUFFER_SIZE) {
+        logger.error(`IPC buffer exceeded ${MAX_BUFFER_SIZE} bytes, destroying socket`);
+        socket.destroy();
+        this.connections.delete(socket);
+        return;
+      }
 
       // Process complete JSON messages (newline-delimited)
       let newlineIndex: number;
