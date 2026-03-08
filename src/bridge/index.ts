@@ -29,7 +29,12 @@ import { OAuthProvider } from '../lib/auth/oauth-provider.js';
 import { storeKeychainOAuthTokenInfo, readKeychainOAuthTokenInfo } from '../lib/auth/keychain.js';
 import { updateAuthProfileRefreshedAt } from '../lib/auth/profiles.js';
 import { readKeychainProxyBearerToken } from '../lib/auth/keychain.js';
-import type { Tool, Resource, Prompt } from '@modelcontextprotocol/sdk/types.js';
+import {
+  LoggingMessageNotificationSchema,
+  type Tool,
+  type Resource,
+  type Prompt,
+} from '@modelcontextprotocol/sdk/types.js';
 import { createRequire } from 'module';
 const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
   version: string;
@@ -586,6 +591,13 @@ class BridgeProcess {
 
     logger.info('Connected to MCP server');
     logger.debug('MCP client created successfully, authProvider was:', !!clientConfig.authProvider);
+
+    // Forward server logging messages to connected IPC clients
+    this.client
+      .getSDKClient()
+      .setNotificationHandler(LoggingMessageNotificationSchema, (notification) => {
+        this.broadcastNotification('logging/message', notification.params);
+      });
 
     // Update session with protocol version, MCP session ID, and lastSeenAt
     const serverDetails = await this.client.getServerDetails();
