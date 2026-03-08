@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
 
 ### Fixed
+- `--header` / `-H` option is now specific to the `connect` command instead of being shown as a global option in `mcpc --help`
 - IPC buffer between CLI and bridge process is now capped at 10 MB; sockets are destroyed if the limit is exceeded, preventing unbounded memory growth
 - `validateOptions()` no longer includes subcommand-specific options (`--full`, `--x402`, `--proxy`, etc.) in global known-options list; misplaced flags now produce clear "Unknown option" errors instead of confusing Commander rejections
 - Sessions requiring authentication now correctly show as `expired` instead of `live` when the server rejects unauthenticated connections

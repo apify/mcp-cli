@@ -411,7 +411,6 @@ describe('validateOptions', () => {
   });
 
   it('should not throw for known value options with separate values', () => {
-    expect(() => validateOptions(['--header', 'Authorization: Bearer token'])).not.toThrow();
     expect(() => validateOptions(['--timeout', '30'])).not.toThrow();
     expect(() => validateOptions(['--profile', 'personal'])).not.toThrow();
   });
@@ -459,6 +458,9 @@ describe('validateOptions', () => {
     expect(() => validateOptions(['--output', 'out.txt'])).toThrow(ClientError);
     expect(() => validateOptions(['--client-id', 'abc'])).toThrow(ClientError);
     expect(() => validateOptions(['--payment-required', 'data'])).toThrow(ClientError);
+    // --header is connect-specific, not global
+    expect(() => validateOptions(['--header', 'Authorization: Bearer token'])).toThrow(ClientError);
+    expect(() => validateOptions(['-H', 'Authorization: Bearer token'])).toThrow(ClientError);
   });
 
   it('should accept subcommand-specific options after a command token', () => {
@@ -471,6 +473,13 @@ describe('validateOptions', () => {
     expect(() =>
       validateOptions(['login', 'srv', '--client-id', 'abc', '--client-secret', 'xyz'])
     ).not.toThrow();
+    // --header is accepted after connect command token
+    expect(() =>
+      validateOptions(['connect', 'srv', '@s', '--header', 'Authorization: Bearer token'])
+    ).not.toThrow();
+    expect(() =>
+      validateOptions(['connect', 'srv', '@s', '-H', 'Authorization: Bearer token'])
+    ).not.toThrow();
   });
 
   it('should accept empty args array', () => {
@@ -478,12 +487,10 @@ describe('validateOptions', () => {
   });
 
   it('should skip the value of a global option that takes a value', () => {
-    // The value 'connect' after --header should not be treated as a command token
-    // that stops validation; it's the header value. Then --bad should be caught.
-    expect(() => validateOptions(['--header', '--bad'])).not.toThrow();
-    // --header consumes the next arg as its value, so --bad is skipped
-    // Actually, --header takes one value, then --bad is the next token and is checked
-    // Let me verify: --header takes 'val', then the loop continues
+    // --timeout takes a value, so the next token should be skipped during validation
+    expect(() => validateOptions(['--timeout', '30', 'connect'])).not.toThrow();
+    // --profile takes a value, so the next token should be skipped
+    expect(() => validateOptions(['--profile', 'myprofile', 'connect'])).not.toThrow();
   });
 
   it('should handle --option=value syntax', () => {

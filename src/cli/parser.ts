@@ -30,20 +30,15 @@ export function getJsonFromEnv(): boolean {
 }
 
 // Global options that take a value (not boolean flags)
-const GLOBAL_OPTIONS_WITH_VALUES = [
-  '-H',
-  '--header',
-  '--timeout',
-  '--profile',
-  '--schema',
-  '--schema-mode',
-];
+const GLOBAL_OPTIONS_WITH_VALUES = ['--timeout', '--profile', '--schema', '--schema-mode'];
 
 // All options that take a value — used by optionTakesValue() to correctly skip
 // the next arg when scanning for command tokens. Includes subcommand-specific
 // options so misplaced flags still get their values skipped during scanning.
 const OPTIONS_WITH_VALUES = [
   ...GLOBAL_OPTIONS_WITH_VALUES,
+  '-H',
+  '--header',
   '--proxy',
   '--proxy-bearer-token',
   '--scope',
@@ -237,7 +232,6 @@ export function validateArgValues(args: string[]): void {
  * Environment variables MCPC_VERBOSE and MCPC_JSON are used as defaults
  */
 export function extractOptions(args: string[]): {
-  headers?: string[];
   timeout?: number;
   profile?: string;
   x402?: boolean;
@@ -248,16 +242,6 @@ export function extractOptions(args: string[]): {
     verbose: args.includes('--verbose') || getVerboseFromEnv(),
     json: args.includes('--json') || args.includes('-j') || getJsonFromEnv(),
   };
-
-  // Extract --header (can be repeated)
-  const headers: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    const nextArg = args[i + 1];
-    if ((arg === '--header' || arg === '-H') && nextArg) {
-      headers.push(nextArg);
-    }
-  }
 
   // Extract --timeout
   const timeoutIndex = args.findIndex((arg) => arg === '--timeout');
@@ -275,7 +259,6 @@ export function extractOptions(args: string[]): {
 
   return {
     ...options,
-    ...(headers.length > 0 && { headers }),
     ...(timeout !== undefined && { timeout }),
     ...(profile && { profile }),
     ...(x402 && { x402 }),
