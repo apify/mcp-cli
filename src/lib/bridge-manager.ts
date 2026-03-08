@@ -16,13 +16,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { unlink } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import type {
-  ServerConfig,
-  AuthCredentials,
-  ProxyConfig,
-  X402WalletCredentials,
-  RequestOptionsOverride,
-} from './types.js';
+import type { ServerConfig, AuthCredentials, ProxyConfig, X402WalletCredentials } from './types.js';
 import { getSocketPath, waitForFile, isProcessAlive, fileExists, getLogsDir } from './utils.js';
 import { updateSession, getSession } from './sessions.js';
 import { createLogger } from './logger.js';
@@ -543,26 +537,4 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     `Bridge for ${sessionName} failed after restart: ${errorMsg}. ` +
       `For details, check logs at ${logPath}`
   );
-}
-
-/**
- * Send request options override to a running bridge via IPC
- * Updates the bridge's MCP client headers in-memory (no persistence)
- *
- * @param sessionName - Name of the session (used to compute socket path)
- * @param options - Headers to override
- */
-export async function sendRequestOptionsToBridge(
-  sessionName: string,
-  options: RequestOptionsOverride
-): Promise<void> {
-  const socketPath = getSocketPath(sessionName);
-  const client = new BridgeClient(socketPath);
-  try {
-    await client.connect();
-    client.sendRequestOptions(options);
-    logger.debug(`Sent request options to bridge for ${sessionName}`);
-  } finally {
-    await client.close();
-  }
 }

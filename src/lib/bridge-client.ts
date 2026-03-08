@@ -15,12 +15,7 @@
 
 import { connect, type Socket } from 'net';
 import { EventEmitter } from 'events';
-import type {
-  IpcMessage,
-  NotificationData,
-  X402WalletCredentials,
-  RequestOptionsOverride,
-} from './types.js';
+import type { IpcMessage, NotificationData, X402WalletCredentials } from './types.js';
 import { createLogger } from './logger.js';
 import { NetworkError, ClientError, ServerError, AuthError } from './errors.js';
 import { generateRequestId } from './utils.js';
@@ -191,12 +186,17 @@ export class BridgeClient extends EventEmitter {
    * Send a request to the bridge and wait for response
    * Uses 3-minute timeout for MCP operations by default, or custom timeout if provided
    */
-  async request(method: string, params?: unknown, timeout?: number): Promise<unknown> {
+  async request(
+    method: string,
+    params?: unknown,
+    options?: { timeout?: number; headers?: Record<string, string> }
+  ): Promise<unknown> {
     if (!this.socket) {
       throw new NetworkError('Not connected to bridge');
     }
 
     const id = generateRequestId();
+    const { timeout, headers } = options ?? {};
 
     const message: IpcMessage = {
       type: 'request',
@@ -204,6 +204,7 @@ export class BridgeClient extends EventEmitter {
       method,
       params,
       ...(timeout !== undefined && { timeout }),
+      ...(headers !== undefined && { headers }),
     };
 
     logger.debug('Sending request:', { id, method });
@@ -263,17 +264,6 @@ export class BridgeClient extends EventEmitter {
     this.send({
       type: 'set-x402-wallet',
       x402Wallet: wallet,
-    });
-  }
-
-  /**
-   * Send request options override to bridge (one-way, no response expected)
-   * Updates headers on the bridge's MCP client in-memory
-   */
-  sendRequestOptions(options: RequestOptionsOverride): void {
-    this.send({
-      type: 'set-request-options',
-      requestOptions: options,
     });
   }
 

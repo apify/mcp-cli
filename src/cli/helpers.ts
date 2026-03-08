@@ -3,7 +3,7 @@
  * Provides target resolution and MCP client management
  */
 
-import type { IMcpClient, OutputMode, ServerConfig, RequestOptionsOverride } from '../lib/types.js';
+import type { IMcpClient, OutputMode, ServerConfig } from '../lib/types.js';
 import { ClientError } from '../lib/errors.js';
 import { normalizeServerUrl, isValidSessionName, getServerHost } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
@@ -161,8 +161,8 @@ export interface McpClientContext {
  * Execute an operation with an MCP client via a named session
  * The target must be a valid session name (starts with @)
  *
- * When --header or --timeout are provided, they are sent to the bridge via IPC
- * and applied in-memory (no persistence, no bridge restart).
+ * When --header or --timeout are provided, they flow per-request via IPC
+ * and are applied by the bridge before each MCP call (no persistence).
  *
  * @param target - Session name (e.g. @apify)
  * @param options - CLI options (verbose, outputMode, headers, timeout, etc.)
@@ -193,9 +193,6 @@ export async function withMcpClient<T>(
 
   logger.debug('Using session:', target);
 
-  // Build request options override from CLI flags (sent via IPC, not persisted)
-  const requestOptions = buildRequestOptions(options);
-
   // Get session data to include in context
   const session = await getSession(target);
   const context: McpClientContext = {
@@ -212,35 +209,16 @@ export async function withMcpClient<T>(
     });
   }
 
-  // Use session client — send request options via IPC before executing the callback
-  // Also pass timeout to withSessionClient for IPC-level timeout
-  const sessionOpts = options.timeout !== undefined ? { timeout: options.timeout } : undefined;
+  // Build per-request session options from CLI flags
+  const parsedHeaders = options.headers?.length ? parseHeaderFlags(options.headers) : undefined;
+  const sessionOpts: { timeout?: number; headers?: Record<string, string> } = {
+    ...(options.timeout !== undefined && { timeout: options.timeout }),
+    ...(parsedHeaders && Object.keys(parsedHeaders).length > 0 && { headers: parsedHeaders }),
+  };
+
   return await withSessionClient(
     target,
-    async (client) => {
-      // Send options override to bridge if any were specified
-      if (requestOptions) {
-        const { sendRequestOptionsToBridge } = await import('../lib/bridge-manager.js');
-        await sendRequestOptionsToBridge(target, requestOptions);
-      }
-      return callback(client, context);
-    },
-    sessionOpts
+    (client) => callback(client, context),
+    Object.keys(sessionOpts).length > 0 ? sessionOpts : undefined
   );
-}
-
-/**
- * Build request options override from CLI flags
- * Returns undefined if no overrides are needed
- * Note: timeout is handled separately via PR #38's per-request IPC path
- */
-function buildRequestOptions(options: { headers?: string[] }): RequestOptionsOverride | undefined {
-  if (options.headers && options.headers.length > 0) {
-    const headers = parseHeaderFlags(options.headers);
-    if (Object.keys(headers).length > 0) {
-      return { headers };
-    }
-  }
-
-  return undefined;
 }

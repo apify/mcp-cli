@@ -22,11 +22,7 @@ import {
 } from '../lib/index.js';
 import { ClientError, NetworkError, isAuthenticationError } from '../lib/index.js';
 import { loadSessions, updateSession } from '../lib/sessions.js';
-import type {
-  AuthCredentials,
-  X402WalletCredentials,
-  RequestOptionsOverride,
-} from '../lib/types.js';
+import type { AuthCredentials, X402WalletCredentials } from '../lib/types.js';
 import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
 import { OAuthProvider } from '../lib/auth/oauth-provider.js';
 import { storeKeychainOAuthTokenInfo, readKeychainOAuthTokenInfo } from '../lib/auth/keychain.js';
@@ -238,23 +234,6 @@ class BridgeProcess {
     if (this.x402WalletResolver) {
       this.x402WalletResolver();
       this.x402WalletResolver = null;
-    }
-  }
-
-  /**
-   * Apply per-command request options received from CLI via IPC
-   * Updates headers on the MCP client in-memory (no persistence)
-   * Note: timeout is handled per-request via the IPC message timeout field
-   */
-  private applyRequestOptions(options: RequestOptionsOverride): void {
-    if (!this.client) {
-      logger.debug('No MCP client to apply request options to (not yet connected)');
-      return;
-    }
-
-    if (options.headers && Object.keys(options.headers).length > 0) {
-      this.client.updateTransportHeaders(options.headers);
-      logger.debug(`Applied header overrides: ${Object.keys(options.headers).join(', ')}`);
     }
   }
 
@@ -890,12 +869,6 @@ class BridgeProcess {
           }
           break;
 
-        case 'set-request-options':
-          if (message.requestOptions) {
-            this.applyRequestOptions(message.requestOptions);
-          }
-          break;
-
         default:
           throw new ClientError(`Unknown message type: ${message.type}`);
       }
@@ -932,9 +905,12 @@ class BridgeProcess {
     }
 
     try {
-      // Apply per-request timeout if provided (from CLI --timeout flag, in seconds → milliseconds)
+      // Apply per-request overrides from CLI flags
       if (message.timeout !== undefined) {
         this.client.setRequestTimeout(message.timeout * 1000);
+      }
+      if (message.headers !== undefined) {
+        this.client.updateTransportHeaders(message.headers);
       }
 
       let result: unknown;

@@ -43,6 +43,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   private bridgeClient: BridgeClient;
   private sessionName: string;
   private requestTimeout?: number; // Per-request timeout in seconds
+  private requestHeaders?: Record<string, string>; // Per-request header overrides
 
   constructor(sessionName: string, bridgeClient: BridgeClient) {
     super();
@@ -56,6 +57,24 @@ export class SessionClient extends EventEmitter implements IMcpClient {
    */
   setRequestTimeout(timeout: number): void {
     this.requestTimeout = timeout;
+  }
+
+  /**
+   * Set header overrides for all subsequent requests
+   */
+  setRequestHeaders(headers: Record<string, string>): void {
+    this.requestHeaders = headers;
+  }
+
+  /**
+   * Build per-request options (timeout + headers) for bridge client calls
+   */
+  private get requestOptions(): { timeout?: number; headers?: Record<string, string> } | undefined {
+    if (this.requestTimeout === undefined && this.requestHeaders === undefined) return undefined;
+    return {
+      ...(this.requestTimeout !== undefined && { timeout: this.requestTimeout }),
+      ...(this.requestHeaders !== undefined && { headers: this.requestHeaders }),
+    };
   }
 
   /**
@@ -124,7 +143,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         this.bridgeClient.request(
           'getServerDetails',
           undefined,
-          this.requestTimeout
+          this.requestOptions
         ) as Promise<ServerDetails>,
       'getServerDetails'
     );
@@ -133,7 +152,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   // MCP operations
   async ping(): Promise<void> {
     return this.withRetry(
-      () => this.bridgeClient.request('ping', undefined, this.requestTimeout).then(() => undefined),
+      () => this.bridgeClient.request('ping', undefined, this.requestOptions).then(() => undefined),
       'ping'
     );
   }
@@ -144,7 +163,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         this.bridgeClient.request(
           'listTools',
           cursor,
-          this.requestTimeout
+          this.requestOptions
         ) as Promise<ListToolsResult>,
       'listTools'
     );
@@ -156,7 +175,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         this.bridgeClient.request(
           'callTool',
           { name, arguments: args },
-          this.requestTimeout
+          this.requestOptions
         ) as Promise<CallToolResult>,
       'callTool'
     );
@@ -168,7 +187,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         this.bridgeClient.request(
           'listResources',
           cursor,
-          this.requestTimeout
+          this.requestOptions
         ) as Promise<ListResourcesResult>,
       'listResources'
     );
@@ -180,7 +199,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         this.bridgeClient.request(
           'listResourceTemplates',
           cursor,
-          this.requestTimeout
+          this.requestOptions
         ) as Promise<ListResourceTemplatesResult>,
       'listResourceTemplates'
     );
@@ -192,7 +211,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         this.bridgeClient.request(
           'readResource',
           { uri },
-          this.requestTimeout
+          this.requestOptions
         ) as Promise<ReadResourceResult>,
       'readResource'
     );
@@ -202,7 +221,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     return this.withRetry(
       () =>
         this.bridgeClient
-          .request('subscribeResource', { uri }, this.requestTimeout)
+          .request('subscribeResource', { uri }, this.requestOptions)
           .then(() => undefined),
       'subscribeResource'
     );
@@ -212,7 +231,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     return this.withRetry(
       () =>
         this.bridgeClient
-          .request('unsubscribeResource', { uri }, this.requestTimeout)
+          .request('unsubscribeResource', { uri }, this.requestOptions)
           .then(() => undefined),
       'unsubscribeResource'
     );
@@ -224,7 +243,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         this.bridgeClient.request(
           'listPrompts',
           cursor,
-          this.requestTimeout
+          this.requestOptions
         ) as Promise<ListPromptsResult>,
       'listPrompts'
     );
@@ -239,7 +258,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
             name,
             arguments: args,
           },
-          this.requestTimeout
+          this.requestOptions
         ) as Promise<GetPromptResult>,
       'getPrompt'
     );
@@ -249,7 +268,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     return this.withRetry(
       () =>
         this.bridgeClient
-          .request('setLoggingLevel', level, this.requestTimeout)
+          .request('setLoggingLevel', level, this.requestOptions)
           .then(() => undefined),
       'setLoggingLevel'
     );
@@ -286,12 +305,15 @@ export async function createSessionClient(sessionName: string): Promise<SessionC
 export async function withSessionClient<T>(
   sessionName: string,
   callback: (client: IMcpClient) => Promise<T>,
-  options?: { timeout?: number }
+  options?: { timeout?: number; headers?: Record<string, string> }
 ): Promise<T> {
   const client = await createSessionClient(sessionName);
 
   if (options?.timeout !== undefined) {
     client.setRequestTimeout(options.timeout);
+  }
+  if (options?.headers !== undefined) {
+    client.setRequestHeaders(options.headers);
   }
 
   try {
