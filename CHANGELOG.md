@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
 
 ### Fixed
+- Sessions requiring authentication now correctly show as `expired` instead of `live` when the server rejects unauthenticated connections
+- Auth errors wrapped in `NetworkError` by bridge IPC are now detected on first health check, avoiding unnecessary bridge restart
+- Fixed flaky E2E invariant check that failed when `lastSeenAt` changed between `--json` and `--json --verbose` calls
 - `--timeout` flag now correctly propagates to MCP requests via session bridge
 - `parseServerArg()` now handles well Windows drive-letter config paths as well as other ambiguous cases
 

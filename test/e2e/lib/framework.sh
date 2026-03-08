@@ -263,7 +263,12 @@ run_xmcpc() {
     return 1
   fi
 
-  if [[ "$json_verbose_stdout" != "$json_stdout" ]]; then
+  # Normalize time-varying fields (lastSeenAt changes between calls due to keepalive pings)
+  local json_normalized json_verbose_normalized
+  json_normalized=$(echo "$json_stdout" | sed 's/"lastSeenAt":"[^"]*"/"lastSeenAt":"__NORMALIZED__"/g')
+  json_verbose_normalized=$(echo "$json_verbose_stdout" | sed 's/"lastSeenAt":"[^"]*"/"lastSeenAt":"__NORMALIZED__"/g')
+
+  if [[ "$json_verbose_normalized" != "$json_normalized" ]]; then
     echo "INVARIANT VIOLATION: --verbose changed stdout (with --json)" >&2
     echo "--- json stdout ---" >&2
     echo "$json_stdout" >&2
