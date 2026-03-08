@@ -492,11 +492,10 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
       logger.debug(`Bridge for ${sessionName} is healthy`);
       return socketPath;
     }
-    // Not healthy - check if it's a connection issue vs MCP error
-    if (result.error instanceof NetworkError) {
-      logger.warn(`Bridge process alive but socket not responding for ${sessionName}`);
-    } else if (result.error) {
-      // MCP connection error - check if it's an auth error
+    // Not healthy - check error type
+    if (result.error) {
+      // Check for auth errors first (may be wrapped as NetworkError by bridge IPC,
+      // since MCP auth failures are NetworkError in the bridge process)
       const errorMessage = result.error.message || '';
       if (isAuthenticationError(errorMessage)) {
         // Mark session as expired so it shows correctly in session list
@@ -506,10 +505,14 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
         const target = session.server.url || session.server.command || sessionName;
         throw createServerAuthError(target, { sessionName, originalError: result.error });
       }
-      // Other MCP errors - propagate
-      throw new ClientError(
-        `Bridge for ${sessionName} failed to connect to MCP server: ${result.error.message}`
-      );
+      if (result.error instanceof NetworkError) {
+        logger.warn(`Bridge process alive but socket not responding for ${sessionName}`);
+      } else {
+        // Other MCP errors - propagate
+        throw new ClientError(
+          `Bridge for ${sessionName} failed to connect to MCP server: ${result.error.message}`
+        );
+      }
     }
   } else {
     logger.debug(`Bridge process not alive for ${sessionName}, will try to restart it`);
