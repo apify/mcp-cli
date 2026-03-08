@@ -81,11 +81,6 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   };
 
   // Only include optional properties if they're present
-  if (opts.header) {
-    // Commander stores repeated options as arrays, but single values as strings
-    // Always convert to array for consistent handling
-    options.headers = Array.isArray(opts.header) ? opts.header : [opts.header];
-  }
   if (opts.timeout) {
     const timeout = parseInt(opts.timeout as string, 10);
     if (isNaN(timeout) || timeout <= 0) {
@@ -311,7 +306,6 @@ function createTopLevelProgram(): Command {
     )
     .usage('[options] [<@session>] [<command>]')
     .option('-j, --json', 'Output in JSON format for scripting')
-    .option('-H, --header <header>', 'HTTP header (can be repeated)')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
@@ -348,6 +342,7 @@ Full docs: ${docsUrl}`
     .command('connect [server] [@session]')
     .usage('<server> <@session>')
     .description('Connect to an MCP server and start a new named @session')
+    .option('-H, --header <header>', 'HTTP header (can be repeated)')
     .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
@@ -374,6 +369,13 @@ Server formats:
       const globalOpts = getOptionsFromCommand(command);
       const parsed = parseServerArg(server);
 
+      // Extract --header from connect-specific opts
+      const headers: string[] | undefined = opts.header
+        ? Array.isArray(opts.header)
+          ? (opts.header as string[])
+          : [opts.header as string]
+        : undefined;
+
       if (!parsed) {
         throw new ClientError(
           `Invalid server: "${server}"\n\n` +
@@ -385,6 +387,7 @@ Server formats:
         // Config file entry: pass entry name as target with config file path
         await sessions.connectSession(parsed.entry, sessionName, {
           ...globalOpts,
+          ...(headers && { headers }),
           config: parsed.file,
           proxy: opts.proxy,
           proxyBearerToken: opts.proxyBearerToken,
@@ -393,6 +396,7 @@ Server formats:
       } else {
         await sessions.connectSession(server, sessionName, {
           ...globalOpts,
+          ...(headers && { headers }),
           proxy: opts.proxy,
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
@@ -773,7 +777,6 @@ function createSessionProgram(): Command {
     .name('mcpc <@session>')
     .helpOption('-h, --help', 'Display help')
     .option('-j, --json', 'Output in JSON format for scripting and code mode')
-    .option('-H, --header <header>', 'Custom HTTP header (can be repeated)')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile override')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
