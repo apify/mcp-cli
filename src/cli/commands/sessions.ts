@@ -11,6 +11,7 @@ import {
   getServerHost,
   redactHeaders,
 } from '../../lib/index.js';
+import { DISCONNECTED_THRESHOLD_MS } from '../../lib/types.js';
 import type { ServerConfig, ProxyConfig } from '../../lib/types.js';
 import {
   formatOutput,
@@ -313,18 +314,33 @@ export async function connectSession(
   }
 }
 
+// DISCONNECTED_THRESHOLD_MS imported from ../../lib/types.js
+
+type DisplayStatus = 'live' | 'disconnected' | 'crashed' | 'unauthorized' | 'expired';
+
 /**
  * Determine bridge status for a session
  */
 function getBridgeStatus(session: {
   status?: string;
   pid?: number;
-}): 'live' | 'crashed' | 'expired' {
+  lastSeenAt?: string;
+}): DisplayStatus {
+  if (session.status === 'unauthorized') {
+    return 'unauthorized';
+  }
   if (session.status === 'expired') {
     return 'expired';
   }
   if (!session.pid || !isProcessAlive(session.pid)) {
     return 'crashed';
+  }
+  // Bridge is alive — check if server is actually responding
+  if (session.lastSeenAt) {
+    const lastSeenMs = Date.now() - new Date(session.lastSeenAt).getTime();
+    if (lastSeenMs > DISCONNECTED_THRESHOLD_MS) {
+      return 'disconnected';
+    }
   }
   return 'live';
 }
@@ -332,12 +348,16 @@ function getBridgeStatus(session: {
 /**
  * Format bridge status for display with dot indicator
  */
-function formatBridgeStatus(status: 'live' | 'crashed' | 'expired'): { dot: string; text: string } {
+function formatBridgeStatus(status: DisplayStatus): { dot: string; text: string } {
   switch (status) {
     case 'live':
       return { dot: chalk.green('●'), text: chalk.green('live') };
+    case 'disconnected':
+      return { dot: chalk.yellow('●'), text: chalk.yellow('disconnected') };
     case 'crashed':
       return { dot: chalk.yellow('○'), text: chalk.yellow('crashed') };
+    case 'unauthorized':
+      return { dot: chalk.red('○'), text: chalk.red('unauthorized') };
     case 'expired':
       return { dot: chalk.red('○'), text: chalk.red('expired') };
   }
@@ -405,7 +425,7 @@ export async function listSessionsAndAuthProfiles(options: {
         const status = getBridgeStatus(session);
         const { dot, text } = formatBridgeStatus(status);
 
-        // Format status with time ago info (only show if not live or last seen > 5 min ago)
+        // Format status with time ago info (show for non-live states and stale live sessions)
         let statusStr = `${dot} ${text}`;
         if (session.lastSeenAt) {
           const lastSeenMs = Date.now() - new Date(session.lastSeenAt).getTime();
@@ -419,6 +439,12 @@ export async function listSessionsAndAuthProfiles(options: {
         }
 
         console.log(`  ${formatSessionLine(session)} ${statusStr}`);
+
+        // Show recovery hint for unauthorized sessions
+        if (status === 'unauthorized') {
+          const target = getServerHost(session.server.url || session.server.command || '');
+          console.log(chalk.dim(`    ↳ run: mcpc login ${target} && mcpc ${session.name} restart`));
+        }
       }
     }
 

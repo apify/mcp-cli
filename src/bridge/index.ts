@@ -11,6 +11,7 @@ import { unlink } from 'fs/promises';
 import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
 import type { McpClient } from '../core/index.js';
 import type { ServerConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
+import { KEEPALIVE_INTERVAL_MS } from '../lib/types.js';
 import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
 import {
   fileExists,
@@ -42,8 +43,7 @@ import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 // Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
 setGlobalDispatcher(new EnvHttpProxyAgent());
 
-// Keepalive ping interval in milliseconds (30 seconds)
-const KEEPALIVE_INTERVAL_MS = 30_000;
+// KEEPALIVE_INTERVAL_MS imported from ../lib/types.js
 
 // Maximum IPC buffer size (10 MB) — destroy socket if exceeded
 const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
@@ -280,8 +280,8 @@ class BridgeProcess {
       }
     } catch (error) {
       logger.error('Failed to get access token:', error);
-      // Mark session as expired if token refresh fails
-      await this.markSessionExpiredAndExit();
+      // Mark session as unauthorized if token refresh fails
+      await this.markSessionStatusAndExit('unauthorized');
       throw error;
     }
 
@@ -715,12 +715,18 @@ class BridgeProcess {
   }
 
   /**
-   * Check if an error indicates session expiration and handle accordingly
+   * Check if an error indicates session expiration or auth failure and handle accordingly
    */
   private handlePossibleExpiration(error: Error): void {
-    if (isSessionExpiredError(error.message) || isAuthenticationError(error.message)) {
+    if (isAuthenticationError(error.message)) {
+      logger.warn('Authentication rejected, marking session as unauthorized and shutting down');
+      this.markSessionStatusAndExit('unauthorized').catch((e) => {
+        logger.error('Failed to mark session as unauthorized:', e);
+        process.exit(1);
+      });
+    } else if (isSessionExpiredError(error.message)) {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
-      this.markSessionExpiredAndExit().catch((e) => {
+      this.markSessionStatusAndExit('expired').catch((e) => {
         logger.error('Failed to mark session as expired:', e);
         process.exit(1);
       });
@@ -728,16 +734,16 @@ class BridgeProcess {
   }
 
   /**
-   * Mark the session as expired in sessions.json and exit
+   * Mark the session with given status in sessions.json and exit
    */
-  private async markSessionExpiredAndExit(): Promise<void> {
+  private async markSessionStatusAndExit(status: 'expired' | 'unauthorized'): Promise<void> {
     if (this.isShuttingDown) {
       return;
     }
 
     try {
-      await updateSession(this.options.sessionName, { status: 'expired' });
-      logger.info(`Session ${this.options.sessionName} marked as expired`);
+      await updateSession(this.options.sessionName, { status });
+      logger.info(`Session ${this.options.sessionName} marked as ${status}`);
     } catch (error) {
       logger.error('Failed to update session status:', error);
     }

@@ -103,7 +103,7 @@ export function createServerAuthError(
   options?: { sessionName?: string; originalError?: Error }
 ): AuthError {
   const sessionHint = options?.sessionName
-    ? `Then recreate the session:\n  mcpc connect ${target} ${options.sessionName}`
+    ? `Then restart the session:\n  mcpc ${options.sessionName} restart`
     : `Then run your command again.`;
 
   return new AuthError(
