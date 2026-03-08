@@ -108,11 +108,22 @@ export class McpClient implements IMcpClient {
 
   /**
    * Override request timeout for subsequent requests (in milliseconds)
-   * Used by bridge to apply per-request timeout from CLI --timeout flag
+   * Pass undefined to restore SDK default.
    */
-  setRequestTimeout(timeoutMs: number): void {
-    this.requestTimeout = timeoutMs;
-    this.logger.debug(`Request timeout updated to ${timeoutMs}ms`);
+  setRequestTimeout(timeoutMs: number | undefined): void {
+    if (timeoutMs === undefined) {
+      delete this.requestTimeout;
+    } else {
+      this.requestTimeout = timeoutMs;
+    }
+    this.logger.debug(`Request timeout updated to ${timeoutMs ?? 'default'}`);
+  }
+
+  /**
+   * Get current request timeout in milliseconds, or undefined for SDK default
+   */
+  getRequestTimeout(): number | undefined {
+    return this.requestTimeout;
   }
 
   /**
@@ -443,32 +454,36 @@ export class McpClient implements IMcpClient {
   }
 
   /**
-   * Update transport headers at runtime
-   * Merges new headers with existing transport requestInit headers
-   * Only works for HTTP transports (StreamableHTTPClientTransport)
+   * Get current transport headers (from StreamableHTTPClientTransport._requestInit.headers)
+   * Returns a shallow copy. Returns empty object for stdio transports.
    */
-  updateTransportHeaders(headers: Record<string, string>): void {
+  getTransportHeaders(): Record<string, string> {
+    if (!this.transport) return {};
+    const t = this.transport as unknown as Record<string, unknown>;
+    const requestInit = t._requestInit as Record<string, unknown> | undefined;
+    if (!requestInit) return {};
+    return { ...((requestInit.headers || {}) as Record<string, string>) };
+  }
+
+  /**
+   * Replace transport headers at runtime (overwrites, does not merge)
+   * Only affects HTTP transports (StreamableHTTPClientTransport)
+   */
+  setTransportHeaders(headers: Record<string, string>): void {
     if (!this.transport) {
-      this.logger.debug('No transport to update headers on');
+      this.logger.debug('No transport to set headers on');
       return;
     }
 
-    // Access the transport's internal requestInit to update headers
-    // StreamableHTTPClientTransport stores headers in _requestInit
     const t = this.transport as unknown as Record<string, unknown>;
     const requestInit = t._requestInit as Record<string, unknown> | undefined;
 
     if (requestInit !== undefined) {
-      const existingHeaders = (requestInit.headers || {}) as Record<string, string>;
-      requestInit.headers = { ...existingHeaders, ...headers };
-      this.logger.debug(`Transport headers updated: ${Object.keys(headers).join(', ')}`);
+      requestInit.headers = { ...headers };
     } else {
-      // Transport doesn't have _requestInit (e.g., stdio transport) — set it
-      t._requestInit = { headers };
-      this.logger.debug(
-        `Transport requestInit created with headers: ${Object.keys(headers).join(', ')}`
-      );
+      t._requestInit = { headers: { ...headers } };
     }
+    this.logger.debug(`Transport headers set: ${Object.keys(headers).join(', ')}`);
   }
 
   /**

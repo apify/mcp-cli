@@ -40,6 +40,7 @@ const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true';
 let failNextCount = 0;
 let sessionExpired = false;
 const deletedSessions: string[] = [];
+let lastMcpHeaders: Record<string, string> = {};
 
 // Test data
 const TOOLS = [
@@ -410,6 +411,11 @@ async function main() {
           res.end(JSON.stringify({ deletedSessions }));
           return;
         }
+        if (action === 'last-mcp-headers') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(lastMcpHeaders));
+          return;
+        }
         if (action === 'get-active-sessions') {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ activeSessions: Array.from(transports.keys()) }));
@@ -445,6 +451,7 @@ async function main() {
           failNextCount = 0;
           sessionExpired = false;
           deletedSessions.length = 0;
+          lastMcpHeaders = {};
           res.writeHead(200);
           res.end('State reset');
           return;
@@ -493,6 +500,9 @@ async function main() {
 
     // MCP endpoint
     if (url.pathname === '/' || url.pathname === '/mcp') {
+      // Capture headers for test inspection via GET /control/last-mcp-headers
+      lastMcpHeaders = { ...(req.headers as Record<string, string>) };
+
       // Handle MCP requests via StreamableHTTPServerTransport
       const mcpSessionId = req.headers['mcp-session-id'] as string | undefined;
 

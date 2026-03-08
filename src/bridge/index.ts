@@ -904,13 +904,21 @@ class BridgeProcess {
       logger.debug(`  token expires in: ${expiresIn} seconds`);
     }
 
+    // Save originals so per-request overrides don't leak to subsequent requests
+    const savedTimeout = this.client.getRequestTimeout();
+    const savedHeaders =
+      message.headers !== undefined ? this.client.getTransportHeaders() : undefined;
+
     try {
       // Apply per-request overrides from CLI flags
       if (message.timeout !== undefined) {
         this.client.setRequestTimeout(message.timeout * 1000);
       }
       if (message.headers !== undefined) {
-        this.client.updateTransportHeaders(message.headers);
+        this.client.setTransportHeaders({
+          ...this.client.getTransportHeaders(),
+          ...message.headers,
+        });
       }
 
       let result: unknown;
@@ -1003,6 +1011,12 @@ class BridgeProcess {
 
       // Check if this error indicates session expiration
       this.handlePossibleExpiration(error as Error);
+    } finally {
+      // Restore originals so overrides don't leak to subsequent requests
+      this.client.setRequestTimeout(savedTimeout);
+      if (savedHeaders !== undefined) {
+        this.client.setTransportHeaders(savedHeaders);
+      }
     }
   }
 
