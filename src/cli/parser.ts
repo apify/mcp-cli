@@ -29,22 +29,40 @@ export function getJsonFromEnv(): boolean {
   return isEnvTrue(process.env.MCPC_JSON);
 }
 
-// Options that take a value (not boolean flags)
-const OPTIONS_WITH_VALUES = [
+// Global options that take a value (not boolean flags)
+const GLOBAL_OPTIONS_WITH_VALUES = [
   '-H',
   '--header',
   '--timeout',
   '--profile',
   '--schema',
   '--schema-mode',
-  '--proxy',
-  '--proxy-bearer-token',
 ];
 
-// All known options (both boolean flags and value options)
-// Includes both global options and command-specific options
+// All options that take a value — used by optionTakesValue() to correctly skip
+// the next arg when scanning for command tokens. Includes subcommand-specific
+// options so misplaced flags still get their values skipped during scanning.
+const OPTIONS_WITH_VALUES = [
+  ...GLOBAL_OPTIONS_WITH_VALUES,
+  '--proxy',
+  '--proxy-bearer-token',
+  '--scope',
+  '--client-id',
+  '--client-secret',
+  '-o',
+  '--output',
+  '--max-size',
+  '-r',
+  '--payment-required',
+  '--amount',
+  '--expiry',
+];
+
+// Global options recognized before the first command token.
+// validateOptions() stops at the first non-option token, so subcommand-specific
+// options (--scope, --proxy, --full, --x402, etc.) are handled by Commander.
 const KNOWN_OPTIONS = [
-  ...OPTIONS_WITH_VALUES,
+  ...GLOBAL_OPTIONS_WITH_VALUES,
   '-j',
   '--json',
   '-v',
@@ -52,8 +70,6 @@ const KNOWN_OPTIONS = [
   '-h',
   '--help',
   '--verbose',
-  '--full',
-  '--x402',
 ];
 
 // Valid --schema-mode values
