@@ -386,9 +386,15 @@ function formatToolsSummary(tools: Tool[]): string[] {
   // Summary list of tools
   const bullet = chalk.dim('*');
   for (const tool of tools) {
+    const parts: string[] = [];
     const annotationsStr = formatToolAnnotations(tool.annotations);
-    const annotationsSuffix = annotationsStr ? ` ${chalk.gray(`[${annotationsStr}]`)}` : '';
-    lines.push(`${bullet} ${inBackticks(tool.name)}${annotationsSuffix}`);
+    if (annotationsStr) parts.push(annotationsStr);
+    // Show async indicator if tool supports task execution
+    const toolAny = tool as Record<string, unknown>;
+    const execution = toolAny.execution as Record<string, unknown> | undefined;
+    if (execution?.taskSupport) parts.push('async');
+    const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
+    lines.push(`${bullet} ${inBackticks(tool.name)}${suffix}`);
   }
 
   return lines;
