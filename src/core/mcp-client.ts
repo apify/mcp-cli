@@ -530,6 +530,95 @@ export class McpClient implements IMcpClient {
   }
 
   /**
+   * Call a tool with task-augmented execution in detached mode.
+   * Returns immediately after task creation with the task ID.
+   */
+  async callToolDetached(name: string, args?: Record<string, unknown>): Promise<TaskUpdate> {
+    try {
+      this.logger.debug(`Calling tool detached: ${name}`, args);
+      const stream = this.client.experimental.tasks.callToolStream(
+        { name, arguments: args || {} },
+        CallToolResultSchema,
+        this.getRequestOptions()
+      );
+
+      for await (const message of stream) {
+        if (message.type === 'taskCreated') {
+          this.logger.debug(`Task created (detached): ${message.task.taskId}`);
+          const update = taskToUpdate(message.task);
+          // Break out of the generator — this closes the stream
+          // The task continues running on the server
+          return update;
+        }
+        if (message.type === 'error') {
+          throw new ServerError(`Tool ${name} task failed: ${message.error.message}`, {
+            originalError: message.error,
+          });
+        }
+      }
+
+      throw new ServerError(`Tool ${name} task stream ended without creating a task`);
+    } catch (error) {
+      if (error instanceof ServerError) throw error;
+      this.logger.error(`Failed to call tool ${name} detached:`, error);
+      throw new ServerError(`Failed to call tool ${name} detached: ${(error as Error).message}`, {
+        originalError: error,
+      });
+    }
+  }
+
+  /**
+   * Poll a task by ID until it reaches a terminal state.
+   * Used for crash recovery — reconnect to an existing task.
+   */
+  async pollTask(taskId: string, onUpdate?: (update: TaskUpdate) => void): Promise<CallToolResult> {
+    const POLL_INTERVAL_MS = 2000;
+
+    try {
+      this.logger.debug(`Polling task: ${taskId}`);
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const task = await this.getTask(taskId);
+        const update: TaskUpdate = {
+          taskId: task.taskId,
+          status: task.status,
+          ...(task.statusMessage != null ? { statusMessage: task.statusMessage } : {}),
+          createdAt: task.createdAt,
+          lastUpdatedAt: task.lastUpdatedAt,
+        };
+        onUpdate?.(update);
+
+        if (
+          task.status === 'completed' ||
+          task.status === 'failed' ||
+          task.status === 'cancelled'
+        ) {
+          // For completed tasks, the result is in the task itself
+          if (task.status === 'completed') {
+            // Re-fetch task to get final result if needed
+            // The GetTaskResult includes the task with its artifacts
+            return {
+              content: [{ type: 'text', text: task.statusMessage || 'Task completed' }],
+            } as CallToolResult;
+          }
+          throw new ServerError(
+            `Task ${taskId} ${task.status}: ${task.statusMessage || 'no details'}`
+          );
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      }
+    } catch (error) {
+      if (error instanceof ServerError) throw error;
+      this.logger.error(`Failed to poll task ${taskId}:`, error);
+      throw new ServerError(`Failed to poll task ${taskId}: ${(error as Error).message}`, {
+        originalError: error,
+      });
+    }
+  }
+
+  /**
    * List tasks on the server
    */
   async listTasks(cursor?: string): Promise<ListTasksResult> {

@@ -472,6 +472,7 @@ All state files are stored in `~/.mcpc/` directory (unless overridden by `MCPC_H
 
 - `~/.mcpc/sessions.json` - Active sessions with references to auth profiles (file-locked for concurrent access)
 - `~/.mcpc/profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
+- `~/.mcpc/active-tasks.json` - Active async tasks per session (for crash recovery)
 - `~/.mcpc/bridges/` - Unix domain socket files for bridge processes
 - `~/.mcpc/history` - Interactive shell command history (last 1000 commands)
 - `~/.mcpc/logs/bridge-<session>.log` - Bridge process logs (max 10MB, 5 files)

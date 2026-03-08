@@ -365,6 +365,8 @@ export interface IMcpClient {
     args?: Record<string, unknown>,
     onUpdate?: (update: TaskUpdate) => void
   ): Promise<CallToolResult>;
+  callToolDetached(name: string, args?: Record<string, unknown>): Promise<TaskUpdate>;
+  pollTask(taskId: string, onUpdate?: (update: TaskUpdate) => void): Promise<CallToolResult>;
   listTasks(cursor?: string): Promise<ListTasksResult>;
   getTask(taskId: string): Promise<GetTaskResult>;
   cancelTask(taskId: string): Promise<CancelTaskResult>;

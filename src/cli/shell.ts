@@ -221,16 +221,23 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
       case 'tools-call': {
         if (args.length === 0) {
           console.log(chalk.red('Error: tools-call requires a tool name'));
-          console.log('Usage: tools-call <name> [key:=value ...]');
+          console.log('Usage: tools-call <name> [--async] [--detach] [key:=value ...]');
           return;
         }
 
+        // Extract flags from args
+        const asyncFlag = args.includes('--async');
+        const detachFlag = args.includes('--detach');
+        const filteredArgs = args.filter((a) => a !== '--async' && a !== '--detach');
+
         // First arg is tool name, rest are positional arguments
-        const toolName = args[0] as string;
-        const toolArgs = args.slice(1);
+        const toolName = filteredArgs[0] as string;
+        const toolArgs = filteredArgs.slice(1);
 
         await tools.callTool(ctx.target, toolName, {
           ...options,
+          ...(asyncFlag ? { async: true } : {}),
+          ...(detachFlag ? { detach: true } : {}),
           ...(toolArgs.length > 0 ? { args: toolArgs } : {}),
         });
         break;

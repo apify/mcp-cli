@@ -7,7 +7,8 @@
 
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { createServer, type Server as NetServer, type Socket } from 'net';
-import { unlink } from 'fs/promises';
+import { readFile, unlink, writeFile } from 'fs/promises';
+import { join } from 'path';
 import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
 import type { McpClient } from '../core/index.js';
 import type { ServerConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
@@ -15,6 +16,7 @@ import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../li
 import {
   fileExists,
   getBridgesDir,
+  getMcpcHome,
   getSocketPath,
   ensureDir,
   cleanupOrphanedLogFiles,
@@ -90,7 +92,7 @@ class BridgeProcess {
   // Cached tools list for x402 proactive signing (updated via listChanged notifications)
   private cachedTools: Tool[] | null = null;
 
-  // Active async tasks (in-memory, not persisted across restarts)
+  // Active async tasks (in-memory, also persisted to disk for crash recovery)
   private activeTasks: Map<string, Task> = new Map();
 
   // Promise to track when auth credentials are received (for startup sequencing)
@@ -951,39 +953,67 @@ class BridgeProcess {
             name: string;
             arguments?: Record<string, unknown>;
             useTask?: boolean;
+            detach?: boolean;
           };
           if (params.useTask && this.client.supportsTasksForToolCall()) {
-            // Task-augmented tool call: stream updates to requesting socket
-            const onUpdate = (update: TaskUpdate): void => {
-              // Track active task
-              this.activeTasks.set(update.taskId, {
-                taskId: update.taskId,
-                status: update.status,
-                statusMessage: update.statusMessage,
-                createdAt: update.createdAt ?? new Date().toISOString(),
-                lastUpdatedAt: update.lastUpdatedAt ?? new Date().toISOString(),
+            if (params.detach) {
+              // Detached execution: start task and return task ID immediately
+              // The tool continues running in the background on the server
+              const taskUpdate = await this.client.callToolDetached(params.name, params.arguments);
+              this.activeTasks.set(taskUpdate.taskId, {
+                taskId: taskUpdate.taskId,
+                status: taskUpdate.status,
+                statusMessage: taskUpdate.statusMessage,
+                createdAt: taskUpdate.createdAt ?? new Date().toISOString(),
+                lastUpdatedAt: taskUpdate.lastUpdatedAt ?? new Date().toISOString(),
               } as Task);
-              // Send task update to requesting client
-              if (message.id) {
-                this.sendResponse(socket, {
-                  type: 'task-update',
-                  id: message.id,
-                  taskUpdate: update,
-                });
-              }
-            };
-            try {
-              result = await this.client.callToolWithTask(params.name, params.arguments, onUpdate);
-            } finally {
-              // Clean up completed tasks from activeTasks
-              // (keep only working/input_required tasks)
-              for (const [taskId, task] of this.activeTasks) {
-                if (
-                  task.status === 'completed' ||
-                  task.status === 'failed' ||
-                  task.status === 'cancelled'
-                ) {
-                  this.activeTasks.delete(taskId);
+              await this.persistActiveTask(taskUpdate.taskId, params.name);
+              result = taskUpdate;
+            } else {
+              // Task-augmented tool call: stream updates to requesting socket
+              const onUpdate = (update: TaskUpdate): void => {
+                // Track active task
+                this.activeTasks.set(update.taskId, {
+                  taskId: update.taskId,
+                  status: update.status,
+                  statusMessage: update.statusMessage,
+                  createdAt: update.createdAt ?? new Date().toISOString(),
+                  lastUpdatedAt: update.lastUpdatedAt ?? new Date().toISOString(),
+                } as Task);
+                // Send task update to requesting client
+                if (message.id) {
+                  this.sendResponse(socket, {
+                    type: 'task-update',
+                    id: message.id,
+                    taskUpdate: update,
+                  });
+                }
+              };
+              let taskId: string | undefined;
+              const { wrappedOnUpdate } = this.persistActiveTaskOnCreate((update: TaskUpdate) => {
+                taskId = update.taskId;
+                onUpdate(update);
+              }, params.name);
+              try {
+                result = await this.client.callToolWithTask(
+                  params.name,
+                  params.arguments,
+                  wrappedOnUpdate
+                );
+              } finally {
+                // Clean up completed tasks from activeTasks and persistence
+                for (const [tid, task] of this.activeTasks) {
+                  if (
+                    task.status === 'completed' ||
+                    task.status === 'failed' ||
+                    task.status === 'cancelled'
+                  ) {
+                    this.activeTasks.delete(tid);
+                    await this.removePersistedTask(tid).catch(() => {});
+                  }
+                }
+                if (taskId) {
+                  await this.removePersistedTask(taskId).catch(() => {});
                 }
               }
             }
@@ -1063,6 +1093,35 @@ class BridgeProcess {
           break;
         }
 
+        case 'pollTask': {
+          const params = message.params as { taskId: string };
+          const onUpdate = (update: TaskUpdate): void => {
+            // Track active task
+            this.activeTasks.set(update.taskId, {
+              taskId: update.taskId,
+              status: update.status,
+              statusMessage: update.statusMessage,
+              createdAt: update.createdAt ?? new Date().toISOString(),
+              lastUpdatedAt: update.lastUpdatedAt ?? new Date().toISOString(),
+            } as Task);
+            // Send task update to requesting client
+            if (message.id) {
+              this.sendResponse(socket, {
+                type: 'task-update',
+                id: message.id,
+                taskUpdate: update,
+              });
+            }
+          };
+          try {
+            result = await this.client.pollTask(params.taskId, onUpdate);
+          } finally {
+            this.activeTasks.delete(params.taskId);
+            await this.removePersistedTask(params.taskId).catch(() => {});
+          }
+          break;
+        }
+
         default:
           throw new ClientError(`Unknown MCP method: ${message.method}`);
       }
@@ -1082,6 +1141,90 @@ class BridgeProcess {
       // Check if this error indicates session expiration
       this.handlePossibleExpiration(error as Error);
     }
+  }
+
+  // --- Active task persistence for crash recovery ---
+
+  private getActiveTasksPath(): string {
+    return join(getMcpcHome(), 'active-tasks.json');
+  }
+
+  private async loadPersistedTasks(): Promise<
+    Record<string, Record<string, { taskId: string; toolName: string; createdAt: string }>>
+  > {
+    const path = this.getActiveTasksPath();
+    if (!(await fileExists(path))) return {};
+    try {
+      return JSON.parse(await readFile(path, 'utf-8')) as Record<
+        string,
+        Record<string, { taskId: string; toolName: string; createdAt: string }>
+      >;
+    } catch {
+      return {};
+    }
+  }
+
+  private async savePersistedTasks(
+    data: Record<string, Record<string, { taskId: string; toolName: string; createdAt: string }>>
+  ): Promise<void> {
+    const path = this.getActiveTasksPath();
+    await writeFile(path, JSON.stringify(data, null, 2), { mode: 0o600 });
+  }
+
+  /**
+   * Persist an active task to disk for crash recovery
+   */
+  private async persistActiveTask(taskId: string, toolName: string): Promise<void> {
+    try {
+      const data = await this.loadPersistedTasks();
+      const sessionName = this.options.sessionName;
+      if (!data[sessionName]) data[sessionName] = {};
+      data[sessionName][taskId] = {
+        taskId,
+        toolName,
+        createdAt: new Date().toISOString(),
+      };
+      await this.savePersistedTasks(data);
+    } catch (error) {
+      logger.warn(`Failed to persist active task ${taskId}:`, error);
+    }
+  }
+
+  /**
+   * Remove a persisted task (on completion/failure/cancellation)
+   */
+  private async removePersistedTask(taskId: string): Promise<void> {
+    try {
+      const data = await this.loadPersistedTasks();
+      const sessionTasks = data[this.options.sessionName];
+      if (sessionTasks) {
+        delete sessionTasks[taskId];
+        if (Object.keys(sessionTasks).length === 0) {
+          delete data[this.options.sessionName];
+        }
+        await this.savePersistedTasks(data);
+      }
+    } catch (error) {
+      logger.warn(`Failed to remove persisted task ${taskId}:`, error);
+    }
+  }
+
+  /**
+   * Helper to wrap onUpdate callback with task persistence on first creation
+   */
+  private persistActiveTaskOnCreate(
+    onUpdate: (update: TaskUpdate) => void,
+    toolName: string
+  ): { wrappedOnUpdate: (update: TaskUpdate) => void } {
+    let persisted = false;
+    const wrappedOnUpdate = (update: TaskUpdate): void => {
+      if (!persisted) {
+        persisted = true;
+        this.persistActiveTask(update.taskId, toolName).catch(() => {});
+      }
+      onUpdate(update);
+    };
+    return { wrappedOnUpdate };
   }
 
   /**

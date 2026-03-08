@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Async task support for `tools-call`: when the server supports MCP tasks, tool calls automatically use task-augmented execution with a progress spinner showing elapsed time and server status messages in human mode
-- `--sync` flag for `tools-call` to force synchronous execution, skipping async tasks
+- `--async` flag for `tools-call` to opt-in to async task execution (experimental) with a progress spinner showing elapsed time and server status messages in human mode
+- `--detach` flag for `tools-call` to start an async task and return the task ID immediately without waiting for completion (implies `--async`)
 - New `tasks-list`, `tasks-get`, `tasks-cancel` commands for managing async tasks on the server
 - Task capability and `execution.taskSupport` displayed in `tools-get` and server info
 - E2E test server now includes a `slow-task` tool that supports async task execution
@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Async task execution for `tools-call` is now opt-in via `--async` flag instead of automatic; `--sync` flag removed
+- Bridge crash resilience: active tasks are reconnected via polling after bridge restart instead of re-invoked
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
 
   | Before                                        | After                                                      |

@@ -109,13 +109,14 @@ function formatElapsed(ms: number): string {
 }
 
 /**
- * Check if task-augmented execution should be used for a tool call
+ * Check if task-augmented execution should be used for a tool call.
+ * Async tasks are opt-in via --async or --detach flags.
  */
 async function shouldUseTask(
   client: import('../../lib/types.js').IMcpClient,
-  sync: boolean | undefined
+  async_: boolean | undefined
 ): Promise<boolean> {
-  if (sync) return false;
+  if (!async_) return false;
   const details = await client.getServerDetails();
   return !!details.capabilities?.tasks?.requests?.tools?.call;
 }
@@ -126,15 +127,16 @@ async function shouldUseTask(
  * 1. Positional args: key:=value pairs or inline JSON
  * 2. Stdin: pipe JSON input (echo '{"key":"value"}' | mcpc ...)
  *
- * When the server supports async tasks, uses task-augmented execution
- * with a progress spinner in human mode. Use --sync to force synchronous execution.
+ * Use --async for task-augmented execution with progress spinner.
+ * Use --detach to start an async task and return the task ID immediately.
  */
 export async function callTool(
   target: string,
   name: string,
   options: CommandOptions & {
     args?: string[];
-    sync?: boolean;
+    async?: boolean;
+    detach?: boolean;
   }
 ): Promise<void> {
   // Parse args from positional arguments or stdin
@@ -188,12 +190,35 @@ export async function callTool(
       }
     }
 
+    // --detach implies --async
+    const useAsync = options.detach || options.async;
     // Check if we should use task-augmented execution
-    const useTask = await shouldUseTask(client, options.sync);
+    const useTask = await shouldUseTask(client, useAsync);
+
+    // Warn if --async/--detach was requested but server doesn't support tasks
+    if (useAsync && !useTask) {
+      if (options.outputMode === 'human') {
+        console.log(
+          formatWarning(
+            'Server does not support async tasks, falling back to synchronous execution'
+          )
+        );
+      }
+    }
 
     let result;
 
-    if (useTask) {
+    if (useTask && options.detach) {
+      // Detached execution: start async task and return task ID immediately
+      const taskUpdate = await client.callToolDetached(name, parsedArgs);
+
+      if (options.outputMode === 'human') {
+        console.log(formatSuccess(`Task started: ${taskUpdate.taskId}`));
+      } else {
+        console.log(formatOutput({ taskId: taskUpdate.taskId, status: taskUpdate.status }, 'json'));
+      }
+      return;
+    } else if (useTask) {
       // Task-augmented execution with progress display
       const startTime = Date.now();
       let spinner: ReturnType<typeof ora> | null = null;
@@ -240,7 +265,7 @@ export async function callTool(
         if (timerInterval) clearInterval(timerInterval);
       }
     } else {
-      // Synchronous execution (no task support or --sync flag)
+      // Synchronous execution (default)
       result = await client.callTool(name, parsedArgs);
       if (options.outputMode === 'human') {
         console.log(formatSuccess(`Tool ${name} executed successfully`));
