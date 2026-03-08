@@ -57,7 +57,9 @@ test_pass
 # Test: bridge restart with rejected session ID marks session as expired
 test_case "rejected session ID marks session as expired"
 
-run_xmcpc --json
+# Use run_mcpc (not run_xmcpc) because session list can change between
+# the 4 variant calls when other tests run in parallel with shared home
+run_mcpc --json
 bridge_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
 assert_not_empty "$bridge_pid" "should have bridge PID"
 

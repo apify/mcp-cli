@@ -20,7 +20,9 @@ test_pass
 
 # Test: session appears in list
 test_case "session appears in list"
-run_xmcpc --json
+# Use run_mcpc (not run_xmcpc) because session list can change between
+# the 4 variant calls when other tests run in parallel with shared home
+run_mcpc --json
 assert_success
 assert_json "$STDOUT" ".sessions[] | select(.name == \"$SESSION\")"
 test_pass
