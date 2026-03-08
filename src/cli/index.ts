@@ -60,6 +60,11 @@ interface HandlerOptions {
   full?: boolean;
 }
 
+/** Commander option collector for repeated flags (e.g. --header) */
+function collectOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
 /**
  * Extract options from Commander's Command object
  * Used by command handlers to get parsed options in consistent format
@@ -81,10 +86,8 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   };
 
   // Only include optional properties if they're present
-  if (opts.header) {
-    // Commander stores repeated options as arrays, but single values as strings
-    // Always convert to array for consistent handling
-    options.headers = Array.isArray(opts.header) ? opts.header : [opts.header];
+  if (opts.header && (opts.header as string[]).length > 0) {
+    options.headers = opts.header as string[];
   }
   if (opts.timeout) {
     const timeout = parseInt(opts.timeout as string, 10);
@@ -311,7 +314,7 @@ function createTopLevelProgram(): Command {
     )
     .usage('[options] [<@session>] [<command>]')
     .option('-j, --json', 'Output in JSON format for scripting')
-    .option('-H, --header <header>', 'HTTP header (can be repeated)')
+    .option('-H, --header <header>', 'HTTP header (can be repeated)', collectOption, [])
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
@@ -773,7 +776,7 @@ function createSessionProgram(): Command {
     .name('mcpc <@session>')
     .helpOption('-h, --help', 'Display help')
     .option('-j, --json', 'Output in JSON format for scripting and code mode')
-    .option('-H, --header <header>', 'Custom HTTP header (can be repeated)')
+    .option('-H, --header <header>', 'Custom HTTP header (can be repeated)', collectOption, [])
     .option('--verbose', 'Enable debug logging')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
