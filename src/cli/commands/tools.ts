@@ -2,9 +2,11 @@
  * Tools command handlers
  */
 
+import ora from 'ora';
+import chalk from 'chalk';
 import { formatOutput, formatToolDetail, formatSuccess, formatWarning } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
-import type { CommandOptions } from '../../lib/types.js';
+import type { CommandOptions, TaskUpdate } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs, hasStdinData, readStdinArgs } from '../parser.js';
 import {
@@ -93,16 +95,46 @@ export async function getTool(
 }
 
 /**
+ * Format elapsed time as M:SS or H:MM:SS
+ */
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+/**
+ * Check if task-augmented execution should be used for a tool call
+ */
+async function shouldUseTask(
+  client: import('../../lib/types.js').IMcpClient,
+  sync: boolean | undefined
+): Promise<boolean> {
+  if (sync) return false;
+  const details = await client.getServerDetails();
+  return !!details.capabilities?.tasks?.requests?.tools?.call;
+}
+
+/**
  * Call a tool with arguments
  * Arguments can be provided via:
  * 1. Positional args: key:=value pairs or inline JSON
  * 2. Stdin: pipe JSON input (echo '{"key":"value"}' | mcpc ...)
+ *
+ * When the server supports async tasks, uses task-augmented execution
+ * with a progress spinner in human mode. Use --sync to force synchronous execution.
  */
 export async function callTool(
   target: string,
   name: string,
   options: CommandOptions & {
     args?: string[];
+    sync?: boolean;
   }
 ): Promise<void> {
   // Parse args from positional arguments or stdin
@@ -156,10 +188,66 @@ export async function callTool(
       }
     }
 
-    const result = await client.callTool(name, parsedArgs);
+    // Check if we should use task-augmented execution
+    const useTask = await shouldUseTask(client, options.sync);
+
+    let result;
+
+    if (useTask) {
+      // Task-augmented execution with progress display
+      const startTime = Date.now();
+      let spinner: ReturnType<typeof ora> | null = null;
+      let timerInterval: ReturnType<typeof setInterval> | null = null;
+      let lastStatusMessage: string | undefined;
+
+      const updateSpinnerText = (): void => {
+        if (!spinner) return;
+        const elapsed = formatElapsed(Date.now() - startTime);
+        const statusSuffix = lastStatusMessage ? ` ${chalk.dim(lastStatusMessage)}` : '';
+        spinner.text = `Running tool ${chalk.bold(name)}... (${elapsed})${statusSuffix}`;
+      };
+
+      if (options.outputMode === 'human') {
+        spinner = ora({
+          text: `Running tool ${chalk.bold(name)}... (0:00)`,
+          color: 'cyan',
+        }).start();
+        timerInterval = setInterval(updateSpinnerText, 1000);
+      }
+
+      const onUpdate = (update: TaskUpdate): void => {
+        if (update.statusMessage) {
+          lastStatusMessage = update.statusMessage;
+        }
+        if (spinner) {
+          updateSpinnerText();
+        }
+      };
+
+      try {
+        result = await client.callToolWithTask(name, parsedArgs, onUpdate);
+        const elapsed = formatElapsed(Date.now() - startTime);
+        if (spinner) {
+          spinner.succeed(`Tool ${chalk.bold(name)} executed successfully (${elapsed})`);
+        }
+      } catch (error) {
+        const elapsed = formatElapsed(Date.now() - startTime);
+        if (spinner) {
+          spinner.fail(`Tool ${chalk.bold(name)} failed (${elapsed})`);
+        }
+        throw error;
+      } finally {
+        if (timerInterval) clearInterval(timerInterval);
+      }
+    } else {
+      // Synchronous execution (no task support or --sync flag)
+      result = await client.callTool(name, parsedArgs);
+      if (options.outputMode === 'human') {
+        console.log(formatSuccess(`Tool ${name} executed successfully`));
+      }
+    }
 
     if (options.outputMode === 'human') {
-      console.log(formatSuccess(`Tool ${name} executed successfully`));
       console.log(formatOutput(result, 'human'));
     } else {
       console.log(formatOutput(result, 'json'));

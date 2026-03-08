@@ -8,11 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+- Async task support for `tools-call`: when the server supports MCP tasks, tool calls automatically use task-augmented execution with a progress spinner showing elapsed time and server status messages in human mode
+- `--sync` flag for `tools-call` to force synchronous execution, skipping async tasks
+- New `tasks-list`, `tasks-get`, `tasks-cancel` commands for managing async tasks on the server
+- Task capability and `execution.taskSupport` displayed in `tools-get` and server info
+- E2E test server now includes a `slow-task` tool that supports async task execution
 - `--client-id` and `--client-secret` options for `mcpc login` command, for servers that don't support dynamic client registration
 - `mcpc close @session`, `mcpc restart @session`, and `mcpc shell @session` command-first syntax as alternatives to `mcpc @session close/restart/shell`
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
 
 ### Fixed
+
 - `validateOptions()` no longer includes subcommand-specific options (`--full`, `--x402`, `--proxy`, etc.) in global known-options list; misplaced flags now produce clear "Unknown option" errors instead of confusing Commander rejections
 - Sessions requiring authentication now correctly show as `expired` instead of `live` when the server rejects unauthenticated connections
 - Auth errors wrapped in `NetworkError` by bridge IPC are now detected on first health check, avoiding unnecessary bridge restart
@@ -21,16 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parseServerArg()` now handles well Windows drive-letter config paths as well as other ambiguous cases
 
 ### Changed
+
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
 
-  | Before                                        | After |
-  |-----------------------------------------------|-------|
+  | Before                                        | After                                                      |
+  | --------------------------------------------- | ---------------------------------------------------------- |
   | `mcpc <server> tools-list`                    | `mcpc connect <server> @name` then `mcpc @name tools-list` |
-  | `mcpc <server> connect @name`                    | `mcpc connect <server> @name` |
-  | `mcpc <server> login`                            | `mcpc login <server>` |
-  | `mcpc <server> logout`                           | `mcpc logout <server>` |
-  | `mcpc --clean=sessions`                       | `mcpc clean sessions` |
-  | `mcpc --config file.json entry connect @name` | `mcpc connect file.json:entry @name` |
+  | `mcpc <server> connect @name`                 | `mcpc connect <server> @name`                              |
+  | `mcpc <server> login`                         | `mcpc login <server>`                                      |
+  | `mcpc <server> logout`                        | `mcpc logout <server>`                                     |
+  | `mcpc --clean=sessions`                       | `mcpc clean sessions`                                      |
+  | `mcpc --config file.json entry connect @name` | `mcpc connect file.json:entry @name`                       |
 
   Direct one-shot URL access (e.g. `mcpc mcp.apify.com tools-list`) is removed; create a session first with `mcpc connect`.
 
@@ -39,16 +47,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.10] - 2026-03-01
 
 ### Added
+
 - Support for `HTTPS_PROXY`, `HTTP_PROXY`, and `NO_PROXY` / lowercase variants env vars for outbound connections
 - CI/CD automated test pipeline
 
 ### Changed
+
 - Replaced deprecated `keytar` package with `@napi-rs/keyring` for OS keychain integration
 - Temp files now written to `~/.mcpc/` instead of `/tmp/` to avoid cross-device rename errors on Linux
 - Improved error messages for invalid server hostnames and mistyped commands (e.g. `mcpc login`)
 - Added `prettier` formatting check to lint step
 
 ### Fixed
+
 - Fixed `ExperimentalWarning: Importing JSON modules is an experimental feature` on Node.js 22+
 - Fixed OAuth token refresh for servers with root-based discovery (`.well-known` at `/`)
 - Fixed OAuth errors incorrectly expiring the session instead of failing gracefully
@@ -56,10 +67,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.9] - 2026-02-02
 
 ### Added
+
 - Added CHANGELOG.md for tracking changes
 - Automated GitHub release creation in publish script
 
 ### Changed
+
 - `tools-list` now shows a compact summary by default to support dynamic tool discovery
 - Added `--full` flag to `tools-list` for detailed tool information
 - Publish script now automatically updates CHANGELOG.md version on release
@@ -67,10 +80,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.8] - 2026-01-21
 
 ### Changed
+
 - Session is now marked as expired (not auto-reconnected) when server rejects MCP session ID
 - Users must explicitly run `mcpc @session restart` to recover from expired sessions
 
 ### Fixed
+
 - Fixed incorrect flagging of expired sessions as crashed
 - Fixed session expiration detection for various error message formats
 - Fixed help command output
@@ -78,46 +93,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.7] - 2026-01-03
 
 ### Changed
+
 - Documentation improvements and updates
 - Various cosmetic improvements to CLI output
 
 ### Fixed
+
 - Minor bug fixes
 
 ## [0.1.6] - 2026-01-02
 
 ### Added
+
 - Session notifications with timestamps for tracking list changes (`tools/list_changed`, `resources/list_changed`, `prompts/list_changed`)
 
 ### Changed
+
 - Renamed `_meta` to `_mcpc` in JSON output for MCP spec conformance
 - Improved formatting of prompts output
 - Various cosmetic improvements
 
 ### Fixed
+
 - Fixed proxy server issues
 - Fixed screenshot URL in README
 
 ## [0.1.5] - 2026-01-01
 
 ### Added
+
 - Implemented `--proxy` option for exposing sessions as local MCP servers
 - Added `mcpc @session restart` command
 
 ### Changed
+
 - Renamed `session` command to `connect` for clarity
 - Renamed "dead" session status to "crashed" for clarity
 
 ### Fixed
+
 - Fixed `--timeout` option handling
 
 ## [0.1.4] - 2025-12-31
 
 ### Added
+
 - Implemented `--schema` and `--schema-mode` options for tools
 - Added `mcpc @session restart` command
 
 ### Changed
+
 - Renamed `tools-schema` command to `tools-get`
 - Improved formatting for prompts and tools output
 - Security review and improvements
@@ -125,6 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.3] - 2025-12-29
 
 ### Added
+
 - Initial public release
 - Support for Streamable HTTP and stdio transports
 - Session management with persistent bridge processes

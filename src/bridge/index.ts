@@ -28,7 +28,8 @@ import { OAuthProvider } from '../lib/auth/oauth-provider.js';
 import { storeKeychainOAuthTokenInfo, readKeychainOAuthTokenInfo } from '../lib/auth/keychain.js';
 import { updateAuthProfileRefreshedAt } from '../lib/auth/profiles.js';
 import { readKeychainProxyBearerToken } from '../lib/auth/keychain.js';
-import type { Tool, Resource, Prompt } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool, Resource, Prompt, Task } from '@modelcontextprotocol/sdk/types.js';
+import type { TaskUpdate } from '../lib/types.js';
 import { createRequire } from 'module';
 const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
   version: string;
@@ -85,6 +86,9 @@ class BridgeProcess {
 
   // Cached tools list for x402 proactive signing (updated via listChanged notifications)
   private cachedTools: Tool[] | null = null;
+
+  // Active async tasks (in-memory, not persisted across restarts)
+  private activeTasks: Map<string, Task> = new Map();
 
   // Promise to track when auth credentials are received (for startup sequencing)
   private authCredentialsReceived: Promise<void> | null = null;
@@ -514,6 +518,13 @@ class BridgeProcess {
       capabilities: {
         roots: { listChanged: true },
         sampling: {},
+        tasks: {
+          list: {},
+          cancel: {},
+          requests: {
+            sampling: { createMessage: {} },
+          },
+        },
       },
       // Pass auth provider for automatic token refresh (HTTP transport only)
       ...(this.authProvider && { authProvider: this.authProvider }),
@@ -926,8 +937,49 @@ class BridgeProcess {
         }
 
         case 'callTool': {
-          const params = message.params as { name: string; arguments?: Record<string, unknown> };
-          result = await this.client.callTool(params.name, params.arguments);
+          const params = message.params as {
+            name: string;
+            arguments?: Record<string, unknown>;
+            useTask?: boolean;
+          };
+          if (params.useTask && this.client.supportsTasksForToolCall()) {
+            // Task-augmented tool call: stream updates to requesting socket
+            const onUpdate = (update: TaskUpdate): void => {
+              // Track active task
+              this.activeTasks.set(update.taskId, {
+                taskId: update.taskId,
+                status: update.status,
+                statusMessage: update.statusMessage,
+                createdAt: update.createdAt ?? new Date().toISOString(),
+                lastUpdatedAt: update.lastUpdatedAt ?? new Date().toISOString(),
+              } as Task);
+              // Send task update to requesting client
+              if (message.id) {
+                this.sendResponse(socket, {
+                  type: 'task-update',
+                  id: message.id,
+                  taskUpdate: update,
+                });
+              }
+            };
+            try {
+              result = await this.client.callToolWithTask(params.name, params.arguments, onUpdate);
+            } finally {
+              // Clean up completed tasks from activeTasks
+              // (keep only working/input_required tasks)
+              for (const [taskId, task] of this.activeTasks) {
+                if (
+                  task.status === 'completed' ||
+                  task.status === 'failed' ||
+                  task.status === 'cancelled'
+                ) {
+                  this.activeTasks.delete(taskId);
+                }
+              }
+            }
+          } else {
+            result = await this.client.callTool(params.name, params.arguments);
+          }
           break;
         }
 
@@ -982,6 +1034,24 @@ class BridgeProcess {
         case 'getServerDetails':
           result = await this.client.getServerDetails();
           break;
+
+        case 'listTasks': {
+          const cursor = message.params as string | undefined;
+          result = await this.client.listTasks(cursor);
+          break;
+        }
+
+        case 'getTask': {
+          const params = message.params as { taskId: string };
+          result = await this.client.getTask(params.taskId);
+          break;
+        }
+
+        case 'cancelTask': {
+          const params = message.params as { taskId: string };
+          result = await this.client.cancelTask(params.taskId);
+          break;
+        }
 
         default:
           throw new ClientError(`Unknown MCP method: ${message.method}`);

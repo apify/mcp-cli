@@ -31,6 +31,10 @@ import type {
   UnsubscribeRequest,
   LoggingLevel,
   ListResourceTemplatesResult,
+  Task,
+  GetTaskResult,
+  ListTasksResult,
+  CancelTaskResult,
 } from '@modelcontextprotocol/sdk/types.js';
 
 // Re-export core MCP types for external use
@@ -60,6 +64,10 @@ export type {
   SubscribeRequest,
   UnsubscribeRequest,
   LoggingLevel,
+  Task,
+  GetTaskResult,
+  ListTasksResult,
+  CancelTaskResult,
 };
 
 // Re-export protocol version constants
@@ -179,6 +187,7 @@ export type IpcMessageType =
   | 'response'
   | 'shutdown'
   | 'notification'
+  | 'task-update'
   | 'set-auth-credentials'
   | 'set-x402-wallet';
 
@@ -213,7 +222,8 @@ export type NotificationType =
   | 'resources/updated'
   | 'prompts/list_changed'
   | 'progress'
-  | 'logging/message';
+  | 'logging/message'
+  | 'tasks/status';
 
 /**
  * Notification data
@@ -221,6 +231,17 @@ export type NotificationType =
 export interface NotificationData {
   method: NotificationType;
   params?: unknown;
+}
+
+/**
+ * Task status update sent from bridge to CLI during task-augmented tool calls
+ */
+export interface TaskUpdate {
+  taskId: string;
+  status: 'working' | 'input_required' | 'completed' | 'failed' | 'cancelled';
+  statusMessage?: string;
+  createdAt?: string;
+  lastUpdatedAt?: string;
 }
 
 /**
@@ -234,6 +255,7 @@ export interface IpcMessage {
   timeout?: number; // Per-request timeout in seconds (overrides default)
   result?: unknown; // Response result
   notification?: NotificationData; // Notification data (for type='notification')
+  taskUpdate?: TaskUpdate; // Task progress update (for type='task-update')
   authCredentials?: AuthCredentials; // Auth credentials (for type='set-auth-credentials')
   x402Wallet?: X402WalletCredentials; // x402 wallet (for type='set-x402-wallet')
   error?: {
@@ -336,4 +358,14 @@ export interface IMcpClient {
   listPrompts(cursor?: string): Promise<ListPromptsResult>;
   getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult>;
   setLoggingLevel(level: LoggingLevel): Promise<void>;
+
+  // Task operations (async tool execution)
+  callToolWithTask(
+    name: string,
+    args?: Record<string, unknown>,
+    onUpdate?: (update: TaskUpdate) => void
+  ): Promise<CallToolResult>;
+  listTasks(cursor?: string): Promise<ListTasksResult>;
+  getTask(taskId: string): Promise<GetTaskResult>;
+  cancelTask(taskId: string): Promise<CancelTaskResult>;
 }

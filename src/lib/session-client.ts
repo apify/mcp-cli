@@ -25,12 +25,16 @@ import type {
   IMcpClient,
   NotificationData,
   ServerDetails,
+  TaskUpdate,
+  GetTaskResult,
+  ListTasksResult,
+  CancelTaskResult,
 } from './types.js';
 import type { ListResourceTemplatesResult } from '@modelcontextprotocol/sdk/types.js';
 import { BridgeClient } from './bridge-client.js';
 import { ensureBridgeReady, restartBridge } from './bridge-manager.js';
 import { NetworkError } from './errors.js';
-import { getSocketPath, getLogsDir } from './utils.js';
+import { getSocketPath, getLogsDir, generateRequestId } from './utils.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('session-client');
@@ -252,6 +256,80 @@ export class SessionClient extends EventEmitter implements IMcpClient {
           .request('setLoggingLevel', level, this.requestTimeout)
           .then(() => undefined),
       'setLoggingLevel'
+    );
+  }
+
+  /**
+   * Call a tool with task-augmented execution
+   * Listens for task-update IPC messages keyed by request ID
+   */
+  async callToolWithTask(
+    name: string,
+    args?: Record<string, unknown>,
+    onUpdate?: (update: TaskUpdate) => void
+  ): Promise<CallToolResult> {
+    return this.withRetry(() => {
+      return new Promise<CallToolResult>((resolve, reject) => {
+        const id = generateRequestId();
+
+        // Listen for task updates for this specific request
+        const updateHandler = (update: TaskUpdate): void => {
+          onUpdate?.(update);
+        };
+        this.bridgeClient.on(`task-update:${id}`, updateHandler);
+
+        // Send the request manually (we need the request ID for event correlation)
+        const cleanup = (): void => {
+          this.bridgeClient.removeListener(`task-update:${id}`, updateHandler);
+        };
+
+        this.bridgeClient
+          .request('callTool', { name, arguments: args, useTask: true }, this.requestTimeout, id)
+          .then((result) => {
+            cleanup();
+            resolve(result as CallToolResult);
+          })
+          .catch((error: Error) => {
+            cleanup();
+            reject(error);
+          });
+      });
+    }, 'callToolWithTask');
+  }
+
+  async listTasks(cursor?: string): Promise<ListTasksResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'listTasks',
+          cursor,
+          this.requestTimeout
+        ) as Promise<ListTasksResult>,
+      'listTasks'
+    );
+  }
+
+  async getTask(taskId: string): Promise<GetTaskResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'getTask',
+          { taskId },
+          this.requestTimeout
+        ) as Promise<GetTaskResult>,
+      'getTask'
+    );
+  }
+
+  async cancelTask(taskId: string): Promise<CancelTaskResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'cancelTask',
+          { taskId },
+          this.requestTimeout
+        ) as Promise<CancelTaskResult>,
+      'cancelTask'
     );
   }
 

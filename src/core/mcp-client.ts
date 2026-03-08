@@ -15,7 +15,11 @@ import type {
   ListPromptsResult,
   GetPromptResult,
   LoggingLevel,
+  GetTaskResult,
+  ListTasksResult,
+  CancelTaskResult,
 } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { createNoOpLogger, type Logger } from '../lib/logger.js';
 import { ServerError, NetworkError, isShutdownError } from '../lib/errors.js';
 
@@ -29,7 +33,24 @@ function getRootCauseMessage(error: Error): string {
   }
   return current.message;
 }
-import type { IMcpClient, ServerDetails } from '../lib/types.js';
+import type { IMcpClient, ServerDetails, TaskUpdate } from '../lib/types.js';
+import type { Task } from '@modelcontextprotocol/sdk/types.js';
+
+/**
+ * Convert an SDK Task to a TaskUpdate, handling exactOptionalPropertyTypes
+ */
+function taskToUpdate(task: Task): TaskUpdate {
+  const update: TaskUpdate = {
+    taskId: task.taskId,
+    status: task.status,
+    createdAt: task.createdAt,
+    lastUpdatedAt: task.lastUpdatedAt,
+  };
+  if (task.statusMessage) {
+    update.statusMessage = task.statusMessage;
+  }
+  return update;
+}
 
 /**
  * Transport with protocol version information (e.g., StreamableHTTPClientTransport)
@@ -436,6 +457,130 @@ export class McpClient implements IMcpClient {
     } catch (error) {
       this.logger.error(`Failed to set log level:`, error);
       throw new ServerError(`Failed to set log level: ${(error as Error).message}`, {
+        originalError: error,
+      });
+    }
+  }
+
+  /**
+   * Check if the server supports task-augmented tool calls
+   */
+  supportsTasksForToolCall(): boolean {
+    const capabilities = this.client.getServerCapabilities();
+    return !!capabilities?.tasks?.requests?.tools?.call;
+  }
+
+  /**
+   * Call a tool with task-augmented execution
+   * Uses the SDK's experimental callToolStream which handles task creation,
+   * polling, and result retrieval automatically via an AsyncGenerator.
+   */
+  async callToolWithTask(
+    name: string,
+    args?: Record<string, unknown>,
+    onUpdate?: (update: TaskUpdate) => void
+  ): Promise<CallToolResult> {
+    try {
+      this.logger.debug(`Calling tool with task: ${name}`, args);
+      const stream = this.client.experimental.tasks.callToolStream(
+        { name, arguments: args || {} },
+        CallToolResultSchema,
+        this.getRequestOptions()
+      );
+
+      let result: CallToolResult | undefined;
+
+      for await (const message of stream) {
+        switch (message.type) {
+          case 'taskCreated':
+            this.logger.debug(`Task created: ${message.task.taskId}`);
+            onUpdate?.(taskToUpdate(message.task));
+            break;
+
+          case 'taskStatus':
+            this.logger.debug(`Task ${message.task.taskId} status: ${message.task.status}`);
+            onUpdate?.(taskToUpdate(message.task));
+            break;
+
+          case 'result':
+            this.logger.debug(`Task completed with result for tool ${name}`);
+            result = message.result as CallToolResult;
+            break;
+
+          case 'error':
+            this.logger.error(`Task error for tool ${name}:`, message.error);
+            throw new ServerError(`Tool ${name} task failed: ${message.error.message}`, {
+              originalError: message.error,
+            });
+        }
+      }
+
+      if (!result) {
+        throw new ServerError(`Tool ${name} task completed without a result`);
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof ServerError) throw error;
+      this.logger.error(`Failed to call tool ${name} with task:`, error);
+      throw new ServerError(`Failed to call tool ${name} with task: ${(error as Error).message}`, {
+        originalError: error,
+      });
+    }
+  }
+
+  /**
+   * List tasks on the server
+   */
+  async listTasks(cursor?: string): Promise<ListTasksResult> {
+    try {
+      this.logger.debug('Listing tasks...', cursor ? { cursor } : {});
+      const result = await this.client.experimental.tasks.listTasks(
+        cursor,
+        this.getRequestOptions()
+      );
+      this.logger.debug(`Found ${result.tasks.length} tasks`);
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to list tasks:', error);
+      throw new ServerError(`Failed to list tasks: ${(error as Error).message}`, {
+        originalError: error,
+      });
+    }
+  }
+
+  /**
+   * Get a task's current status
+   */
+  async getTask(taskId: string): Promise<GetTaskResult> {
+    try {
+      this.logger.debug(`Getting task: ${taskId}`);
+      const result = await this.client.experimental.tasks.getTask(taskId, this.getRequestOptions());
+      this.logger.debug(`Task ${taskId} status: ${result.status}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get task ${taskId}:`, error);
+      throw new ServerError(`Failed to get task ${taskId}: ${(error as Error).message}`, {
+        originalError: error,
+      });
+    }
+  }
+
+  /**
+   * Cancel a running task
+   */
+  async cancelTask(taskId: string): Promise<CancelTaskResult> {
+    try {
+      this.logger.debug(`Cancelling task: ${taskId}`);
+      const result = await this.client.experimental.tasks.cancelTask(
+        taskId,
+        this.getRequestOptions()
+      );
+      this.logger.debug(`Task ${taskId} cancelled`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to cancel task ${taskId}:`, error);
+      throw new ServerError(`Failed to cancel task ${taskId}: ${(error as Error).message}`, {
         originalError: error,
       });
     }

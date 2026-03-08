@@ -19,6 +19,7 @@ import type {
   Prompt,
   SessionData,
   ServerDetails,
+  Task,
 } from '../lib/types.js';
 import { extractSingleTextContent } from './tool-result.js';
 import { isValidSessionName } from '../lib/utils.js';
@@ -453,6 +454,15 @@ export function formatToolDetail(tool: Tool): string {
     lines.push(...outputArgs);
   }
 
+  // Task support (from execution.taskSupport)
+  const toolAny = tool as Record<string, unknown>;
+  const execution = toolAny.execution as Record<string, unknown> | undefined;
+  const taskSupport = execution?.taskSupport as string | undefined;
+  if (taskSupport) {
+    lines.push('');
+    lines.push(`${chalk.bold('Task support:')} ${taskSupport}`);
+  }
+
   // Description in code block
   const description = (tool.description || '').trim();
   if (description) {
@@ -743,6 +753,67 @@ function formatPromptContent(content: PromptMessage['content']): string {
 }
 
 /**
+ * Get a colored status indicator for a task status
+ */
+function taskStatusIcon(status: string): string {
+  switch (status) {
+    case 'working':
+      return chalk.cyan('⟳');
+    case 'input_required':
+      return chalk.yellow('?');
+    case 'completed':
+      return chalk.green('✔');
+    case 'failed':
+      return chalk.red('✖');
+    case 'cancelled':
+      return chalk.gray('⊘');
+    default:
+      return chalk.gray('·');
+  }
+}
+
+/**
+ * Format a single task with details
+ */
+export function formatTask(task: Task): string {
+  const lines: string[] = [];
+
+  lines.push(`${chalk.bold('Task:')} ${inBackticks(task.taskId)}`);
+  lines.push(`${chalk.bold('Status:')} ${taskStatusIcon(task.status)} ${task.status}`);
+
+  if (task.statusMessage) {
+    lines.push(`${chalk.bold('Message:')} ${task.statusMessage}`);
+  }
+
+  if (task.createdAt) {
+    lines.push(`${chalk.bold('Created:')} ${task.createdAt}`);
+  }
+  if (task.lastUpdatedAt) {
+    lines.push(`${chalk.bold('Updated:')} ${task.lastUpdatedAt}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a list of tasks as a summary table
+ */
+export function formatTasks(taskList: Task[]): string {
+  const lines: string[] = [];
+
+  lines.push(chalk.bold(`Tasks (${taskList.length}):`));
+
+  const bullet = chalk.dim('*');
+  for (const task of taskList) {
+    const statusStr = `${taskStatusIcon(task.status)} ${task.status}`;
+    const msgStr = task.statusMessage ? chalk.dim(` - ${task.statusMessage}`) : '';
+    lines.push(`${bullet} ${inBackticks(task.taskId)}  ${statusStr}${msgStr}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * Format a generic object as key-value pairs
  */
 export function formatObject(obj: Record<string, unknown>): string {
@@ -979,6 +1050,13 @@ export function formatServerDetails(details: ServerDetails, target: string): str
     capabilityList.push(`${bullet} completions`);
   }
 
+  if (capabilities?.tasks) {
+    const features: string[] = [];
+    if (capabilities.tasks.requests?.tools?.call) features.push('tools');
+    const featureStr = features.length > 0 ? ` (${features.join(', ')})` : '';
+    capabilityList.push(`${bullet} tasks${featureStr}`);
+  }
+
   if (capabilityList.length > 0) {
     lines.push(capabilityList.join('\n'));
   } else {
@@ -1008,6 +1086,12 @@ export function formatServerDetails(details: ServerDetails, target: string): str
     commands.push(
       `${bullet} ${bt}mcpc ${target} prompts-get <name> [arg1:=val1 ... | <args-json> | <stdin]${bt}`
     );
+  }
+
+  if (capabilities?.tasks) {
+    commands.push(`${bullet} ${bt}mcpc ${target} tasks-list${bt}`);
+    commands.push(`${bullet} ${bt}mcpc ${target} tasks-get <taskId>${bt}`);
+    commands.push(`${bullet} ${bt}mcpc ${target} tasks-cancel <taskId>${bt}`);
   }
 
   if (capabilities?.logging) {

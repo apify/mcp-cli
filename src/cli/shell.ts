@@ -13,6 +13,7 @@ import type { OutputMode, CommandOptions, NotificationData } from '../lib/types.
 import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
 import * as prompts from './commands/prompts.js';
+import * as tasks from './commands/tasks.js';
 import * as logging from './commands/logging.js';
 import { ping } from './commands/utilities.js';
 import { createSessionClient } from '../lib/session-client.js';
@@ -284,6 +285,30 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
           return;
         }
         await logging.setLogLevel(ctx.target, args[0] as string, options);
+        break;
+      }
+
+      case 'tasks-list':
+        await tasks.listTasks(ctx.target, options);
+        break;
+
+      case 'tasks-get': {
+        if (args.length === 0) {
+          console.log(chalk.red('Error: tasks-get requires a task ID'));
+          console.log('Usage: tasks-get <taskId>');
+          return;
+        }
+        await tasks.getTask(ctx.target, args[0] as string, options);
+        break;
+      }
+
+      case 'tasks-cancel': {
+        if (args.length === 0) {
+          console.log(chalk.red('Error: tasks-cancel requires a task ID'));
+          console.log('Usage: tasks-cancel <taskId>');
+          return;
+        }
+        await tasks.cancelTask(ctx.target, args[0] as string, options);
         break;
       }
 

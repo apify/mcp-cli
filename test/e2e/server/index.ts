@@ -27,7 +27,14 @@ import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
   ListResourceTemplatesRequestSchema,
+  GetTaskRequestSchema,
+  GetTaskPayloadRequestSchema,
+  ListTasksRequestSchema,
+  CancelTaskRequestSchema,
+  type Task,
+  type Result,
 } from '@modelcontextprotocol/sdk/types.js';
+import { randomUUID } from 'crypto';
 import http from 'http';
 
 // Configuration from environment
@@ -109,6 +116,20 @@ const TOOLS = [
     annotations: {
       title: 'Write File',
       destructiveHint: true,
+    },
+  },
+  {
+    name: 'slow-task',
+    description: 'Long-running tool that supports async task execution',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        ms: { type: 'number', description: 'Duration in milliseconds', default: 3000 },
+        steps: { type: 'number', description: 'Number of progress steps', default: 3 },
+      },
+    },
+    execution: {
+      taskSupport: 'optional' as const,
     },
   },
 ];
@@ -195,6 +216,14 @@ function shouldFail(): boolean {
   return false;
 }
 
+// Task store for async tool execution
+interface TaskEntry {
+  task: Task;
+  result?: Result;
+  abortController?: AbortController;
+}
+const taskStore = new Map<string, TaskEntry>();
+
 // Active MCP server instances, keyed by session ID
 const mcpServers = new Map<string, Server>();
 
@@ -211,6 +240,15 @@ function createMcpServer(): Server {
         resources: { subscribe: true, listChanged: true },
         prompts: { listChanged: true },
         logging: {},
+        tasks: {
+          list: {},
+          cancel: {},
+          requests: {
+            tools: {
+              call: {},
+            },
+          },
+        },
       },
       instructions:
         'E2E test server for mcpc. Provides sample tools, resources, and prompts for testing.',
@@ -267,9 +305,117 @@ function createMcpServer(): Server {
           content: [{ type: 'text', text: `Would write to ${args?.path}` }],
         };
 
+      case 'slow-task': {
+        const ms = Number(args?.ms || 3000);
+        const steps = Number(args?.steps || 3);
+        const taskParam = request.params.task;
+
+        if (taskParam) {
+          // Task-augmented execution: create task and run in background
+          const taskId = randomUUID();
+          const now = new Date().toISOString();
+          const task: Task = {
+            taskId,
+            status: 'working',
+            createdAt: now,
+            lastUpdatedAt: now,
+            statusMessage: 'Starting...',
+          };
+          const abortController = new AbortController();
+          taskStore.set(taskId, { task, abortController });
+
+          // Run the work in background
+          void (async () => {
+            const stepDuration = ms / steps;
+            for (let i = 1; i <= steps; i++) {
+              await new Promise((resolve) => setTimeout(resolve, stepDuration));
+              if (abortController.signal.aborted) {
+                return;
+              }
+              const entry = taskStore.get(taskId);
+              if (entry) {
+                entry.task.status = i < steps ? 'working' : 'completed';
+                entry.task.statusMessage =
+                  i < steps ? `Processing step ${i}/${steps}` : `Done (${steps} steps)`;
+                entry.task.lastUpdatedAt = new Date().toISOString();
+                if (i === steps) {
+                  entry.result = {
+                    content: [
+                      {
+                        type: 'text',
+                        text: `Completed ${steps} steps in ${ms}ms`,
+                      },
+                    ],
+                  };
+                }
+              }
+            }
+          })();
+
+          // Return CreateTaskResult immediately
+          return { task } as unknown as { content: { type: string; text: string }[] };
+        }
+
+        // Synchronous execution (no task param)
+        await new Promise((resolve) => setTimeout(resolve, ms));
+        return {
+          content: [{ type: 'text', text: `Completed ${steps} steps in ${ms}ms` }],
+        };
+      }
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
+  });
+
+  // Task management handlers
+  server.setRequestHandler(GetTaskRequestSchema, async (request) => {
+    const { taskId } = request.params;
+    const entry = taskStore.get(taskId);
+    if (!entry) {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+    return entry.task;
+  });
+
+  server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
+    const { taskId } = request.params;
+    const entry = taskStore.get(taskId);
+    if (!entry) {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+    // Block until task reaches terminal state
+    while (entry.task.status === 'working' || entry.task.status === 'input_required') {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    if (entry.result) {
+      return entry.result;
+    }
+    throw new Error(`Task ${taskId} has no result (status: ${entry.task.status})`);
+  });
+
+  server.setRequestHandler(ListTasksRequestSchema, async () => {
+    const allTasks = Array.from(taskStore.values()).map((e) => e.task);
+    return { tasks: allTasks };
+  });
+
+  server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
+    const { taskId } = request.params;
+    const entry = taskStore.get(taskId);
+    if (!entry) {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+    if (
+      entry.task.status === 'completed' ||
+      entry.task.status === 'failed' ||
+      entry.task.status === 'cancelled'
+    ) {
+      throw new Error(`Cannot cancel task in terminal state: ${entry.task.status}`);
+    }
+    entry.task.status = 'cancelled';
+    entry.task.lastUpdatedAt = new Date().toISOString();
+    entry.abortController?.abort();
+    return entry.task;
   });
 
   // Resources

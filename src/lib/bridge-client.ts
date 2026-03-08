@@ -15,7 +15,7 @@
 
 import { connect, type Socket } from 'net';
 import { EventEmitter } from 'events';
-import type { IpcMessage, NotificationData, X402WalletCredentials } from './types.js';
+import type { IpcMessage, NotificationData, TaskUpdate, X402WalletCredentials } from './types.js';
 import { createLogger } from './logger.js';
 import { NetworkError, ClientError, ServerError, AuthError } from './errors.js';
 import { generateRequestId } from './utils.js';
@@ -173,6 +173,11 @@ export class BridgeClient extends EventEmitter {
           pending.resolve(message.result);
         }
       }
+    } else if (message.type === 'task-update' && message.id && message.taskUpdate) {
+      // Emit task update keyed by request ID so the right caller gets it
+      const update: TaskUpdate = message.taskUpdate;
+      logger.debug(`Received task update for request ${message.id}:`, update.status);
+      this.emit(`task-update:${message.id}`, update);
     } else if (message.type === 'notification' && message.notification) {
       // Emit notification event
       const notification: NotificationData = message.notification;
@@ -185,13 +190,19 @@ export class BridgeClient extends EventEmitter {
   /**
    * Send a request to the bridge and wait for response
    * Uses 3-minute timeout for MCP operations by default, or custom timeout if provided
+   * @param requestId - Optional custom request ID (used for task-update event correlation)
    */
-  async request(method: string, params?: unknown, timeout?: number): Promise<unknown> {
+  async request(
+    method: string,
+    params?: unknown,
+    timeout?: number,
+    requestId?: string
+  ): Promise<unknown> {
     if (!this.socket) {
       throw new NetworkError('Not connected to bridge');
     }
 
-    const id = generateRequestId();
+    const id = requestId || generateRequestId();
 
     const message: IpcMessage = {
       type: 'request',
