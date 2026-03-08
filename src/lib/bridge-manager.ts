@@ -470,6 +470,11 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     throw new ClientError(`Session not found: ${sessionName}`);
   }
 
+  if (session.status === 'unauthorized') {
+    const target = session.server.url || session.server.command || sessionName;
+    throw createServerAuthError(target, { sessionName });
+  }
+
   if (session.status === 'expired') {
     throw new ClientError(
       `Session ${sessionName} has expired. ` +
@@ -498,9 +503,9 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
       // since MCP auth failures are NetworkError in the bridge process)
       const errorMessage = result.error.message || '';
       if (isAuthenticationError(errorMessage)) {
-        // Mark session as expired so it shows correctly in session list
-        await updateSession(sessionName, { status: 'expired' }).catch((e) =>
-          logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
+        // Mark session as unauthorized so it shows correctly in session list
+        await updateSession(sessionName, { status: 'unauthorized' }).catch((e) =>
+          logger.warn(`Failed to mark session ${sessionName} as unauthorized:`, e)
         );
         const target = session.server.url || session.server.command || sessionName;
         throw createServerAuthError(target, { sessionName, originalError: result.error });
@@ -531,9 +536,9 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   // Not healthy after restart - check if it's an auth error
   const errorMsg = result.error?.message || 'unknown error';
   if (isAuthenticationError(errorMsg)) {
-    // Mark session as expired so it shows correctly in session list
-    await updateSession(sessionName, { status: 'expired' }).catch((e) =>
-      logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
+    // Mark session as unauthorized so it shows correctly in session list
+    await updateSession(sessionName, { status: 'unauthorized' }).catch((e) =>
+      logger.warn(`Failed to mark session ${sessionName} as unauthorized:`, e)
     );
     const target = session.server.url || session.server.command || sessionName;
     throw createServerAuthError(target, {

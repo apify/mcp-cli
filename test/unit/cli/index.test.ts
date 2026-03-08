@@ -170,21 +170,19 @@ describe('extractOptions', () => {
     expect(result).toEqual({ json: true, verbose: false });
   });
 
-  it('should extract multiple --header options', () => {
+  it('should not extract --header (connect-specific option)', () => {
     const result = extractOptions(['--header', 'Auth: Bearer token', '--header', 'X-Key: value']);
     expect(result).toEqual({
       json: false,
       verbose: false,
-      headers: ['Auth: Bearer token', 'X-Key: value'],
     });
   });
 
-  it('should extract --header short form (-H)', () => {
+  it('should not extract -H short form (connect-specific option)', () => {
     const result = extractOptions(['-H', 'Auth: token', '-H', 'X-Key: value']);
     expect(result).toEqual({
       json: false,
       verbose: false,
-      headers: ['Auth: token', 'X-Key: value'],
     });
   });
 
@@ -193,19 +191,11 @@ describe('extractOptions', () => {
     expect(result).toEqual({ json: false, verbose: false, timeout: 120 });
   });
 
-  it('should extract all options together', () => {
-    const result = extractOptions([
-      '--json',
-      '--verbose',
-      '--header',
-      'Auth: token',
-      '--timeout',
-      '60',
-    ]);
+  it('should extract all global options together', () => {
+    const result = extractOptions(['--json', '--verbose', '--timeout', '60']);
     expect(result).toEqual({
       json: true,
       verbose: true,
-      headers: ['Auth: token'],
       timeout: 60,
     });
   });

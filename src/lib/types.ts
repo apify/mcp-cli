@@ -73,6 +73,12 @@ export type {
 // Re-export protocol version constants
 export { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 
+/** Keepalive ping interval in milliseconds (30 seconds) */
+export const KEEPALIVE_INTERVAL_MS = 30_000;
+
+/** Threshold for considering a session disconnected (bridge alive but server unreachable) */
+export const DISCONNECTED_THRESHOLD_MS = 2 * KEEPALIVE_INTERVAL_MS + 5000; // ~2 missed pings + 5s buffer
+
 /**
  * Configuration for a connection to MCP server
  * Used both for config file format and internal representation
@@ -99,10 +105,11 @@ export interface ProxyConfig {
 /**
  * Session status
  * - active: Session is healthy and can be used
- * - expired: Server indicated session is no longer valid (e.g., 404 response)
+ * - unauthorized: Server rejected authentication (401/403) or token refresh failed. Recovery: login then restart.
+ * - expired: Server indicated session is no longer valid (e.g., 404 response). Recovery: restart.
  * - crashed: Bridge process crashed, session might or might not be usable. Bridge will be restarted on next command.
  */
-export type SessionStatus = 'active' | 'expired' | 'crashed';
+export type SessionStatus = 'active' | 'unauthorized' | 'expired' | 'crashed';
 
 /**
  * Notification timestamps for list change events
