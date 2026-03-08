@@ -58,8 +58,7 @@ _SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION}")
 
 # Test: session is removed from sessions list after close
 test_case "session is removed from sessions list after close"
-# Use run_mcpc (not run_xmcpc) because session list can change between runs
-run_mcpc --json
+run_xmcpc --json
 assert_success
 session_exists=$(echo "$STDOUT" | jq -r ".sessions[] | select(.name == \"$SESSION\") | .name")
 assert_empty "$session_exists" "session should not exist after close"
