@@ -389,12 +389,12 @@ function formatToolsSummary(tools: Tool[]): string[] {
     const parts: string[] = [];
     const annotationsStr = formatToolAnnotations(tool.annotations);
     if (annotationsStr) parts.push(annotationsStr);
+    // Show async indicator if tool supports task execution
     const toolAny = tool as Record<string, unknown>;
     const execution = toolAny.execution as Record<string, unknown> | undefined;
-    const taskSupport = execution?.taskSupport as string | undefined;
-    if (taskSupport === 'optional' || taskSupport === 'required') parts.push('async');
-    const annotationsSuffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
-    lines.push(`${bullet} ${inBackticks(tool.name)}${annotationsSuffix}`);
+    if (execution?.taskSupport) parts.push('async');
+    const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
+    lines.push(`${bullet} ${inBackticks(tool.name)}${suffix}`);
   }
 
   return lines;
