@@ -1126,6 +1126,8 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
   - https://github.com/adhikasp/mcp-client-cli
   - https://github.com/thellimist/clihub (see https://news.ycombinator.com/item?id=47157398)
   - https://github.com/EstebanForge/mcp-cli-ent
+  - https://github.com/knowsuchagency/mcp2cli
+  - https://github.com/mcpshim/mcpshim
 - Code mode
   - https://blog.cloudflare.com/code-mode/
   - https://www.anthropic.com/engineering/code-execution-with-mcp
