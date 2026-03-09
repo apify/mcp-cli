@@ -1125,7 +1125,7 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 | Tool | Lang | Stars | Active | Tools | Resources | Prompts | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
 |---|---|--:|---|---|---|---|---|---|---|---|---|---|---|
-| **[mcpc](https://github.com/apify/mcpc)** | TS | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| **[mcpc](https://github.com/apify/mcpc)** | TS | ~350 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
 | [mcporter](https://github.com/steipete/mcporter) | TS | ~2.6k | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
 | [mcp-cli](https://github.com/chrishayuk/mcp-cli) (IBM) | Python | ~1.9k | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
 | [mcptools](https://github.com/f/mcptools) | Go | ~1.5k | ⚠️ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | — |
