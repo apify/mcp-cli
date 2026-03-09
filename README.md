@@ -1129,7 +1129,7 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 | [steipete/mcporter](https://github.com/steipete/mcporter) | TS | ~2.6k | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
 | [chrishayuk/mcp-cli](https://github.com/chrishayuk/mcp-cli) (IBM) | Python | ~1.9k | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
 | [f/mcptools](https://github.com/f/mcptools) | Go | ~1.5k | ⚠️ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | — |
-| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli) | TS | ~950 | ⚠️ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
+| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli) | TS | ~950 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 | [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) | Python | ~670 | ⚠️ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ |
 | [thellimist/clihub](https://github.com/thellimist/clihub) | Go | ~590 | ✅ | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | — |
 | [wong2/mcp-cli](https://github.com/wong2/mcp-cli) | JS | ~420 | ⚠️ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | — | — |
