@@ -485,7 +485,7 @@ export class McpClient implements IMcpClient {
       const stream = this.client.experimental.tasks.callToolStream(
         { name, arguments: args || {} },
         CallToolResultSchema,
-        this.getRequestOptions()
+        { ...this.getRequestOptions(), task: {} }
       );
 
       let result: CallToolResult | undefined;
@@ -539,7 +539,7 @@ export class McpClient implements IMcpClient {
       const stream = this.client.experimental.tasks.callToolStream(
         { name, arguments: args || {} },
         CallToolResultSchema,
-        this.getRequestOptions()
+        { ...this.getRequestOptions(), task: {} }
       );
 
       for await (const message of stream) {

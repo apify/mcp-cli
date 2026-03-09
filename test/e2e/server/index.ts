@@ -317,6 +317,7 @@ function createMcpServer(): Server {
           const task: Task = {
             taskId,
             status: 'working',
+            ttl: null,
             createdAt: now,
             lastUpdatedAt: now,
             statusMessage: 'Starting...',

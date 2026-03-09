@@ -18,11 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `tasks-list`, `tasks-get`, `tasks-cancel` commands for managing async tasks on the server
 - Task capability and `execution.taskSupport` displayed in `tools-get` and server info
 - E2E test server now includes a `slow-task` tool that supports async task execution
+- E2E tests for async task execution, detached mode, task management (list/get/cancel), and synchronous fallback
+- `[async]` indicator in `tools-list` output for tools that support async task execution
 - `--client-id` and `--client-secret` options for `mcpc login` command, for servers that don't support dynamic client registration
 - `mcpc close @session`, `mcpc restart @session`, and `mcpc shell @session` command-first syntax as alternatives to `mcpc @session close/restart/shell`
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
 
 ### Fixed
+- `--async` and `--detach` tool calls now correctly send task creation parameters to the server, fixing "task stream ended without creating a task" errors
 - `logging-set-level` JSON output no longer includes a `success` field; output is now `{"level":"<level>"}` consistent with the project's convention of indicating errors via exit codes
 - `--header` / `-H` option is now specific to the `connect` command instead of being shown as a global option in `mcpc --help`
 - Bridge now forwards `logging/message` notifications from the MCP server to connected clients, so `logging-set-level` actually takes effect in interactive shell sessions
