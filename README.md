@@ -1155,6 +1155,7 @@ These resources describe the "code mode" pattern (replacing many tool definition
 - [Dynamic context discovery](https://cursor.com/blog/dynamic-context-discovery) - Cursor's approach to dynamic tool discovery
 - [cmcp](https://github.com/assimelha/cmcp) (~27 stars, Rust) - MCP proxy aggregating servers behind `search()` + `execute()`
 - [cloudflare-mcp](https://github.com/mattzcarey/cloudflare-mcp) (~124 stars, TS) - MCP server for the Cloudflare API using code mode
+- [infinite-mcp](https://github.com/day50-dev/infinite-mcp) (Python) - Meta-MCP server that exposes 1000+ pre-indexed MCP servers via semantic search and dynamic tool discovery
 
 ### Other
 
