@@ -1123,19 +1123,19 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 <!-- Stars and activity as of March 2026. -->
 
-| Tool | Lang | Stars | Created | Active | Tools | Resources | Prompts | Code mode | Sessions | OAuth | Shell | Stdio | HTTP | Tool search | LLM |
-|---|---|--:|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **[mcpc](https://github.com/apify/mcpc)** | TS | — | Dec 2025 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
-| [mcporter](https://github.com/steipete/mcporter) | TS | ~2.6k | Dec 2025 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
-| [mcp-cli](https://github.com/chrishayuk/mcp-cli) (IBM) | Python | ~1.9k | Nov 2024 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
-| [mcptools](https://github.com/f/mcptools) | Go | ~1.5k | Mar 2025 | ⚠️ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | — |
-| [mcp-cli](https://github.com/philschmid/mcp-cli) (philschmid) | TS | ~950 | Jan 2026 | ⚠️ | ✅ | — | — | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — |
-| [mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) | Python | ~670 | Nov 2024 | ⚠️ | ✅ | ✅ | ✅ | — | — | — | — | ✅ | — | — | ✅ |
-| [clihub](https://github.com/thellimist/clihub) | Go | ~590 | Feb 2026 | ✅ | ✅ | — | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| [mcp-cli](https://github.com/wong2/mcp-cli) | JS | ~420 | Dec 2024 | ⚠️ | ✅ | ✅ | ✅ | — | — | ✅ | — | — | ✅ | — | — |
-| [mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | Mar 2026 | ✅ | ✅ | — | — | ✅ | — | — | — | ✅ | ✅ | ✅ | — |
-| [mcpshim](https://github.com/mcpshim/mcpshim) | Go | ~46 | Feb 2026 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — |
-| [mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go | ~13 | Nov 2025 | ✅ | ✅ | — | — | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — |
+| Tool | Lang | Stars | Active | Tools | Resources | Prompts | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
+|---|---|--:|---|---|---|---|---|---|---|---|---|---|---|
+| **[mcpc](https://github.com/apify/mcpc)** | TS | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| [mcporter](https://github.com/steipete/mcporter) | TS | ~2.6k | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| [mcp-cli](https://github.com/chrishayuk/mcp-cli) (IBM) | Python | ~1.9k | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
+| [mcptools](https://github.com/f/mcptools) | Go | ~1.5k | ⚠️ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | — |
+| [mcp-cli](https://github.com/philschmid/mcp-cli) (philschmid) | TS | ~950 | ⚠️ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
+| [mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) | Python | ~670 | ⚠️ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ |
+| [clihub](https://github.com/thellimist/clihub) | Go | ~590 | ✅ | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | — |
+| [mcp-cli](https://github.com/wong2/mcp-cli) | JS | ~420 | ⚠️ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | — | — |
+| [mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | ✅ | ✅ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — |
+| [mcpshim](https://github.com/mcpshim/mcpshim) | Go | ~46 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
+| [mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go | ~13 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 
 **Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **LLM** = requires/uses an LLM.
 
