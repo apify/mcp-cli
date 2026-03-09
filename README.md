@@ -1119,28 +1119,47 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 ## Related work
 
-- MCP CLI clients
-  - https://github.com/chrishayuk/mcp-cli
-  - https://github.com/wong2/mcp-cli
-  - https://github.com/f/mcptools
-  - https://github.com/adhikasp/mcp-client-cli
-  - https://github.com/thellimist/clihub (see https://news.ycombinator.com/item?id=47157398)
-  - https://github.com/EstebanForge/mcp-cli-ent
-  - https://github.com/knowsuchagency/mcp2cli
-  - https://github.com/mcpshim/mcpshim
-- Code mode
-  - https://blog.cloudflare.com/code-mode/
-  - https://www.anthropic.com/engineering/code-execution-with-mcp
-  - https://github.com/steipete/mcporter
-  - https://github.com/mattzcarey/cloudflare-mcp
-  - https://github.com/assimelha/cmcp
-- Dynamic tool discovery
-  - https://www.anthropic.com/engineering/advanced-tool-use
-    - https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool
-  - https://cursor.com/blog/dynamic-context-discovery
-  - https://github.com/philschmid/mcp-cli (https://www.philschmid.de/mcp-cli)
-- Other
-  - https://github.com/TeamSparkAI/mcpGraph
+### MCP CLI clients
+
+<!-- Stars and activity as of March 2026. -->
+
+| Tool | Lang | Stars | Active | Tools | Resources | Prompts | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
+|---|---|--:|---|---|---|---|---|---|---|---|---|---|---|
+| **[apify/mcpc](https://github.com/apify/mcpc)** | TS | ~350 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| [steipete/mcporter](https://github.com/steipete/mcporter) | TS | ~2.6k | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| [IBM/mcp-cli](https://github.com/IBM/mcp-cli) | Python | ~1.9k | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
+| [f/mcptools](https://github.com/f/mcptools) | Go | ~1.5k | ⚠️ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | — |
+| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli) | TS | ~950 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
+| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) | Python | ~670 | ⚠️ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ |
+| [thellimist/clihub](https://github.com/thellimist/clihub) | Go | ~590 | ✅ | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | — |
+| [wong2/mcp-cli](https://github.com/wong2/mcp-cli) | JS | ~420 | ⚠️ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | — | — |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | ✅ | ✅ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — |
+| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim) | Go | ~46 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
+| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go | ~13 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
+
+**Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **LLM** = requires/uses an LLM.
+
+**Notes:**
+- [thellimist/clihub](https://github.com/thellimist/clihub) is a code generator that compiles MCP tools into standalone CLI binaries, rather than a runtime client ([HN discussion](https://news.ycombinator.com/item?id=47157398)).
+- [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) also supports OpenAPI specs directly and uses a custom TOON encoding for token-efficient tool schemas.
+- [IBM/mcp-cli](https://github.com/IBM/mcp-cli) and [mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) integrate an LLM (Ollama, OpenAI, etc.) for chat-style interaction, while the other tools are pure CLI clients.
+
+### Code mode and dynamic tool discovery
+
+These resources describe the "code mode" pattern (replacing many tool definitions with `search` + `execute`) and dynamic tool discovery:
+
+- [Code mode](https://www.anthropic.com/engineering/code-execution-with-mcp) - Anthropic's blog post on code execution with MCP
+- [Code mode at Cloudflare](https://blog.cloudflare.com/code-mode/) - Cloudflare's implementation of the code mode pattern
+- [Advanced tool use](https://www.anthropic.com/engineering/advanced-tool-use) - Anthropic's engineering post on tool search
+  - [Claude tool search](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool) - Claude platform docs
+- [Dynamic context discovery](https://cursor.com/blog/dynamic-context-discovery) - Cursor's approach to dynamic tool discovery
+- [cmcp](https://github.com/assimelha/cmcp) (~27 stars, Rust) - MCP proxy aggregating servers behind `search()` + `execute()`
+- [cloudflare-mcp](https://github.com/mattzcarey/cloudflare-mcp) (~124 stars, TS) - MCP server for the Cloudflare API using code mode
+- [infinite-mcp](https://github.com/day50-dev/infinite-mcp) (Python) - Meta-MCP server that exposes 1000+ pre-indexed MCP servers via semantic search and dynamic tool discovery
+
+### Other
+
+- [mcpGraph](https://github.com/TeamSparkAI/mcpGraph) - MCP server that orchestrates directed graphs of MCP tool calls
 
 ## License
 
