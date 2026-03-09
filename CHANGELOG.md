@@ -36,8 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Async task execution for `tools-call` is now opt-in via `--async` flag instead of automatic; `--sync` flag removed
-- Bridge crash resilience: active tasks are reconnected via polling after bridge restart instead of re-invoked
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
 
   | Before                                        | After                                                      |
