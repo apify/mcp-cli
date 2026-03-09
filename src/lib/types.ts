@@ -145,9 +145,19 @@ export interface SessionData {
   status?: SessionStatus; // Session health status (default: active)
   proxy?: ProxyConfig; // Proxy server configuration (if enabled)
   notifications?: SessionNotifications; // Last list change notification timestamps
+  activeTasks?: Record<string, ActiveTaskEntry>; // Active async tasks for crash recovery
   // Timestamps (ISO 8601 strings)
   createdAt: string; // When the session was created
   lastSeenAt?: string; // Last successful server response (ping, command, etc.)
+}
+
+/**
+ * Entry for an active async task persisted for crash recovery
+ */
+export interface ActiveTaskEntry {
+  taskId: string;
+  toolName: string;
+  createdAt: string;
 }
 
 /**

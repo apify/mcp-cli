@@ -7,8 +7,7 @@
 
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { createServer, type Server as NetServer, type Socket } from 'net';
-import { readFile, unlink, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { unlink } from 'fs/promises';
 import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
 import type { McpClient } from '../core/index.js';
 import type { ServerConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
@@ -17,14 +16,13 @@ import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../li
 import {
   fileExists,
   getBridgesDir,
-  getMcpcHome,
   getSocketPath,
   ensureDir,
   cleanupOrphanedLogFiles,
   isSessionExpiredError,
 } from '../lib/index.js';
 import { ClientError, NetworkError, isAuthenticationError } from '../lib/index.js';
-import { loadSessions, updateSession } from '../lib/sessions.js';
+import { getSession, loadSessions, updateSession } from '../lib/sessions.js';
 import type { AuthCredentials, X402WalletCredentials } from '../lib/types.js';
 import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
 import { OAuthProvider } from '../lib/auth/oauth-provider.js';
@@ -1162,48 +1160,21 @@ class BridgeProcess {
     }
   }
 
-  // --- Active task persistence for crash recovery ---
-
-  private getActiveTasksPath(): string {
-    return join(getMcpcHome(), 'active-tasks.json');
-  }
-
-  private async loadPersistedTasks(): Promise<
-    Record<string, Record<string, { taskId: string; toolName: string; createdAt: string }>>
-  > {
-    const path = this.getActiveTasksPath();
-    if (!(await fileExists(path))) return {};
-    try {
-      return JSON.parse(await readFile(path, 'utf-8')) as Record<
-        string,
-        Record<string, { taskId: string; toolName: string; createdAt: string }>
-      >;
-    } catch {
-      return {};
-    }
-  }
-
-  private async savePersistedTasks(
-    data: Record<string, Record<string, { taskId: string; toolName: string; createdAt: string }>>
-  ): Promise<void> {
-    const path = this.getActiveTasksPath();
-    await writeFile(path, JSON.stringify(data, null, 2), { mode: 0o600 });
-  }
+  // --- Active task persistence for crash recovery (stored in sessions.json) ---
 
   /**
-   * Persist an active task to disk for crash recovery
+   * Persist an active task to sessions.json for crash recovery
    */
   private async persistActiveTask(taskId: string, toolName: string): Promise<void> {
     try {
-      const data = await this.loadPersistedTasks();
-      const sessionName = this.options.sessionName;
-      if (!data[sessionName]) data[sessionName] = {};
-      data[sessionName][taskId] = {
+      const session = await getSession(this.options.sessionName);
+      const activeTasks = { ...session?.activeTasks };
+      activeTasks[taskId] = {
         taskId,
         toolName,
         createdAt: new Date().toISOString(),
       };
-      await this.savePersistedTasks(data);
+      await updateSession(this.options.sessionName, { activeTasks });
     } catch (error) {
       logger.warn(`Failed to persist active task ${taskId}:`, error);
     }
@@ -1214,14 +1185,13 @@ class BridgeProcess {
    */
   private async removePersistedTask(taskId: string): Promise<void> {
     try {
-      const data = await this.loadPersistedTasks();
-      const sessionTasks = data[this.options.sessionName];
-      if (sessionTasks) {
-        delete sessionTasks[taskId];
-        if (Object.keys(sessionTasks).length === 0) {
-          delete data[this.options.sessionName];
-        }
-        await this.savePersistedTasks(data);
+      const session = await getSession(this.options.sessionName);
+      if (session?.activeTasks?.[taskId]) {
+        const activeTasks = { ...session.activeTasks };
+        delete activeTasks[taskId];
+        await updateSession(this.options.sessionName, {
+          activeTasks: Object.keys(activeTasks).length > 0 ? activeTasks : {},
+        });
       }
     } catch (error) {
       logger.warn(`Failed to remove persisted task ${taskId}:`, error);
