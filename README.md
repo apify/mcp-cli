@@ -1133,7 +1133,7 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 | [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) | Python | ~670 | ⚠️ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ |
 | [thellimist/clihub](https://github.com/thellimist/clihub) | Go | ~590 | ✅ | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | — |
 | [wong2/mcp-cli](https://github.com/wong2/mcp-cli) | JS | ~420 | ⚠️ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | — | — |
-| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | ✅ | ✅ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim) | Go | ~46 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
 | [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go | ~13 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 
