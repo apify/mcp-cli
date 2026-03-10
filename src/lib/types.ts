@@ -127,6 +127,7 @@ export interface SessionData {
   server: ServerConfig; // Transport configuration (header values redacted to "<redacted>")
   profileName?: string; // Name of auth profile (for OAuth servers)
   x402?: boolean; // x402 auto-payment enabled for this session
+  insecure?: boolean; // Skip TLS certificate verification
   pid?: number; // Bridge process PID
   protocolVersion?: string; // Negotiated MCP version
   mcpSessionId?: string; // Server-assigned MCP session ID for resumption (Streamable HTTP only)
@@ -264,6 +265,7 @@ export interface CommandOptions {
   headers?: string[];
   timeout?: number;
   verbose?: boolean;
+  insecure?: boolean; // Skip TLS certificate verification (for self-signed certs)
   hideTarget?: boolean; // Suppress session info prefix (used in interactive shell)
   schema?: string; // Path to expected schema file for validation
   schemaMode?: 'strict' | 'compatible' | 'ignore'; // Schema validation mode
