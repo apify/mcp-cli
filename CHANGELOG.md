@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DISCONNECTED_THRESHOLD_MS` is now derived from `KEEPALIVE_INTERVAL_MS` (2× ping interval + 5s buffer) via shared constants, eliminating duplicate magic numbers
 
 ### Added
+<<<<<<< claude/mcp-async-tasks-XUYpP
 
 - `--async` flag for `tools-call` to opt-in to async task execution (experimental) with a progress spinner showing elapsed time and server status messages in human mode
 - `--detach` flag for `tools-call` to start an async task and return the task ID immediately without waiting for completion (implies `--async`)
@@ -20,12 +21,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - E2E test server now includes a `slow-task` tool that supports async task execution
 - E2E tests for async task execution, detached mode, task management (list/get/cancel), and synchronous fallback
 - `[async]` indicator in `tools-list` output for tools that support async task execution
+=======
+- `--insecure` global option to skip TLS certificate verification, for MCP servers with self-signed certificates
+- E2E test for `--insecure` flag using a self-signed HTTPS test server wrapper
+>>>>>>> main
 - `--client-id` and `--client-secret` options for `mcpc login` command, for servers that don't support dynamic client registration
 - `mcpc close @session`, `mcpc restart @session`, and `mcpc shell @session` command-first syntax as alternatives to `mcpc @session close/restart/shell`
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
 
 ### Fixed
+<<<<<<< claude/mcp-async-tasks-XUYpP
 - `--async` and `--detach` tool calls now correctly send task creation parameters to the server, fixing "task stream ended without creating a task" errors
+=======
+- `logTarget` no longer prints a misleading `[→ @name (HTTP)]` prefix when a session doesn't exist; only the error message is shown
+>>>>>>> main
 - `logging-set-level` JSON output no longer includes a `success` field; output is now `{"level":"<level>"}` consistent with the project's convention of indicating errors via exit codes
 - `--header` / `-H` option is now specific to the `connect` command instead of being shown as a global option in `mcpc --help`
 - Bridge now forwards `logging/message` notifications from the MCP server to connected clients, so `logging-set-level` actually takes effect in interactive shell sessions

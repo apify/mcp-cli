@@ -965,8 +965,9 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
     const session = await getSession(target);
     if (session) {
       console.log(`[${formatSessionLine(session)}]\n`);
-      return;
     }
+    // Session not found - don't print anything, let the error handler show the message
+    return;
   }
 
   // For direct connections, use transportConfig if available

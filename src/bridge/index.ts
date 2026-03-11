@@ -47,8 +47,7 @@ import { createX402FetchMiddleware } from '../lib/x402/fetch-middleware.js';
 import type { SignerWallet } from '../lib/x402/signer.js';
 import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 
-// Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
-setGlobalDispatcher(new EnvHttpProxyAgent());
+// HTTP proxy and TLS settings are configured in main() after parsing --insecure flag
 
 // KEEPALIVE_INTERVAL_MS imported from ../lib/types.js
 
@@ -65,6 +64,7 @@ interface BridgeOptions {
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
   x402?: boolean; // Enable x402 auto-payment
+  insecure?: boolean; // Skip TLS certificate verification
 }
 
 /**
@@ -336,6 +336,9 @@ class BridgeProcess {
     });
 
     logger.info(`Bridge process starting for session: ${this.options.sessionName}`);
+    if (this.options.insecure) {
+      logger.warn('TLS certificate verification is disabled (--insecure)');
+    }
 
     // 2. Clean up orphaned log files (runs asynchronously in background)
     this.runOrphanedLogCleanup();
@@ -1355,7 +1358,7 @@ async function main(): Promise<void> {
 
   if (args.length < 2) {
     console.error(
-      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--x402]'
+      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--x402] [--insecure]'
     );
     process.exit(1);
   }
@@ -1393,6 +1396,15 @@ async function main(): Promise<void> {
   // Parse --x402 flag (for x402 payment signing)
   const x402 = args.includes('--x402');
 
+  // Parse --insecure flag (skip TLS certificate verification)
+  const insecure = args.includes('--insecure');
+
+  // Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
+  // Also handle --insecure flag to disable TLS certificate verification
+  setGlobalDispatcher(
+    new EnvHttpProxyAgent(insecure ? { connect: { rejectUnauthorized: false } } : {})
+  );
+
   try {
     const bridgeOptions: BridgeOptions = {
       sessionName,
@@ -1410,6 +1422,9 @@ async function main(): Promise<void> {
     }
     if (x402) {
       bridgeOptions.x402 = true;
+    }
+    if (insecure) {
+      bridgeOptions.insecure = true;
     }
 
     const bridge = new BridgeProcess(bridgeOptions);

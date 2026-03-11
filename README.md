@@ -117,6 +117,7 @@ Options:
   --profile <name>             OAuth profile for the server ("default" if not provided)
   --schema <file>              Validate tool/prompt schema against expected schema
   --schema-mode <mode>         Schema validation mode: strict, compatible (default), ignore
+  --insecure                   Skip TLS certificate verification (for self-signed certs)
   --timeout <seconds>          Request timeout in seconds (default: 300)
   -v, --version                Output the version number
   -h, --help                   Display help
@@ -1133,7 +1134,7 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 | [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) | Python | ~670 | ⚠️ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ |
 | [thellimist/clihub](https://github.com/thellimist/clihub) | Go | ~590 | ✅ | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | — |
 | [wong2/mcp-cli](https://github.com/wong2/mcp-cli) | JS | ~420 | ⚠️ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | — | — |
-| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | ✅ | ✅ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim) | Go | ~46 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
 | [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go | ~13 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 

@@ -86,6 +86,7 @@ export async function connectSession(
     proxy?: string;
     proxyBearerToken?: string;
     x402?: boolean;
+    insecure?: boolean;
   }
 ): Promise<void> {
   try {
@@ -219,6 +220,7 @@ export async function connectSession(
       ...(profileName && { profileName }),
       ...(proxyConfig && { proxy: proxyConfig }),
       ...(options.x402 && { x402: true }),
+      ...(options.insecure && { insecure: true }),
     };
 
     if (isReconnect) {
@@ -251,6 +253,9 @@ export async function connectSession(
       }
       if (options.x402) {
         bridgeOptions.x402 = true;
+      }
+      if (options.insecure) {
+        bridgeOptions.insecure = true;
       }
 
       const { pid } = await startBridge(bridgeOptions);
@@ -637,6 +642,10 @@ export async function restartSession(
 
     if (session.x402) {
       bridgeOptions.x402 = session.x402;
+    }
+
+    if (session.insecure) {
+      bridgeOptions.insecure = session.insecure;
     }
 
     // NOTE: Do NOT pass mcpSessionId on explicit restart.

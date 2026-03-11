@@ -57,6 +57,7 @@ export interface StartBridgeOptions {
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
   x402?: boolean; // Enable x402 auto-payment using the wallet
+  insecure?: boolean; // Skip TLS certificate verification
 }
 
 export interface StartBridgeResult {
@@ -88,6 +89,7 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
     proxyConfig,
     mcpSessionId,
     x402,
+    insecure,
   } = options;
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
@@ -142,6 +144,12 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
   if (x402) {
     args.push('--x402');
     logger.debug('Passing x402 flag to bridge');
+  }
+
+  // Pass insecure flag (if enabled)
+  if (insecure) {
+    args.push('--insecure');
+    logger.debug('Passing insecure flag to bridge');
   }
 
   logger.debug('Bridge executable:', bridgeExecutable);
@@ -303,6 +311,10 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   if (session.x402) {
     bridgeOptions.x402 = session.x402;
     logger.debug('Using saved x402 flag');
+  }
+  if (session.insecure) {
+    bridgeOptions.insecure = session.insecure;
+    logger.debug('Using saved insecure flag');
   }
 
   const { pid } = await startBridge(bridgeOptions);
