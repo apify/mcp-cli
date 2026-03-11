@@ -43,7 +43,13 @@ const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.j
 };
 
 // Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
-setGlobalDispatcher(new EnvHttpProxyAgent());
+// Also handle --insecure flag to disable TLS certificate verification (for self-signed certs)
+{
+  const insecure = process.argv.includes('--insecure');
+  setGlobalDispatcher(
+    new EnvHttpProxyAgent(insecure ? { connect: { rejectUnauthorized: false } } : {})
+  );
+}
 
 /**
  * Options passed to command handlers
@@ -55,6 +61,7 @@ interface HandlerOptions {
   verbose?: boolean;
   profile?: string;
   x402?: boolean;
+  insecure?: boolean;
   schema?: string;
   schemaMode?: 'strict' | 'compatible' | 'ignore';
   full?: boolean;
@@ -93,6 +100,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.profile) options.profile = opts.profile;
   if (verbose) options.verbose = verbose;
   if (opts.x402) options.x402 = true;
+  if (opts.insecure) options.insecure = true;
   if (opts.schema) options.schema = opts.schema;
   if (opts.schemaMode) {
     const mode = opts.schemaMode as string;
@@ -311,6 +319,7 @@ function createTopLevelProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .version(mcpcVersion, '-v, --version', 'Output the version number')
     .helpOption('-h, --help', 'Display help');
 
@@ -392,6 +401,7 @@ Server formats:
           proxy: opts.proxy,
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
+          ...(globalOpts.insecure && { insecure: true }),
         });
       } else {
         await sessions.connectSession(server, sessionName, {
@@ -400,6 +410,7 @@ Server formats:
           proxy: opts.proxy,
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
+          ...(globalOpts.insecure && { insecure: true }),
         });
       }
     });
@@ -781,7 +792,8 @@ function createSessionProgram(): Command {
     .option('--profile <name>', 'OAuth profile override')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
-    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)');
+    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)');
 
   return program;
 }

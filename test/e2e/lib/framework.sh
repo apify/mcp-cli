@@ -553,6 +553,7 @@ assert_stderr_empty() {
 TEST_SERVER_PORT="${TEST_SERVER_PORT:-0}"  # 0 = random port
 _TEST_SERVER_PID=""
 _PROXY_SERVER_PID=""
+_HTTPS_WRAPPER_PID=""
 
 # Start test MCP server
 # Usage: start_test_server [env_vars...]
@@ -599,8 +600,11 @@ start_test_server() {
 # Create a dummy auth profile for a host (internal helper)
 # This is needed because mcpc requires auth profiles for all HTTP servers
 # Uses atomic symlink creation for cross-platform locking
+# Usage: _create_test_auth_profile <host> [scheme]
+#   scheme defaults to "http" if not specified
 _create_test_auth_profile() {
   local host="$1"
+  local scheme="${2:-http}"
   local profiles_file="$MCPC_HOME_DIR/profiles.json"
   local lock_file="$MCPC_HOME_DIR/profiles.lock"
 
@@ -627,7 +631,7 @@ _create_test_auth_profile() {
   if [[ -f "$profiles_file" && -s "$profiles_file" ]]; then
     # File exists and is non-empty - add profile for this host using jq
     local updated
-    if updated=$(jq --arg host "$host" '.profiles[$host] = {"default": {"name": "default", "serverUrl": ("http://" + $host), "authType": "oauth", "oauthIssuer": "https://test.example.com", "createdAt": "2025-01-01T00:00:00Z"}}' "$profiles_file" 2>/dev/null); then
+    if updated=$(jq --arg host "$host" --arg scheme "$scheme" '.profiles[$host] = {"default": {"name": "default", "serverUrl": ($scheme + "://" + $host), "authType": "oauth", "oauthIssuer": "https://test.example.com", "createdAt": "2025-01-01T00:00:00Z"}}' "$profiles_file" 2>/dev/null); then
       # Write to temp file then atomically rename
       local temp_file="$profiles_file.$$.tmp"
       echo "$updated" > "$temp_file"
@@ -640,7 +644,7 @@ _create_test_auth_profile() {
     "$host": {
       "default": {
         "name": "default",
-        "serverUrl": "http://$host",
+        "serverUrl": "$scheme://$host",
         "authType": "oauth",
         "oauthIssuer": "https://test.example.com",
         "createdAt": "2025-01-01T00:00:00Z"
@@ -658,7 +662,7 @@ EOF
     "$host": {
       "default": {
         "name": "default",
-        "serverUrl": "http://$host",
+        "serverUrl": "$scheme://$host",
         "authType": "oauth",
         "oauthIssuer": "https://test.example.com",
         "createdAt": "2025-01-01T00:00:00Z"
@@ -699,8 +703,47 @@ start_proxy_server() {
   echo "# Proxy server started at $PROXY_URL (PID: $_PROXY_SERVER_PID)"
 }
 
+# Start an HTTPS wrapper around the test server using a self-signed certificate.
+# Requires start_test_server to have been called first.
+# Sets TEST_HTTPS_SERVER_URL in the environment.
+start_https_test_server() {
+  local log="$_TEST_RUN_DIR/https-wrapper.log"
+  cd "$PROJECT_ROOT"
+  env TARGET_URL="$TEST_SERVER_URL" npx tsx test/e2e/server/https-wrapper.ts >"$log" 2>&1 &
+  _HTTPS_WRAPPER_PID=$!
+
+  # Wait for HTTPS_PORT= line in log (up to 10 seconds)
+  local max_wait=50
+  local waited=0
+  while ! grep -q "^HTTPS_PORT=" "$log" 2>/dev/null; do
+    sleep 0.2
+    ((waited++)) || true
+    if [[ $waited -ge $max_wait ]]; then
+      echo "Error: HTTPS wrapper server failed to start" >&2
+      cat "$log" >&2
+      kill $_HTTPS_WRAPPER_PID 2>/dev/null || true
+      exit 1
+    fi
+  done
+
+  local https_port
+  https_port=$(grep "^HTTPS_PORT=" "$log" | cut -d= -f2 | tr -d '[:space:]')
+
+  export TEST_HTTPS_SERVER_URL="https://localhost:${https_port}"
+  echo "# HTTPS wrapper started at $TEST_HTTPS_SERVER_URL (PID: $_HTTPS_WRAPPER_PID)"
+
+  # Create auth profile for HTTPS host
+  _create_test_auth_profile "localhost:${https_port}" "https"
+}
+
 # Stop test server
 stop_test_server() {
+  if [[ -n "$_HTTPS_WRAPPER_PID" ]]; then
+    pkill -P "$_HTTPS_WRAPPER_PID" 2>/dev/null || true
+    kill "$_HTTPS_WRAPPER_PID" 2>/dev/null || true
+    wait "$_HTTPS_WRAPPER_PID" 2>/dev/null || true
+    _HTTPS_WRAPPER_PID=""
+  fi
   if [[ -n "$_TEST_SERVER_PID" ]]; then
     # Kill all child processes first (tsx spawns node as child)
     pkill -P "$_TEST_SERVER_PID" 2>/dev/null || true

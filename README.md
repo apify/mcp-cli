@@ -117,6 +117,7 @@ Options:
   --profile <name>             OAuth profile for the server ("default" if not provided)
   --schema <file>              Validate tool/prompt schema against expected schema
   --schema-mode <mode>         Schema validation mode: strict, compatible (default), ignore
+  --insecure                   Skip TLS certificate verification (for self-signed certs)
   --timeout <seconds>          Request timeout in seconds (default: 300)
   -v, --version                Output the version number
   -h, --help                   Display help
