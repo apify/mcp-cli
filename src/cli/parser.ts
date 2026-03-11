@@ -29,13 +29,6 @@ export function getJsonFromEnv(): boolean {
   return isEnvTrue(process.env.MCPC_JSON);
 }
 
-/**
- * Get insecure flag from environment variable
- */
-export function getInsecureFromEnv(): boolean {
-  return isEnvTrue(process.env.MCPC_INSECURE);
-}
-
 // Global options that take a value (not boolean flags)
 const GLOBAL_OPTIONS_WITH_VALUES = ['--timeout', '--profile', '--schema', '--schema-mode'];
 
@@ -267,7 +260,7 @@ export function extractOptions(args: string[]): {
   const x402 = args.includes('--x402') || undefined;
 
   // Extract --insecure (boolean flag)
-  const insecure = args.includes('--insecure') || getInsecureFromEnv() || undefined;
+  const insecure = args.includes('--insecure') || undefined;
 
   return {
     ...options,

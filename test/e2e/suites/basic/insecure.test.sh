@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test: --insecure flag and MCPC_INSECURE env var for self-signed TLS certificates
+# Test: --insecure flag for self-signed TLS certificates
 
 source "$(dirname "$0")/../../lib/framework.sh"
 test_init "basic/insecure" --isolated
@@ -42,21 +42,6 @@ test_case "tools-call works over insecure session"
 run_mcpc "$SESSION" tools-call echo message:=hello
 assert_success
 assert_contains "$STDOUT" "hello"
-test_pass
-
-# Test: MCPC_INSECURE=1 env var works
-test_case "MCPC_INSECURE=1 env var allows self-signed cert connection"
-SESSION_ENV=$(session_name "insecure-env")
-MCPC_INSECURE=1 run_mcpc connect "$TEST_HTTPS_SERVER_URL" "$SESSION_ENV" --header "X-Test: true"
-assert_success
-_SESSIONS_CREATED+=("$SESSION_ENV")
-test_pass
-
-# Test: MCP operations work with env var session
-test_case "tools-list works with MCPC_INSECURE=1 session"
-run_xmcpc "$SESSION_ENV" tools-list
-assert_success
-assert_contains "$STDOUT" "echo"
 test_pass
 
 test_done

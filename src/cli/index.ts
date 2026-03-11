@@ -29,7 +29,6 @@ import {
   extractOptions,
   getVerboseFromEnv,
   getJsonFromEnv,
-  getInsecureFromEnv,
   validateOptions,
   validateArgValues,
   parseServerArg,
@@ -46,7 +45,7 @@ const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.j
 // Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
 // Also handle --insecure flag to disable TLS certificate verification (for self-signed certs)
 {
-  const insecure = process.argv.includes('--insecure') || getInsecureFromEnv();
+  const insecure = process.argv.includes('--insecure');
   setGlobalDispatcher(
     new EnvHttpProxyAgent(insecure ? { connect: { rejectUnauthorized: false } } : {})
   );
@@ -101,7 +100,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.profile) options.profile = opts.profile;
   if (verbose) options.verbose = verbose;
   if (opts.x402) options.x402 = true;
-  if (opts.insecure || getInsecureFromEnv()) options.insecure = true;
+  if (opts.insecure) options.insecure = true;
   if (opts.schema) options.schema = opts.schema;
   if (opts.schemaMode) {
     const mode = opts.schemaMode as string;
