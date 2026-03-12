@@ -157,11 +157,22 @@ export async function connectSession(
     const serverConfig = await resolveTarget(target, options);
 
     // For HTTP targets, resolve auth profile (with helpful errors if none available)
+    // If user explicitly provided an Authorization header via --header and did NOT
+    // explicitly specify --profile, skip OAuth profile auto-detection.
+    // Explicit CLI flags should take precedence over stored profiles.
     let profileName: string | undefined;
+    const hasExplicitAuthHeader = serverConfig.headers?.Authorization !== undefined;
+    const hasExplicitProfile = options.profile !== undefined;
     if (serverConfig.url) {
-      profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
-        sessionName: name,
-      });
+      if (hasExplicitAuthHeader && !hasExplicitProfile) {
+        logger.debug(
+          'Skipping OAuth profile auto-detection: explicit Authorization header provided via --header'
+        );
+      } else {
+        profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
+          sessionName: name,
+        });
+      }
     }
 
     // Store headers in OS keychain (secure storage) before starting bridge
