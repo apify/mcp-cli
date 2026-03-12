@@ -141,7 +141,7 @@ export class BridgeClient extends EventEmitter {
     });
 
     this.socket.on('error', (error) => {
-      logger.error('Socket error:', error);
+      logger.debug('Socket error:', error);
       this.cleanup();
     });
   }

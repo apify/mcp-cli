@@ -1,11 +1,13 @@
 /**
  * Interactive OAuth 2.1 flow with PKCE
  * Handles browser-based authorization with local callback server
+ * Falls back to manual URL paste when browser is unavailable
  */
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'http';
 import type { Socket } from 'net';
 import { URL } from 'url';
+import { createInterface } from 'readline';
 import { auth as sdkAuth } from '@modelcontextprotocol/sdk/client/auth.js';
 import { OAuthProvider, type OAuthProviderOptions } from './oauth-provider.js';
 import { normalizeServerUrl } from '../utils.js';
@@ -248,8 +250,9 @@ async function findAvailablePort(startPort: number = 8000): Promise<number> {
 /**
  * Open a URL in the default browser
  * Uses platform-specific commands
+ * Returns true if the browser was opened successfully, false otherwise
  */
-async function openBrowser(url: string): Promise<void> {
+async function tryOpenBrowser(url: string): Promise<boolean> {
   const { exec } = await import('child_process');
   const { promisify } = await import('util');
   const execAsync = promisify(exec);
@@ -268,15 +271,104 @@ async function openBrowser(url: string): Promise<void> {
   try {
     await execAsync(command);
     logger.debug('Browser opened successfully');
+    return true;
   } catch (error) {
     logger.warn(`Failed to open browser: ${(error as Error).message}`);
-    throw new ClientError(`Failed to open browser. Please manually navigate to: ${url}`);
+    return false;
   }
+}
+
+/**
+ * Extract authorization code and state from a callback URL
+ * Parses URLs like: http://localhost:8000/callback?code=abc123&state=xyz
+ */
+function extractCodeFromUrl(callbackUrl: string): { code: string; state?: string } {
+  try {
+    // Handle both full URLs and just query strings
+    const url = callbackUrl.startsWith('http')
+      ? new URL(callbackUrl)
+      : new URL(callbackUrl, 'http://localhost');
+
+    const code = url.searchParams.get('code');
+    const error = url.searchParams.get('error');
+    const errorDescription = url.searchParams.get('error_description');
+    const state = url.searchParams.get('state') || undefined;
+
+    if (error) {
+      const message = errorDescription || error;
+      throw new ClientError(`OAuth error: ${message}`);
+    }
+
+    if (!code) {
+      throw new ClientError(
+        'No authorization code found in the URL. Make sure you copied the full URL from the browser address bar after authorizing.'
+      );
+    }
+
+    const result: { code: string; state?: string } = { code };
+    if (state !== undefined) {
+      result.state = state;
+    }
+    return result;
+  } catch (e) {
+    if (e instanceof ClientError) throw e;
+    throw new ClientError(
+      'Invalid URL. Please paste the full URL from the browser address bar after authorizing.'
+    );
+  }
+}
+
+/**
+ * Prompt user to paste the callback URL from their browser
+ * Uses readline (not raw mode) so it works in all terminal environments
+ */
+function promptForCallbackUrl(): {
+  promise: Promise<{ code: string; state?: string }>;
+  cleanup: () => void;
+} {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    rl.close();
+  };
+
+  const promise = new Promise<{ code: string; state?: string }>((resolve, reject) => {
+    rl.question('\nPaste the callback URL from your browser here:\n> ', (answer: string) => {
+      cleanup();
+      const trimmed = answer.trim();
+      if (!trimmed) {
+        reject(new ClientError('Authentication cancelled by user'));
+        return;
+      }
+      try {
+        resolve(extractCodeFromUrl(trimmed));
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    rl.on('close', () => {
+      // Handle Ctrl+C / Ctrl+D
+      if (!cleaned) {
+        cleaned = true;
+        reject(new ClientError('Authentication cancelled by user'));
+      }
+    });
+  });
+
+  return { promise, cleanup };
 }
 
 /**
  * Perform interactive OAuth flow
  * Opens browser for user authentication and handles callback
+ * Falls back to manual URL paste when browser cannot be opened
  */
 export async function performOAuthFlow(
   serverUrl: string,
@@ -340,6 +432,12 @@ export async function performOAuthFlow(
   // Start callback server
   const { server, codePromise, destroyConnections } = startCallbackServer(port);
 
+  // Track whether browser failed so we can fall back to URL paste
+  let browserFailed = false;
+
+  // Handler refs for cleanup
+  const pasteHandlerRef: { current: { cleanup: () => void } | null } = { current: null };
+
   try {
     // Start server
     await new Promise<void>((resolve, reject) => {
@@ -369,16 +467,21 @@ export async function performOAuthFlow(
       }
 
       console.log('Opening browser...');
-      console.log('If the browser does not open automatically, please visit the URL above.');
-      console.log('Press Esc to cancel.\n');
+      const opened = await tryOpenBrowser(authorizationUrl.toString());
 
-      // Set up escape key handler AFTER Enter confirmation (to avoid raw mode conflicts)
-      escapeHandlerRef.current = waitForEscapeKey();
-
-      try {
-        await openBrowser(authorizationUrl.toString());
-      } catch (error) {
-        console.error((error as Error).message);
+      if (opened) {
+        console.log('If the browser does not open automatically, please visit the URL above.');
+        console.log('Press Esc to cancel.\n');
+        // Set up escape key handler AFTER Enter confirmation (to avoid raw mode conflicts)
+        escapeHandlerRef.current = waitForEscapeKey();
+      } else {
+        browserFailed = true;
+        console.log(
+          '\nCould not open browser. Please open the authorization URL above in your browser.'
+        );
+        console.log(
+          'After authorizing, copy the full callback URL from the browser address bar and paste it here.'
+        );
       }
     };
 
@@ -396,10 +499,17 @@ export async function performOAuthFlow(
       if (result === 'REDIRECT') {
         // Wait for callback with authorization code, or user pressing Escape
         logger.debug('Waiting for authorization code...');
-        const racers: Promise<{ code: string }>[] = [codePromise];
-        if (escapeHandlerRef.current) {
+        const racers: Promise<{ code: string; state?: string }>[] = [codePromise];
+
+        if (browserFailed) {
+          // Browser didn't open - also accept pasted callback URL
+          const urlHandler = promptForCallbackUrl();
+          pasteHandlerRef.current = urlHandler;
+          racers.push(urlHandler.promise);
+        } else if (escapeHandlerRef.current) {
           racers.push(escapeHandlerRef.current.promise as Promise<{ code: string }>);
         }
+
         const { code } = await Promise.race(racers);
 
         // Exchange code for tokens
@@ -414,8 +524,9 @@ export async function performOAuthFlow(
         await sdkAuth(provider, tokenOptions);
       }
     } finally {
-      // Clean up escape key handler
+      // Clean up escape key handler and paste handler
       escapeHandlerRef.current?.cleanup();
+      pasteHandlerRef.current?.cleanup();
     }
 
     // Get the saved profile
@@ -434,6 +545,8 @@ export async function performOAuthFlow(
     logger.debug(`OAuth flow failed: ${(error as Error).message}`);
     throw error;
   } finally {
+    // Clean up paste handler in case of error
+    pasteHandlerRef.current?.cleanup();
     // Close callback server and destroy all connections
     destroyConnections();
     server.close();
