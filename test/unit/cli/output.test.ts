@@ -490,6 +490,40 @@ describe('formatTools', () => {
       const output = formatTools([]);
       expect(output).toContain('Available tools (0):');
     });
+
+    it('should show async indicator for tools with task support', () => {
+      const tools = [
+        {
+          name: 'async_tool',
+          description: 'A tool with async support',
+          inputSchema: { type: 'object', properties: {} },
+          execution: { taskSupport: 'optional' },
+        },
+        {
+          name: 'sync_tool',
+          description: 'A regular tool',
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ] as Tool[];
+
+      const output = formatTools(tools);
+      expect(output).toContain('`async_tool` [async]');
+      expect(output).not.toContain('`sync_tool` [');
+    });
+
+    it('should combine annotations and async indicator', () => {
+      const tools = [
+        {
+          name: 'combined_tool',
+          inputSchema: { type: 'object', properties: {} },
+          annotations: { readOnlyHint: true },
+          execution: { taskSupport: 'required' },
+        },
+      ] as Tool[];
+
+      const output = formatTools(tools);
+      expect(output).toContain('[read-only, async]');
+    });
   });
 });
 

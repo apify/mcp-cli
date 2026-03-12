@@ -13,6 +13,7 @@ import type { OutputMode, CommandOptions, NotificationData } from '../lib/types.
 import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
 import * as prompts from './commands/prompts.js';
+import * as tasks from './commands/tasks.js';
 import * as logging from './commands/logging.js';
 import { ping } from './commands/utilities.js';
 import { createSessionClient } from '../lib/session-client.js';
@@ -220,16 +221,23 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
       case 'tools-call': {
         if (args.length === 0) {
           console.log(chalk.red('Error: tools-call requires a tool name'));
-          console.log('Usage: tools-call <name> [key:=value ...]');
+          console.log('Usage: tools-call <name> [--async] [--detach] [key:=value ...]');
           return;
         }
 
+        // Extract flags from args
+        const asyncFlag = args.includes('--async');
+        const detachFlag = args.includes('--detach');
+        const filteredArgs = args.filter((a) => a !== '--async' && a !== '--detach');
+
         // First arg is tool name, rest are positional arguments
-        const toolName = args[0] as string;
-        const toolArgs = args.slice(1);
+        const toolName = filteredArgs[0] as string;
+        const toolArgs = filteredArgs.slice(1);
 
         await tools.callTool(ctx.target, toolName, {
           ...options,
+          ...(asyncFlag ? { async: true } : {}),
+          ...(detachFlag ? { detach: true } : {}),
           ...(toolArgs.length > 0 ? { args: toolArgs } : {}),
         });
         break;
@@ -284,6 +292,30 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
           return;
         }
         await logging.setLogLevel(ctx.target, args[0] as string, options);
+        break;
+      }
+
+      case 'tasks-list':
+        await tasks.listTasks(ctx.target, options);
+        break;
+
+      case 'tasks-get': {
+        if (args.length === 0) {
+          console.log(chalk.red('Error: tasks-get requires a task ID'));
+          console.log('Usage: tasks-get <taskId>');
+          return;
+        }
+        await tasks.getTask(ctx.target, args[0] as string, options);
+        break;
+      }
+
+      case 'tasks-cancel': {
+        if (args.length === 0) {
+          console.log(chalk.red('Error: tasks-cancel requires a task ID'));
+          console.log('Usage: tasks-cancel <taskId>');
+          return;
+        }
+        await tasks.cancelTask(ctx.target, args[0] as string, options);
         break;
       }
 

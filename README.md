@@ -112,12 +112,12 @@ Universal command-line client for the Model Context Protocol (MCP).
 
 Options:
   -j, --json                   Output in JSON format for scripting
-  -H, --header <header>        HTTP header (can be repeated)
   --verbose                    Enable debug logging
   --profile <name>             OAuth profile for the server ("default" if not provided)
   --schema <file>              Validate tool/prompt schema against expected schema
   --schema-mode <mode>         Schema validation mode: strict, compatible (default), ignore
   --timeout <seconds>          Request timeout in seconds (default: 300)
+  --insecure                   Skip TLS certificate verification (for self-signed certs)
   -v, --version                Output the version number
   -h, --help                   Display help
 
@@ -144,6 +144,9 @@ MCP session commands (after connecting):
   <@session> resources-subscribe <uri>
   <@session> resources-unsubscribe <uri>
   <@session> resources-templates-list
+  <@session> tasks-list
+  <@session> tasks-get <taskId>
+  <@session> tasks-cancel <taskId>
   <@session> logging-set-level <level>
   <@session> ping
 
@@ -435,7 +438,16 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
 3. **Config file headers** - Headers from `--config` file for the server
 4. **No authentication** - Attempts unauthenticated connection
 
-`mcpc` automatically handles authentication based on whether you specify a profile:
+**Note:** `--profile` and `--header "Authorization: ..."` cannot be combined — they are mutually
+exclusive. Providing both will result in a clear error. Use one or the other.
+
+`mcpc` automatically handles authentication based on what you specify:
+
+**When `--header "Authorization: ..."` is provided:**
+
+- The explicit header is always used, and OAuth profile auto-detection is skipped entirely
+- This works even if a `default` profile exists for the server
+- Cannot be combined with `--profile` (returns an error)
 
 **When `--profile <name>` is specified:**
 
@@ -444,7 +456,13 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
    - If authentication fails (expired/invalid) → Fail with an error
 2. **Profile doesn't exist**: Fail with an error
 
-**When no `--profile` is specified:**
+**When `--no-profile` is specified:**
+
+- Skip all OAuth profile detection and connect anonymously
+- Useful when a `default` profile exists but you want an unauthenticated session
+- Can be combined with `--header "Authorization: ..."` for explicit bearer token without profile
+
+**When no flags are specified (default):**
 
 1. **`default` profile exists for the server**: Use its stored credentials
    - If authentication succeeds → Continue with command/session
@@ -457,7 +475,7 @@ On failure, the error message includes instructions on how to login and save the
 
 This flow ensures:
 
-- You only authenticate when necessary
+- Explicit CLI flags always take precedence over stored profiles
 - Credentials are never silently mixed up (personal → work) or downgraded (authenticated → unauthenticated)
 - You can mix authenticated sessions (with named profiles) and public access on the same server
 
@@ -474,6 +492,12 @@ mcpc connect mcp.apify.com @apify-work --profile work
 # - Tries unauthenticated if 'default' doesn't exist
 # - Fails if the server requires authentication
 mcpc connect mcp.apify.com @apify-personal
+
+# Explicit bearer token - skips profile auto-detection:
+mcpc connect mcp.apify.com @apify --header "Authorization: Bearer ${APIFY_TOKEN}"
+
+# Anonymous - skips default profile even if it exists:
+mcpc connect mcp.apify.com @apify-anon --no-profile
 ```
 
 ## MCP proxy
@@ -1133,7 +1157,7 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 | [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) | Python | ~670 | ⚠️ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ |
 | [thellimist/clihub](https://github.com/thellimist/clihub) | Go | ~590 | ✅ | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | — |
 | [wong2/mcp-cli](https://github.com/wong2/mcp-cli) | JS | ~420 | ⚠️ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | — | — |
-| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | ✅ | ✅ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim) | Go | ~46 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
 | [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go | ~13 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 

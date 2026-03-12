@@ -85,4 +85,4 @@ jobs:
         run: npm run build
 
       - name: E2E tests
-        run: ./test/e2e/run.sh --no-build --runtime bun --parallel 6
+        run: ./test/e2e/run.sh --no-build --runtime bun --parallel 4

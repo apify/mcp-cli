@@ -22,6 +22,7 @@ import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
 import * as utilities from './commands/utilities.js';
 import * as auth from './commands/auth.js';
+import * as tasks from './commands/tasks.js';
 import { handleX402Command } from './commands/x402.js';
 import { clean } from './commands/clean.js';
 import type { OutputMode } from '../lib/index.js';
@@ -43,7 +44,13 @@ const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.j
 };
 
 // Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
-setGlobalDispatcher(new EnvHttpProxyAgent());
+// Also handle --insecure flag to disable TLS certificate verification (for self-signed certs)
+{
+  const insecure = process.argv.includes('--insecure');
+  setGlobalDispatcher(
+    new EnvHttpProxyAgent(insecure ? { connect: { rejectUnauthorized: false } } : {})
+  );
+}
 
 /**
  * Options passed to command handlers
@@ -54,7 +61,9 @@ interface HandlerOptions {
   timeout?: number;
   verbose?: boolean;
   profile?: string;
+  noProfile?: boolean;
   x402?: boolean;
+  insecure?: boolean;
   schema?: string;
   schemaMode?: 'strict' | 'compatible' | 'ignore';
   full?: boolean;
@@ -90,9 +99,14 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
     }
     options.timeout = timeout;
   }
-  if (opts.profile) options.profile = opts.profile;
+  if (opts.profile === false) {
+    options.noProfile = true;
+  } else if (opts.profile) {
+    options.profile = opts.profile;
+  }
   if (verbose) options.verbose = verbose;
   if (opts.x402) options.x402 = true;
+  if (opts.insecure) options.insecure = true;
   if (opts.schema) options.schema = opts.schema;
   if (opts.schemaMode) {
     const mode = opts.schemaMode as string;
@@ -311,6 +325,7 @@ function createTopLevelProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .version(mcpcVersion, '-v, --version', 'Output the version number')
     .helpOption('-h, --help', 'Display help');
 
@@ -329,6 +344,9 @@ MCP session commands (after connecting):
   <@session> resources-subscribe <uri>
   <@session> resources-unsubscribe <uri>
   <@session> resources-templates-list
+  <@session> tasks-list
+  <@session> tasks-get <taskId>
+  <@session> tasks-cancel <taskId>
   <@session> logging-set-level <level>
   <@session> ping
 
@@ -344,6 +362,7 @@ Full docs: ${docsUrl}`
     .description('Connect to an MCP server and start a new named @session')
     .option('-H, --header <header>', 'HTTP header (can be repeated)')
     .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
+    .option('--no-profile', 'Skip OAuth profile (connect anonymously)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
@@ -392,6 +411,7 @@ Server formats:
           proxy: opts.proxy,
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
+          ...(globalOpts.insecure && { insecure: true }),
         });
       } else {
         await sessions.connectSession(server, sessionName, {
@@ -400,6 +420,7 @@ Server formats:
           proxy: opts.proxy,
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
+          ...(globalOpts.insecure && { insecure: true }),
         });
       }
     });
@@ -660,11 +681,37 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tools-call <name> [args...]')
     .description('Call a tool with arguments (key:=value pairs or JSON)')
-    .action(async (name, args, _options, command) => {
+    .option('--async', 'Use async task execution (experimental)')
+    .option('--detach', 'Start async task and return immediately with task ID (implies --async)')
+    .action(async (name, args, options, command) => {
       await tools.callTool(session, name, {
         args,
+        async: options.async,
+        detach: options.detach,
         ...getOptionsFromCommand(command),
       });
+    });
+
+  // Tasks commands
+  program
+    .command('tasks-list')
+    .description('List active tasks')
+    .action(async (_options, command) => {
+      await tasks.listTasks(session, getOptionsFromCommand(command));
+    });
+
+  program
+    .command('tasks-get <taskId>')
+    .description('Get status of a specific task')
+    .action(async (taskId, _options, command) => {
+      await tasks.getTask(session, taskId, getOptionsFromCommand(command));
+    });
+
+  program
+    .command('tasks-cancel <taskId>')
+    .description('Cancel a running task')
+    .action(async (taskId, _options, command) => {
+      await tasks.cancelTask(session, taskId, getOptionsFromCommand(command));
     });
 
   // Resources commands
@@ -781,7 +828,8 @@ function createSessionProgram(): Command {
     .option('--profile <name>', 'OAuth profile override')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
-    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)');
+    .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)');
 
   return program;
 }

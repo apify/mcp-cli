@@ -22,7 +22,7 @@ import {
   isSessionExpiredError,
 } from '../lib/index.js';
 import { ClientError, NetworkError, isAuthenticationError } from '../lib/index.js';
-import { loadSessions, updateSession } from '../lib/sessions.js';
+import { getSession, loadSessions, updateSession } from '../lib/sessions.js';
 import type { AuthCredentials, X402WalletCredentials } from '../lib/types.js';
 import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
 import { OAuthProvider } from '../lib/auth/oauth-provider.js';
@@ -34,7 +34,9 @@ import {
   type Tool,
   type Resource,
   type Prompt,
+  type Task,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { TaskUpdate } from '../lib/types.js';
 import { createRequire } from 'module';
 const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
   version: string;
@@ -45,8 +47,7 @@ import { createX402FetchMiddleware } from '../lib/x402/fetch-middleware.js';
 import type { SignerWallet } from '../lib/x402/signer.js';
 import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 
-// Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
-setGlobalDispatcher(new EnvHttpProxyAgent());
+// HTTP proxy and TLS settings are configured in main() after parsing --insecure flag
 
 // KEEPALIVE_INTERVAL_MS imported from ../lib/types.js
 
@@ -63,6 +64,7 @@ interface BridgeOptions {
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
   x402?: boolean; // Enable x402 auto-payment
+  insecure?: boolean; // Skip TLS certificate verification
 }
 
 /**
@@ -93,6 +95,9 @@ class BridgeProcess {
 
   // Cached tools list for x402 proactive signing (updated via listChanged notifications)
   private cachedTools: Tool[] | null = null;
+
+  // Active async tasks (in-memory, also persisted to disk for crash recovery)
+  private activeTasks: Map<string, Task> = new Map();
 
   // Promise to track when auth credentials are received (for startup sequencing)
   private authCredentialsReceived: Promise<void> | null = null;
@@ -331,6 +336,9 @@ class BridgeProcess {
     });
 
     logger.info(`Bridge process starting for session: ${this.options.sessionName}`);
+    if (this.options.insecure) {
+      logger.warn('TLS certificate verification is disabled (--insecure)');
+    }
 
     // 2. Clean up orphaned log files (runs asynchronously in background)
     this.runOrphanedLogCleanup();
@@ -522,6 +530,13 @@ class BridgeProcess {
       capabilities: {
         roots: { listChanged: true },
         sampling: {},
+        tasks: {
+          list: {},
+          cancel: {},
+          requests: {
+            sampling: { createMessage: {} },
+          },
+        },
       },
       // Pass auth provider for automatic token refresh (HTTP transport only)
       ...(this.authProvider && { authProvider: this.authProvider }),
@@ -727,19 +742,21 @@ class BridgeProcess {
   }
 
   /**
-   * Check if an error indicates session expiration or auth failure and handle accordingly
+   * Check if an error indicates session expiration or auth failure and handle accordingly.
+   * Session expiry is checked first since it's more specific (404/session-not-found),
+   * while auth errors are broader (401/403/unauthorized) and could overlap.
    */
   private handlePossibleExpiration(error: Error): void {
-    if (isAuthenticationError(error.message)) {
-      logger.warn('Authentication rejected, marking session as unauthorized and shutting down');
-      this.markSessionStatusAndExit('unauthorized').catch((e) => {
-        logger.error('Failed to mark session as unauthorized:', e);
-        process.exit(1);
-      });
-    } else if (isSessionExpiredError(error.message)) {
+    if (isSessionExpiredError(error.message)) {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
       this.markSessionStatusAndExit('expired').catch((e) => {
         logger.error('Failed to mark session as expired:', e);
+        process.exit(1);
+      });
+    } else if (isAuthenticationError(error.message)) {
+      logger.warn('Authentication rejected, marking session as unauthorized and shutting down');
+      this.markSessionStatusAndExit('unauthorized').catch((e) => {
+        logger.error('Failed to mark session as unauthorized:', e);
         process.exit(1);
       });
     }
@@ -954,8 +971,77 @@ class BridgeProcess {
         }
 
         case 'callTool': {
-          const params = message.params as { name: string; arguments?: Record<string, unknown> };
-          result = await this.client.callTool(params.name, params.arguments);
+          const params = message.params as {
+            name: string;
+            arguments?: Record<string, unknown>;
+            useTask?: boolean;
+            detach?: boolean;
+          };
+          if (params.useTask && this.client.supportsTasksForToolCall()) {
+            if (params.detach) {
+              // Detached execution: start task and return task ID immediately
+              // The tool continues running in the background on the server
+              const taskUpdate = await this.client.callToolDetached(params.name, params.arguments);
+              this.activeTasks.set(taskUpdate.taskId, {
+                taskId: taskUpdate.taskId,
+                status: taskUpdate.status,
+                statusMessage: taskUpdate.statusMessage,
+                createdAt: taskUpdate.createdAt ?? new Date().toISOString(),
+                lastUpdatedAt: taskUpdate.lastUpdatedAt ?? new Date().toISOString(),
+              } as Task);
+              await this.persistActiveTask(taskUpdate.taskId, params.name);
+              result = taskUpdate;
+            } else {
+              // Task-augmented tool call: stream updates to requesting socket
+              const onUpdate = (update: TaskUpdate): void => {
+                // Track active task
+                this.activeTasks.set(update.taskId, {
+                  taskId: update.taskId,
+                  status: update.status,
+                  statusMessage: update.statusMessage,
+                  createdAt: update.createdAt ?? new Date().toISOString(),
+                  lastUpdatedAt: update.lastUpdatedAt ?? new Date().toISOString(),
+                } as Task);
+                // Send task update to requesting client
+                if (message.id) {
+                  this.sendResponse(socket, {
+                    type: 'task-update',
+                    id: message.id,
+                    taskUpdate: update,
+                  });
+                }
+              };
+              let taskId: string | undefined;
+              const { wrappedOnUpdate } = this.persistActiveTaskOnCreate((update: TaskUpdate) => {
+                taskId = update.taskId;
+                onUpdate(update);
+              }, params.name);
+              try {
+                result = await this.client.callToolWithTask(
+                  params.name,
+                  params.arguments,
+                  wrappedOnUpdate
+                );
+              } finally {
+                // Clean up completed tasks from activeTasks and persistence
+                for (const [tid, task] of this.activeTasks) {
+                  if (
+                    task.status === 'completed' ||
+                    task.status === 'failed' ||
+                    task.status === 'cancelled'
+                  ) {
+                    this.activeTasks.delete(tid);
+                    await this.removePersistedTask(tid).catch(() => {});
+                  }
+                }
+                if (taskId) {
+                  await this.removePersistedTask(taskId).catch(() => {});
+                }
+              }
+            }
+          } else {
+            result = await this.client.callTool(params.name, params.arguments);
+          }
           break;
         }
 
@@ -1011,6 +1097,53 @@ class BridgeProcess {
           result = await this.client.getServerDetails();
           break;
 
+        case 'listTasks': {
+          const cursor = message.params as string | undefined;
+          result = await this.client.listTasks(cursor);
+          break;
+        }
+
+        case 'getTask': {
+          const params = message.params as { taskId: string };
+          result = await this.client.getTask(params.taskId);
+          break;
+        }
+
+        case 'cancelTask': {
+          const params = message.params as { taskId: string };
+          result = await this.client.cancelTask(params.taskId);
+          break;
+        }
+
+        case 'pollTask': {
+          const params = message.params as { taskId: string };
+          const onUpdate = (update: TaskUpdate): void => {
+            // Track active task
+            this.activeTasks.set(update.taskId, {
+              taskId: update.taskId,
+              status: update.status,
+              statusMessage: update.statusMessage,
+              createdAt: update.createdAt ?? new Date().toISOString(),
+              lastUpdatedAt: update.lastUpdatedAt ?? new Date().toISOString(),
+            } as Task);
+            // Send task update to requesting client
+            if (message.id) {
+              this.sendResponse(socket, {
+                type: 'task-update',
+                id: message.id,
+                taskUpdate: update,
+              });
+            }
+          };
+          try {
+            result = await this.client.pollTask(params.taskId, onUpdate);
+          } finally {
+            this.activeTasks.delete(params.taskId);
+            await this.removePersistedTask(params.taskId).catch(() => {});
+          }
+          break;
+        }
+
         default:
           throw new ClientError(`Unknown MCP method: ${message.method}`);
       }
@@ -1030,6 +1163,62 @@ class BridgeProcess {
       // Check if this error indicates session expiration
       this.handlePossibleExpiration(error as Error);
     }
+  }
+
+  // --- Active task persistence for crash recovery (stored in sessions.json) ---
+
+  /**
+   * Persist an active task to sessions.json for crash recovery
+   */
+  private async persistActiveTask(taskId: string, toolName: string): Promise<void> {
+    try {
+      const session = await getSession(this.options.sessionName);
+      const activeTasks = { ...session?.activeTasks };
+      activeTasks[taskId] = {
+        taskId,
+        toolName,
+        createdAt: new Date().toISOString(),
+      };
+      await updateSession(this.options.sessionName, { activeTasks });
+    } catch (error) {
+      logger.warn(`Failed to persist active task ${taskId}:`, error);
+    }
+  }
+
+  /**
+   * Remove a persisted task (on completion/failure/cancellation)
+   */
+  private async removePersistedTask(taskId: string): Promise<void> {
+    try {
+      const session = await getSession(this.options.sessionName);
+      if (session?.activeTasks?.[taskId]) {
+        const activeTasks = { ...session.activeTasks };
+        delete activeTasks[taskId];
+        await updateSession(this.options.sessionName, {
+          activeTasks: Object.keys(activeTasks).length > 0 ? activeTasks : {},
+        });
+      }
+    } catch (error) {
+      logger.warn(`Failed to remove persisted task ${taskId}:`, error);
+    }
+  }
+
+  /**
+   * Helper to wrap onUpdate callback with task persistence on first creation
+   */
+  private persistActiveTaskOnCreate(
+    onUpdate: (update: TaskUpdate) => void,
+    toolName: string
+  ): { wrappedOnUpdate: (update: TaskUpdate) => void } {
+    let persisted = false;
+    const wrappedOnUpdate = (update: TaskUpdate): void => {
+      if (!persisted) {
+        persisted = true;
+        this.persistActiveTask(update.taskId, toolName).catch(() => {});
+      }
+      onUpdate(update);
+    };
+    return { wrappedOnUpdate };
   }
 
   /**
@@ -1171,7 +1360,7 @@ async function main(): Promise<void> {
 
   if (args.length < 2) {
     console.error(
-      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--x402]'
+      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--x402] [--insecure]'
     );
     process.exit(1);
   }
@@ -1209,6 +1398,15 @@ async function main(): Promise<void> {
   // Parse --x402 flag (for x402 payment signing)
   const x402 = args.includes('--x402');
 
+  // Parse --insecure flag (skip TLS certificate verification)
+  const insecure = args.includes('--insecure');
+
+  // Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
+  // Also handle --insecure flag to disable TLS certificate verification
+  setGlobalDispatcher(
+    new EnvHttpProxyAgent(insecure ? { connect: { rejectUnauthorized: false } } : {})
+  );
+
   try {
     const bridgeOptions: BridgeOptions = {
       sessionName,
@@ -1226,6 +1424,9 @@ async function main(): Promise<void> {
     }
     if (x402) {
       bridgeOptions.x402 = true;
+    }
+    if (insecure) {
+      bridgeOptions.insecure = true;
     }
 
     const bridge = new BridgeProcess(bridgeOptions);
