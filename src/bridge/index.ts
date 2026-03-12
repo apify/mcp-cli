@@ -742,19 +742,21 @@ class BridgeProcess {
   }
 
   /**
-   * Check if an error indicates session expiration or auth failure and handle accordingly
+   * Check if an error indicates session expiration or auth failure and handle accordingly.
+   * Session expiry is checked first since it's more specific (404/session-not-found),
+   * while auth errors are broader (401/403/unauthorized) and could overlap.
    */
   private handlePossibleExpiration(error: Error): void {
-    if (isAuthenticationError(error.message)) {
-      logger.warn('Authentication rejected, marking session as unauthorized and shutting down');
-      this.markSessionStatusAndExit('unauthorized').catch((e) => {
-        logger.error('Failed to mark session as unauthorized:', e);
-        process.exit(1);
-      });
-    } else if (isSessionExpiredError(error.message)) {
+    if (isSessionExpiredError(error.message)) {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
       this.markSessionStatusAndExit('expired').catch((e) => {
         logger.error('Failed to mark session as expired:', e);
+        process.exit(1);
+      });
+    } else if (isAuthenticationError(error.message)) {
+      logger.warn('Authentication rejected, marking session as unauthorized and shutting down');
+      this.markSessionStatusAndExit('unauthorized').catch((e) => {
+        logger.error('Failed to mark session as unauthorized:', e);
         process.exit(1);
       });
     }
