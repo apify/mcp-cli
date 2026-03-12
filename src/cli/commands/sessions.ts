@@ -83,6 +83,7 @@ export async function connectSession(
     headers?: string[];
     timeout?: number;
     profile?: string;
+    noProfile?: boolean;
     proxy?: string;
     proxyBearerToken?: string;
     x402?: boolean;
@@ -156,31 +157,43 @@ export async function connectSession(
     // Resolve target to transport config
     const serverConfig = await resolveTarget(target, options);
 
+    // Detect conflicting auth flags: --profile and --header "Authorization: ..." are mutually exclusive
+    const hasExplicitAuthHeader = serverConfig.headers?.Authorization !== undefined;
+    const hasExplicitProfile = options.profile !== undefined;
+
+    if (hasExplicitAuthHeader && hasExplicitProfile) {
+      throw new ClientError(
+        `Cannot combine --profile with --header "Authorization: ...".\n\n` +
+          `Use either:\n` +
+          `  --profile ${options.profile}  (OAuth authentication via saved profile)\n` +
+          `  --header "Authorization: Bearer <token>"  (static bearer token)`
+      );
+    }
+
     // For HTTP targets, resolve auth profile (with helpful errors if none available)
+    // Skip OAuth profile resolution when:
+    // - --no-profile is specified (explicit anonymous connection)
+    // - --header "Authorization: ..." is provided (explicit bearer token)
     let profileName: string | undefined;
     if (serverConfig.url) {
-      profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
-        sessionName: name,
-      });
+      if (options.noProfile) {
+        logger.debug('Skipping OAuth profile: --no-profile specified');
+      } else if (hasExplicitAuthHeader) {
+        logger.debug(
+          'Skipping OAuth profile auto-detection: explicit Authorization header provided via --header'
+        );
+      } else {
+        profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
+          sessionName: name,
+        });
+      }
     }
 
     // Store headers in OS keychain (secure storage) before starting bridge
-    // For OAuth sessions (with --profile), DON'T store the `Authorization` header
-    // because it comes from the OAuth profile and may expire.
-    // The bridge will get fresh tokens via the profile mechanism instead.
     let headers: Record<string, string> | undefined;
     if (Object.keys(serverConfig.headers || {}).length > 0) {
       headers = { ...serverConfig.headers };
 
-      // Remove OAuth-derived Authorization header - it will be handled via the profile
-      if (profileName && headers.Authorization?.startsWith('Bearer ')) {
-        logger.debug(
-          `Skipping OAuth Authorization header storage for session ${name} (handled via profile)`
-        );
-        delete headers.Authorization;
-      }
-
-      // Only store remaining headers (from --header flags)
       if (Object.keys(headers).length > 0) {
         logger.debug(
           `Storing ${Object.keys(headers).length} headers for session ${name} in keychain`
