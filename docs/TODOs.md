@@ -5,6 +5,10 @@
 ## NEW
 
 
+- the README should show explain each command, show the full options from "mcpc help command" - perhaps this could be on start of the readme,
+  with links to the more detailed sections below
+
+
 - mcp-cli inspiration
 Add glob-based tool search across all servers like `mcpc grep *mail*` or `mcpc grep *@session/mail*`.
     Consider making `tools-list` more succinct for discovery.
