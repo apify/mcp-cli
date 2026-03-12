@@ -112,13 +112,12 @@ Universal command-line client for the Model Context Protocol (MCP).
 
 Options:
   -j, --json                   Output in JSON format for scripting
-  -H, --header <header>        HTTP header (can be repeated)
   --verbose                    Enable debug logging
   --profile <name>             OAuth profile for the server ("default" if not provided)
   --schema <file>              Validate tool/prompt schema against expected schema
   --schema-mode <mode>         Schema validation mode: strict, compatible (default), ignore
-  --insecure                   Skip TLS certificate verification (for self-signed certs)
   --timeout <seconds>          Request timeout in seconds (default: 300)
+  --insecure                   Skip TLS certificate verification (for self-signed certs)
   -v, --version                Output the version number
   -h, --help                   Display help
 
@@ -145,6 +144,9 @@ MCP session commands (after connecting):
   <@session> resources-subscribe <uri>
   <@session> resources-unsubscribe <uri>
   <@session> resources-templates-list
+  <@session> tasks-list
+  <@session> tasks-get <taskId>
+  <@session> tasks-cancel <taskId>
   <@session> logging-set-level <level>
   <@session> ping
 
