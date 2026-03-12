@@ -61,6 +61,7 @@ interface HandlerOptions {
   timeout?: number;
   verbose?: boolean;
   profile?: string;
+  noProfile?: boolean;
   x402?: boolean;
   insecure?: boolean;
   schema?: string;
@@ -98,7 +99,11 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
     }
     options.timeout = timeout;
   }
-  if (opts.profile) options.profile = opts.profile;
+  if (opts.profile === false) {
+    options.noProfile = true;
+  } else if (opts.profile) {
+    options.profile = opts.profile;
+  }
   if (verbose) options.verbose = verbose;
   if (opts.x402) options.x402 = true;
   if (opts.insecure) options.insecure = true;
@@ -357,6 +362,7 @@ Full docs: ${docsUrl}`
     .description('Connect to an MCP server and start a new named @session')
     .option('-H, --header <header>', 'HTTP header (can be repeated)')
     .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
+    .option('--no-profile', 'Skip OAuth profile (connect anonymously)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')

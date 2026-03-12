@@ -401,15 +401,23 @@ mcpc connect <server> @<name> --profile <profile>
 
 **Authentication Behavior:**
 
+When `--header "Authorization: ..."` is provided (without `--profile`):
+- Explicit header is used, OAuth profile auto-detection is skipped entirely
+
 When `--profile <name>` is specified:
 1. Profile exists for server → Use its stored credentials; fail with error if expired/invalid
 2. Profile doesn't exist → Fail with error
+3. Cannot be combined with `--header "Authorization: ..."` (returns error)
 
-When no `--profile` is specified (uses `default` profile):
+When `--no-profile` is specified:
+- Skip all OAuth profile detection and connect anonymously (or with explicit `--header`)
+
+When no flags are specified (default):
 1. `default` profile exists for server → Use its credentials; fail with error if expired/invalid
 2. `default` profile doesn't exist → Attempt unauthenticated connection; fail with error if server requires auth
 
 On failure, the error message includes instructions on how to login. This ensures:
+- Explicit CLI flags always take precedence over stored profiles
 - Authentication only happens when user explicitly calls `login`
 - Credentials are never silently downgraded
 - You can mix authenticated sessions and public access on the same server
