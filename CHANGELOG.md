@@ -28,7 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--no-profile` option for `connect` command to skip OAuth profile auto-detection and connect anonymously
 
 ### Fixed
-- Keychain unavailability warning is now displayed in red for better visibility in human mode
 - `--async` and `--detach` tool calls now correctly send task creation parameters to the server, fixing "task stream ended without creating a task" errors
 - File lock retries now use randomized exponential backoff to reduce contention when multiple processes compete for the same lock
 - Explicit `--header "Authorization: Bearer ..."` is no longer silently ignored when a default OAuth profile exists for the same server; explicit CLI headers now take precedence over auto-detected profiles
