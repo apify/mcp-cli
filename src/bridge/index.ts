@@ -636,17 +636,17 @@ class BridgeProcess {
     // The SDK calls authProvider.tokens() before each request,
     // which triggers OAuthTokenManager.getValidAccessToken() to refresh if needed
 
-    // Pre-populate tools cache for x402 proactive signing
-    if (this.x402Wallet) {
+    // Pre-populate tools cache (used by x402 proactive signing and getCachedTools IPC method)
+    if (serverDetails.capabilities?.tools) {
       try {
         const toolsResult = await this.client.listTools();
         if (toolsResult.tools) {
           this.cachedTools = toolsResult.tools;
-          logger.debug(`Pre-populated tools cache (${this.cachedTools.length} tools) for x402`);
+          logger.debug(`Pre-populated tools cache (${this.cachedTools.length} tools)`);
         }
       } catch (error) {
-        // Non-fatal: 402 fallback will still work without proactive signing
-        logger.warn('Failed to pre-populate tools cache for x402:', error);
+        // Non-fatal: tools will be fetched on demand
+        logger.warn('Failed to pre-populate tools cache:', error);
       }
     }
   }
@@ -1143,6 +1143,10 @@ class BridgeProcess {
           }
           break;
         }
+
+        case 'getCachedTools':
+          result = { tools: this.cachedTools ?? [] };
+          break;
 
         default:
           throw new ClientError(`Unknown MCP method: ${message.method}`);

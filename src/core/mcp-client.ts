@@ -260,6 +260,13 @@ export class McpClient implements IMcpClient {
   }
 
   /**
+   * Get cached tools list (not available for direct connections)
+   */
+  getCachedTools(): Promise<ListToolsResult | null> {
+    return Promise.resolve(null);
+  }
+
+  /**
    * Get the MCP session ID assigned by the server (if any)
    * This can be used for session resumption after bridge restart
    */

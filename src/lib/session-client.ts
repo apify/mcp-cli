@@ -134,6 +134,19 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     );
   }
 
+  // Cached data (no server call, returns bridge in-memory cache)
+  async getCachedTools(): Promise<ListToolsResult | null> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'getCachedTools',
+          undefined,
+          this.requestTimeout
+        ) as Promise<ListToolsResult | null>,
+      'getCachedTools'
+    );
+  }
+
   // MCP operations
   async ping(): Promise<void> {
     return this.withRetry(

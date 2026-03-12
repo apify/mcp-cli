@@ -546,8 +546,12 @@ export async function showServerDetails(
     const serverDetails = await client.getServerDetails();
     const { serverInfo, capabilities, instructions, protocolVersion } = serverDetails;
 
+    // Get cached tools list from bridge (no extra server call)
+    const cachedToolsResult = await client.getCachedTools();
+    const tools = cachedToolsResult?.tools ?? [];
+
     if (options.outputMode === 'human') {
-      console.log(formatServerDetails(serverDetails, target));
+      console.log(formatServerDetails(serverDetails, target, tools));
     } else {
       // JSON output MUST match MCP InitializeResult structure!
       // See https://modelcontextprotocol.io/specification/2025-11-25/schema#initializeresult
@@ -571,6 +575,7 @@ export async function showServerDetails(
             capabilities,
             serverInfo,
             instructions,
+            ...(tools.length > 0 && { tools }),
           },
           'json'
         )

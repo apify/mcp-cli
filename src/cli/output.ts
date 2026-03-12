@@ -1010,7 +1010,11 @@ export function formatJsonError(error: Error, code: number): string {
 /**
  * Format server details for human-readable output
  */
-export function formatServerDetails(details: ServerDetails, target: string): string {
+export function formatServerDetails(
+  details: ServerDetails,
+  target: string,
+  tools?: Tool[]
+): string {
   const lines: string[] = [];
   const bullet = chalk.dim('*');
   const bt = chalk.gray('`'); // backtick
@@ -1109,6 +1113,12 @@ export function formatServerDetails(details: ServerDetails, target: string): str
 
   lines.push(commands.join('\n'));
   lines.push('');
+
+  // Tools list (from bridge cache, no extra server call)
+  if (tools && tools.length > 0) {
+    lines.push(formatToolsCompact(tools));
+    lines.push('');
+  }
 
   // Instructions in code block
   const trimmed = instructions ? instructions.trim() : '';
