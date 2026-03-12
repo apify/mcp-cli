@@ -9,6 +9,8 @@
  * - 4: Authentication error (invalid credentials, forbidden)
  */
 
+import chalk from 'chalk';
+
 /**
  * Base error class for all mcpc errors
  * Contains an exit code for CLI error handling
@@ -176,7 +178,7 @@ export function toMcpError(error: unknown): McpError {
 export function formatHumanError(error: unknown, verbose = false): string {
   const mcpError = toMcpError(error);
 
-  let output = `Error: ${mcpError.message}`;
+  let output = chalk.red(`Error: ${mcpError.message}`);
 
   if (verbose && mcpError.details) {
     output += `\n\nDetails:\n${JSON.stringify(mcpError.details, null, 2)}`;
