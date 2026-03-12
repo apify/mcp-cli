@@ -2,10 +2,14 @@
  * OS Keychain integration for secure credential storage
  * Uses @napi-rs/keyring for cross-platform keychain access.
  * Falls back to ~/.mcpc/credentials.json (mode 0600) when the OS keychain
- * is unavailable (e.g. headless servers, containers).
+ * is unavailable (e.g. headless servers, containers, missing libsecret).
+ *
+ * The @napi-rs/keyring native addon is loaded lazily on first use via a
+ * cached import() promise.  If the addon or its shared-library dependency
+ * (libsecret on Linux) is not present, a one-time warning is emitted and
+ * file-based fallback is used for the entire session.
  */
 
-import { Entry } from '@napi-rs/keyring';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { createLogger, getJsonMode } from '../logger.js';
@@ -53,14 +57,40 @@ async function fileDelete(account: string): Promise<boolean> {
 // Keychain wrappers with automatic file fallback
 // =============================================================================
 
+// Typed structurally to avoid a hard import-time dependency on the package.
+type EntryLike = {
+  setPassword(value: string): void;
+  getPassword(): string | null;
+  deletePassword(): boolean;
+};
+type EntryConstructor = new (service: string, account: string) => EntryLike;
+
 let keychainAvailable: boolean | null = null; // null = untested
 
-function withKeychain<T>(keychainOp: () => T, fallback: () => Promise<T>): Promise<T> {
+// Cache the import() result so the native addon is attempted only once per
+// module instance.  Using a promise (not top-level await) keeps this
+// compatible with CJS environments such as Jest/ts-jest.
+// Rejects if the addon or its shared-library dependency (libsecret) is absent.
+let _entryPromise: Promise<EntryConstructor> | null = null;
+
+function getEntry(): Promise<EntryConstructor> {
+  if (_entryPromise === null) {
+    _entryPromise = import('@napi-rs/keyring').then((m) => m.Entry as unknown as EntryConstructor);
+  }
+  return _entryPromise;
+}
+
+async function withKeychain<T>(
+  keychainOp: (EntryClass: EntryConstructor) => T,
+  fallback: () => Promise<T>
+): Promise<T> {
   if (keychainAvailable === false) return fallback();
+
   try {
-    const result = keychainOp();
+    const EntryClass = await getEntry();
+    const result = keychainOp(EntryClass);
     keychainAvailable = true;
-    return Promise.resolve(result);
+    return result;
   } catch (error) {
     if (keychainAvailable === null && !getJsonMode()) {
       logger.warn(
@@ -76,8 +106,8 @@ function withKeychain<T>(keychainOp: () => T, fallback: () => Promise<T>): Promi
 
 function keychainSet(account: string, value: string): Promise<void> {
   return withKeychain(
-    () => {
-      new Entry(SERVICE_NAME, account).setPassword(value);
+    (EntryClass) => {
+      new EntryClass(SERVICE_NAME, account).setPassword(value);
     },
     () => fileSet(account, value)
   );
@@ -85,14 +115,14 @@ function keychainSet(account: string, value: string): Promise<void> {
 
 function keychainGet(account: string): Promise<string | null> {
   return withKeychain(
-    () => new Entry(SERVICE_NAME, account).getPassword() ?? null,
+    (EntryClass) => new EntryClass(SERVICE_NAME, account).getPassword() ?? null,
     () => fileGet(account)
   );
 }
 
 function keychainDelete(account: string): Promise<boolean> {
   return withKeychain(
-    () => new Entry(SERVICE_NAME, account).deletePassword(),
+    (EntryClass) => new EntryClass(SERVICE_NAME, account).deletePassword(),
     () => fileDelete(account)
   );
 }

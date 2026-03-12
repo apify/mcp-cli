@@ -15,7 +15,7 @@ curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
 
 # Create session
 SESSION=$(session_name "close-delete")
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION" --header "X-Test: true"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
@@ -58,7 +58,8 @@ _SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION}")
 
 # Test: session is removed from sessions list after close
 test_case "session is removed from sessions list after close"
-# Use run_mcpc (not run_xmcpc) because session list can change between runs
+# Use run_mcpc (not run_xmcpc) because session list can change between
+# the 4 variant calls when other tests run in parallel with shared home
 run_mcpc --json
 assert_success
 session_exists=$(echo "$STDOUT" | jq -r ".sessions[] | select(.name == \"$SESSION\") | .name")
@@ -72,7 +73,7 @@ curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
 
 SESSION2=$(session_name "rapid")
 for i in 1 2 3; do
-  run_mcpc "$TEST_SERVER_URL" connect "$SESSION2"
+  run_mcpc connect "$TEST_SERVER_URL" "$SESSION2" --header "X-Test: true"
   assert_success "iteration $i: create should succeed"
   run_mcpc "$SESSION2" close
   assert_success "iteration $i: close should succeed"

@@ -19,7 +19,7 @@ curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
 initial_sessions=$(curl -s "$TEST_SERVER_URL/control/get-active-sessions" | jq '.activeSessions | length')
 
 # Create mcpc session
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION" --header "X-Test: true"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 
@@ -57,8 +57,8 @@ test_pass
 # Test: bridge restart with rejected session ID marks session as expired
 test_case "rejected session ID marks session as expired"
 
-# Get bridge PID (use run_mcpc, not run_xmcpc, because session list output
-# can change between runs when other tests run in parallel with shared home)
+# Use run_mcpc (not run_xmcpc) because session list can change between
+# the 4 variant calls when other tests run in parallel with shared home
 run_mcpc --json
 bridge_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
 assert_not_empty "$bridge_pid" "should have bridge PID"

@@ -2,7 +2,15 @@
  * Tests for argument parsing utilities
  */
 
-import { parseCommandArgs, getVerboseFromEnv, getJsonFromEnv } from '../../../src/cli/parser.js';
+import {
+  parseCommandArgs,
+  getVerboseFromEnv,
+  getJsonFromEnv,
+  validateOptions,
+  validateArgValues,
+  optionTakesValue,
+  hasSubcommand,
+} from '../../../src/cli/parser.js';
 import { ClientError } from '../../../src/lib/errors.js';
 
 describe('parseCommandArgs', () => {
@@ -311,5 +319,215 @@ describe('getJsonFromEnv', () => {
     expect(getJsonFromEnv()).toBe(false);
     process.env.MCPC_JSON = 'false';
     expect(getJsonFromEnv()).toBe(false);
+  });
+});
+
+describe('optionTakesValue', () => {
+  it('should return true for global options that take values', () => {
+    expect(optionTakesValue('-H')).toBe(true);
+    expect(optionTakesValue('--header')).toBe(true);
+    expect(optionTakesValue('--timeout')).toBe(true);
+    expect(optionTakesValue('--profile')).toBe(true);
+    expect(optionTakesValue('--schema')).toBe(true);
+    expect(optionTakesValue('--schema-mode')).toBe(true);
+  });
+
+  it('should return true for subcommand-specific options that take values', () => {
+    expect(optionTakesValue('--proxy')).toBe(true);
+    expect(optionTakesValue('--proxy-bearer-token')).toBe(true);
+    expect(optionTakesValue('--scope')).toBe(true);
+    expect(optionTakesValue('--client-id')).toBe(true);
+    expect(optionTakesValue('--client-secret')).toBe(true);
+    expect(optionTakesValue('-o')).toBe(true);
+    expect(optionTakesValue('--output')).toBe(true);
+    expect(optionTakesValue('--max-size')).toBe(true);
+    expect(optionTakesValue('-r')).toBe(true);
+    expect(optionTakesValue('--payment-required')).toBe(true);
+    expect(optionTakesValue('--amount')).toBe(true);
+    expect(optionTakesValue('--expiry')).toBe(true);
+  });
+
+  it('should return false for boolean flags', () => {
+    expect(optionTakesValue('--verbose')).toBe(false);
+    expect(optionTakesValue('--json')).toBe(false);
+    expect(optionTakesValue('-j')).toBe(false);
+    expect(optionTakesValue('-v')).toBe(false);
+    expect(optionTakesValue('--help')).toBe(false);
+    expect(optionTakesValue('-h')).toBe(false);
+  });
+
+  it('should handle --option=value syntax by extracting option name', () => {
+    expect(optionTakesValue('--timeout=30')).toBe(true);
+    expect(optionTakesValue('--header=Authorization')).toBe(true);
+    expect(optionTakesValue('--verbose=true')).toBe(false);
+  });
+
+  it('should return false for unknown options', () => {
+    expect(optionTakesValue('--unknown')).toBe(false);
+    expect(optionTakesValue('--foo')).toBe(false);
+  });
+});
+
+describe('hasSubcommand', () => {
+  it('should return false for empty or option-only args', () => {
+    // args[0] = node, args[1] = script, so effective args start at index 2
+    expect(hasSubcommand(['node', 'mcpc'])).toBe(false);
+    expect(hasSubcommand(['node', 'mcpc', '--verbose'])).toBe(false);
+    expect(hasSubcommand(['node', 'mcpc', '--json', '--verbose'])).toBe(false);
+  });
+
+  it('should return true when a non-option arg is present', () => {
+    expect(hasSubcommand(['node', 'mcpc', 'connect'])).toBe(true);
+    expect(hasSubcommand(['node', 'mcpc', '@session'])).toBe(true);
+    expect(hasSubcommand(['node', 'mcpc', '--json', 'connect'])).toBe(true);
+  });
+
+  it('should skip values of options that take values', () => {
+    // --header takes a value; 'connect' is not the value of --header if placed correctly
+    expect(hasSubcommand(['node', 'mcpc', '--header', 'Auth: Bearer x', 'connect'])).toBe(true);
+    // --timeout takes a value; '30' should be skipped, not treated as a subcommand
+    expect(hasSubcommand(['node', 'mcpc', '--timeout', '30'])).toBe(false);
+  });
+
+  it('should skip values of subcommand-specific options that take values', () => {
+    // --proxy takes a value; its value should be skipped during scanning
+    expect(hasSubcommand(['node', 'mcpc', '--proxy', '8080'])).toBe(false);
+    expect(hasSubcommand(['node', 'mcpc', '--scope', 'read'])).toBe(false);
+    expect(hasSubcommand(['node', 'mcpc', '-o', 'out.txt'])).toBe(false);
+  });
+
+  it('should handle --option=value syntax without skipping next arg', () => {
+    expect(hasSubcommand(['node', 'mcpc', '--timeout=30', 'connect'])).toBe(true);
+    // The value is embedded in the option, so 'connect' is the subcommand
+    expect(hasSubcommand(['node', 'mcpc', '--timeout=30'])).toBe(false);
+  });
+});
+
+describe('validateOptions', () => {
+  it('should not throw for known global options', () => {
+    expect(() => validateOptions(['--verbose', '--json'])).not.toThrow();
+    expect(() => validateOptions(['--json', '--verbose'])).not.toThrow();
+    expect(() => validateOptions(['-j'])).not.toThrow();
+  });
+
+  it('should not throw for known value options with separate values', () => {
+    expect(() => validateOptions(['--timeout', '30'])).not.toThrow();
+    expect(() => validateOptions(['--profile', 'personal'])).not.toThrow();
+  });
+
+  it('should not throw for subcommand-specific options after a command token', () => {
+    // --scope appears after 'login' command token — must not be rejected
+    expect(() => validateOptions(['login', 'mcp.apify.com', '--scope', 'read'])).not.toThrow();
+    // --payment-required, --amount, --expiry for x402 sign
+    expect(() =>
+      validateOptions(['x402', 'sign', '--payment-required', 'data', '--amount', '1.0'])
+    ).not.toThrow();
+    // -o/--output, --max-size for resources-read
+    expect(() =>
+      validateOptions(['@session', 'resources-read', 'uri', '-o', 'out.txt', '--max-size', '1024'])
+    ).not.toThrow();
+  });
+
+  it('should not throw for unknown options that appear after @session (non-option token)', () => {
+    expect(() =>
+      validateOptions(['--json', '@mysession', '--unknown-subcommand-flag'])
+    ).not.toThrow();
+  });
+
+  it('should throw for unknown options that appear before any command token', () => {
+    // No command token at all
+    expect(() => validateOptions(['--unknown'])).toThrow(ClientError);
+    expect(() => validateOptions(['--unknown'])).toThrow('Unknown option: --unknown');
+    // Unknown option before a command token
+    expect(() => validateOptions(['--bad-flag', 'login'])).toThrow(ClientError);
+    expect(() => validateOptions(['--bad-flag', 'login'])).toThrow('Unknown option: --bad-flag');
+  });
+
+  it('should reject subcommand-specific options when used as global options', () => {
+    // These options are valid only after a command token; before that they are unknown
+    expect(() => validateOptions(['--full'])).toThrow(ClientError);
+    expect(() => validateOptions(['--full'])).toThrow('Unknown option: --full');
+    expect(() => validateOptions(['--x402'])).toThrow(ClientError);
+    expect(() => validateOptions(['--x402'])).toThrow('Unknown option: --x402');
+    expect(() => validateOptions(['--scope', 'read'])).toThrow(ClientError);
+    expect(() => validateOptions(['--scope', 'read'])).toThrow('Unknown option: --scope');
+    expect(() => validateOptions(['--proxy', '8080'])).toThrow(ClientError);
+    expect(() => validateOptions(['--proxy', '8080'])).toThrow('Unknown option: --proxy');
+    expect(() => validateOptions(['-o', 'out.txt'])).toThrow(ClientError);
+    expect(() => validateOptions(['-o', 'out.txt'])).toThrow('Unknown option: -o');
+    expect(() => validateOptions(['--output', 'out.txt'])).toThrow(ClientError);
+    expect(() => validateOptions(['--client-id', 'abc'])).toThrow(ClientError);
+    expect(() => validateOptions(['--payment-required', 'data'])).toThrow(ClientError);
+    // --header is connect-specific, not global
+    expect(() => validateOptions(['--header', 'Authorization: Bearer token'])).toThrow(ClientError);
+    expect(() => validateOptions(['-H', 'Authorization: Bearer token'])).toThrow(ClientError);
+  });
+
+  it('should accept subcommand-specific options after a command token', () => {
+    // Same options that were rejected above should pass after a command token
+    expect(() => validateOptions(['connect', 'srv', '--full'])).not.toThrow();
+    expect(() => validateOptions(['connect', 'srv', '--x402'])).not.toThrow();
+    expect(() => validateOptions(['login', 'srv', '--scope', 'read'])).not.toThrow();
+    expect(() => validateOptions(['connect', 'srv', '--proxy', '8080'])).not.toThrow();
+    expect(() => validateOptions(['@s', 'resources-read', 'uri', '-o', 'out.txt'])).not.toThrow();
+    expect(() =>
+      validateOptions(['login', 'srv', '--client-id', 'abc', '--client-secret', 'xyz'])
+    ).not.toThrow();
+    // --header is accepted after connect command token
+    expect(() =>
+      validateOptions(['connect', 'srv', '@s', '--header', 'Authorization: Bearer token'])
+    ).not.toThrow();
+    expect(() =>
+      validateOptions(['connect', 'srv', '@s', '-H', 'Authorization: Bearer token'])
+    ).not.toThrow();
+  });
+
+  it('should accept empty args array', () => {
+    expect(() => validateOptions([])).not.toThrow();
+  });
+
+  it('should skip the value of a global option that takes a value', () => {
+    // --timeout takes a value, so the next token should be skipped during validation
+    expect(() => validateOptions(['--timeout', '30', 'connect'])).not.toThrow();
+    // --profile takes a value, so the next token should be skipped
+    expect(() => validateOptions(['--profile', 'myprofile', 'connect'])).not.toThrow();
+  });
+
+  it('should handle --option=value syntax', () => {
+    expect(() => validateOptions(['--timeout=30'])).not.toThrow();
+    expect(() => validateOptions(['--schema-mode=strict'])).not.toThrow();
+  });
+});
+
+describe('validateArgValues', () => {
+  it('should not throw for valid --schema-mode values', () => {
+    expect(() => validateArgValues(['--schema-mode', 'strict'])).not.toThrow();
+    expect(() => validateArgValues(['--schema-mode', 'compatible'])).not.toThrow();
+    expect(() => validateArgValues(['--schema-mode', 'ignore'])).not.toThrow();
+  });
+
+  it('should throw for invalid --schema-mode value before command token', () => {
+    expect(() => validateArgValues(['--schema-mode', 'bad'])).toThrow(ClientError);
+    expect(() => validateArgValues(['--schema-mode', 'bad'])).toThrow(
+      'Invalid --schema-mode value'
+    );
+  });
+
+  it('should not validate --schema-mode value after command token', () => {
+    // Even an invalid value is not checked once we are past a command token
+    expect(() =>
+      validateArgValues(['connect', 'example.com', '--schema-mode', 'bad'])
+    ).not.toThrow();
+  });
+
+  it('should throw for invalid --timeout value before command token', () => {
+    expect(() => validateArgValues(['--timeout', 'notanumber'])).toThrow(ClientError);
+    expect(() => validateArgValues(['--timeout', 'notanumber'])).toThrow('Invalid --timeout value');
+  });
+
+  it('should not validate --timeout after command token', () => {
+    expect(() =>
+      validateArgValues(['connect', 'example.com', '--timeout', 'notanumber'])
+    ).not.toThrow();
   });
 });

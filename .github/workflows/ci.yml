@@ -15,10 +15,10 @@ jobs:
         node-version: [20, 22, 24]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -35,15 +35,15 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
-  e2e:
-    name: E2E tests
+  e2e-node:
+    name: E2E tests (Node.js)
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v4
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -54,13 +54,35 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v2
-
       - name: E2E tests
         # Run without gnome-keyring: @napi-rs/keyring fails fast when no D-Bus secret
         # service is available, and keychain.ts automatically falls back to encrypted
         # file storage (~/.mcpc/credentials.json, mode 0600).  The keychain code paths
         # are covered by unit tests; e2e tests only need credentials to work, not a
         # specific storage backend.
-        run: ./test/e2e/run.sh --no-build --parallel 4
+        run: ./test/e2e/run.sh --no-build --parallel 6
+
+  e2e-bun:
+    name: E2E tests (Bun)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: E2E tests
+        run: ./test/e2e/run.sh --no-build --runtime bun --parallel 4

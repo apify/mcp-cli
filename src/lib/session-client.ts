@@ -25,12 +25,16 @@ import type {
   IMcpClient,
   NotificationData,
   ServerDetails,
+  TaskUpdate,
+  GetTaskResult,
+  ListTasksResult,
+  CancelTaskResult,
 } from './types.js';
 import type { ListResourceTemplatesResult } from '@modelcontextprotocol/sdk/types.js';
 import { BridgeClient } from './bridge-client.js';
 import { ensureBridgeReady, restartBridge } from './bridge-manager.js';
 import { NetworkError } from './errors.js';
-import { getSocketPath, getLogsDir } from './utils.js';
+import { getSocketPath, getLogsDir, generateRequestId } from './utils.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('session-client');
@@ -42,12 +46,20 @@ const logger = createLogger('session-client');
 export class SessionClient extends EventEmitter implements IMcpClient {
   private bridgeClient: BridgeClient;
   private sessionName: string;
+  private requestTimeout?: number; // Per-request timeout in seconds
 
   constructor(sessionName: string, bridgeClient: BridgeClient) {
     super();
     this.sessionName = sessionName;
     this.bridgeClient = bridgeClient;
     this.setupNotificationForwarding();
+  }
+
+  /**
+   * Set request timeout for all subsequent requests (in seconds)
+   */
+  setRequestTimeout(timeout: number): void {
+    this.requestTimeout = timeout;
   }
 
   /**
@@ -112,19 +124,32 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   // Server info (single IPC call for all server information)
   async getServerDetails(): Promise<ServerDetails> {
     return this.withRetry(
-      () => this.bridgeClient.request('getServerDetails') as Promise<ServerDetails>,
+      () =>
+        this.bridgeClient.request(
+          'getServerDetails',
+          undefined,
+          this.requestTimeout
+        ) as Promise<ServerDetails>,
       'getServerDetails'
     );
   }
 
   // MCP operations
   async ping(): Promise<void> {
-    return this.withRetry(() => this.bridgeClient.request('ping').then(() => undefined), 'ping');
+    return this.withRetry(
+      () => this.bridgeClient.request('ping', undefined, this.requestTimeout).then(() => undefined),
+      'ping'
+    );
   }
 
   async listTools(cursor?: string): Promise<ListToolsResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('listTools', cursor) as Promise<ListToolsResult>,
+      () =>
+        this.bridgeClient.request(
+          'listTools',
+          cursor,
+          this.requestTimeout
+        ) as Promise<ListToolsResult>,
       'listTools'
     );
   }
@@ -132,14 +157,23 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   async callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult> {
     return this.withRetry(
       () =>
-        this.bridgeClient.request('callTool', { name, arguments: args }) as Promise<CallToolResult>,
+        this.bridgeClient.request(
+          'callTool',
+          { name, arguments: args },
+          this.requestTimeout
+        ) as Promise<CallToolResult>,
       'callTool'
     );
   }
 
   async listResources(cursor?: string): Promise<ListResourcesResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('listResources', cursor) as Promise<ListResourcesResult>,
+      () =>
+        this.bridgeClient.request(
+          'listResources',
+          cursor,
+          this.requestTimeout
+        ) as Promise<ListResourcesResult>,
       'listResources'
     );
   }
@@ -149,7 +183,8 @@ export class SessionClient extends EventEmitter implements IMcpClient {
       () =>
         this.bridgeClient.request(
           'listResourceTemplates',
-          cursor
+          cursor,
+          this.requestTimeout
         ) as Promise<ListResourceTemplatesResult>,
       'listResourceTemplates'
     );
@@ -157,28 +192,44 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
   async readResource(uri: string): Promise<ReadResourceResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('readResource', { uri }) as Promise<ReadResourceResult>,
+      () =>
+        this.bridgeClient.request(
+          'readResource',
+          { uri },
+          this.requestTimeout
+        ) as Promise<ReadResourceResult>,
       'readResource'
     );
   }
 
   async subscribeResource(uri: string): Promise<void> {
     return this.withRetry(
-      () => this.bridgeClient.request('subscribeResource', { uri }).then(() => undefined),
+      () =>
+        this.bridgeClient
+          .request('subscribeResource', { uri }, this.requestTimeout)
+          .then(() => undefined),
       'subscribeResource'
     );
   }
 
   async unsubscribeResource(uri: string): Promise<void> {
     return this.withRetry(
-      () => this.bridgeClient.request('unsubscribeResource', { uri }).then(() => undefined),
+      () =>
+        this.bridgeClient
+          .request('unsubscribeResource', { uri }, this.requestTimeout)
+          .then(() => undefined),
       'unsubscribeResource'
     );
   }
 
   async listPrompts(cursor?: string): Promise<ListPromptsResult> {
     return this.withRetry(
-      () => this.bridgeClient.request('listPrompts', cursor) as Promise<ListPromptsResult>,
+      () =>
+        this.bridgeClient.request(
+          'listPrompts',
+          cursor,
+          this.requestTimeout
+        ) as Promise<ListPromptsResult>,
       'listPrompts'
     );
   }
@@ -186,18 +237,178 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   async getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult> {
     return this.withRetry(
       () =>
-        this.bridgeClient.request('getPrompt', {
-          name,
-          arguments: args,
-        }) as Promise<GetPromptResult>,
+        this.bridgeClient.request(
+          'getPrompt',
+          {
+            name,
+            arguments: args,
+          },
+          this.requestTimeout
+        ) as Promise<GetPromptResult>,
       'getPrompt'
     );
   }
 
   async setLoggingLevel(level: LoggingLevel): Promise<void> {
     return this.withRetry(
-      () => this.bridgeClient.request('setLoggingLevel', level).then(() => undefined),
+      () =>
+        this.bridgeClient
+          .request('setLoggingLevel', level, this.requestTimeout)
+          .then(() => undefined),
       'setLoggingLevel'
+    );
+  }
+
+  /**
+   * Call a tool with task-augmented execution
+   * Listens for task-update IPC messages keyed by request ID.
+   * On bridge crash, if a task was already created, reconnects via pollTask
+   * instead of re-invoking the tool (crash resilience).
+   */
+  async callToolWithTask(
+    name: string,
+    args?: Record<string, unknown>,
+    onUpdate?: (update: TaskUpdate) => void
+  ): Promise<CallToolResult> {
+    let capturedTaskId: string | undefined;
+
+    const executeToolCall = (): Promise<CallToolResult> => {
+      return new Promise<CallToolResult>((resolve, reject) => {
+        const id = generateRequestId();
+
+        const updateHandler = (update: TaskUpdate): void => {
+          capturedTaskId = update.taskId;
+          onUpdate?.(update);
+        };
+        this.bridgeClient.on(`task-update:${id}`, updateHandler);
+
+        const cleanup = (): void => {
+          this.bridgeClient.removeListener(`task-update:${id}`, updateHandler);
+        };
+
+        this.bridgeClient
+          .request('callTool', { name, arguments: args, useTask: true }, this.requestTimeout, id)
+          .then((result) => {
+            cleanup();
+            resolve(result as CallToolResult);
+          })
+          .catch((error: Error) => {
+            cleanup();
+            reject(error);
+          });
+      });
+    };
+
+    try {
+      return await executeToolCall();
+    } catch (error) {
+      if (!(error instanceof NetworkError)) {
+        const err = error as Error;
+        const logPath = `${getLogsDir()}/bridge-${this.sessionName}.log`;
+        err.message = `${err.message}. For details, check logs at ${logPath}`;
+        throw error;
+      }
+
+      logger.debug(`Socket error during callToolWithTask, will restart bridge...`);
+      await this.bridgeClient.close();
+      await restartBridge(this.sessionName);
+
+      const socketPath = getSocketPath(this.sessionName);
+      this.bridgeClient = new BridgeClient(socketPath);
+      this.setupNotificationForwarding();
+      await this.bridgeClient.connect();
+
+      if (capturedTaskId) {
+        // Task was already created — poll it instead of re-invoking
+        logger.debug(`Reconnected, polling existing task ${capturedTaskId} instead of re-invoking`);
+        return await this.pollTask(capturedTaskId, onUpdate);
+      }
+
+      // Task wasn't created yet — retry the full tool call
+      logger.debug(`Reconnected, retrying callToolWithTask`);
+      return await executeToolCall();
+    }
+  }
+
+  /**
+   * Call a tool in detached mode — returns task ID immediately without waiting
+   */
+  async callToolDetached(name: string, args?: Record<string, unknown>): Promise<TaskUpdate> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'callTool',
+          { name, arguments: args, useTask: true, detach: true },
+          this.requestTimeout
+        ) as Promise<TaskUpdate>,
+      'callToolDetached'
+    );
+  }
+
+  /**
+   * Poll a task by ID until terminal state (for crash recovery)
+   */
+  async pollTask(taskId: string, onUpdate?: (update: TaskUpdate) => void): Promise<CallToolResult> {
+    return this.withRetry(() => {
+      return new Promise<CallToolResult>((resolve, reject) => {
+        const id = generateRequestId();
+
+        const updateHandler = (update: TaskUpdate): void => {
+          onUpdate?.(update);
+        };
+        this.bridgeClient.on(`task-update:${id}`, updateHandler);
+
+        const cleanup = (): void => {
+          this.bridgeClient.removeListener(`task-update:${id}`, updateHandler);
+        };
+
+        this.bridgeClient
+          .request('pollTask', { taskId }, this.requestTimeout, id)
+          .then((result) => {
+            cleanup();
+            resolve(result as CallToolResult);
+          })
+          .catch((error: Error) => {
+            cleanup();
+            reject(error);
+          });
+      });
+    }, 'pollTask');
+  }
+
+  async listTasks(cursor?: string): Promise<ListTasksResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'listTasks',
+          cursor,
+          this.requestTimeout
+        ) as Promise<ListTasksResult>,
+      'listTasks'
+    );
+  }
+
+  async getTask(taskId: string): Promise<GetTaskResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'getTask',
+          { taskId },
+          this.requestTimeout
+        ) as Promise<GetTaskResult>,
+      'getTask'
+    );
+  }
+
+  async cancelTask(taskId: string): Promise<CancelTaskResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'cancelTask',
+          { taskId },
+          this.requestTimeout
+        ) as Promise<CancelTaskResult>,
+      'cancelTask'
     );
   }
 
@@ -231,9 +442,14 @@ export async function createSessionClient(sessionName: string): Promise<SessionC
  */
 export async function withSessionClient<T>(
   sessionName: string,
-  callback: (client: IMcpClient) => Promise<T>
+  callback: (client: IMcpClient) => Promise<T>,
+  options?: { timeout?: number }
 ): Promise<T> {
   const client = await createSessionClient(sessionName);
+
+  if (options?.timeout !== undefined) {
+    client.setRequestTimeout(options.timeout);
+  }
 
   try {
     return await callback(client);

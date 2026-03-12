@@ -15,7 +15,7 @@
 
 import { connect, type Socket } from 'net';
 import { EventEmitter } from 'events';
-import type { IpcMessage, NotificationData, X402WalletCredentials } from './types.js';
+import type { IpcMessage, NotificationData, TaskUpdate, X402WalletCredentials } from './types.js';
 import { createLogger } from './logger.js';
 import { NetworkError, ClientError, ServerError, AuthError } from './errors.js';
 import { generateRequestId } from './utils.js';
@@ -27,6 +27,9 @@ const REQUEST_TIMEOUT = 3 * 60 * 1000;
 
 // Timeout for initial socket connection (5 seconds)
 const CONNECT_TIMEOUT = 5 * 1000;
+
+// Maximum IPC buffer size (10 MB) — destroy socket if exceeded
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
 
 export class BridgeClient extends EventEmitter {
   private socket: Socket | null = null;
@@ -108,6 +111,13 @@ export class BridgeClient extends EventEmitter {
     this.socket.on('data', (data) => {
       this.buffer += data.toString();
 
+      if (this.buffer.length > MAX_BUFFER_SIZE) {
+        logger.error(`IPC buffer exceeded ${MAX_BUFFER_SIZE} bytes, destroying socket`);
+        this.socket?.destroy();
+        this.cleanup();
+        return;
+      }
+
       // Process complete JSON messages (newline-delimited)
       let newlineIndex: number;
       while ((newlineIndex = this.buffer.indexOf('\n')) !== -1) {
@@ -173,6 +183,11 @@ export class BridgeClient extends EventEmitter {
           pending.resolve(message.result);
         }
       }
+    } else if (message.type === 'task-update' && message.id && message.taskUpdate) {
+      // Emit task update keyed by request ID so the right caller gets it
+      const update: TaskUpdate = message.taskUpdate;
+      logger.debug(`Received task update for request ${message.id}:`, update.status);
+      this.emit(`task-update:${message.id}`, update);
     } else if (message.type === 'notification' && message.notification) {
       // Emit notification event
       const notification: NotificationData = message.notification;
@@ -184,30 +199,40 @@ export class BridgeClient extends EventEmitter {
 
   /**
    * Send a request to the bridge and wait for response
-   * Uses 3-minute timeout for MCP operations
+   * Uses 3-minute timeout for MCP operations by default, or custom timeout if provided
+   * @param requestId - Optional custom request ID (used for task-update event correlation)
    */
-  async request(method: string, params?: unknown): Promise<unknown> {
+  async request(
+    method: string,
+    params?: unknown,
+    timeout?: number,
+    requestId?: string
+  ): Promise<unknown> {
     if (!this.socket) {
       throw new NetworkError('Not connected to bridge');
     }
 
-    const id = generateRequestId();
+    const id = requestId || generateRequestId();
 
     const message: IpcMessage = {
       type: 'request',
       id,
       method,
       params,
+      ...(timeout !== undefined && { timeout }),
     };
 
     logger.debug('Sending request:', { id, method });
+
+    // Use custom timeout (in seconds, convert to ms) or default
+    const timeoutMs = timeout !== undefined ? timeout * 1000 : REQUEST_TIMEOUT;
 
     // Create promise for response
     const promise = new Promise<unknown>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         this.pendingRequests.delete(id);
         reject(new NetworkError(`Request timeout: ${method}`));
-      }, REQUEST_TIMEOUT);
+      }, timeoutMs);
 
       this.pendingRequests.set(id, { resolve, reject, timeoutId });
     });

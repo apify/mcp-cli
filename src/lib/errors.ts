@@ -103,13 +103,13 @@ export function createServerAuthError(
   options?: { sessionName?: string; originalError?: Error }
 ): AuthError {
   const sessionHint = options?.sessionName
-    ? `Then recreate the session:\n  mcpc ${target} session ${options.sessionName}`
+    ? `Then restart the session:\n  mcpc ${options.sessionName} restart`
     : `Then run your command again.`;
 
   return new AuthError(
     `Authentication required by server.\n\n` +
       `To authenticate, run:\n` +
-      `  mcpc ${target} login\n\n` +
+      `  mcpc login ${target}\n\n` +
       sessionHint,
     options?.originalError ? { originalError: options.originalError } : undefined
   );

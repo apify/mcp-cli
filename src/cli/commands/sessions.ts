@@ -11,6 +11,7 @@ import {
   getServerHost,
   redactHeaders,
 } from '../../lib/index.js';
+import { DISCONNECTED_THRESHOLD_MS } from '../../lib/types.js';
 import type { ServerConfig, ProxyConfig } from '../../lib/types.js';
 import {
   formatOutput,
@@ -73,8 +74,8 @@ async function checkPortAvailable(host: string, port: number): Promise<boolean> 
  * If session already exists with crashed bridge, reconnects it automatically
  */
 export async function connectSession(
-  name: string,
   target: string,
+  name: string,
   options: {
     outputMode: OutputMode;
     verbose?: boolean;
@@ -82,9 +83,11 @@ export async function connectSession(
     headers?: string[];
     timeout?: number;
     profile?: string;
+    noProfile?: boolean;
     proxy?: string;
     proxyBearerToken?: string;
     x402?: boolean;
+    insecure?: boolean;
   }
 ): Promise<void> {
   try {
@@ -154,31 +157,43 @@ export async function connectSession(
     // Resolve target to transport config
     const serverConfig = await resolveTarget(target, options);
 
+    // Detect conflicting auth flags: --profile and --header "Authorization: ..." are mutually exclusive
+    const hasExplicitAuthHeader = serverConfig.headers?.Authorization !== undefined;
+    const hasExplicitProfile = options.profile !== undefined;
+
+    if (hasExplicitAuthHeader && hasExplicitProfile) {
+      throw new ClientError(
+        `Cannot combine --profile with --header "Authorization: ...".\n\n` +
+          `Use either:\n` +
+          `  --profile ${options.profile}  (OAuth authentication via saved profile)\n` +
+          `  --header "Authorization: Bearer <token>"  (static bearer token)`
+      );
+    }
+
     // For HTTP targets, resolve auth profile (with helpful errors if none available)
+    // Skip OAuth profile resolution when:
+    // - --no-profile is specified (explicit anonymous connection)
+    // - --header "Authorization: ..." is provided (explicit bearer token)
     let profileName: string | undefined;
     if (serverConfig.url) {
-      profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
-        sessionName: name,
-      });
+      if (options.noProfile) {
+        logger.debug('Skipping OAuth profile: --no-profile specified');
+      } else if (hasExplicitAuthHeader) {
+        logger.debug(
+          'Skipping OAuth profile auto-detection: explicit Authorization header provided via --header'
+        );
+      } else {
+        profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
+          sessionName: name,
+        });
+      }
     }
 
     // Store headers in OS keychain (secure storage) before starting bridge
-    // For OAuth sessions (with --profile), DON'T store the `Authorization` header
-    // because it comes from the OAuth profile and may expire.
-    // The bridge will get fresh tokens via the profile mechanism instead.
     let headers: Record<string, string> | undefined;
     if (Object.keys(serverConfig.headers || {}).length > 0) {
       headers = { ...serverConfig.headers };
 
-      // Remove OAuth-derived Authorization header - it will be handled via the profile
-      if (profileName && headers.Authorization?.startsWith('Bearer ')) {
-        logger.debug(
-          `Skipping OAuth Authorization header storage for session ${name} (handled via profile)`
-        );
-        delete headers.Authorization;
-      }
-
-      // Only store remaining headers (from --header flags)
       if (Object.keys(headers).length > 0) {
         logger.debug(
           `Storing ${Object.keys(headers).length} headers for session ${name} in keychain`
@@ -218,6 +233,7 @@ export async function connectSession(
       ...(profileName && { profileName }),
       ...(proxyConfig && { proxy: proxyConfig }),
       ...(options.x402 && { x402: true }),
+      ...(options.insecure && { insecure: true }),
     };
 
     if (isReconnect) {
@@ -250,6 +266,9 @@ export async function connectSession(
       }
       if (options.x402) {
         bridgeOptions.x402 = true;
+      }
+      if (options.insecure) {
+        bridgeOptions.insecure = true;
       }
 
       const { pid } = await startBridge(bridgeOptions);
@@ -313,18 +332,33 @@ export async function connectSession(
   }
 }
 
+// DISCONNECTED_THRESHOLD_MS imported from ../../lib/types.js
+
+type DisplayStatus = 'live' | 'disconnected' | 'crashed' | 'unauthorized' | 'expired';
+
 /**
  * Determine bridge status for a session
  */
 function getBridgeStatus(session: {
   status?: string;
   pid?: number;
-}): 'live' | 'crashed' | 'expired' {
+  lastSeenAt?: string;
+}): DisplayStatus {
+  if (session.status === 'unauthorized') {
+    return 'unauthorized';
+  }
   if (session.status === 'expired') {
     return 'expired';
   }
   if (!session.pid || !isProcessAlive(session.pid)) {
     return 'crashed';
+  }
+  // Bridge is alive — check if server is actually responding
+  if (session.lastSeenAt) {
+    const lastSeenMs = Date.now() - new Date(session.lastSeenAt).getTime();
+    if (lastSeenMs > DISCONNECTED_THRESHOLD_MS) {
+      return 'disconnected';
+    }
   }
   return 'live';
 }
@@ -332,12 +366,16 @@ function getBridgeStatus(session: {
 /**
  * Format bridge status for display with dot indicator
  */
-function formatBridgeStatus(status: 'live' | 'crashed' | 'expired'): { dot: string; text: string } {
+function formatBridgeStatus(status: DisplayStatus): { dot: string; text: string } {
   switch (status) {
     case 'live':
       return { dot: chalk.green('●'), text: chalk.green('live') };
+    case 'disconnected':
+      return { dot: chalk.yellow('●'), text: chalk.yellow('disconnected') };
     case 'crashed':
       return { dot: chalk.yellow('○'), text: chalk.yellow('crashed') };
+    case 'unauthorized':
+      return { dot: chalk.red('○'), text: chalk.red('unauthorized') };
     case 'expired':
       return { dot: chalk.red('○'), text: chalk.red('expired') };
   }
@@ -399,13 +437,14 @@ export async function listSessionsAndAuthProfiles(options: {
     // Display sessions
     if (sessions.length === 0) {
       console.log(chalk.bold('No active MCP sessions.'));
+      console.log(chalk.dim('  ↳ run: mcpc connect mcp.example.com @test'));
     } else {
       console.log(chalk.bold('MCP sessions:'));
       for (const session of sessions) {
         const status = getBridgeStatus(session);
         const { dot, text } = formatBridgeStatus(status);
 
-        // Format status with time ago info (only show if not live or last seen > 5 min ago)
+        // Format status with time ago info (show for non-live states and stale live sessions)
         let statusStr = `${dot} ${text}`;
         if (session.lastSeenAt) {
           const lastSeenMs = Date.now() - new Date(session.lastSeenAt).getTime();
@@ -419,6 +458,12 @@ export async function listSessionsAndAuthProfiles(options: {
         }
 
         console.log(`  ${formatSessionLine(session)} ${statusStr}`);
+
+        // Show recovery hint for unauthorized sessions
+        if (status === 'unauthorized') {
+          const target = getServerHost(session.server.url || session.server.command || '');
+          console.log(chalk.dim(`    ↳ run: mcpc login ${target} && mcpc ${session.name} restart`));
+        }
       }
     }
 
@@ -426,6 +471,7 @@ export async function listSessionsAndAuthProfiles(options: {
     console.log('');
     if (profiles.length === 0) {
       console.log(chalk.bold('No OAuth profiles.'));
+      console.log(chalk.dim('  ↳ run: mcpc login mcp.example.com'));
     } else {
       console.log(chalk.bold('Available OAuth profiles:'));
       for (const profile of profiles) {
@@ -609,6 +655,10 @@ export async function restartSession(
 
     if (session.x402) {
       bridgeOptions.x402 = session.x402;
+    }
+
+    if (session.insecure) {
+      bridgeOptions.insecure = session.insecure;
     }
 
     // NOTE: Do NOT pass mcpSessionId on explicit restart.

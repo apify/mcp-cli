@@ -32,7 +32,7 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "build:readme": "./scripts/update-readme.sh",
-    "test": "npm run build && npm run test:unit && ./test/e2e/run.sh --no-build --parallel 4 && ./test/e2e/run.sh --no-build --runtime bun",
+    "test": "npm run build && npm run test:unit && ./test/e2e/run.sh --no-build --parallel 8 && ./test/e2e/run.sh --no-build --parallel 8 --runtime bun",
     "test:unit": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "npm run test:coverage:unit && npm run test:coverage:e2e && npm run test:coverage:merge",

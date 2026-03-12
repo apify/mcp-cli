@@ -12,14 +12,15 @@ SESSION=$(session_name "failover")
 
 # Test: create session for failover test
 test_case "create session for failover test"
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION" --header "X-Test: true"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass
 
 # Test: get bridge PID
 test_case "get bridge PID"
-# Use run_mcpc (not run_xmcpc) because session list can change between runs
+# Use run_mcpc (not run_xmcpc) because session list can change between
+# the 4 variant calls when other tests run in parallel with shared home
 run_mcpc --json
 bridge_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
 assert_not_empty "$bridge_pid" "should have bridge PID"

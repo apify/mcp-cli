@@ -184,27 +184,12 @@ MCPC="${E2E_RUNTIME:-node} $PROJECT_ROOT/dist/cli/index.js"
 
 # Run mcpc and capture output
 # Sets: STDOUT, STDERR, EXIT_CODE
-# Note: Automatically adds --header for test server connections to satisfy auth requirement
 run_mcpc() {
   local stdout_file="$TEST_TMP/stdout.$$.$RANDOM"
   local stderr_file="$TEST_TMP/stderr.$$.$RANDOM"
 
-  # Build command args, adding test header if connecting to test server
-  local -a args=()
-  local first_arg="${1:-}"
-  if [[ -n "${TEST_SERVER_URL:-}" && "$first_arg" == "$TEST_SERVER_URL" ]]; then
-    # Add dummy header to satisfy auth credential requirement
-    args=("$first_arg" "--header" "X-Test: true")
-    shift
-    for arg in "$@"; do
-      args+=("$arg")
-    done
-  else
-    args=("$@")
-  fi
-
   set +e
-  $MCPC ${args[@]+"${args[@]}"} >"$stdout_file" 2>"$stderr_file"
+  $MCPC "$@" >"$stdout_file" 2>"$stderr_file"
   EXIT_CODE=$?
   set -e
 
@@ -278,7 +263,12 @@ run_xmcpc() {
     return 1
   fi
 
-  if [[ "$json_verbose_stdout" != "$json_stdout" ]]; then
+  # Normalize time-varying fields (lastSeenAt changes between calls due to keepalive pings)
+  local json_normalized json_verbose_normalized
+  json_normalized=$(echo "$json_stdout" | sed 's/"lastSeenAt":"[^"]*"/"lastSeenAt":"__NORMALIZED__"/g')
+  json_verbose_normalized=$(echo "$json_verbose_stdout" | sed 's/"lastSeenAt":"[^"]*"/"lastSeenAt":"__NORMALIZED__"/g')
+
+  if [[ "$json_verbose_normalized" != "$json_normalized" ]]; then
     echo "INVARIANT VIOLATION: --verbose changed stdout (with --json)" >&2
     echo "--- json stdout ---" >&2
     echo "$json_stdout" >&2
@@ -344,12 +334,17 @@ session_name() {
 
 # Create a session and track it for cleanup
 # Usage: create_session <target> [session-suffix]
+# Automatically adds X-Test header when connecting to TEST_SERVER_URL
 create_session() {
   local target="$1"
   local suffix="${2:-default}"
   local session=$(session_name "$suffix")
 
-  run_mcpc "$target" connect "$session"
+  if [[ -n "${TEST_SERVER_URL:-}" && "$target" == "$TEST_SERVER_URL" ]]; then
+    run_mcpc connect "$target" "$session" --header "X-Test: true"
+  else
+    run_mcpc connect "$target" "$session"
+  fi
   if [[ $EXIT_CODE -eq 0 ]]; then
     _SESSIONS_CREATED+=("$session")
   fi
@@ -558,6 +553,7 @@ assert_stderr_empty() {
 TEST_SERVER_PORT="${TEST_SERVER_PORT:-0}"  # 0 = random port
 _TEST_SERVER_PID=""
 _PROXY_SERVER_PID=""
+_HTTPS_WRAPPER_PID=""
 
 # Start test MCP server
 # Usage: start_test_server [env_vars...]
@@ -604,8 +600,11 @@ start_test_server() {
 # Create a dummy auth profile for a host (internal helper)
 # This is needed because mcpc requires auth profiles for all HTTP servers
 # Uses atomic symlink creation for cross-platform locking
+# Usage: _create_test_auth_profile <host> [scheme]
+#   scheme defaults to "http" if not specified
 _create_test_auth_profile() {
   local host="$1"
+  local scheme="${2:-http}"
   local profiles_file="$MCPC_HOME_DIR/profiles.json"
   local lock_file="$MCPC_HOME_DIR/profiles.lock"
 
@@ -632,7 +631,7 @@ _create_test_auth_profile() {
   if [[ -f "$profiles_file" && -s "$profiles_file" ]]; then
     # File exists and is non-empty - add profile for this host using jq
     local updated
-    if updated=$(jq --arg host "$host" '.profiles[$host] = {"default": {"name": "default", "serverUrl": ("http://" + $host), "authType": "oauth", "oauthIssuer": "https://test.example.com", "createdAt": "2025-01-01T00:00:00Z"}}' "$profiles_file" 2>/dev/null); then
+    if updated=$(jq --arg host "$host" --arg scheme "$scheme" '.profiles[$host] = {"default": {"name": "default", "serverUrl": ($scheme + "://" + $host), "authType": "oauth", "oauthIssuer": "https://test.example.com", "createdAt": "2025-01-01T00:00:00Z"}}' "$profiles_file" 2>/dev/null); then
       # Write to temp file then atomically rename
       local temp_file="$profiles_file.$$.tmp"
       echo "$updated" > "$temp_file"
@@ -645,7 +644,7 @@ _create_test_auth_profile() {
     "$host": {
       "default": {
         "name": "default",
-        "serverUrl": "http://$host",
+        "serverUrl": "$scheme://$host",
         "authType": "oauth",
         "oauthIssuer": "https://test.example.com",
         "createdAt": "2025-01-01T00:00:00Z"
@@ -663,7 +662,7 @@ EOF
     "$host": {
       "default": {
         "name": "default",
-        "serverUrl": "http://$host",
+        "serverUrl": "$scheme://$host",
         "authType": "oauth",
         "oauthIssuer": "https://test.example.com",
         "createdAt": "2025-01-01T00:00:00Z"
@@ -704,8 +703,47 @@ start_proxy_server() {
   echo "# Proxy server started at $PROXY_URL (PID: $_PROXY_SERVER_PID)"
 }
 
+# Start an HTTPS wrapper around the test server using a self-signed certificate.
+# Requires start_test_server to have been called first.
+# Sets TEST_HTTPS_SERVER_URL in the environment.
+start_https_test_server() {
+  local log="$_TEST_RUN_DIR/https-wrapper.log"
+  cd "$PROJECT_ROOT"
+  env TARGET_URL="$TEST_SERVER_URL" npx tsx test/e2e/server/https-wrapper.ts >"$log" 2>&1 &
+  _HTTPS_WRAPPER_PID=$!
+
+  # Wait for HTTPS_PORT= line in log (up to 10 seconds)
+  local max_wait=50
+  local waited=0
+  while ! grep -q "^HTTPS_PORT=" "$log" 2>/dev/null; do
+    sleep 0.2
+    ((waited++)) || true
+    if [[ $waited -ge $max_wait ]]; then
+      echo "Error: HTTPS wrapper server failed to start" >&2
+      cat "$log" >&2
+      kill $_HTTPS_WRAPPER_PID 2>/dev/null || true
+      exit 1
+    fi
+  done
+
+  local https_port
+  https_port=$(grep "^HTTPS_PORT=" "$log" | cut -d= -f2 | tr -d '[:space:]')
+
+  export TEST_HTTPS_SERVER_URL="https://localhost:${https_port}"
+  echo "# HTTPS wrapper started at $TEST_HTTPS_SERVER_URL (PID: $_HTTPS_WRAPPER_PID)"
+
+  # Create auth profile for HTTPS host
+  _create_test_auth_profile "localhost:${https_port}" "https"
+}
+
 # Stop test server
 stop_test_server() {
+  if [[ -n "$_HTTPS_WRAPPER_PID" ]]; then
+    pkill -P "$_HTTPS_WRAPPER_PID" 2>/dev/null || true
+    kill "$_HTTPS_WRAPPER_PID" 2>/dev/null || true
+    wait "$_HTTPS_WRAPPER_PID" 2>/dev/null || true
+    _HTTPS_WRAPPER_PID=""
+  fi
   if [[ -n "$_TEST_SERVER_PID" ]]; then
     # Kill all child processes first (tsx spawns node as child)
     pkill -P "$_TEST_SERVER_PID" 2>/dev/null || true

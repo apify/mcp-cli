@@ -90,6 +90,14 @@ export interface OAuthProviderOptions {
    * If true, ignore existing tokens and force re-authentication (auth flow mode only)
    */
   forceReauth?: boolean;
+
+  /**
+   * Pre-configured client credentials (for servers without dynamic client registration)
+   */
+  clientCredentials?: {
+    clientId: string;
+    clientSecret?: string;
+  };
 }
 
 /**
@@ -102,6 +110,7 @@ export class OAuthProvider implements OAuthClientProvider {
   private _clientId?: string;
   private _redirectUrl: string;
   private _forceReauth: boolean;
+  private _clientCredentials?: { clientId: string; clientSecret?: string };
 
   // Auth flow state (only used during interactive OAuth)
   private _authProfile?: AuthProfile;
@@ -120,12 +129,9 @@ export class OAuthProvider implements OAuthClientProvider {
     if (options.clientId) {
       this._clientId = options.clientId;
     }
-
-    // if (this.tokenManager) {
-    //  logger.debug(`OAuthProvider created in runtime mode for ${options.profileName}`);
-    // } else {
-    //  logger.debug(`OAuthProvider created in auth flow mode for ${options.profileName}`);
-    // }
+    if (options.clientCredentials) {
+      this._clientCredentials = options.clientCredentials;
+    }
   }
 
   /**
@@ -144,7 +150,10 @@ export class OAuthProvider implements OAuthClientProvider {
       redirect_uris: [this._redirectUrl],
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
-      token_endpoint_auth_method: 'none', // Public client (CLI)
+      // Use client_secret_post when client secret is provided (confidential client)
+      token_endpoint_auth_method: this._clientCredentials?.clientSecret
+        ? 'client_secret_post'
+        : 'none',
       client_name: 'mcpc',
       client_uri: 'https://github.com/apify/mcpc',
     };
@@ -154,6 +163,17 @@ export class OAuthProvider implements OAuthClientProvider {
     // Runtime mode: return client ID from constructor
     if (this.isRuntimeMode() && this._clientId) {
       return { client_id: this._clientId };
+    }
+
+    // Pre-configured client credentials: skip dynamic registration
+    if (this._clientCredentials) {
+      const info: OAuthClientInformationMixed = {
+        client_id: this._clientCredentials.clientId,
+      };
+      if (this._clientCredentials.clientSecret) {
+        info.client_secret = this._clientCredentials.clientSecret;
+      }
+      return info;
     }
 
     // Auth flow mode: try to load from memory or keychain

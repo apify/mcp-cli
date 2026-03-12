@@ -278,9 +278,9 @@ export async function consolidateSessions(
           continue;
         }
 
-        // If session expired → remove it
-        if (cleanExpired && session.status === 'expired') {
-          logger.debug(`Removing expired session: ${name}`);
+        // If session expired or unauthorized → remove it
+        if (cleanExpired && (session.status === 'expired' || session.status === 'unauthorized')) {
+          logger.debug(`Removing ${session.status} session: ${name}`);
           delete storage.sessions[name];
           result.expiredSessions++;
           hasChanges = true;
@@ -320,13 +320,22 @@ export async function consolidateSessions(
           logger.debug(`Clearing crashed bridge PID for session: ${name} (PID: ${session.pid})`);
           delete session.pid;
           hasChanges = true;
-          // Don't overwrite 'expired' status - that's a server-side state, not bridge state
-          if (session.status !== 'crashed' && session.status !== 'expired') {
+          // Don't overwrite 'expired' or 'unauthorized' status - those are server-side states, not bridge state
+          if (
+            session.status !== 'crashed' &&
+            session.status !== 'expired' &&
+            session.status !== 'unauthorized'
+          ) {
             session.status = 'crashed';
             result.crashedBridges++;
           }
-        } else if (!session.pid && session.status !== 'crashed' && session.status !== 'expired') {
-          // No pid but not marked crashed yet (and not expired)
+        } else if (
+          !session.pid &&
+          session.status !== 'crashed' &&
+          session.status !== 'expired' &&
+          session.status !== 'unauthorized'
+        ) {
+          // No pid but not marked crashed yet (and not expired/unauthorized)
           session.status = 'crashed';
           result.crashedBridges++;
           hasChanges = true;

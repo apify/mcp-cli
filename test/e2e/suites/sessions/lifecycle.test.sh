@@ -12,7 +12,7 @@ SESSION=$(session_name "lifecycle")
 
 # Test: connect creates session
 test_case "connect creates session"
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION" --header "X-Test: true"
 assert_success "connect should succeed"
 assert_contains "$STDOUT" "created"
 _SESSIONS_CREATED+=("$SESSION")
@@ -20,8 +20,8 @@ test_pass
 
 # Test: session appears in list
 test_case "session appears in list"
-# Use run_mcpc (not run_xmcpc) because session list can change between runs
-# when other tests run in parallel with shared home
+# Use run_mcpc (not run_xmcpc) because session list can change between
+# the 4 variant calls when other tests run in parallel with shared home
 run_mcpc --json
 assert_success
 assert_json "$STDOUT" ".sessions[] | select(.name == \"$SESSION\")"

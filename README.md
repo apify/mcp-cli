@@ -84,21 +84,21 @@ dbus-run-session -- bash -c "echo -n 'password' | gnome-keyring-daemon --unlock 
 mcpc
 
 # Login to remote MCP server and save OAuth credentials for future use
-mcpc mcp.apify.com login
+mcpc login mcp.apify.com
 
-# Show information about a remote MCP server
-mcpc mcp.apify.com
-
-# Use JSON mode for scripting
-mcpc mcp.apify.com tools-list --json
-
-# Create and use persistent MCP session
-mcpc mcp.apify.com connect @test
+# Create a persistent session and interact with it
+mcpc connect mcp.apify.com @test
+mcpc @test                                            # show server info
+mcpc @test tools-list
 mcpc @test tools-call search-actors keywords:="website crawler"
 mcpc @test shell
 
-# Interact with a local MCP server package (stdio) referenced from config file
-mcpc --config ~/.vscode/mcp.json filesystem tools-list
+# Use JSON mode for scripting
+mcpc --json @test tools-list
+
+# Use a local MCP server package (stdio) referenced from config file
+mcpc connect ./.vscode/mcp.json:filesystem @fs
+mcpc @fs tools-list
 ```
 
 ## Usage
@@ -106,68 +106,56 @@ mcpc --config ~/.vscode/mcp.json filesystem tools-list
 <!-- AUTO-GENERATED: mcpc --help -->
 
 ```
-Usage: mcpc [options] <target> [command]
+Usage: mcpc [options] [<@session>] [<command>]
 
 Universal command-line client for the Model Context Protocol (MCP).
 
 Options:
-  -j, --json                    Output in JSON format for scripting
-  -c, --config <file>           Path to MCP config JSON file (e.g. ".vscode/mcp.json")
-  -H, --header <header>         HTTP header for remote MCP server (can be repeated)
-  -v, --version                 Output the version number
-  --verbose                     Enable debug logging
-  --profile <name>              OAuth profile for the server ("default" if not provided)
-  --schema <file>               Validate tool/prompt schema against expected schema
-  --schema-mode <mode>          Schema validation mode: strict, compatible (default), ignore
-  --timeout <seconds>           Request timeout in seconds (default: 300)
-  --proxy <[host:]port>         Start proxy MCP server for session (with "connect" command)
-  --proxy-bearer-token <token>  Require authentication for access to proxy server
-  --x402                        Enable x402 auto-payment using the configured wallet
-  --clean[=types]               Clean up mcpc data (types: sessions, logs, profiles, all)
-  -h, --help                    Display general help
+  -j, --json                   Output in JSON format for scripting
+  --verbose                    Enable debug logging
+  --profile <name>             OAuth profile for the server ("default" if not provided)
+  --schema <file>              Validate tool/prompt schema against expected schema
+  --schema-mode <mode>         Schema validation mode: strict, compatible (default), ignore
+  --timeout <seconds>          Request timeout in seconds (default: 300)
+  --insecure                   Skip TLS certificate verification (for self-signed certs)
+  -v, --version                Output the version number
+  -h, --help                   Display help
 
-Targets:
-  @<session>                    Named persistent session (e.g. "@apify")
-  <config-entry>                Entry in MCP config file specified by --config (e.g. "fs")
-  <server-url>                  Remote MCP server URL (e.g. "mcp.apify.com")
+Commands:
+  connect <server> <@session>  Connect to an MCP server and start a new named @session
+  close <@session>             Close a session
+  restart <@session>           Restart a session (losing all state)
+  shell <@session>             Open interactive shell for a session
+  login <server>               Interactively login to a server using OAuth and save profile
+  logout <server>              Delete an authentication profile for a server
+  clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
+  x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
+  help [command]               Show help for a specific command
 
-Management commands:
-  login                         Create OAuth profile with credentials for remote server
-  logout                        Remove OAuth profile for remote server
-  connect @<session>            Connect to server and create named persistent session
-  restart                       Kill and restart a session
-  close                         Close a session
+MCP session commands (after connecting):
+  <@session>                   Show MCP server info and capabilities
+  <@session> tools-list        List MCP tools
+  <@session> tools-get <name>
+  <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
+  <@session> prompts-list
+  <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
+  <@session> resources-list
+  <@session> resources-read <uri>
+  <@session> resources-subscribe <uri>
+  <@session> resources-unsubscribe <uri>
+  <@session> resources-templates-list
+  <@session> tasks-list
+  <@session> tasks-get <taskId>
+  <@session> tasks-cancel <taskId>
+  <@session> logging-set-level <level>
+  <@session> ping
 
-MCP server commands:
-  help                          Show server info ("help" can be omitted)
-  shell                         Open interactive shell
-  tools-list [--full]           Send "tools/list" MCP request...
-  tools-get <tool-name>
-  tools-call <tool-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
-  prompts-list
-  prompts-get <prompt-name> [arg1:=val1 arg2:=val2 ... | <args-json> | <stdin]
-  resources
-  resources-list
-  resources-read <uri>
-  resources-subscribe <uri>
-  resources-unsubscribe <uri>
-  resources-templates-list
-  logging-set-level <level>
-  ping
-
-x402 payment commands (no target needed):
-  x402 init                     Create a new x402 wallet
-  x402 import <key>             Import wallet from private key
-  x402 info                     Show wallet info
-  x402 sign -r <base64>         Sign payment from PAYMENT-REQUIRED header
-  x402 remove                   Remove the wallet
-
-Run "mcpc" without <target> to show available sessions and profiles.
+Run "mcpc" without arguments to show active sessions and OAuth profiles.
 ```
 
 ### General actions
 
-When `<target>` is omitted, `mcpc` provides general actions:
+With no arguments, `mcpc` lists all active sessions and saved OAuth profiles:
 
 ```bash
 # List all sessions and OAuth profiles (also in JSON mode)
@@ -178,46 +166,31 @@ mcpc --json
 mcpc --help
 mcpc --version
 
-# Clean expired sessions and old log files (see below for details)
-mcpc --clean
+# Clean stale sessions and old log files
+mcpc clean
 ```
 
-### Targets
+### Server formats
 
-To connect and interact with an MCP server, you need to specify a `<target>`, which can be one of (in this order of precedence):
+The `connect`, `login`, and `logout` commands accept a `<server>` argument in these formats:
 
-- **Entry in a config file** (e.g. `--config .vscode/mcp.json filesystem`) - see [Config file](#mcp-server-config-file)
-- **Remote MCP server URL** (e.g. `https://mcp.apify.com`)
-- **Named session** (e.g. `@apify`) - see [Sessions](#sessions)
-
-`mcpc` automatically selects the transport protocol based on the server (stdio or Streamable HTTP),
-connects, and enables you to interact with it.
-
-**URL handling:**
-
-- URLs without a scheme (e.g. `mcp.apify.com`) default to `https://`
-- `localhost` and `127.0.0.1` addresses without a scheme default to `http://` (for local dev/proxy servers)
-- To override the default, specify the scheme explicitly (e.g. `http://example.com`)
+- **Remote URL** (e.g. `mcp.apify.com` or `https://mcp.apify.com`) — scheme defaults to `https://`
+- **Config file entry** (e.g. `~/.vscode/mcp.json:filesystem`) — `file:entry-name` syntax
 
 ### MCP commands
 
-When `<target>` is provided, `mcpc` sends MCP requests to the target server:
+All MCP commands go through a named session created with `connect`:
 
 ```bash
-# Server from config file (stdio)
-mcpc --config .vscode/mcp.json fileSystem
-mcpc --config .vscode/mcp.json fileSystem tools-list
-mcpc --config .vscode/mcp.json fileSystem tools-call list_directory path:=/
-
-# Remote server (Streamable HTTP)
-mcpc mcp.apify.com\?tools=docs
-mcpc mcp.apify.com\?tools=docs tools-list
-mcpc mcp.apify.com\?tools=docs tools-call search-apify-docs query:="What are Actors?"
-
-# Session
-mcpc mcp.apify.com\?tools=docs connect @apify
+# Connect to a remote server and create a session
+mcpc connect mcp.apify.com @apify
 mcpc @apify tools-list
 mcpc @apify tools-call search-apify-docs query:="What are Actors?"
+
+# Connect to a local server via config file entry
+mcpc connect ~/.vscode/mcp.json:filesystem @fs
+mcpc @fs tools-list
+mcpc @fs tools-call list_directory path:=/
 ```
 
 See [MCP feature support](#mcp-feature-support) for details about all supported MCP features and commands.
@@ -228,18 +201,18 @@ The `tools-call` and `prompts-get` commands accept arguments as positional param
 
 ```bash
 # Key:=value pairs (auto-parsed: tries JSON, falls back to string)
-mcpc <target> tools-call <tool-name> greeting:="hello world" count:=10 enabled:=true
-mcpc <target> tools-call <tool-name> config:='{"key":"value"}' items:='[1,2,3]'
+mcpc @session tools-call <tool-name> greeting:="hello world" count:=10 enabled:=true
+mcpc @session tools-call <tool-name> config:='{"key":"value"}' items:='[1,2,3]'
 
 # Force string type with JSON quotes
-mcpc <target> tools-call <tool-name> id:='"123"' flag:='"true"'
+mcpc @session tools-call <tool-name> id:='"123"' flag:='"true"'
 
 # Inline JSON object (if first arg starts with { or [)
-mcpc <target> tools-call <tool-name> '{"greeting":"hello world","count":10}'
+mcpc @session tools-call <tool-name> '{"greeting":"hello world","count":10}'
 
 # Read from stdin (automatic when no positional args and input is piped)
-echo '{"greeting":"hello","count":10}' | mcpc <target> tools-call <tool-name>
-cat args.json | mcpc <target> tools-call <tool-name>
+echo '{"greeting":"hello","count":10}' | mcpc @session tools-call <tool-name>
+cat args.json | mcpc @session tools-call <tool-name>
 ```
 
 **Rules:**
@@ -286,8 +259,7 @@ mcpc @server tools-call search "query:=hello world"
 `mcpc` provides an interactive shell for discovery and testing of MCP servers.
 
 ```bash
-mcpc mcp.apify.com shell    # Direct connection
-mcpc @apify shell           # Use existing session
+mcpc @apify shell
 ```
 
 Shell commands: `help`, `exit`/`quit`/Ctrl+D, Ctrl+C to cancel.
@@ -317,7 +289,7 @@ which then serve as unique reference in commands.
 
 ```bash
 # Create a persistent session
-mcpc mcp.apify.com\?tools=docs connect @apify
+mcpc connect mcp.apify.com @apify
 
 # List all sessions and OAuth profiles
 mcpc
@@ -327,10 +299,10 @@ mcpc @apify tools-list
 mcpc @apify shell
 
 # Restart the session (kills and restarts the bridge process)
-mcpc @apify restart
+mcpc @apify restart    # or: mcpc restart @apify
 
 # Close the session, terminates bridge process
-mcpc @apify close
+mcpc @apify close      # or: mcpc close @apify
 
 # ...now session name "@apify" is forgotten and available for future use
 ```
@@ -371,14 +343,14 @@ and any future attempts to use them will fail.
 To **remove the session from the list**, you need to explicitly close it:
 
 ```bash
-mcpc @apify close
+mcpc @apify close    # or: mcpc close @apify
 ```
 
 You can restart a session anytime, which kills the bridge process
 and opens new connection with new `MCP-Session-Id`, by running:
 
 ```bash
-mcpc @apify restart
+mcpc @apify restart  # or: mcpc restart @apify
 ```
 
 ## Authentication
@@ -391,11 +363,7 @@ For local servers (stdio) or remote servers (Streamable HTTP) which do not requi
 `mcpc` can be used without authentication:
 
 ```bash
-# One-shot command
-mcpc mcp.apify.com\?tools=docs tools-list
-
-# Session command
-mcpc mcp.apify.com\?tools=docs connect @test
+mcpc connect mcp.apify.com @test
 mcpc @test tools-list
 ```
 
@@ -407,11 +375,8 @@ All headers are stored securely in the OS keychain for the session, but they are
 running a one-shot command or connecting new session.
 
 ```bash
-# One-time command with Bearer token
-mcpc --header "Authorization: Bearer ${APIFY_TOKEN}" https://mcp.apify.com tools-list
-
-# Create session with Bearer token (saved to keychain for this session only)
-mcpc --header "Authorization: Bearer ${APIFY_TOKEN}" https://mcp.apify.com connect @apify
+# Create session with Bearer token (token saved to keychain for this session only)
+mcpc connect https://mcp.apify.com @apify --header "Authorization: Bearer ${APIFY_TOKEN}"
 
 # Use the session (Bearer token is loaded from keychain automatically)
 mcpc @apify tools-list
@@ -443,25 +408,25 @@ Key concepts:
 
 ```bash
 # Login to server and save 'default' authentication profile for future use
-mcpc mcp.apify.com login
+mcpc login mcp.apify.com
 
 # Use named authentication profile instead of 'default'
-mcpc mcp.apify.com login --profile work
+mcpc login mcp.apify.com --profile work
 
 # Create two sessions using the two different credentials
-mcpc https://mcp.apify.com connect @apify-personal
-mcpc https://mcp.apify.com connect @apify-work --profile work
+mcpc connect mcp.apify.com @apify-personal
+mcpc connect mcp.apify.com @apify-work --profile work
 
 # Both sessions now work independently
 mcpc @apify-personal tools-list  # Uses personal account
 mcpc @apify-work tools-list      # Uses work account
 
 # Re-authenticate existing profile (e.g., to refresh or change scopes)
-mcpc mcp.apify.com login --profile work
+mcpc login mcp.apify.com --profile work
 
 # Delete "default" and "work" authentication profiles
-mcpc mcp.apify.com logout
-mcpc mcp.apify.com logout --profile work
+mcpc logout mcp.apify.com
+mcpc logout mcp.apify.com --profile work
 ```
 
 ### Authentication precedence
@@ -473,7 +438,16 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
 3. **Config file headers** - Headers from `--config` file for the server
 4. **No authentication** - Attempts unauthenticated connection
 
-`mcpc` automatically handles authentication based on whether you specify a profile:
+**Note:** `--profile` and `--header "Authorization: ..."` cannot be combined — they are mutually
+exclusive. Providing both will result in a clear error. Use one or the other.
+
+`mcpc` automatically handles authentication based on what you specify:
+
+**When `--header "Authorization: ..."` is provided:**
+
+- The explicit header is always used, and OAuth profile auto-detection is skipped entirely
+- This works even if a `default` profile exists for the server
+- Cannot be combined with `--profile` (returns an error)
 
 **When `--profile <name>` is specified:**
 
@@ -482,7 +456,13 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
    - If authentication fails (expired/invalid) → Fail with an error
 2. **Profile doesn't exist**: Fail with an error
 
-**When no `--profile` is specified:**
+**When `--no-profile` is specified:**
+
+- Skip all OAuth profile detection and connect anonymously
+- Useful when a `default` profile exists but you want an unauthenticated session
+- Can be combined with `--header "Authorization: ..."` for explicit bearer token without profile
+
+**When no flags are specified (default):**
 
 1. **`default` profile exists for the server**: Use its stored credentials
    - If authentication succeeds → Continue with command/session
@@ -495,7 +475,7 @@ On failure, the error message includes instructions on how to login and save the
 
 This flow ensures:
 
-- You only authenticate when necessary
+- Explicit CLI flags always take precedence over stored profiles
 - Credentials are never silently mixed up (personal → work) or downgraded (authenticated → unauthenticated)
 - You can mix authenticated sessions (with named profiles) and public access on the same server
 
@@ -505,16 +485,19 @@ This flow ensures:
 # With specific profile - always authenticated:
 # - Uses 'work' if it exists
 # - Fails if it doesn't exist
-mcpc mcp.apify.com connect @apify-work --profile work
+mcpc connect mcp.apify.com @apify-work --profile work
 
 # Without profile - opportunistic authentication:
 # - Uses 'default' if it exists
 # - Tries unauthenticated if 'default' doesn't exist
 # - Fails if the server requires authentication
-mcpc mcp.apify.com connect @apify-personal
+mcpc connect mcp.apify.com @apify-personal
 
-# Public server - no authentication needed:
-mcpc mcp.apify.com\?tools=docs tools-list
+# Explicit bearer token - skips profile auto-detection:
+mcpc connect mcp.apify.com @apify --header "Authorization: Bearer ${APIFY_TOKEN}"
+
+# Anonymous - skips default profile even if it exists:
+mcpc connect mcp.apify.com @apify-anon --no-profile
 ```
 
 ## MCP proxy
@@ -526,25 +509,21 @@ See also [AI sandboxes](#ai-sandboxes).
 
 ```bash
 # Human authenticates to a remote server
-mcpc mcp.apify.com login
+mcpc login mcp.apify.com
 
 # Create authenticated session with proxy server on localhost:8080
-mcpc mcp.apify.com connect @open-relay --proxy 8080
+mcpc connect mcp.apify.com @open-relay --proxy 8080
 
 # Now any MCP client can connect to proxy like to a regular MCP server
 # The client has NO access to the original OAuth tokens or HTTP headers
 # Note: localhost/127.0.0.1 URLs default to http:// (no scheme needed)
-mcpc localhost:8080 tools-list
-mcpc 127.0.0.1:8080 tools-call search-actors keywords:="web scraper"
-
-# Or create a new session from the proxy for convenience
-mcpc localhost:8080 connect @sandboxed
+mcpc connect localhost:8080 @sandboxed
 mcpc @sandboxed tools-call search-actors keywords:="web scraper"
 
 # Optionally protect proxy with bearer token for better security (stored in OS keychain)
-mcpc mcp.apify.com connect @secure-relay --proxy 8081 --proxy-bearer-token secret123
+mcpc connect mcp.apify.com @secure-relay --proxy 8081 --proxy-bearer-token secret123
 # To use the proxy, caller needs to pass the bearer token in HTTP header
-mcpc localhost:8081 connect @sandboxed2 --header "Authorization: Bearer secret123"
+mcpc connect localhost:8081 @sandboxed2 --header "Authorization: Bearer secret123"
 ```
 
 **Proxy options for `connect` command:**
@@ -565,13 +544,13 @@ mcpc localhost:8081 connect @sandboxed2 --header "Authorization: Bearer secret12
 
 ```bash
 # Localhost only (default, most secure)
-mcpc mcp.apify.com connect @relay --proxy 8080
+mcpc connect mcp.apify.com @relay --proxy 8080
 
 # Bind to all interfaces (allows network access - use with caution!)
-mcpc mcp.apify.com connect @relay --proxy 0.0.0.0:8080
+mcpc connect mcp.apify.com @relay --proxy 0.0.0.0:8080
 
 # Bind to specific interface
-mcpc mcp.apify.com connect @relay --proxy 192.168.1.100:8080
+mcpc connect mcp.apify.com @relay --proxy 192.168.1.100:8080
 ```
 
 When listing sessions, proxy info is displayed prominently:
@@ -664,8 +643,8 @@ it's always a good idea to run them in a code sandbox with limited access to you
 
 The [proxy MCP server](#mcp-proxy) feature provides a security boundary for AI agents:
 
-1. **Human creates authentication profile**: `mcpc mcp.apify.com login --profile ai-access`
-2. **Human creates session**: `mcpc mcp.apify.com connect @ai-sandbox --profile ai-access --proxy 8080`
+1. **Human creates authentication profile**: `mcpc login mcp.apify.com --profile ai-access`
+2. **Human creates session**: `mcpc connect mcp.apify.com @ai-sandbox --profile ai-access --proxy 8080`
 3. **AI runs inside a sandbox**: If sandbox has access limited to `localhost:8080`,
    it can only interact with the MCP server through the `@ai-sandbox` session,
    without access to the original OAuth credentials, HTTP headers, or `mcpc` configuration.
@@ -732,7 +711,7 @@ Pass the `--x402` flag when connecting to a session or running direct commands:
 
 ```bash
 # Create a session with x402 payment support
-mcpc mcp.apify.com connect @apify --x402
+mcpc connect mcp.apify.com @apify --x402
 
 # The session now automatically handles 402 responses
 mcpc @apify tools-call expensive-tool query:="hello"
@@ -904,7 +883,7 @@ When connected via a [session](#sessions), `mcpc` automatically handles `list_ch
 notifications for tools, resources, and prompts.
 The bridge process tracks when each notification type was last received.
 In [shell mode](#interactive-shell), notifications are displayed in real-time.
-The timestamps are available in JSON output of `mcpc <target> --json` under the `_mcpc.notifications`
+The timestamps are available in JSON output of `mcpc @session --json` under the `_mcpc.notifications`
 field - see [Server instructions](#server-instructions).
 
 #### Server logs
@@ -958,14 +937,12 @@ You can configure `mcpc` using a config file, environment variables, or command-
 
 `mcpc` supports the ["standard"](https://gofastmcp.com/integrations/mcp-json-configuration)
 MCP server JSON config file, compatible with Claude Desktop, VS Code, and other MCP clients.
-You can point to an existing config file with `--config`:
+Use the `file:entry` syntax to reference a server from a config file:
 
 ```bash
-# One-shot command to an MCP server configured in Visual Studio Code
-mcpc --config .vscode/mcp.json apify tools-list
-
-# Open a session to a server specified in the custom config file
-mcpc --config .vscode/mcp.json apify connect @my-apify
+# Open a session to a server specified in the Visual Studio Code config
+mcpc connect .vscode/mcp.json:apify @my-apify
+mcpc @my-apify tools-list
 ```
 
 **Example MCP config JSON file:**
@@ -1010,14 +987,12 @@ For **stdio servers:**
 
 **Using servers from config file:**
 
-When `--config` is provided, you can reference servers by name:
+Reference servers by their name using the `file:entry` syntax:
 
 ```bash
-# With config file, use server names directly
-mcpc --config .vscode/mcp.json filesystem tools-list
-
-# Create a named session from server in config
-mcpc --config .vscode/mcp.json filesystem connect @fs
+# Create a named session from a server in the config
+mcpc connect .vscode/mcp.json:filesystem @fs
+mcpc @fs tools-list
 mcpc @fs tools-call search
 ```
 
@@ -1060,20 +1035,19 @@ Config files support environment variable substitution using `${VAR_NAME}` synta
 
 ### Cleanup
 
-You can clean up the `mcpc` state and data using the `--clean` option:
+You can clean up the `mcpc` state and data using the `clean` command:
 
 ```bash
 # Safe non-destructive cleanup: remove expired sessions, delete old orphaned logs
-mcpc --clean
+mcpc clean
 
-# Clean specific resources (comma-separated)
-mcpc --clean=sessions      # Kill bridges, delete all sessions
-mcpc --clean=profiles      # Delete all authentication profiles
-mcpc --clean=logs          # Delete all log files
-mcpc --clean=sessions,logs # Clean multiple resource types
+# Clean specific resources
+mcpc clean sessions    # Kill bridges, delete all sessions
+mcpc clean profiles    # Delete all authentication profiles
+mcpc clean logs        # Delete all log files
 
 # Nuclear option: remove everything
-mcpc --clean=all           # Delete all sessions, profiles, logs, and sockets
+mcpc clean all         # Delete all sessions, profiles, logs, and sockets
 ```
 
 ## Security
@@ -1152,12 +1126,12 @@ The main `mcpc` process doesn't save log files, but supports [verbose mode](#ver
 **"Session not found"**
 
 - List existing sessions: `mcpc`
-- Create new session if expired: `mcpc @<session-name> close` and `mcpc <target> connect @<session-name>`
+- Create new session if expired: `mcpc @<session-name> close` and `mcpc connect <server> @<session-name>`
 
 **"Authentication failed"**
 
 - List saved OAuth profiles: `mcpc`
-- Re-authenticate: `mcpc <server> login [--profile <name>]`
+- Re-authenticate: `mcpc login <server> [--profile <name>]`
 - For bearer tokens: provide `--header "Authorization: Bearer ${TOKEN}"` again
 
 ## Development
@@ -1169,26 +1143,47 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 ## Related work
 
-- MCP CLI clients
-  - https://github.com/chrishayuk/mcp-cli
-  - https://github.com/wong2/mcp-cli
-  - https://github.com/f/mcptools
-  - https://github.com/adhikasp/mcp-client-cli
-  - https://github.com/mattzcarey/cloudflare-mcp
-  - https://github.com/thellimist/clihub (see https://news.ycombinator.com/item?id=47157398)
-  - https://github.com/EstebanForge/mcp-cli-ent
-  - https://github.com/assimelha/cmcp
-- Code mode
-  - https://blog.cloudflare.com/code-mode/
-  - https://www.anthropic.com/engineering/code-execution-with-mcp
-  - https://github.com/steipete/mcporter
-- Dynamic tool discovery
-  - https://www.anthropic.com/engineering/advanced-tool-use
-    - https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool
-  - https://cursor.com/blog/dynamic-context-discovery
-  - https://github.com/philschmid/mcp-cli (https://www.philschmid.de/mcp-cli)
-- Other
-  - https://github.com/TeamSparkAI/mcpGraph
+### MCP CLI clients
+
+<!-- Stars and activity as of March 2026. -->
+
+| Tool | Lang | Stars | Active | Tools | Resources | Prompts | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
+|---|---|--:|---|---|---|---|---|---|---|---|---|---|---|
+| **[apify/mcpc](https://github.com/apify/mcpc)** | TS | ~350 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| [steipete/mcporter](https://github.com/steipete/mcporter) | TS | ~2.6k | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| [IBM/mcp-cli](https://github.com/IBM/mcp-cli) | Python | ~1.9k | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
+| [f/mcptools](https://github.com/f/mcptools) | Go | ~1.5k | ⚠️ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | — |
+| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli) | TS | ~950 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
+| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) | Python | ~670 | ⚠️ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ |
+| [thellimist/clihub](https://github.com/thellimist/clihub) | Go | ~590 | ✅ | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | — |
+| [wong2/mcp-cli](https://github.com/wong2/mcp-cli) | JS | ~420 | ⚠️ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | — | — |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim) | Go | ~46 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
+| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go | ~13 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
+
+**Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **LLM** = requires/uses an LLM.
+
+**Notes:**
+- [thellimist/clihub](https://github.com/thellimist/clihub) is a code generator that compiles MCP tools into standalone CLI binaries, rather than a runtime client ([HN discussion](https://news.ycombinator.com/item?id=47157398)).
+- [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) also supports OpenAPI specs directly and uses a custom TOON encoding for token-efficient tool schemas.
+- [IBM/mcp-cli](https://github.com/IBM/mcp-cli) and [mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) integrate an LLM (Ollama, OpenAI, etc.) for chat-style interaction, while the other tools are pure CLI clients.
+
+### Code mode and dynamic tool discovery
+
+These resources describe the "code mode" pattern (replacing many tool definitions with `search` + `execute`) and dynamic tool discovery:
+
+- [Code mode](https://www.anthropic.com/engineering/code-execution-with-mcp) - Anthropic's blog post on code execution with MCP
+- [Code mode at Cloudflare](https://blog.cloudflare.com/code-mode/) - Cloudflare's implementation of the code mode pattern
+- [Advanced tool use](https://www.anthropic.com/engineering/advanced-tool-use) - Anthropic's engineering post on tool search
+  - [Claude tool search](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool) - Claude platform docs
+- [Dynamic context discovery](https://cursor.com/blog/dynamic-context-discovery) - Cursor's approach to dynamic tool discovery
+- [cmcp](https://github.com/assimelha/cmcp) (~27 stars, Rust) - MCP proxy aggregating servers behind `search()` + `execute()`
+- [cloudflare-mcp](https://github.com/mattzcarey/cloudflare-mcp) (~124 stars, TS) - MCP server for the Cloudflare API using code mode
+- [infinite-mcp](https://github.com/day50-dev/infinite-mcp) (Python) - Meta-MCP server that exposes 1000+ pre-indexed MCP servers via semantic search and dynamic tool discovery
+
+### Other
+
+- [mcpGraph](https://github.com/TeamSparkAI/mcpGraph) - MCP server that orchestrates directed graphs of MCP tool calls
 
 ## License
 

@@ -12,7 +12,7 @@ SESSION=$(session_name "pagination")
 
 # Create session
 test_case "create session"
-run_mcpc "$TEST_SERVER_URL" connect "$SESSION"
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION" --header "X-Test: true"
 assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass
@@ -21,13 +21,14 @@ test_pass
 test_case "tools-list fetches all pages"
 run_xmcpc "$SESSION" tools-list
 assert_success
-# Server has 5 tools, pagination is 2 per page, so we need 3 pages
+# Server has 6 tools, pagination is 2 per page, so we need 3 pages
 # All tools should be present
 assert_contains "$STDOUT" "echo"
 assert_contains "$STDOUT" "add"
 assert_contains "$STDOUT" "fail"
 assert_contains "$STDOUT" "slow"
 assert_contains "$STDOUT" "write-file"
+assert_contains "$STDOUT" "slow-task"
 test_pass
 
 # Test: tools-list --json returns all tools
@@ -36,7 +37,7 @@ run_xmcpc "$SESSION" tools-list --json
 assert_success
 # Count tools in JSON output (returns array directly)
 tool_count=$(echo "$STDOUT" | jq 'length')
-assert_eq "$tool_count" "5" "should have all 5 tools"
+assert_eq "$tool_count" "6" "should have all 6 tools"
 test_pass
 
 # Test: resources-list fetches all pages

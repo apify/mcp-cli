@@ -17,7 +17,14 @@ import { unlink } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { ServerConfig, AuthCredentials, ProxyConfig, X402WalletCredentials } from './types.js';
-import { getSocketPath, waitForFile, isProcessAlive, fileExists, getLogsDir } from './utils.js';
+import {
+  getSocketPath,
+  waitForFile,
+  isProcessAlive,
+  fileExists,
+  getLogsDir,
+  isSessionExpiredError,
+} from './utils.js';
 import { updateSession, getSession } from './sessions.js';
 import { createLogger } from './logger.js';
 import {
@@ -36,6 +43,40 @@ import { getAuthProfile } from './auth/profiles.js';
 import { getWallet } from './wallets.js';
 
 const logger = createLogger('bridge-manager');
+
+/**
+ * Classify a bridge health check error as session expiry or auth failure and throw.
+ * Session expiry (404/session-not-found) is checked first since it's more specific
+ * than auth errors (401/403/unauthorized). Does nothing if neither pattern matches.
+ */
+async function classifyAndThrowSessionError(
+  sessionName: string,
+  session: { server: ServerConfig },
+  errorMessage: string,
+  originalError?: Error
+): Promise<void> {
+  if (isSessionExpiredError(errorMessage)) {
+    await updateSession(sessionName, { status: 'expired' }).catch((e) =>
+      logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
+    );
+    const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
+    throw new ClientError(
+      `Session ${sessionName} expired (server rejected session ID). ` +
+        `Use "mcpc ${sessionName} restart" to start a new session. ` +
+        `For details, check logs at ${logPath}`
+    );
+  }
+  if (isAuthenticationError(errorMessage)) {
+    await updateSession(sessionName, { status: 'unauthorized' }).catch((e) =>
+      logger.warn(`Failed to mark session ${sessionName} as unauthorized:`, e)
+    );
+    const target = session.server.url || session.server.command || sessionName;
+    throw createServerAuthError(target, {
+      sessionName,
+      ...(originalError && { originalError }),
+    });
+  }
+}
 
 // Get the path to the bridge executable
 function getBridgeExecutable(): string {
@@ -57,6 +98,7 @@ export interface StartBridgeOptions {
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
   x402?: boolean; // Enable x402 auto-payment using the wallet
+  insecure?: boolean; // Skip TLS certificate verification
 }
 
 export interface StartBridgeResult {
@@ -88,6 +130,7 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
     proxyConfig,
     mcpSessionId,
     x402,
+    insecure,
   } = options;
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
@@ -142,6 +185,12 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
   if (x402) {
     args.push('--x402');
     logger.debug('Passing x402 flag to bridge');
+  }
+
+  // Pass insecure flag (if enabled)
+  if (insecure) {
+    args.push('--insecure');
+    logger.debug('Passing insecure flag to bridge');
   }
 
   logger.debug('Bridge executable:', bridgeExecutable);
@@ -303,6 +352,10 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   if (session.x402) {
     bridgeOptions.x402 = session.x402;
     logger.debug('Using saved x402 flag');
+  }
+  if (session.insecure) {
+    bridgeOptions.insecure = session.insecure;
+    logger.debug('Using saved insecure flag');
   }
 
   const { pid } = await startBridge(bridgeOptions);
@@ -470,6 +523,11 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     throw new ClientError(`Session not found: ${sessionName}`);
   }
 
+  if (session.status === 'unauthorized') {
+    const target = session.server.url || session.server.command || sessionName;
+    throw createServerAuthError(target, { sessionName });
+  }
+
   if (session.status === 'expired') {
     throw new ClientError(
       `Session ${sessionName} has expired. ` +
@@ -492,20 +550,18 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
       logger.debug(`Bridge for ${sessionName} is healthy`);
       return socketPath;
     }
-    // Not healthy - check if it's a connection issue vs MCP error
-    if (result.error instanceof NetworkError) {
-      logger.warn(`Bridge process alive but socket not responding for ${sessionName}`);
-    } else if (result.error) {
-      // MCP connection error - check if it's an auth error
+    // Not healthy - check error type
+    if (result.error) {
       const errorMessage = result.error.message || '';
-      if (isAuthenticationError(errorMessage)) {
-        const target = session.server.url || session.server.command || sessionName;
-        throw createServerAuthError(target, { sessionName, originalError: result.error });
+      await classifyAndThrowSessionError(sessionName, session, errorMessage, result.error);
+      if (result.error instanceof NetworkError) {
+        logger.warn(`Bridge process alive but socket not responding for ${sessionName}`);
+      } else {
+        // Other MCP errors - propagate
+        throw new ClientError(
+          `Bridge for ${sessionName} failed to connect to MCP server: ${result.error.message}`
+        );
       }
-      // Other MCP errors - propagate
-      throw new ClientError(
-        `Bridge for ${sessionName} failed to connect to MCP server: ${result.error.message}`
-      );
     }
   } else {
     logger.debug(`Bridge process not alive for ${sessionName}, will try to restart it`);
@@ -521,15 +577,9 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     return socketPath;
   }
 
-  // Not healthy after restart - check if it's an auth error
+  // Not healthy after restart - classify the error
   const errorMsg = result.error?.message || 'unknown error';
-  if (isAuthenticationError(errorMsg)) {
-    const target = session.server.url || session.server.command || sessionName;
-    throw createServerAuthError(target, {
-      sessionName,
-      ...(result.error && { originalError: result.error }),
-    });
-  }
+  await classifyAndThrowSessionError(sessionName, session, errorMsg, result.error);
 
   // Other errors - provide detailed error with log path
   const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;

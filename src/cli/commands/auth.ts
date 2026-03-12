@@ -15,7 +15,12 @@ import { DEFAULT_AUTH_PROFILE } from '../../lib/auth/oauth-utils.js';
  */
 export async function login(
   serverUrl: string,
-  options: CommandOptions & { profile?: string; scope?: string }
+  options: CommandOptions & {
+    profile?: string;
+    scope?: string;
+    clientId?: string;
+    clientSecret?: string;
+  }
 ): Promise<void> {
   try {
     const normalizedUrl = normalizeServerUrl(serverUrl);
@@ -23,13 +28,29 @@ export async function login(
 
     validateProfileName(profileName);
 
+    if (options.clientSecret && !options.clientId) {
+      throw new Error('--client-secret requires --client-id');
+    }
+
     if (options.outputMode === 'human') {
       console.log(formatInfo(`Starting OAuth authentication for ${normalizedUrl}`));
       console.log(formatInfo(`Profile: ${chalk.magenta(profileName)}`));
     }
 
     // Perform OAuth flow
-    const result = await performOAuthFlow(normalizedUrl, profileName, options.scope);
+    const clientCredentials: { clientId?: string; clientSecret?: string } = {};
+    if (options.clientId) {
+      clientCredentials.clientId = options.clientId;
+    }
+    if (options.clientSecret) {
+      clientCredentials.clientSecret = options.clientSecret;
+    }
+    const result = await performOAuthFlow(
+      normalizedUrl,
+      profileName,
+      options.scope,
+      clientCredentials
+    );
 
     if (options.outputMode === 'human') {
       console.log(formatSuccess('Authentication successful!'));
