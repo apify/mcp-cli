@@ -45,6 +45,7 @@ export async function withFileLock<T>(
         retries: 5,
         minTimeout: 100,
         maxTimeout: LOCK_TIMEOUT,
+        randomize: true,
       },
     });
 

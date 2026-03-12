@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--no-profile` option for `connect` command to skip OAuth profile auto-detection and connect anonymously
 
 ### Fixed
+- File lock retries now use randomized exponential backoff to reduce contention when multiple processes compete for the same lock
 - Explicit `--header "Authorization: Bearer ..."` is no longer silently ignored when a default OAuth profile exists for the same server; explicit CLI headers now take precedence over auto-detected profiles
 - Combining `--profile` with `--header "Authorization: ..."` now returns a clear error instead of silently stripping the header
 - `logTarget` no longer prints a misleading `[→ @name (HTTP)]` prefix when a session doesn't exist; only the error message is shown
