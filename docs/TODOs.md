@@ -74,8 +74,6 @@ $ mcpc @github/get_file_contents arg:="yes"  # NEW
 # Misc
 
 
-- sign -r <b64> Sign payment from PAYMENT-REQUIRED header  - why the "-r" is needed?
-
 
 ## Nice to have
 

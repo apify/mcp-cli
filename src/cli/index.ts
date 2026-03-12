@@ -562,7 +562,7 @@ Subcommands:
   init          Create a new x402 wallet
   import <key>  Import wallet from private key
   info          Show wallet info
-  sign -r <b64> Sign payment from PAYMENT-REQUIRED header
+  sign <b64>    Sign payment from PAYMENT-REQUIRED header
   remove        Remove the wallet
 `
     )

@@ -341,8 +341,6 @@ describe('optionTakesValue', () => {
     expect(optionTakesValue('-o')).toBe(true);
     expect(optionTakesValue('--output')).toBe(true);
     expect(optionTakesValue('--max-size')).toBe(true);
-    expect(optionTakesValue('-r')).toBe(true);
-    expect(optionTakesValue('--payment-required')).toBe(true);
     expect(optionTakesValue('--amount')).toBe(true);
     expect(optionTakesValue('--expiry')).toBe(true);
   });
@@ -418,10 +416,8 @@ describe('validateOptions', () => {
   it('should not throw for subcommand-specific options after a command token', () => {
     // --scope appears after 'login' command token — must not be rejected
     expect(() => validateOptions(['login', 'mcp.apify.com', '--scope', 'read'])).not.toThrow();
-    // --payment-required, --amount, --expiry for x402 sign
-    expect(() =>
-      validateOptions(['x402', 'sign', '--payment-required', 'data', '--amount', '1.0'])
-    ).not.toThrow();
+    // --amount, --expiry for x402 sign
+    expect(() => validateOptions(['x402', 'sign', 'data', '--amount', '1.0'])).not.toThrow();
     // -o/--output, --max-size for resources-read
     expect(() =>
       validateOptions(['@session', 'resources-read', 'uri', '-o', 'out.txt', '--max-size', '1024'])
@@ -457,7 +453,6 @@ describe('validateOptions', () => {
     expect(() => validateOptions(['-o', 'out.txt'])).toThrow('Unknown option: -o');
     expect(() => validateOptions(['--output', 'out.txt'])).toThrow(ClientError);
     expect(() => validateOptions(['--client-id', 'abc'])).toThrow(ClientError);
-    expect(() => validateOptions(['--payment-required', 'data'])).toThrow(ClientError);
     // --header is connect-specific, not global
     expect(() => validateOptions(['--header', 'Authorization: Bearer token'])).toThrow(ClientError);
     expect(() => validateOptions(['-H', 'Authorization: Bearer token'])).toThrow(ClientError);
