@@ -529,6 +529,8 @@ Example: `mcpc @apify logging-set-level debug`
 
 After making any code changes, always run `npm run lint` and fix **all** errors before committing. Do not skip or ignore lint failures. The lint command checks both ESLint rules and Prettier formatting. To auto-fix issues, run `npm run lint:fix`. If auto-fix doesn't resolve everything, manually fix the remaining errors. Never commit code that fails `npm run lint`.
 
+After lint passes, run `npm test` (unit tests) and fix any failures before committing. If a test fails due to your changes, update the test or fix the code so all tests pass. Never commit code that fails unit tests.
+
 For any non-trivial change (new feature, bug fix, behaviour change, or notable refactor), add an entry to the `[Unreleased]` section of `CHANGELOG.md` before finishing. Use the appropriate category (`Added`, `Changed`, `Fixed`, `Removed`). Skip purely internal changes such as test-only edits, code style fixes, or minor cosmetic/styling tweaks (e.g. changing colors, adjusting whitespace, renaming labels).
 
 When implementing features:
