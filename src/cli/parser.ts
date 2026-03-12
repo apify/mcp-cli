@@ -109,6 +109,9 @@ export const KNOWN_SESSION_COMMANDS = [
   'prompts-get',
   'logging-set-level',
   'ping',
+  'tasks-list',
+  'tasks-get',
+  'tasks-cancel',
 ];
 
 /**

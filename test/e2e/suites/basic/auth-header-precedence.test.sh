@@ -112,8 +112,8 @@ test_pass
 # Test 6: --no-profile combined with --header Authorization works
 # =============================================================================
 
-# Brief pause to avoid lock contention from rapid session creation
-sleep 1
+# Brief pause to avoid lock contention from rapid session creation (Bun needs more time)
+sleep 2
 
 test_case "--no-profile with explicit Authorization header works"
 SESSION6=$(session_name "no-prof-hdr")

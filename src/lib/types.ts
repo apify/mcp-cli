@@ -31,6 +31,10 @@ import type {
   UnsubscribeRequest,
   LoggingLevel,
   ListResourceTemplatesResult,
+  Task,
+  GetTaskResult,
+  ListTasksResult,
+  CancelTaskResult,
 } from '@modelcontextprotocol/sdk/types.js';
 
 // Re-export core MCP types for external use
@@ -60,6 +64,10 @@ export type {
   SubscribeRequest,
   UnsubscribeRequest,
   LoggingLevel,
+  Task,
+  GetTaskResult,
+  ListTasksResult,
+  CancelTaskResult,
 };
 
 // Re-export protocol version constants
@@ -138,9 +146,19 @@ export interface SessionData {
   status?: SessionStatus; // Session health status (default: active)
   proxy?: ProxyConfig; // Proxy server configuration (if enabled)
   notifications?: SessionNotifications; // Last list change notification timestamps
+  activeTasks?: Record<string, ActiveTaskEntry>; // Active async tasks for crash recovery
   // Timestamps (ISO 8601 strings)
   createdAt: string; // When the session was created
   lastSeenAt?: string; // Last successful server response (ping, command, etc.)
+}
+
+/**
+ * Entry for an active async task persisted for crash recovery
+ */
+export interface ActiveTaskEntry {
+  taskId: string;
+  toolName: string;
+  createdAt: string;
 }
 
 /**
@@ -187,6 +205,7 @@ export type IpcMessageType =
   | 'response'
   | 'shutdown'
   | 'notification'
+  | 'task-update'
   | 'set-auth-credentials'
   | 'set-x402-wallet';
 
@@ -221,7 +240,8 @@ export type NotificationType =
   | 'resources/updated'
   | 'prompts/list_changed'
   | 'progress'
-  | 'logging/message';
+  | 'logging/message'
+  | 'tasks/status';
 
 /**
  * Notification data
@@ -229,6 +249,17 @@ export type NotificationType =
 export interface NotificationData {
   method: NotificationType;
   params?: unknown;
+}
+
+/**
+ * Task status update sent from bridge to CLI during task-augmented tool calls
+ */
+export interface TaskUpdate {
+  taskId: string;
+  status: 'working' | 'input_required' | 'completed' | 'failed' | 'cancelled';
+  statusMessage?: string;
+  createdAt?: string;
+  lastUpdatedAt?: string;
 }
 
 /**
@@ -242,6 +273,7 @@ export interface IpcMessage {
   timeout?: number; // Per-request timeout in seconds (overrides default)
   result?: unknown; // Response result
   notification?: NotificationData; // Notification data (for type='notification')
+  taskUpdate?: TaskUpdate; // Task progress update (for type='task-update')
   authCredentials?: AuthCredentials; // Auth credentials (for type='set-auth-credentials')
   x402Wallet?: X402WalletCredentials; // x402 wallet (for type='set-x402-wallet')
   error?: {
@@ -345,4 +377,16 @@ export interface IMcpClient {
   listPrompts(cursor?: string): Promise<ListPromptsResult>;
   getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult>;
   setLoggingLevel(level: LoggingLevel): Promise<void>;
+
+  // Task operations (async tool execution)
+  callToolWithTask(
+    name: string,
+    args?: Record<string, unknown>,
+    onUpdate?: (update: TaskUpdate) => void
+  ): Promise<CallToolResult>;
+  callToolDetached(name: string, args?: Record<string, unknown>): Promise<TaskUpdate>;
+  pollTask(taskId: string, onUpdate?: (update: TaskUpdate) => void): Promise<CallToolResult>;
+  listTasks(cursor?: string): Promise<ListTasksResult>;
+  getTask(taskId: string): Promise<GetTaskResult>;
+  cancelTask(taskId: string): Promise<CancelTaskResult>;
 }

@@ -22,6 +22,7 @@ import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
 import * as utilities from './commands/utilities.js';
 import * as auth from './commands/auth.js';
+import * as tasks from './commands/tasks.js';
 import { handleX402Command } from './commands/x402.js';
 import { clean } from './commands/clean.js';
 import type { OutputMode } from '../lib/index.js';
@@ -343,6 +344,9 @@ MCP session commands (after connecting):
   <@session> resources-subscribe <uri>
   <@session> resources-unsubscribe <uri>
   <@session> resources-templates-list
+  <@session> tasks-list
+  <@session> tasks-get <taskId>
+  <@session> tasks-cancel <taskId>
   <@session> logging-set-level <level>
   <@session> ping
 
@@ -677,11 +681,37 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tools-call <name> [args...]')
     .description('Call a tool with arguments (key:=value pairs or JSON)')
-    .action(async (name, args, _options, command) => {
+    .option('--async', 'Use async task execution (experimental)')
+    .option('--detach', 'Start async task and return immediately with task ID (implies --async)')
+    .action(async (name, args, options, command) => {
       await tools.callTool(session, name, {
         args,
+        async: options.async,
+        detach: options.detach,
         ...getOptionsFromCommand(command),
       });
+    });
+
+  // Tasks commands
+  program
+    .command('tasks-list')
+    .description('List active tasks')
+    .action(async (_options, command) => {
+      await tasks.listTasks(session, getOptionsFromCommand(command));
+    });
+
+  program
+    .command('tasks-get <taskId>')
+    .description('Get status of a specific task')
+    .action(async (taskId, _options, command) => {
+      await tasks.getTask(session, taskId, getOptionsFromCommand(command));
+    });
+
+  program
+    .command('tasks-cancel <taskId>')
+    .description('Cancel a running task')
+    .action(async (taskId, _options, command) => {
+      await tasks.cancelTask(session, taskId, getOptionsFromCommand(command));
     });
 
   // Resources commands

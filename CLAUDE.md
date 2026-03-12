@@ -480,7 +480,7 @@ On failure, the error message includes instructions on how to login. This ensure
 
 All state files are stored in `~/.mcpc/` directory (unless overridden by `MCPC_HOME_DIR` environment variable):
 
-- `~/.mcpc/sessions.json` - Active sessions with references to auth profiles (file-locked for concurrent access)
+- `~/.mcpc/sessions.json` - Active sessions with references to auth profiles and active async tasks (file-locked for concurrent access)
 - `~/.mcpc/profiles.json` - Authentication profiles (OAuth metadata, scopes, expiry)
 - `~/.mcpc/bridges/` - Unix domain socket files for bridge processes
 - `~/.mcpc/history` - Interactive shell command history (last 1000 commands)

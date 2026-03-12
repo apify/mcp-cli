@@ -50,6 +50,7 @@ $ mcpc @github/get_file_contents arg:="yes"  # NEW
 
 - mcpc @apify tools-get fetch-actor-details => should print also "object" properties in human mode
 
+- mcpc @apify tools-call xxx --help / "mcpc @apify/xxx --help" should print tools-get + command info
 
 ## Later
 
@@ -106,4 +107,4 @@ $ mcpc @github/get_file_contents arg:="yes"  # NEW
 
 - nit: show also header / open auth statuses for HTTP servers?
 
-
+- consider adding --idle-timeout to "connect" and then automatically disconnet from remote server, to avoid handing infinitely

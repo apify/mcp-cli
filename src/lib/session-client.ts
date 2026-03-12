@@ -25,12 +25,16 @@ import type {
   IMcpClient,
   NotificationData,
   ServerDetails,
+  TaskUpdate,
+  GetTaskResult,
+  ListTasksResult,
+  CancelTaskResult,
 } from './types.js';
 import type { ListResourceTemplatesResult } from '@modelcontextprotocol/sdk/types.js';
 import { BridgeClient } from './bridge-client.js';
 import { ensureBridgeReady, restartBridge } from './bridge-manager.js';
 import { NetworkError } from './errors.js';
-import { getSocketPath, getLogsDir } from './utils.js';
+import { getSocketPath, getLogsDir, generateRequestId } from './utils.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('session-client');
@@ -252,6 +256,159 @@ export class SessionClient extends EventEmitter implements IMcpClient {
           .request('setLoggingLevel', level, this.requestTimeout)
           .then(() => undefined),
       'setLoggingLevel'
+    );
+  }
+
+  /**
+   * Call a tool with task-augmented execution
+   * Listens for task-update IPC messages keyed by request ID.
+   * On bridge crash, if a task was already created, reconnects via pollTask
+   * instead of re-invoking the tool (crash resilience).
+   */
+  async callToolWithTask(
+    name: string,
+    args?: Record<string, unknown>,
+    onUpdate?: (update: TaskUpdate) => void
+  ): Promise<CallToolResult> {
+    let capturedTaskId: string | undefined;
+
+    const executeToolCall = (): Promise<CallToolResult> => {
+      return new Promise<CallToolResult>((resolve, reject) => {
+        const id = generateRequestId();
+
+        const updateHandler = (update: TaskUpdate): void => {
+          capturedTaskId = update.taskId;
+          onUpdate?.(update);
+        };
+        this.bridgeClient.on(`task-update:${id}`, updateHandler);
+
+        const cleanup = (): void => {
+          this.bridgeClient.removeListener(`task-update:${id}`, updateHandler);
+        };
+
+        this.bridgeClient
+          .request('callTool', { name, arguments: args, useTask: true }, this.requestTimeout, id)
+          .then((result) => {
+            cleanup();
+            resolve(result as CallToolResult);
+          })
+          .catch((error: Error) => {
+            cleanup();
+            reject(error);
+          });
+      });
+    };
+
+    try {
+      return await executeToolCall();
+    } catch (error) {
+      if (!(error instanceof NetworkError)) {
+        const err = error as Error;
+        const logPath = `${getLogsDir()}/bridge-${this.sessionName}.log`;
+        err.message = `${err.message}. For details, check logs at ${logPath}`;
+        throw error;
+      }
+
+      logger.debug(`Socket error during callToolWithTask, will restart bridge...`);
+      await this.bridgeClient.close();
+      await restartBridge(this.sessionName);
+
+      const socketPath = getSocketPath(this.sessionName);
+      this.bridgeClient = new BridgeClient(socketPath);
+      this.setupNotificationForwarding();
+      await this.bridgeClient.connect();
+
+      if (capturedTaskId) {
+        // Task was already created — poll it instead of re-invoking
+        logger.debug(`Reconnected, polling existing task ${capturedTaskId} instead of re-invoking`);
+        return await this.pollTask(capturedTaskId, onUpdate);
+      }
+
+      // Task wasn't created yet — retry the full tool call
+      logger.debug(`Reconnected, retrying callToolWithTask`);
+      return await executeToolCall();
+    }
+  }
+
+  /**
+   * Call a tool in detached mode — returns task ID immediately without waiting
+   */
+  async callToolDetached(name: string, args?: Record<string, unknown>): Promise<TaskUpdate> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'callTool',
+          { name, arguments: args, useTask: true, detach: true },
+          this.requestTimeout
+        ) as Promise<TaskUpdate>,
+      'callToolDetached'
+    );
+  }
+
+  /**
+   * Poll a task by ID until terminal state (for crash recovery)
+   */
+  async pollTask(taskId: string, onUpdate?: (update: TaskUpdate) => void): Promise<CallToolResult> {
+    return this.withRetry(() => {
+      return new Promise<CallToolResult>((resolve, reject) => {
+        const id = generateRequestId();
+
+        const updateHandler = (update: TaskUpdate): void => {
+          onUpdate?.(update);
+        };
+        this.bridgeClient.on(`task-update:${id}`, updateHandler);
+
+        const cleanup = (): void => {
+          this.bridgeClient.removeListener(`task-update:${id}`, updateHandler);
+        };
+
+        this.bridgeClient
+          .request('pollTask', { taskId }, this.requestTimeout, id)
+          .then((result) => {
+            cleanup();
+            resolve(result as CallToolResult);
+          })
+          .catch((error: Error) => {
+            cleanup();
+            reject(error);
+          });
+      });
+    }, 'pollTask');
+  }
+
+  async listTasks(cursor?: string): Promise<ListTasksResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'listTasks',
+          cursor,
+          this.requestTimeout
+        ) as Promise<ListTasksResult>,
+      'listTasks'
+    );
+  }
+
+  async getTask(taskId: string): Promise<GetTaskResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'getTask',
+          { taskId },
+          this.requestTimeout
+        ) as Promise<GetTaskResult>,
+      'getTask'
+    );
+  }
+
+  async cancelTask(taskId: string): Promise<CancelTaskResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'cancelTask',
+          { taskId },
+          this.requestTimeout
+        ) as Promise<CancelTaskResult>,
+      'cancelTask'
     );
   }
 
