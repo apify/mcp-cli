@@ -44,6 +44,40 @@ import { getWallet } from './wallets.js';
 
 const logger = createLogger('bridge-manager');
 
+/**
+ * Classify a bridge health check error as session expiry or auth failure and throw.
+ * Session expiry (404/session-not-found) is checked first since it's more specific
+ * than auth errors (401/403/unauthorized). Does nothing if neither pattern matches.
+ */
+async function classifyAndThrowSessionError(
+  sessionName: string,
+  session: { server: ServerConfig },
+  errorMessage: string,
+  originalError?: Error
+): Promise<void> {
+  if (isSessionExpiredError(errorMessage)) {
+    await updateSession(sessionName, { status: 'expired' }).catch((e) =>
+      logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
+    );
+    const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
+    throw new ClientError(
+      `Session ${sessionName} expired (server rejected session ID). ` +
+        `Use "mcpc ${sessionName} restart" to start a new session. ` +
+        `For details, check logs at ${logPath}`
+    );
+  }
+  if (isAuthenticationError(errorMessage)) {
+    await updateSession(sessionName, { status: 'unauthorized' }).catch((e) =>
+      logger.warn(`Failed to mark session ${sessionName} as unauthorized:`, e)
+    );
+    const target = session.server.url || session.server.command || sessionName;
+    throw createServerAuthError(target, {
+      sessionName,
+      ...(originalError && { originalError }),
+    });
+  }
+}
+
 // Get the path to the bridge executable
 function getBridgeExecutable(): string {
   // In development, use the compiled bridge in dist/
@@ -519,28 +553,7 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     // Not healthy - check error type
     if (result.error) {
       const errorMessage = result.error.message || '';
-      // Check session expiry first (more specific: 404/session-not-found)
-      if (isSessionExpiredError(errorMessage)) {
-        await updateSession(sessionName, { status: 'expired' }).catch((e) =>
-          logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
-        );
-        const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
-        throw new ClientError(
-          `Session ${sessionName} expired (server rejected session ID). ` +
-            `Use "mcpc ${sessionName} restart" to start a new session. ` +
-            `For details, check logs at ${logPath}`
-        );
-      }
-      // Then check auth errors (may be wrapped as NetworkError by bridge IPC,
-      // since MCP auth failures are NetworkError in the bridge process)
-      if (isAuthenticationError(errorMessage)) {
-        // Mark session as unauthorized so it shows correctly in session list
-        await updateSession(sessionName, { status: 'unauthorized' }).catch((e) =>
-          logger.warn(`Failed to mark session ${sessionName} as unauthorized:`, e)
-        );
-        const target = session.server.url || session.server.command || sessionName;
-        throw createServerAuthError(target, { sessionName, originalError: result.error });
-      }
+      await classifyAndThrowSessionError(sessionName, session, errorMessage, result.error);
       if (result.error instanceof NetworkError) {
         logger.warn(`Bridge process alive but socket not responding for ${sessionName}`);
       } else {
@@ -566,32 +579,7 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
 
   // Not healthy after restart - classify the error
   const errorMsg = result.error?.message || 'unknown error';
-
-  // Check session expiry first (more specific: 404/session-not-found)
-  if (isSessionExpiredError(errorMsg)) {
-    await updateSession(sessionName, { status: 'expired' }).catch((e) =>
-      logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
-    );
-    const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
-    throw new ClientError(
-      `Session ${sessionName} expired (server rejected session ID). ` +
-        `Use "mcpc ${sessionName} restart" to start a new session. ` +
-        `For details, check logs at ${logPath}`
-    );
-  }
-
-  // Then check auth errors (broader: 401/403/unauthorized)
-  if (isAuthenticationError(errorMsg)) {
-    // Mark session as unauthorized so it shows correctly in session list
-    await updateSession(sessionName, { status: 'unauthorized' }).catch((e) =>
-      logger.warn(`Failed to mark session ${sessionName} as unauthorized:`, e)
-    );
-    const target = session.server.url || session.server.command || sessionName;
-    throw createServerAuthError(target, {
-      sessionName,
-      ...(result.error && { originalError: result.error }),
-    });
-  }
+  await classifyAndThrowSessionError(sessionName, session, errorMsg, result.error);
 
   // Other errors - provide detailed error with log path
   const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
