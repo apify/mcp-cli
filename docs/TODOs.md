@@ -107,4 +107,4 @@ $ mcpc @github/get_file_contents arg:="yes"  # NEW
 
 - nit: show also header / open auth statuses for HTTP servers?
 
-
+- consider adding --idle-timeout to "connect" and then automatically disconnet from remote server, to avoid handing infinitely
