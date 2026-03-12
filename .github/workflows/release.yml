@@ -124,7 +124,17 @@ jobs:
 
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "### Pre-release version: \`$NEW_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          PKG_NAME=$(node -p "require('./package.json').name")
+          {
+            echo "### Pre-release version: \`$NEW_VERSION\`"
+            echo ""
+            echo "#### Install"
+            echo "\`\`\`bash"
+            echo "npm install -g ${PKG_NAME}@${NEW_VERSION}"
+            echo "# or"
+            echo "bun install -g ${PKG_NAME}@${NEW_VERSION}"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish pre-release to npm
         if: inputs.type == 'pre-release'
@@ -156,7 +166,17 @@ jobs:
 
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "### Release version: \`$NEW_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          PKG_NAME=$(node -p "require('./package.json').name")
+          {
+            echo "### Release version: \`$NEW_VERSION\`"
+            echo ""
+            echo "#### Install"
+            echo "\`\`\`bash"
+            echo "npm install -g ${PKG_NAME}@${NEW_VERSION}"
+            echo "# or"
+            echo "bun install -g ${PKG_NAME}@${NEW_VERSION}"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Update CHANGELOG.md
         if: inputs.type == 'release'
