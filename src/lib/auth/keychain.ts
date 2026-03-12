@@ -12,6 +12,7 @@
 
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import chalk from 'chalk';
 import { createLogger, getJsonMode } from '../logger.js';
 import { getServerHost, getMcpcHome } from '../utils.js';
 import { withFileLock } from '../file-lock.js';
@@ -94,9 +95,11 @@ async function withKeychain<T>(
   } catch (error) {
     if (keychainAvailable === null && !getJsonMode()) {
       logger.warn(
-        `OS keychain unavailable (${(error as Error).message}), ` +
-          `falling back to file-based credential storage (${credentialsPath()}). ` +
-          `Install a keyring daemon (e.g. gnome-keyring or kwallet) for better security.`
+        chalk.red(
+          `OS keychain unavailable (${(error as Error).message}), ` +
+            `falling back to file-based credential storage (${credentialsPath()}). ` +
+            `Install a keyring daemon (e.g. gnome-keyring or kwallet) for better security.`
+        )
       );
     }
     keychainAvailable = false;
