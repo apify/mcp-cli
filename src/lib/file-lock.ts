@@ -41,9 +41,10 @@ export async function withFileLock<T>(
     // Acquire lock with timeout
     logger.debug(`Acquiring file lock for ${filePath}`);
     release = await lockfile.lock(filePath, {
+      stale: 10000, // Consider lock stale after 10s (handles crashed processes)
       retries: {
-        retries: 5,
-        minTimeout: 100,
+        retries: 10,
+        minTimeout: 200,
         maxTimeout: LOCK_TIMEOUT,
       },
     });
