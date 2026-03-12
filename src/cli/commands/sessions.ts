@@ -90,245 +90,226 @@ export async function connectSession(
     insecure?: boolean;
   }
 ): Promise<void> {
-  try {
-    // Validate session name
-    if (!isValidSessionName(name)) {
+  // Validate session name
+  if (!isValidSessionName(name)) {
+    throw new ClientError(
+      `Invalid session name: ${name}\n` +
+        `Session names must start with @ and be followed by 1-64 characters, alphanumeric with hyphens or underscores only (e.g., @my-session).`
+    );
+  }
+
+  // Validate profile name (if provided)
+  if (options.profile) {
+    validateProfileName(options.profile);
+  }
+
+  // Parse proxy configuration (if provided)
+  let proxyConfig: ProxyConfig | undefined;
+  if (options.proxy) {
+    proxyConfig = parseProxyArg(options.proxy);
+    logger.debug(`Proxy config: ${proxyConfig.host}:${proxyConfig.port}`);
+
+    // Validate port is available before starting bridge
+    const portAvailable = await checkPortAvailable(proxyConfig.host, proxyConfig.port);
+    if (!portAvailable) {
       throw new ClientError(
-        `Invalid session name: ${name}\n` +
-          `Session names must start with @ and be followed by 1-64 characters, alphanumeric with hyphens or underscores only (e.g., @my-session).`
+        `Port ${proxyConfig.port} is already in use on ${proxyConfig.host}. ` +
+          `Choose a different port with --proxy [host:]port`
       );
     }
+  }
 
-    // Validate profile name (if provided)
-    if (options.profile) {
-      validateProfileName(options.profile);
-    }
+  // Validate proxy-bearer-token is only used with --proxy
+  if (options.proxyBearerToken && !options.proxy) {
+    throw new ClientError('--proxy-bearer-token requires --proxy to be specified');
+  }
 
-    // Parse proxy configuration (if provided)
-    let proxyConfig: ProxyConfig | undefined;
-    if (options.proxy) {
-      proxyConfig = parseProxyArg(options.proxy);
-      logger.debug(`Proxy config: ${proxyConfig.host}:${proxyConfig.port}`);
+  // Check if session already exists
+  const existingSession = await getSession(name);
+  if (existingSession) {
+    const bridgeStatus = getBridgeStatus(existingSession);
 
-      // Validate port is available before starting bridge
-      const portAvailable = await checkPortAvailable(proxyConfig.host, proxyConfig.port);
-      if (!portAvailable) {
-        throw new ClientError(
-          `Port ${proxyConfig.port} is already in use on ${proxyConfig.host}. ` +
-            `Choose a different port with --proxy [host:]port`
-        );
-      }
-    }
-
-    // Validate proxy-bearer-token is only used with --proxy
-    if (options.proxyBearerToken && !options.proxy) {
-      throw new ClientError('--proxy-bearer-token requires --proxy to be specified');
-    }
-
-    // Check if session already exists
-    const existingSession = await getSession(name);
-    if (existingSession) {
-      const bridgeStatus = getBridgeStatus(existingSession);
-
-      if (bridgeStatus === 'live') {
-        // Session exists and bridge is running - just show server info
-        if (options.outputMode === 'human') {
-          console.log(formatSuccess(`Session ${name} is already active`));
-        }
-        await showServerDetails(name, { ...options, hideTarget: false });
-        return;
-      }
-
-      // Bridge has crashed or expired - reconnect with warning
+    if (bridgeStatus === 'live') {
+      // Session exists and bridge is running - just show server info
       if (options.outputMode === 'human') {
-        console.log(
-          chalk.yellow(`Session ${name} exists but bridge is ${bridgeStatus}, reconnecting...`)
-        );
+        console.log(formatSuccess(`Session ${name} is already active`));
       }
-
-      // Clean up old bridge resources before reconnecting
-      try {
-        await stopBridge(name);
-      } catch {
-        // Bridge may already be stopped
-      }
+      await showServerDetails(name, { ...options, hideTarget: false });
+      return;
     }
 
-    // Resolve target to transport config
-    const serverConfig = await resolveTarget(target, options);
-
-    // Detect conflicting auth flags: --profile and --header "Authorization: ..." are mutually exclusive
-    const hasExplicitAuthHeader = serverConfig.headers?.Authorization !== undefined;
-    const hasExplicitProfile = options.profile !== undefined;
-
-    if (hasExplicitAuthHeader && hasExplicitProfile) {
-      throw new ClientError(
-        `Cannot combine --profile with --header "Authorization: ...".\n\n` +
-          `Use either:\n` +
-          `  --profile ${options.profile}  (OAuth authentication via saved profile)\n` +
-          `  --header "Authorization: Bearer <token>"  (static bearer token)`
+    // Bridge has crashed or expired - reconnect with warning
+    if (options.outputMode === 'human') {
+      console.log(
+        chalk.yellow(`Session ${name} exists but bridge is ${bridgeStatus}, reconnecting...`)
       );
     }
 
-    // For HTTP targets, resolve auth profile (with helpful errors if none available)
-    // Skip OAuth profile resolution when:
-    // - --no-profile is specified (explicit anonymous connection)
-    // - --header "Authorization: ..." is provided (explicit bearer token)
-    let profileName: string | undefined;
-    if (serverConfig.url) {
-      if (options.noProfile) {
-        logger.debug('Skipping OAuth profile: --no-profile specified');
-      } else if (hasExplicitAuthHeader) {
-        logger.debug(
-          'Skipping OAuth profile auto-detection: explicit Authorization header provided via --header'
-        );
-      } else {
-        profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
-          sessionName: name,
-        });
-      }
-    }
-
-    // Store headers in OS keychain (secure storage) before starting bridge
-    let headers: Record<string, string> | undefined;
-    if (Object.keys(serverConfig.headers || {}).length > 0) {
-      headers = { ...serverConfig.headers };
-
-      if (Object.keys(headers).length > 0) {
-        logger.debug(
-          `Storing ${Object.keys(headers).length} headers for session ${name} in keychain`
-        );
-        await storeKeychainSessionHeaders(name, headers);
-      } else {
-        headers = undefined;
-      }
-    }
-
-    // Store proxy bearer token in keychain (if provided)
-    if (options.proxyBearerToken) {
-      logger.debug(`Storing proxy bearer token for session ${name} in keychain`);
-      await storeKeychainProxyBearerToken(name, options.proxyBearerToken);
-    }
-
-    // Validate x402 wallet (if provided)
-    if (options.x402) {
-      const wallet = await getWallet();
-      if (!wallet) {
-        throw new ClientError('x402 wallet not found. Create one with: mcpc x402 init');
-      }
-      logger.debug(`Using x402 wallet: ${wallet.address}`);
-    }
-
-    // Create or update session record (without pid - that comes from startBridge)
-    // Store serverConfig with headers redacted (actual values in keychain)
-    const isReconnect = !!existingSession;
-    const { headers: _originalHeaders, ...baseTransportConfig } = serverConfig;
-    const sessionTransportConfig: ServerConfig = {
-      ...baseTransportConfig,
-      ...(headers && { headers: redactHeaders(headers) }),
-    };
-
-    const sessionUpdate: Parameters<typeof updateSession>[1] = {
-      server: sessionTransportConfig,
-      ...(profileName && { profileName }),
-      ...(proxyConfig && { proxy: proxyConfig }),
-      ...(options.x402 && { x402: true }),
-      ...(options.insecure && { insecure: true }),
-    };
-
-    if (isReconnect) {
-      await updateSession(name, sessionUpdate);
-      logger.debug(`Session record updated for reconnect: ${name}`);
-    } else {
-      await saveSession(name, {
-        server: sessionTransportConfig,
-        createdAt: new Date().toISOString(),
-        ...sessionUpdate,
-      });
-      logger.debug(`Initial session record created for: ${name}`);
-    }
-
-    // Start bridge process (handles spawning and IPC credential delivery)
+    // Clean up old bridge resources before reconnecting
     try {
-      const bridgeOptions: StartBridgeOptions = {
-        sessionName: name,
-        serverConfig: serverConfig,
-        verbose: options.verbose || false,
-      };
-      if (headers) {
-        bridgeOptions.headers = headers;
-      }
-      if (profileName) {
-        bridgeOptions.profileName = profileName;
-      }
-      if (proxyConfig) {
-        bridgeOptions.proxyConfig = proxyConfig;
-      }
-      if (options.x402) {
-        bridgeOptions.x402 = true;
-      }
-      if (options.insecure) {
-        bridgeOptions.insecure = true;
-      }
-
-      const { pid } = await startBridge(bridgeOptions);
-
-      // Update session with bridge info (socket path is computed from session name)
-      await updateSession(name, { pid });
-      logger.debug(`Session ${name} updated with bridge PID: ${pid}`);
-    } catch (error) {
-      // Clean up on bridge start failure
-      logger.debug(`Bridge start failed, cleaning up session ${name}`);
-      if (!isReconnect) {
-        // Only delete session record for new sessions (not reconnects)
-        try {
-          await deleteSession(name);
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
-      throw error;
+      await stopBridge(name);
+    } catch {
+      // Bridge may already be stopped
     }
+  }
 
-    // Success! Show server info like when running "mcpc <target>"
-    if (options.outputMode === 'human') {
-      console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
-    }
+  // Resolve target to transport config
+  const serverConfig = await resolveTarget(target, options);
 
-    // Display server info via the new session (best-effort)
-    // If bridge is still initializing, don't fail the connect — the session is already created.
-    // The next command (e.g. ping, tools-list) will wait for the bridge to be ready.
-    try {
-      await showServerDetails(name, {
-        ...options,
-        hideTarget: false, // Show session info prefix
-      });
-    } catch (detailsError) {
-      // Re-throw auth errors — these are real failures, not timing issues
-      if (detailsError instanceof AuthError) {
-        throw detailsError;
-      }
+  // Detect conflicting auth flags: --profile and --header "Authorization: ..." are mutually exclusive
+  const hasExplicitAuthHeader = serverConfig.headers?.Authorization !== undefined;
+  const hasExplicitProfile = options.profile !== undefined;
+
+  if (hasExplicitAuthHeader && hasExplicitProfile) {
+    throw new ClientError(
+      `Cannot combine --profile with --header "Authorization: ...".\n\n` +
+        `Use either:\n` +
+        `  --profile ${options.profile}  (OAuth authentication via saved profile)\n` +
+        `  --header "Authorization: Bearer <token>"  (static bearer token)`
+    );
+  }
+
+  // For HTTP targets, resolve auth profile (with helpful errors if none available)
+  // Skip OAuth profile resolution when:
+  // - --no-profile is specified (explicit anonymous connection)
+  // - --header "Authorization: ..." is provided (explicit bearer token)
+  let profileName: string | undefined;
+  if (serverConfig.url) {
+    if (options.noProfile) {
+      logger.debug('Skipping OAuth profile: --no-profile specified');
+    } else if (hasExplicitAuthHeader) {
       logger.debug(
-        `showServerDetails failed for new session ${name}: ${(detailsError as Error).message}`
+        'Skipping OAuth profile auto-detection: explicit Authorization header provided via --header'
       );
-    }
-  } catch (error) {
-    if (options.outputMode === 'human') {
-      console.error(formatError((error as Error).message));
     } else {
-      console.error(
-        formatOutput(
-          {
-            sessionName: name,
-            target,
-            created: false,
-            error: (error as Error).message,
-          },
-          'json'
-        )
+      profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
+        sessionName: name,
+      });
+    }
+  }
+
+  // Store headers in OS keychain (secure storage) before starting bridge
+  let headers: Record<string, string> | undefined;
+  if (Object.keys(serverConfig.headers || {}).length > 0) {
+    headers = { ...serverConfig.headers };
+
+    if (Object.keys(headers).length > 0) {
+      logger.debug(
+        `Storing ${Object.keys(headers).length} headers for session ${name} in keychain`
       );
+      await storeKeychainSessionHeaders(name, headers);
+    } else {
+      headers = undefined;
+    }
+  }
+
+  // Store proxy bearer token in keychain (if provided)
+  if (options.proxyBearerToken) {
+    logger.debug(`Storing proxy bearer token for session ${name} in keychain`);
+    await storeKeychainProxyBearerToken(name, options.proxyBearerToken);
+  }
+
+  // Validate x402 wallet (if provided)
+  if (options.x402) {
+    const wallet = await getWallet();
+    if (!wallet) {
+      throw new ClientError('x402 wallet not found. Create one with: mcpc x402 init');
+    }
+    logger.debug(`Using x402 wallet: ${wallet.address}`);
+  }
+
+  // Create or update session record (without pid - that comes from startBridge)
+  // Store serverConfig with headers redacted (actual values in keychain)
+  const isReconnect = !!existingSession;
+  const { headers: _originalHeaders, ...baseTransportConfig } = serverConfig;
+  const sessionTransportConfig: ServerConfig = {
+    ...baseTransportConfig,
+    ...(headers && { headers: redactHeaders(headers) }),
+  };
+
+  const sessionUpdate: Parameters<typeof updateSession>[1] = {
+    server: sessionTransportConfig,
+    ...(profileName && { profileName }),
+    ...(proxyConfig && { proxy: proxyConfig }),
+    ...(options.x402 && { x402: true }),
+    ...(options.insecure && { insecure: true }),
+  };
+
+  if (isReconnect) {
+    await updateSession(name, sessionUpdate);
+    logger.debug(`Session record updated for reconnect: ${name}`);
+  } else {
+    await saveSession(name, {
+      server: sessionTransportConfig,
+      createdAt: new Date().toISOString(),
+      ...sessionUpdate,
+    });
+    logger.debug(`Initial session record created for: ${name}`);
+  }
+
+  // Start bridge process (handles spawning and IPC credential delivery)
+  try {
+    const bridgeOptions: StartBridgeOptions = {
+      sessionName: name,
+      serverConfig: serverConfig,
+      verbose: options.verbose || false,
+    };
+    if (headers) {
+      bridgeOptions.headers = headers;
+    }
+    if (profileName) {
+      bridgeOptions.profileName = profileName;
+    }
+    if (proxyConfig) {
+      bridgeOptions.proxyConfig = proxyConfig;
+    }
+    if (options.x402) {
+      bridgeOptions.x402 = true;
+    }
+    if (options.insecure) {
+      bridgeOptions.insecure = true;
+    }
+
+    const { pid } = await startBridge(bridgeOptions);
+
+    // Update session with bridge info (socket path is computed from session name)
+    await updateSession(name, { pid });
+    logger.debug(`Session ${name} updated with bridge PID: ${pid}`);
+  } catch (error) {
+    // Clean up on bridge start failure
+    logger.debug(`Bridge start failed, cleaning up session ${name}`);
+    if (!isReconnect) {
+      // Only delete session record for new sessions (not reconnects)
+      try {
+        await deleteSession(name);
+      } catch {
+        // Ignore cleanup errors
+      }
     }
     throw error;
+  }
+
+  // Success! Show server info like when running "mcpc <target>"
+  if (options.outputMode === 'human') {
+    console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
+  }
+
+  // Display server info via the new session (best-effort)
+  // If bridge is still initializing, don't fail the connect — the session is already created.
+  // The next command (e.g. ping, tools-list) will wait for the bridge to be ready.
+  try {
+    await showServerDetails(name, {
+      ...options,
+      hideTarget: false, // Show session info prefix
+    });
+  } catch (detailsError) {
+    // Re-throw auth errors — these are real failures, not timing issues
+    if (detailsError instanceof AuthError) {
+      throw detailsError;
+    }
+    logger.debug(
+      `showServerDetails failed for new session ${name}: ${(detailsError as Error).message}`
+    );
   }
 }
 

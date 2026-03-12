@@ -14,6 +14,7 @@ import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { Command } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatHumanError, ClientError } from '../lib/index.js';
+import chalk from 'chalk';
 import { formatJson, formatJsonError, rainbow } from './output.js';
 import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
@@ -164,7 +165,7 @@ async function main(): Promise<void> {
     validateOptions(args);
     validateArgValues(args);
   } catch (error) {
-    console.error(formatHumanError(error as Error, false));
+    console.error(chalk.red(formatHumanError(error as Error, false)));
     process.exit(1);
   }
 
@@ -215,7 +216,7 @@ async function main(): Promise<void> {
         if (outputMode === 'json') {
           console.error(formatJsonError(error, error.code));
         } else {
-          console.error(formatHumanError(error, opts.verbose));
+          console.error(chalk.red(formatHumanError(error, opts.verbose)));
         }
         process.exit(error.code);
       }
@@ -249,7 +250,7 @@ async function main(): Promise<void> {
         if (outputMode === 'json') {
           console.error(formatJsonError(error, error.code));
         } else {
-          console.error(formatHumanError(error, opts.verbose));
+          console.error(chalk.red(formatHumanError(error, opts.verbose)));
         }
         process.exit(error.code);
       }
@@ -868,7 +869,7 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
       if (outputMode === 'json') {
         console.error(formatJsonError(error, error.code));
       } else {
-        console.error(formatHumanError(error, opts.verbose));
+        console.error(chalk.red(formatHumanError(error, opts.verbose)));
       }
       process.exit(error.code);
     }
@@ -877,7 +878,7 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
     console.error(
       outputMode === 'json'
         ? formatJsonError(error as Error, 1)
-        : formatHumanError(error as Error, opts.verbose)
+        : chalk.red(formatHumanError(error as Error, opts.verbose))
     );
     process.exit(1);
   }

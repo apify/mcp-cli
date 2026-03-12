@@ -555,7 +555,7 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
       const errorMessage = result.error.message || '';
       await classifyAndThrowSessionError(sessionName, session, errorMessage, result.error);
       if (result.error instanceof NetworkError) {
-        logger.warn(`Bridge process alive but socket not responding for ${sessionName}`);
+        logger.debug(`Bridge process alive but socket not responding for ${sessionName}`);
       } else {
         // Other MCP errors - propagate
         throw new ClientError(
