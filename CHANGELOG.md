@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
 
 ### Fixed
+- Explicit `--header "Authorization: Bearer ..."` is no longer silently ignored when a default OAuth profile exists for the same server; explicit CLI headers now take precedence over auto-detected profiles
+- Combining `--profile` with `--header "Authorization: ..."` now returns a clear error instead of silently stripping the header
 - `logTarget` no longer prints a misleading `[→ @name (HTTP)]` prefix when a session doesn't exist; only the error message is shown
 - `logging-set-level` JSON output no longer includes a `success` field; output is now `{"level":"<level>"}` consistent with the project's convention of indicating errors via exit codes
 - `--header` / `-H` option is now specific to the `connect` command instead of being shown as a global option in `mcpc --help`
