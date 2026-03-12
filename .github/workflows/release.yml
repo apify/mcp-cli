@@ -11,7 +11,7 @@ on:
           - pre-release
           - release
       version:
-        description: 'Version bump (release only)'
+        description: 'Version bump'
         required: false
         type: choice
         default: patch
@@ -69,21 +69,39 @@ jobs:
         run: |
           PKG_NAME=$(node -p "require('./package.json').name")
           CURRENT=$(node -p "require('./package.json').version")
+          BUMP="${{ inputs.version }}"
 
-          # Compute the next patch version as the beta base
-          # e.g. 0.1.10 -> 0.1.11, or 0.1.11-beta.2 -> 0.1.11
-          NEXT_PATCH=$(node -p "
-            const v = '${CURRENT}'.replace(/-beta\..*/, '').split('.');
-            v[2] = String(Number(v[2]) + (('${CURRENT}'.includes('-beta.')) ? 0 : 1));
+          # Compute the next base version according to the selected bump type
+          # e.g. 0.1.10 + minor -> 0.2.0, 0.1.10 + major -> 1.0.0, 0.1.10 + patch -> 0.1.11
+          # If already a beta, strip the pre-release suffix first
+          NEXT_BASE=$(node -p "
+            const base = '${CURRENT}'.replace(/-beta\..*/, '');
+            const v = base.split('.').map(Number);
+            if ('${BUMP}' === 'major') { v[0]++; v[1] = 0; v[2] = 0; }
+            else if ('${BUMP}' === 'minor') { v[1]++; v[2] = 0; }
+            else { v[2]++; }
             v.join('.')
           ")
 
-          # Query npm for existing betas of this patch version
+          # If current version is already a beta for this base, don't re-bump
+          CURRENT_BASE=$(node -p "'${CURRENT}'.replace(/-beta\..*/, '')")
+          if [[ "${CURRENT}" == *"-beta."* ]]; then
+            # Already on a beta — check if it matches the target base
+            # e.g. current=0.2.0-beta.1, bump=minor from 0.1.10 -> NEXT_BASE=0.2.0 -> matches, keep it
+            # e.g. current=0.1.11-beta.1, bump=minor from 0.1.10 -> NEXT_BASE=0.2.0 -> mismatch, use NEXT_BASE
+            if [[ "$CURRENT_BASE" == "$NEXT_BASE" ]]; then
+              NEXT_BASE="$CURRENT_BASE"
+            fi
+          fi
+
+          echo "Base version for beta: $NEXT_BASE"
+
+          # Query npm for existing betas of this base version
           LATEST_BETA=$(npm view "${PKG_NAME}" versions --json 2>/dev/null \
             | node -p "
               const all = JSON.parse(require('fs').readFileSync(0,'utf8'));
               const betas = (Array.isArray(all) ? all : [all])
-                .filter(v => v.startsWith('${NEXT_PATCH}-beta.'))
+                .filter(v => v.startsWith('${NEXT_BASE}-beta.'))
                 .sort((a,b) => {
                   const na = Number(a.split('-beta.')[1]);
                   const nb = Number(b.split('-beta.')[1]);
@@ -93,15 +111,15 @@ jobs:
             " \
           ) || true
 
-          if [[ -n "$LATEST_BETA" && "$LATEST_BETA" == ${NEXT_PATCH}-beta.* ]]; then
+          if [[ -n "$LATEST_BETA" && "$LATEST_BETA" == ${NEXT_BASE}-beta.* ]]; then
             # Existing beta found — increment from it
             echo "Found existing beta on npm: $LATEST_BETA — incrementing"
             npm version "$LATEST_BETA" --no-git-tag-version --allow-same-version
             npm version prerelease --preid=beta --no-git-tag-version
           else
             # No beta yet — start at beta.0
-            echo "No existing beta for ${NEXT_PATCH} — creating ${NEXT_PATCH}-beta.0"
-            npm version "${NEXT_PATCH}-beta.0" --no-git-tag-version --allow-same-version
+            echo "No existing beta for ${NEXT_BASE} — creating ${NEXT_BASE}-beta.0"
+            npm version "${NEXT_BASE}-beta.0" --no-git-tag-version --allow-same-version
           fi
 
           NEW_VERSION=$(node -p "require('./package.json').version")
@@ -140,6 +158,33 @@ jobs:
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "### Release version: \`$NEW_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Update CHANGELOG.md
+        if: inputs.type == 'release'
+        run: |
+          NEW_VERSION="${{ steps.release.outputs.version }}"
+          CURRENT="${{ steps.release.outputs.current }}"
+          TODAY=$(date +%Y-%m-%d)
+
+          # Replace [Unreleased] heading with new version, keep an empty [Unreleased] section
+          sed -i "s/^## \[Unreleased\]/## [Unreleased]\n\n## [$NEW_VERSION] - $TODAY/" CHANGELOG.md
+
+          # Update comparison links at the bottom
+          if grep -q "^\[Unreleased\]:" CHANGELOG.md; then
+            sed -i "s|\[Unreleased\]: \(.*\)/compare/v[0-9.]*\.\.\.HEAD|[Unreleased]: \1/compare/v$NEW_VERSION...HEAD\n[$NEW_VERSION]: \1/compare/v$CURRENT...v$NEW_VERSION|" CHANGELOG.md
+          fi
+
+      - name: Commit version bump and changelog
+        if: inputs.type == 'release'
+        run: |
+          NEW_VERSION="${{ steps.release.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "v${NEW_VERSION}"
+          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
+          git push origin main
+          git push origin "v${NEW_VERSION}"
+
       - name: Publish release to npm
         if: inputs.type == 'release'
         run: MCPC_RELEASE=1 npm publish --access public --provenance
@@ -155,4 +200,4 @@ jobs:
           gh release create "v${VERSION}" \
             --title "v${VERSION}" \
             --generate-notes \
-            --target "${{ github.sha }}"
+            --target "v${VERSION}"
