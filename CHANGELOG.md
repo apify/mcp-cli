@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--client-id` and `--client-secret` options for `mcpc login` command, for servers that don't support dynamic client registration
 - `mcpc close @session`, `mcpc restart @session`, and `mcpc shell @session` command-first syntax as alternatives to `mcpc @session close/restart/shell`
 - E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
+- `--no-profile` option for `connect` command to skip OAuth profile auto-detection and connect anonymously
 
 ### Fixed
 - Explicit `--header "Authorization: Bearer ..."` is no longer silently ignored when a default OAuth profile exists for the same server; explicit CLI headers now take precedence over auto-detected profiles

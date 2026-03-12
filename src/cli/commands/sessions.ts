@@ -83,6 +83,7 @@ export async function connectSession(
     headers?: string[];
     timeout?: number;
     profile?: string;
+    noProfile?: boolean;
     proxy?: string;
     proxyBearerToken?: string;
     x402?: boolean;
@@ -170,11 +171,14 @@ export async function connectSession(
     }
 
     // For HTTP targets, resolve auth profile (with helpful errors if none available)
-    // If user explicitly provided an Authorization header via --header (and did NOT
-    // specify --profile), skip OAuth profile auto-detection so the header takes precedence.
+    // Skip OAuth profile resolution when:
+    // - --no-profile is specified (explicit anonymous connection)
+    // - --header "Authorization: ..." is provided (explicit bearer token)
     let profileName: string | undefined;
     if (serverConfig.url) {
-      if (hasExplicitAuthHeader) {
+      if (options.noProfile) {
+        logger.debug('Skipping OAuth profile: --no-profile specified');
+      } else if (hasExplicitAuthHeader) {
         logger.debug(
           'Skipping OAuth profile auto-detection: explicit Authorization header provided via --header'
         );

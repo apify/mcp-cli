@@ -436,7 +436,16 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
 3. **Config file headers** - Headers from `--config` file for the server
 4. **No authentication** - Attempts unauthenticated connection
 
-`mcpc` automatically handles authentication based on whether you specify a profile:
+**Note:** `--profile` and `--header "Authorization: ..."` cannot be combined — they are mutually
+exclusive. Providing both will result in a clear error. Use one or the other.
+
+`mcpc` automatically handles authentication based on what you specify:
+
+**When `--header "Authorization: ..."` is provided:**
+
+- The explicit header is always used, and OAuth profile auto-detection is skipped entirely
+- This works even if a `default` profile exists for the server
+- Cannot be combined with `--profile` (returns an error)
 
 **When `--profile <name>` is specified:**
 
@@ -445,7 +454,13 @@ When multiple authentication methods are available, `mcpc` uses this precedence 
    - If authentication fails (expired/invalid) → Fail with an error
 2. **Profile doesn't exist**: Fail with an error
 
-**When no `--profile` is specified:**
+**When `--no-profile` is specified:**
+
+- Skip all OAuth profile detection and connect anonymously
+- Useful when a `default` profile exists but you want an unauthenticated session
+- Can be combined with `--header "Authorization: ..."` for explicit bearer token without profile
+
+**When no flags are specified (default):**
 
 1. **`default` profile exists for the server**: Use its stored credentials
    - If authentication succeeds → Continue with command/session
@@ -458,7 +473,7 @@ On failure, the error message includes instructions on how to login and save the
 
 This flow ensures:
 
-- You only authenticate when necessary
+- Explicit CLI flags always take precedence over stored profiles
 - Credentials are never silently mixed up (personal → work) or downgraded (authenticated → unauthenticated)
 - You can mix authenticated sessions (with named profiles) and public access on the same server
 
@@ -475,6 +490,12 @@ mcpc connect mcp.apify.com @apify-work --profile work
 # - Tries unauthenticated if 'default' doesn't exist
 # - Fails if the server requires authentication
 mcpc connect mcp.apify.com @apify-personal
+
+# Explicit bearer token - skips profile auto-detection:
+mcpc connect mcp.apify.com @apify --header "Authorization: Bearer ${APIFY_TOKEN}"
+
+# Anonymous - skips default profile even if it exists:
+mcpc connect mcp.apify.com @apify-anon --no-profile
 ```
 
 ## MCP proxy

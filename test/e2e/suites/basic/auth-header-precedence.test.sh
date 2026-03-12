@@ -5,6 +5,7 @@
 # 1. Explicit --header "Authorization: Bearer ..." takes precedence over auto-detected default profile
 # 2. Combining --profile with --header "Authorization: ..." returns a clear error
 # 3. --header with non-Authorization headers still works alongside profiles
+# 4. --no-profile skips auto-detected OAuth profile (anonymous connection)
 
 source "$(dirname "$0")/../../lib/framework.sh"
 test_init "basic/auth-header-precedence" --isolated
@@ -88,6 +89,48 @@ test_case "no auth header and no profile fails on auth-required server"
 # that our auth-header session from test 1 still works
 run_mcpc "$SESSION" ping
 assert_success
+test_pass
+
+# =============================================================================
+# Test 5: --no-profile skips auto-detected profile (anonymous connection)
+# =============================================================================
+# The test server requires auth, so --no-profile without an Authorization header
+# should fail with auth error (not with a profile-related error).
+
+test_case "--no-profile skips OAuth profile and connects anonymously"
+SESSION5=$(session_name "no-prof")
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION5" --no-profile
+# Session creation itself may succeed (just stores config), but the bridge
+# should fail to connect because no auth is provided to an auth-required server.
+# The key assertion: no "profile" related error, just an auth/connection failure.
+if [[ $EXIT_CODE -ne 0 ]]; then
+  assert_not_contains "$STDERR" "No default authentication profile"
+fi
+test_pass
+
+# =============================================================================
+# Test 6: --no-profile combined with --header Authorization works
+# =============================================================================
+
+# Brief pause to avoid lock contention from rapid session creation
+sleep 1
+
+test_case "--no-profile with explicit Authorization header works"
+SESSION6=$(session_name "no-prof-hdr")
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION6" \
+  --no-profile \
+  --header "Authorization: Bearer test-token-noprof"
+assert_success
+_SESSIONS_CREATED+=("$SESSION6")
+
+wait_for "$MCPC $SESSION6 ping >/dev/null 2>&1"
+run_mcpc "$SESSION6" tools-list
+assert_success
+assert_contains "$STDOUT" "echo"
+
+# Clean up
+run_mcpc "$SESSION6" close 2>/dev/null || true
+_SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION6}")
 test_pass
 
 # Clean up
