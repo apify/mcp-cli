@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `--async` and `--detach` tool calls now correctly send task creation parameters to the server, fixing "task stream ended without creating a task" errors
+- File lock retries now use randomized exponential backoff to reduce contention when multiple processes compete for the same lock
 - Explicit `--header "Authorization: Bearer ..."` is no longer silently ignored when a default OAuth profile exists for the same server; explicit CLI headers now take precedence over auto-detected profiles
 - Combining `--profile` with `--header "Authorization: ..."` now returns a clear error instead of silently stripping the header
 - `logTarget` no longer prints a misleading `[→ @name (HTTP)]` prefix when a session doesn't exist; only the error message is shown
