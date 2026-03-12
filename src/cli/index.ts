@@ -478,10 +478,6 @@ Server formats:
       '--client-secret <secret>',
       'OAuth client secret (for servers without dynamic client registration)'
     )
-    .option(
-      '--headless',
-      'Headless mode: print authorization URL and accept pasted callback URL (for environments without a browser)'
-    )
     .action(async (server, opts, command) => {
       if (!server) {
         throw new ClientError(
@@ -493,7 +489,6 @@ Server formats:
         scope: opts.scope,
         clientId: opts.clientId,
         clientSecret: opts.clientSecret,
-        headless: opts.headless,
         ...getOptionsFromCommand(command),
       });
     });

@@ -20,7 +20,6 @@ export async function login(
     scope?: string;
     clientId?: string;
     clientSecret?: string;
-    headless?: boolean;
   }
 ): Promise<void> {
   try {
@@ -50,8 +49,7 @@ export async function login(
       normalizedUrl,
       profileName,
       options.scope,
-      clientCredentials,
-      { headless: options.headless }
+      clientCredentials
     );
 
     if (options.outputMode === 'human') {

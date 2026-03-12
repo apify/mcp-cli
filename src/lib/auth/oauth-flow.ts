@@ -1,7 +1,7 @@
 /**
  * Interactive OAuth 2.1 flow with PKCE
  * Handles browser-based authorization with local callback server
- * Supports headless mode for environments without a browser
+ * Falls back to manual URL paste when browser is unavailable
  */
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'http';
@@ -250,8 +250,9 @@ async function findAvailablePort(startPort: number = 8000): Promise<number> {
 /**
  * Open a URL in the default browser
  * Uses platform-specific commands
+ * Returns true if the browser was opened successfully, false otherwise
  */
-async function openBrowser(url: string): Promise<void> {
+async function tryOpenBrowser(url: string): Promise<boolean> {
   const { exec } = await import('child_process');
   const { promisify } = await import('util');
   const execAsync = promisify(exec);
@@ -270,9 +271,10 @@ async function openBrowser(url: string): Promise<void> {
   try {
     await execAsync(command);
     logger.debug('Browser opened successfully');
+    return true;
   } catch (error) {
     logger.warn(`Failed to open browser: ${(error as Error).message}`);
-    throw new ClientError(`Failed to open browser. Please manually navigate to: ${url}`);
+    return false;
   }
 }
 
@@ -364,28 +366,17 @@ function promptForCallbackUrl(): {
 }
 
 /**
- * Options for performing OAuth flow
- */
-export interface OAuthFlowOptions {
-  headless?: boolean | undefined;
-}
-
-/**
  * Perform interactive OAuth flow
  * Opens browser for user authentication and handles callback
- * In headless mode, prompts user to paste the callback URL instead
+ * Falls back to manual URL paste when browser cannot be opened
  */
 export async function performOAuthFlow(
   serverUrl: string,
   profileName: string,
   scope?: string,
-  clientCredentials?: { clientId?: string; clientSecret?: string },
-  options?: OAuthFlowOptions
+  clientCredentials?: { clientId?: string; clientSecret?: string }
 ): Promise<OAuthFlowResult> {
-  const headless = options?.headless ?? false;
-  logger.debug(
-    `Starting OAuth flow for ${serverUrl} (profile: ${profileName}, headless: ${headless})`
-  );
+  logger.debug(`Starting OAuth flow for ${serverUrl} (profile: ${profileName})`);
 
   // Normalize server URL
   const normalizedServerUrl = normalizeServerUrl(serverUrl);
@@ -438,11 +429,14 @@ export async function performOAuthFlow(
   }
   const provider = new OAuthProvider(providerOptions);
 
-  // Start callback server (even in headless mode - localhost may be reachable)
+  // Start callback server
   const { server, codePromise, destroyConnections } = startCallbackServer(port);
 
-  // Headless URL-paste handler ref for cleanup
-  const headlessHandlerRef: { current: { cleanup: () => void } | null } = { current: null };
+  // Track whether browser failed so we can fall back to URL paste
+  let browserFailed = false;
+
+  // Handler refs for cleanup
+  const pasteHandlerRef: { current: { cleanup: () => void } | null } = { current: null };
 
   try {
     // Start server
@@ -459,44 +453,37 @@ export async function performOAuthFlow(
       current: null,
     };
 
-    if (headless) {
-      // Headless mode: print URL and prompt user to paste callback URL
-      provider.redirectToAuthorization = async (authorizationUrl: URL) => {
-        logger.debug('Headless mode: displaying authorization URL for manual copy');
-        console.log(`\nOpen this URL in a browser to authorize:\n`);
-        console.log(`  ${authorizationUrl.toString()}\n`);
-        console.log(`After authorizing, your browser will redirect to a localhost URL.`);
-        console.log(`Copy the full URL from the browser address bar and paste it below.`);
-        console.log(`(If localhost is reachable, the callback will be handled automatically.)\n`);
-      };
-    } else {
-      // Interactive mode: open browser
-      provider.redirectToAuthorization = async (authorizationUrl: URL) => {
-        logger.debug('Opening browser for authorization...');
-        console.log(`\nAuthorization URL: ${authorizationUrl.toString()}`);
+    // Override redirectToAuthorization to open browser
+    provider.redirectToAuthorization = async (authorizationUrl: URL) => {
+      logger.debug('Opening browser for authorization...');
+      console.log(`\nAuthorization URL: ${authorizationUrl.toString()}`);
 
-        // Ask for confirmation before opening browser
-        const confirmed = await waitForEnterKey(
-          'Press Enter to open browser (any other key to cancel): '
-        );
-        if (!confirmed) {
-          throw new ClientError('Authentication cancelled by user');
-        }
+      // Ask for confirmation before opening browser
+      const confirmed = await waitForEnterKey(
+        'Press Enter to open browser (any other key to cancel): '
+      );
+      if (!confirmed) {
+        throw new ClientError('Authentication cancelled by user');
+      }
 
-        console.log('Opening browser...');
+      console.log('Opening browser...');
+      const opened = await tryOpenBrowser(authorizationUrl.toString());
+
+      if (opened) {
         console.log('If the browser does not open automatically, please visit the URL above.');
         console.log('Press Esc to cancel.\n');
-
         // Set up escape key handler AFTER Enter confirmation (to avoid raw mode conflicts)
         escapeHandlerRef.current = waitForEscapeKey();
-
-        try {
-          await openBrowser(authorizationUrl.toString());
-        } catch (error) {
-          console.error((error as Error).message);
-        }
-      };
-    }
+      } else {
+        browserFailed = true;
+        console.log(
+          '\nCould not open browser. Please open the authorization URL above in your browser.'
+        );
+        console.log(
+          'After authorizing, copy the full callback URL from the browser address bar and paste it here.'
+        );
+      }
+    };
 
     try {
       // Start OAuth flow
@@ -510,14 +497,14 @@ export async function performOAuthFlow(
       const result = await sdkAuth(provider, authOptions);
 
       if (result === 'REDIRECT') {
-        // Wait for callback with authorization code
+        // Wait for callback with authorization code, or user pressing Escape
         logger.debug('Waiting for authorization code...');
         const racers: Promise<{ code: string; state?: string }>[] = [codePromise];
 
-        if (headless) {
-          // In headless mode, also accept pasted callback URL
+        if (browserFailed) {
+          // Browser didn't open - also accept pasted callback URL
           const urlHandler = promptForCallbackUrl();
-          headlessHandlerRef.current = urlHandler;
+          pasteHandlerRef.current = urlHandler;
           racers.push(urlHandler.promise);
         } else if (escapeHandlerRef.current) {
           racers.push(escapeHandlerRef.current.promise as Promise<{ code: string }>);
@@ -537,9 +524,9 @@ export async function performOAuthFlow(
         await sdkAuth(provider, tokenOptions);
       }
     } finally {
-      // Clean up escape key handler and headless handler
+      // Clean up escape key handler and paste handler
       escapeHandlerRef.current?.cleanup();
-      headlessHandlerRef.current?.cleanup();
+      pasteHandlerRef.current?.cleanup();
     }
 
     // Get the saved profile
@@ -558,8 +545,8 @@ export async function performOAuthFlow(
     logger.debug(`OAuth flow failed: ${(error as Error).message}`);
     throw error;
   } finally {
-    // Clean up headless handler in case of error
-    headlessHandlerRef.current?.cleanup();
+    // Clean up paste handler in case of error
+    pasteHandlerRef.current?.cleanup();
     // Close callback server and destroy all connections
     destroyConnections();
     server.close();
