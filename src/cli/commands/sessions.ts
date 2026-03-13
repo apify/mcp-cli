@@ -626,8 +626,29 @@ export async function restartSession(
       bridgeOptions.headers = headers;
     }
 
-    if (session.profileName) {
-      bridgeOptions.profileName = session.profileName;
+    // Resolve auth profile: use stored profile, or auto-detect a default profile
+    // This handles the case where user creates a session without auth, then later runs
+    // `mcpc login <server>` to create a profile, and restarts the session.
+    const hasExplicitAuthHeader = headers?.Authorization !== undefined;
+    let profileName = session.profileName;
+    if (!profileName && serverConfig.url && !hasExplicitAuthHeader) {
+      try {
+        profileName = await resolveAuthProfile(serverConfig.url, serverConfig.url, undefined, {
+          sessionName: name,
+        });
+        if (profileName) {
+          logger.debug(`Discovered auth profile "${profileName}" for session ${name}`);
+          await updateSession(name, { profileName });
+        }
+      } catch {
+        // Profile resolution can throw if profiles exist but no default - ignore on restart,
+        // the session may have been intentionally created without a profile
+        logger.debug(`Auth profile resolution failed for session ${name}, continuing without`);
+      }
+    }
+
+    if (profileName) {
+      bridgeOptions.profileName = profileName;
     }
 
     if (session.proxy) {
