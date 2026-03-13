@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mcpc login` now falls back to accepting a pasted callback URL when the browser cannot be opened (e.g. headless servers, containers)
 - `--async` flag for `tools-call` to opt-in to async task execution (experimental) with a progress spinner showing elapsed time, server status messages, and progress notification messages in human mode
 - `--detach` flag for `tools-call` to start an async task and return the task ID immediately without waiting for completion (implies `--async`)
+- Press ESC during `--async` task execution to detach on the fly — the task continues in the background and the task ID is printed, same as `--detach`
 - New `tasks-list`, `tasks-get`, `tasks-cancel` commands for managing async tasks on the server
 - Task capability and `execution.taskSupport` displayed in `tools-get` and server info
 - E2E test server now includes a `slow-task` tool that supports async task execution
