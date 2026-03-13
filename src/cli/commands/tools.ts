@@ -122,6 +122,47 @@ async function shouldUseTask(
 }
 
 /**
+ * Set up ESC key listener for detaching from an async task.
+ * Returns a promise that resolves when ESC is pressed, and a cleanup function.
+ * Only activates when enabled=true and stdin is a TTY.
+ */
+function setupEscListener(
+  enabled: boolean,
+  canDetach: () => boolean
+): { promise: Promise<'detached'> | null; cleanup: () => void } {
+  if (!enabled || !process.stdin.isTTY) {
+    return { promise: null, cleanup: () => {} };
+  }
+
+  const ESC = '\x1b';
+  let cleaned = false;
+
+  let cleanupFn = (): void => {};
+  const promise = new Promise<'detached'>((resolve) => {
+    const onData = (key: Buffer): void => {
+      if (key.toString() === ESC && canDetach()) {
+        cleanupFn();
+        resolve('detached');
+      }
+    };
+
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.on('data', onData);
+
+    cleanupFn = () => {
+      if (cleaned) return;
+      cleaned = true;
+      process.stdin.off('data', onData);
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+    };
+  });
+
+  return { promise, cleanup: () => cleanupFn() };
+}
+
+/**
  * Call a tool with arguments
  * Arguments can be provided via:
  * 1. Positional args: key:=value pairs or inline JSON
@@ -225,6 +266,7 @@ export async function callTool(
       let timerInterval: ReturnType<typeof setInterval> | null = null;
       let lastStatusMessage: string | undefined;
       let lastProgressMessage: string | undefined;
+      let capturedTaskId: string | undefined;
 
       const updateSpinnerText = (): void => {
         if (!spinner) return;
@@ -232,7 +274,9 @@ export async function callTool(
         const progressSuffix = lastProgressMessage ? ` ${chalk.dim(lastProgressMessage)}` : '';
         const statusSuffix =
           !lastProgressMessage && lastStatusMessage ? ` ${chalk.dim(lastStatusMessage)}` : '';
-        spinner.text = `Running tool ${chalk.bold(name)}... (${elapsed})${progressSuffix}${statusSuffix}`;
+        const escHint =
+          capturedTaskId && escListener.promise ? ` ${chalk.dim('(ESC to detach)')}` : '';
+        spinner.text = `Running tool ${chalk.bold(name)}... (${elapsed})${progressSuffix}${statusSuffix}${escHint}`;
       };
 
       if (options.outputMode === 'human') {
@@ -244,6 +288,9 @@ export async function callTool(
       }
 
       const onUpdate = (update: TaskUpdate): void => {
+        if (update.taskId) {
+          capturedTaskId = update.taskId;
+        }
         if (update.statusMessage) {
           lastStatusMessage = update.statusMessage;
         }
@@ -255,13 +302,42 @@ export async function callTool(
         }
       };
 
+      // Set up ESC key listener for detaching (TTY + human mode only, not in interactive shell)
+      const escListener = setupEscListener(
+        options.outputMode === 'human' && !process.stdin.isRaw,
+        () => !!capturedTaskId
+      );
+
       try {
-        result = await client.callToolWithTask(name, parsedArgs, onUpdate);
+        const taskPromise = client.callToolWithTask(name, parsedArgs, onUpdate);
+
+        if (escListener.promise) {
+          const raceResult = await Promise.race([
+            taskPromise.then((r) => ({ type: 'completed' as const, result: r })),
+            escListener.promise.then(() => ({ type: 'detached' as const })),
+          ]);
+
+          escListener.cleanup();
+
+          if (raceResult.type === 'detached') {
+            if (timerInterval) clearInterval(timerInterval);
+            if (spinner) {
+              spinner.info(`Detached. Task ${chalk.bold(capturedTaskId!)} continues in background`);
+            }
+            return;
+          }
+
+          result = raceResult.result;
+        } else {
+          result = await taskPromise;
+        }
+
         const elapsed = formatElapsed(Date.now() - startTime);
         if (spinner) {
           spinner.succeed(`Tool ${chalk.bold(name)} executed successfully (${elapsed})`);
         }
       } catch (error) {
+        escListener.cleanup();
         const elapsed = formatElapsed(Date.now() - startTime);
         if (spinner) {
           spinner.fail(`Tool ${chalk.bold(name)} failed (${elapsed})`);
