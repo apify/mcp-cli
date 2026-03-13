@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Session restart now auto-detects the `default` OAuth profile created after the session was established, fixing the `login` then `restart` flow for unauthorized sessions
+
 ### Changed
+- When `--profile` is not specified, only the `default` profile is used; non-default profiles require an explicit `--profile` flag
 - Revised session states: auth failures (401/403) now show as `unauthorized` (separate from `expired` which is for session ID expiry), with actionable login guidance; new `disconnected` display state surfaces when bridge is alive but server has been unreachable for >2 minutes
 - `DISCONNECTED_THRESHOLD_MS` is now derived from `KEEPALIVE_INTERVAL_MS` (2× ping interval + 5s buffer) via shared constants, eliminating duplicate magic numbers
 
