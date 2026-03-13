@@ -637,6 +637,7 @@ class BridgeProcess {
     // which triggers OAuthTokenManager.getValidAccessToken() to refresh if needed
 
     // Pre-populate tools cache (used by x402 proactive signing and getCachedTools IPC method)
+    // Note: only fetches the first page of tools, not subsequent pages via cursor
     if (serverDetails.capabilities?.tools) {
       try {
         const toolsResult = await this.client.listTools();

@@ -59,9 +59,8 @@ export async function getTool(
 
   await withMcpClient(target, options, async (client, _context) => {
     // List all tools and find the matching one
-    // TODO: It is wasteful to always re-fetch the full list (applies also to prompts),
-    //  especially considering that MCP SDK client caches these.
-    //  We should use SDK's or our own cache on bridge to make this more efficient
+    // TODO: It is wasteful to always re-fetch the full list (applies also to prompts).
+    //  We should use the bridge's cached tools list (getCachedTools) to make this more efficient
     const result = await client.listTools();
     const tool = result.tools.find((t) => t.name === name);
 
