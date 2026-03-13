@@ -260,7 +260,7 @@ export class McpClient implements IMcpClient {
   }
 
   /**
-   * Get cached tools list (not available for direct connections)
+   * Get cached first page of tools list (not available for direct connections; does not include subsequent pages)
    */
   getCachedTools(): Promise<ListToolsResult | null> {
     return Promise.resolve(null);

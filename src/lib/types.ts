@@ -365,7 +365,7 @@ export interface IMcpClient {
   // single call returns all info to avoid multiple IPC roundtrips)
   getServerDetails(): Promise<ServerDetails>;
 
-  // Cached data (from bridge in-memory cache, no server call)
+  // Cached first page of tools (from bridge in-memory cache, no server call; does not include subsequent pages)
   getCachedTools(): Promise<ListToolsResult | null>;
 
   // MCP operations

@@ -134,7 +134,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     );
   }
 
-  // Cached data (no server call, returns bridge in-memory cache)
+  // Cached first page of tools (no server call, returns bridge in-memory cache; does not include subsequent pages)
   async getCachedTools(): Promise<ListToolsResult | null> {
     return this.withRetry(
       () =>
