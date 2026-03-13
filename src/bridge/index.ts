@@ -460,6 +460,21 @@ class BridgeProcess {
   }
 
   /**
+   * Refresh the tools cache by fetching all pages
+   */
+  private async refreshToolsCache(): Promise<void> {
+    if (!this.client) return;
+    try {
+      const result = await this.client.listAllTools();
+      this.cachedTools = result.tools;
+      logger.debug(`Refreshed tools cache (${this.cachedTools.length} tools)`);
+    } catch (error) {
+      // Non-fatal: tools will be fetched on demand
+      logger.warn('Failed to refresh tools cache:', error);
+    }
+  }
+
+  /**
    * Update session with notification timestamp for list changes
    */
   private async updateNotificationTimestamp(
@@ -546,16 +561,14 @@ class BridgeProcess {
       ...(customFetch && { customFetch }),
       listChanged: {
         tools: {
-          // Let SDK auto-fetch the tools on list changed notification.
-          // Note that it fetches just the first page, not the subsequent using cursor
-          autoRefresh: true,
-          onChanged: (error: Error | null, tools: Tool[] | null) => {
-            logger.debug('Tools list changed', { error, count: tools?.length });
-            // Update local tools cache (used by x402 middleware for proactive signing)
-            if (tools) {
-              this.cachedTools = tools;
-              logger.debug(`Updated cached tools list (${tools.length} tools)`);
-            }
+          // We handle refresh ourselves to fetch ALL pages (SDK only fetches the first page).
+          // SDK's debounceMs still applies, preventing multiple rapid refreshes.
+          autoRefresh: false,
+          onChanged: () => {
+            logger.debug('Tools list changed notification received, refreshing all tools...');
+            this.refreshToolsCache().catch((err) => {
+              logger.warn('Failed to refresh tools cache:', err);
+            });
             // Broadcast notification to all connected clients
             this.broadcastNotification('tools/list_changed');
             // Update session with notification timestamp
@@ -637,18 +650,8 @@ class BridgeProcess {
     // which triggers OAuthTokenManager.getValidAccessToken() to refresh if needed
 
     // Pre-populate tools cache (used by x402 proactive signing and getCachedTools IPC method)
-    // Note: only fetches the first page of tools, not subsequent pages via cursor
     if (serverDetails.capabilities?.tools) {
-      try {
-        const toolsResult = await this.client.listTools();
-        if (toolsResult.tools) {
-          this.cachedTools = toolsResult.tools;
-          logger.debug(`Pre-populated tools cache (${this.cachedTools.length} tools)`);
-        }
-      } catch (error) {
-        // Non-fatal: tools will be fetched on demand
-        logger.warn('Failed to pre-populate tools cache:', error);
-      }
+      await this.refreshToolsCache();
     }
   }
 

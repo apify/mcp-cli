@@ -134,7 +134,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     );
   }
 
-  // Cached first page of tools (no server call, returns bridge in-memory cache; does not include subsequent pages)
+  // Cached tools list (no server call, returns bridge in-memory cache with all pages)
   async getCachedTools(): Promise<ListToolsResult | null> {
     return this.withRetry(
       () =>
@@ -165,6 +165,19 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         ) as Promise<ListToolsResult>,
       'listTools'
     );
+  }
+
+  async listAllTools(): Promise<ListToolsResult> {
+    const allTools = [];
+    let cursor: string | undefined = undefined;
+
+    do {
+      const result = await this.listTools(cursor);
+      allTools.push(...result.tools);
+      cursor = result.nextCursor;
+    } while (cursor);
+
+    return { tools: allTools };
   }
 
   async callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult> {

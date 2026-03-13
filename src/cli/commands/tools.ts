@@ -27,18 +27,9 @@ export async function listTools(
   options: CommandOptions & { full?: boolean }
 ): Promise<void> {
   await withMcpClient(target, options, async (client, _context) => {
-    // Fetch all tools across all pages
-    const allTools = [];
-    let cursor: string | undefined = undefined;
-
-    do {
-      const result = await client.listTools(cursor);
-      allTools.push(...result.tools);
-      cursor = result.nextCursor;
-    } while (cursor);
-
+    const result = await client.listAllTools();
     console.log(
-      formatOutput(allTools, options.outputMode, options.full ? { full: true } : undefined)
+      formatOutput(result.tools, options.outputMode, options.full ? { full: true } : undefined)
     );
   });
 }
@@ -61,7 +52,7 @@ export async function getTool(
     // List all tools and find the matching one
     // TODO: It is wasteful to always re-fetch the full list (applies also to prompts).
     //  We should use the bridge's cached tools list (getCachedTools) to make this more efficient
-    const result = await client.listTools();
+    const result = await client.listAllTools();
     const tool = result.tools.find((t) => t.name === name);
 
     if (!tool) {

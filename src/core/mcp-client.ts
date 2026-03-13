@@ -260,7 +260,7 @@ export class McpClient implements IMcpClient {
   }
 
   /**
-   * Get cached first page of tools list (not available for direct connections; does not include subsequent pages)
+   * Get cached tools list (not available for direct connections)
    */
   getCachedTools(): Promise<ListToolsResult | null> {
     return Promise.resolve(null);
@@ -289,7 +289,7 @@ export class McpClient implements IMcpClient {
   }
 
   /**
-   * List available tools
+   * List available tools (single page)
    */
   async listTools(cursor?: string): Promise<ListToolsResult> {
     try {
@@ -303,6 +303,22 @@ export class McpClient implements IMcpClient {
         originalError: error,
       });
     }
+  }
+
+  /**
+   * List all available tools across all pages
+   */
+  async listAllTools(): Promise<ListToolsResult> {
+    const allTools = [];
+    let cursor: string | undefined = undefined;
+
+    do {
+      const result = await this.listTools(cursor);
+      allTools.push(...result.tools);
+      cursor = result.nextCursor;
+    } while (cursor);
+
+    return { tools: allTools };
   }
 
   /**
