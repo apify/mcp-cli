@@ -224,12 +224,15 @@ export async function callTool(
       let spinner: ReturnType<typeof ora> | null = null;
       let timerInterval: ReturnType<typeof setInterval> | null = null;
       let lastStatusMessage: string | undefined;
+      let lastProgressMessage: string | undefined;
 
       const updateSpinnerText = (): void => {
         if (!spinner) return;
         const elapsed = formatElapsed(Date.now() - startTime);
-        const statusSuffix = lastStatusMessage ? ` ${chalk.dim(lastStatusMessage)}` : '';
-        spinner.text = `Running tool ${chalk.bold(name)}... (${elapsed})${statusSuffix}`;
+        const progressSuffix = lastProgressMessage ? ` ${chalk.dim(lastProgressMessage)}` : '';
+        const statusSuffix =
+          !lastProgressMessage && lastStatusMessage ? ` ${chalk.dim(lastStatusMessage)}` : '';
+        spinner.text = `Running tool ${chalk.bold(name)}... (${elapsed})${progressSuffix}${statusSuffix}`;
       };
 
       if (options.outputMode === 'human') {
@@ -243,6 +246,9 @@ export async function callTool(
       const onUpdate = (update: TaskUpdate): void => {
         if (update.statusMessage) {
           lastStatusMessage = update.statusMessage;
+        }
+        if (update.progressMessage) {
+          lastProgressMessage = update.progressMessage;
         }
         if (spinner) {
           updateSpinnerText();
