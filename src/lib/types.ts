@@ -365,13 +365,10 @@ export interface IMcpClient {
   // single call returns all info to avoid multiple IPC roundtrips)
   getServerDetails(): Promise<ServerDetails>;
 
-  // Cached tools list (no server call, returns bridge in-memory cache with all pages)
-  getCachedTools(): Promise<ListToolsResult | null>;
-
   // MCP operations
   ping(): Promise<void>;
   listTools(cursor?: string): Promise<ListToolsResult>;
-  listAllTools(): Promise<ListToolsResult>;
+  listAllTools(options?: { forceFetch?: boolean }): Promise<ListToolsResult>;
   callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult>;
   listResources(cursor?: string): Promise<ListResourcesResult>;
   listResourceTemplates(cursor?: string): Promise<ListResourceTemplatesResult>;

@@ -260,13 +260,6 @@ export class McpClient implements IMcpClient {
   }
 
   /**
-   * Get cached tools list (not available for direct connections)
-   */
-  getCachedTools(): Promise<ListToolsResult | null> {
-    return Promise.resolve(null);
-  }
-
-  /**
    * Get the MCP session ID assigned by the server (if any)
    * This can be used for session resumption after bridge restart
    */
@@ -306,9 +299,10 @@ export class McpClient implements IMcpClient {
   }
 
   /**
-   * List all available tools across all pages
+   * List all available tools across all pages.
+   * Direct connections have no cache, so forceFetch option is ignored.
    */
-  async listAllTools(): Promise<ListToolsResult> {
+  async listAllTools(_options?: { forceFetch?: boolean }): Promise<ListToolsResult> {
     const allTools = [];
     let cursor: string | undefined = undefined;
 

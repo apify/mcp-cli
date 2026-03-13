@@ -49,11 +49,15 @@ export async function getTool(
   }
 
   await withMcpClient(target, options, async (client, _context) => {
-    // List all tools and find the matching one
-    // TODO: It is wasteful to always re-fetch the full list (applies also to prompts).
-    //  We should use the bridge's cached tools list (getCachedTools) to make this more efficient
-    const result = await client.listAllTools();
-    const tool = result.tools.find((t) => t.name === name);
+    // Use cached tools first, then re-fetch from server if tool not found
+    let result = await client.listAllTools();
+    let tool = result.tools.find((t) => t.name === name);
+
+    if (!tool) {
+      // Tool not in cache — force a fresh fetch in case the cache is stale
+      result = await client.listAllTools({ forceFetch: true });
+      tool = result.tools.find((t) => t.name === name);
+    }
 
     if (!tool) {
       throw new ClientError(`Tool not found: ${name}`);

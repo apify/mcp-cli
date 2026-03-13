@@ -134,19 +134,6 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     );
   }
 
-  // Cached tools list (no server call, returns bridge in-memory cache with all pages)
-  async getCachedTools(): Promise<ListToolsResult | null> {
-    return this.withRetry(
-      () =>
-        this.bridgeClient.request(
-          'getCachedTools',
-          undefined,
-          this.requestTimeout
-        ) as Promise<ListToolsResult | null>,
-      'getCachedTools'
-    );
-  }
-
   // MCP operations
   async ping(): Promise<void> {
     return this.withRetry(
@@ -167,7 +154,24 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     );
   }
 
-  async listAllTools(): Promise<ListToolsResult> {
+  async listAllTools(options?: { forceFetch?: boolean }): Promise<ListToolsResult> {
+    if (!options?.forceFetch) {
+      // Try the bridge's in-memory cache first (no server call)
+      const cached = await this.withRetry(
+        () =>
+          this.bridgeClient.request(
+            'getCachedTools',
+            undefined,
+            this.requestTimeout
+          ) as Promise<ListToolsResult | null>,
+        'getCachedTools'
+      );
+      if (cached && cached.tools.length > 0) {
+        return cached;
+      }
+    }
+
+    // Cache empty or forceFetch requested — fetch all pages from server
     const allTools = [];
     let cursor: string | undefined = undefined;
 

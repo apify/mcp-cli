@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Revised session states: auth failures (401/403) now show as `unauthorized` (separate from `expired` which is for session ID expiry), with actionable login guidance; new `disconnected` display state surfaces when bridge is alive but server has been unreachable for >2 minutes
 - `DISCONNECTED_THRESHOLD_MS` is now derived from `KEEPALIVE_INTERVAL_MS` (2× ping interval + 5s buffer) via shared constants, eliminating duplicate magic numbers
 - Tools cache now fetches all pages (not just the first) on startup and on `tools/list_changed` notifications
+- `listAllTools` now uses bridge cache by default (no server call), with `forceFetch` option to bypass; replaces separate `getCachedTools` method
+- `tools-get` uses cached tools list first and only re-fetches from server if the tool is not found
 
 ### Added
 

@@ -546,9 +546,9 @@ export async function showServerDetails(
     const serverDetails = await client.getServerDetails();
     const { serverInfo, capabilities, instructions, protocolVersion } = serverDetails;
 
-    // Get cached tools list from bridge (no extra server call)
-    const cachedToolsResult = await client.getCachedTools();
-    const tools = cachedToolsResult?.tools ?? [];
+    // Get tools list (uses bridge cache when available, no extra server call)
+    const cachedToolsResult = await client.listAllTools();
+    const tools = cachedToolsResult.tools;
 
     if (options.outputMode === 'human') {
       console.log(formatServerDetails(serverDetails, target, tools));
