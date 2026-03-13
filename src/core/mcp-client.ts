@@ -18,6 +18,7 @@ import type {
   GetTaskResult,
   ListTasksResult,
   CancelTaskResult,
+  Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { createNoOpLogger, type Logger } from '../lib/logger.js';
@@ -103,6 +104,7 @@ export class McpClient implements IMcpClient {
   private transport?: TransportWithTermination;
   private hasConnected = false;
   private requestTimeout?: number;
+  private cachedTools: Tool[] | null = null;
 
   constructor(clientInfo: Implementation, options: McpClientOptions = {}) {
     this.logger = options.logger || createNoOpLogger();
@@ -300,10 +302,14 @@ export class McpClient implements IMcpClient {
 
   /**
    * List all available tools across all pages.
-   * Direct connections have no cache, so forceFetch option is ignored.
+   * Returns cached tools if available; use forceFetch to bypass cache.
    */
-  async listAllTools(_options?: { forceFetch?: boolean }): Promise<ListToolsResult> {
-    const allTools = [];
+  async listAllTools(options?: { forceFetch?: boolean }): Promise<ListToolsResult> {
+    if (!options?.forceFetch && this.cachedTools) {
+      return { tools: this.cachedTools };
+    }
+
+    const allTools: Tool[] = [];
     let cursor: string | undefined = undefined;
 
     do {
@@ -312,7 +318,22 @@ export class McpClient implements IMcpClient {
       cursor = result.nextCursor;
     } while (cursor);
 
+    this.cachedTools = allTools;
     return { tools: allTools };
+  }
+
+  /**
+   * Get the cached tools list synchronously (returns null if not yet populated).
+   */
+  getCachedTools(): Tool[] | null {
+    return this.cachedTools;
+  }
+
+  /**
+   * Invalidate the cached tools list, forcing the next listAllTools call to re-fetch.
+   */
+  invalidateToolsCache(): void {
+    this.cachedTools = null;
   }
 
   /**

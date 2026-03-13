@@ -93,9 +93,6 @@ class BridgeProcess {
   // x402 wallet for automatic payment signing (received via IPC, stored in memory only)
   private x402Wallet: SignerWallet | null = null;
 
-  // Cached tools list for x402 proactive signing (updated via listChanged notifications)
-  private cachedTools: Tool[] | null = null;
-
   // Active async tasks (in-memory, also persisted to disk for crash recovery)
   private activeTasks: Map<string, Task> = new Map();
 
@@ -460,21 +457,6 @@ class BridgeProcess {
   }
 
   /**
-   * Refresh the tools cache by fetching all pages
-   */
-  private async refreshToolsCache(): Promise<void> {
-    if (!this.client) return;
-    try {
-      const result = await this.client.listAllTools();
-      this.cachedTools = result.tools;
-      logger.debug(`Refreshed tools cache (${this.cachedTools.length} tools)`);
-    } catch (error) {
-      // Non-fatal: tools will be fetched on demand
-      logger.warn('Failed to refresh tools cache:', error);
-    }
-  }
-
-  /**
    * Update session with notification timestamp for list changes
    */
   private async updateNotificationTimestamp(
@@ -534,7 +516,8 @@ class BridgeProcess {
       // after it connects and receives the auto-refreshed tools list
       const wallet = this.x402Wallet;
       const getToolByName = (name: string): Tool | undefined => {
-        return this.cachedTools?.find((t: Tool) => t.name === name);
+        // McpClient caches tools in-memory after the first listAllTools call
+        return this.client?.getCachedTools()?.find((t: Tool) => t.name === name);
       };
       customFetch = createX402FetchMiddleware(fetch, { wallet, getToolByName });
     }
@@ -566,9 +549,11 @@ class BridgeProcess {
           autoRefresh: false,
           onChanged: () => {
             logger.debug('Tools list changed notification received, refreshing all tools...');
-            this.refreshToolsCache().catch((err) => {
-              logger.warn('Failed to refresh tools cache:', err);
-            });
+            if (this.client) {
+              this.client.listAllTools({ forceFetch: true }).catch((err) => {
+                logger.warn('Failed to refresh tools cache:', err);
+              });
+            }
             // Broadcast notification to all connected clients
             this.broadcastNotification('tools/list_changed');
             // Update session with notification timestamp
@@ -649,9 +634,11 @@ class BridgeProcess {
     // The SDK calls authProvider.tokens() before each request,
     // which triggers OAuthTokenManager.getValidAccessToken() to refresh if needed
 
-    // Pre-populate tools cache (used by x402 proactive signing and getCachedTools IPC method)
+    // Pre-populate tools cache (used by x402 proactive signing and listAllTools IPC method)
     if (serverDetails.capabilities?.tools) {
-      await this.refreshToolsCache();
+      await this.client.listAllTools({ forceFetch: true }).catch((err) => {
+        logger.warn('Failed to pre-populate tools cache:', err);
+      });
     }
   }
 
@@ -1148,9 +1135,11 @@ class BridgeProcess {
           break;
         }
 
-        case 'getCachedTools':
-          result = { tools: this.cachedTools ?? [] };
+        case 'listAllTools': {
+          const params = message.params as { forceFetch?: boolean } | undefined;
+          result = await this.client.listAllTools(params);
           break;
+        }
 
         default:
           throw new ClientError(`Unknown MCP method: ${message.method}`);

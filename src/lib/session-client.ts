@@ -155,33 +155,15 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   }
 
   async listAllTools(options?: { forceFetch?: boolean }): Promise<ListToolsResult> {
-    if (!options?.forceFetch) {
-      // Try the bridge's in-memory cache first (no server call)
-      const cached = await this.withRetry(
-        () =>
-          this.bridgeClient.request(
-            'getCachedTools',
-            undefined,
-            this.requestTimeout
-          ) as Promise<ListToolsResult | null>,
-        'getCachedTools'
-      );
-      if (cached && cached.tools.length > 0) {
-        return cached;
-      }
-    }
-
-    // Cache empty or forceFetch requested — fetch all pages from server
-    const allTools = [];
-    let cursor: string | undefined = undefined;
-
-    do {
-      const result = await this.listTools(cursor);
-      allTools.push(...result.tools);
-      cursor = result.nextCursor;
-    } while (cursor);
-
-    return { tools: allTools };
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'listAllTools',
+          options?.forceFetch ? { forceFetch: true } : undefined,
+          this.requestTimeout
+        ) as Promise<ListToolsResult>,
+      'listAllTools'
+    );
   }
 
   async callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult> {
