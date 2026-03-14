@@ -8,15 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+
 - Session restart now auto-detects the `default` OAuth profile created after the session was established, fixing the `login` then `restart` flow for unauthorized sessions
 
 ### Changed
+
 - When `--profile` is not specified, only the `default` profile is used; non-default profiles require an explicit `--profile` flag
 - Revised session states: auth failures (401/403) now show as `unauthorized` (separate from `expired` which is for session ID expiry), with actionable login guidance; new `disconnected` display state surfaces when bridge is alive but server has been unreachable for >2 minutes
 - `DISCONNECTED_THRESHOLD_MS` is now derived from `KEEPALIVE_INTERVAL_MS` (2× ping interval + 5s buffer) via shared constants, eliminating duplicate magic numbers
 
 ### Added
 
+- x402 payments are now also sent via the MCP `_meta["x402/payment"]` field on `tools/call` requests, in addition to the existing HTTP `PAYMENT-SIGNATURE` header — servers can choose which mechanism to consume
+- `_meta` parameter threaded through the full tool call chain (`IMcpClient`, `SessionClient`, bridge IPC, `McpClient`) for forward compatibility
 - `mcpc login` now falls back to accepting a pasted callback URL when the browser cannot be opened (e.g. headless servers, containers)
 - `--async` flag for `tools-call` to opt-in to async task execution (experimental) with a progress spinner showing elapsed time, server status messages, and progress notification messages in human mode
 - `--detach` flag for `tools-call` to start an async task and return the task ID immediately without waiting for completion (implies `--async`)
@@ -34,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--no-profile` option for `connect` command to skip OAuth profile auto-detection and connect anonymously
 
 ### Fixed
+
 - `--async` and `--detach` tool calls now correctly send task creation parameters to the server, fixing "task stream ended without creating a task" errors
 - File lock retries now use randomized exponential backoff to reduce contention when multiple processes compete for the same lock
 - Explicit `--header "Authorization: Bearer ..."` is no longer silently ignored when a default OAuth profile exists for the same server; explicit CLI headers now take precedence over auto-detected profiles
