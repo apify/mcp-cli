@@ -236,7 +236,7 @@ export async function handleX402Command(args: string[]): Promise<void> {
     .option('-j, --json', 'Output in JSON format')
     .option('--verbose', 'Enable debug logging')
     .helpOption('-h, --help', 'Display help')
-    .addHelpCommand('help [command]', 'Display help for command')
+    .helpCommand('help [command]', 'Display help for command')
     .addHelpText(
       'after',
       `
