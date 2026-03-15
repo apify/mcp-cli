@@ -153,7 +153,15 @@ async function main(): Promise<void> {
   }
 
   // Check for help flag
+  // x402 has its own Commander program with full subcommand help, so pass --help through
   if (args.includes('--help') || args.includes('-h')) {
+    if (args.includes('x402')) {
+      const x402Index = args.indexOf('x402');
+      const x402Args = args.slice(x402Index + 1);
+      await handleX402Command(x402Args);
+      await closeFileLogger();
+      return;
+    }
     const program = createTopLevelProgram();
     await program.parseAsync(process.argv);
     return;
@@ -563,6 +571,8 @@ Subcommands:
   import <key>  Import wallet from private key
   info          Show wallet info
   sign <b64>    Sign payment from PAYMENT-REQUIRED header
+                  --amount <usd>      Override amount in USD
+                  --expiry <seconds>  Override expiry in seconds
   remove        Remove the wallet
 `
     )
@@ -573,9 +583,15 @@ Subcommands:
   program
     .command('help [command]')
     .description('Show help for a specific command')
-    .action((cmdName?: string) => {
+    .action(async (cmdName?: string) => {
       if (!cmdName) {
         program.outputHelp();
+        return;
+      }
+
+      // x402 has its own Commander program with full subcommand help
+      if (cmdName === 'x402') {
+        await handleX402Command(['--help']);
         return;
       }
 
