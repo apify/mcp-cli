@@ -229,7 +229,7 @@ async function signPaymentCommand(options: SignOptions): Promise<void> {
 
 export async function handleX402Command(args: string[]): Promise<void> {
   const program = new Command();
-  program.name('mcpc x402').description('x402 wallet management and payment signing');
+  program.name('mcpc x402').description('x402 wallet management and payment signing (EXPERIMENTAL)');
 
   // Inherit global options so they parse correctly
   program
