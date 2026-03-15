@@ -3,6 +3,7 @@
  */
 
 import { discoverTokenEndpoint } from '../../../../src/lib/auth/oauth-utils.js';
+import * as proxyFetchModule from '../../../../src/lib/proxy-fetch.js';
 
 // Helper to create a mock fetch Response
 function mockResponse(body: object | null, ok = true): Response {
@@ -16,7 +17,7 @@ describe('discoverTokenEndpoint', () => {
   let fetchSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    fetchSpy = jest.spyOn(global, 'fetch');
+    fetchSpy = jest.spyOn(proxyFetchModule, 'proxyFetch');
   });
 
   afterEach(() => {

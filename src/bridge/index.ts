@@ -6,6 +6,7 @@
  */
 
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
+import { initProxyFetch, proxyFetch } from '../lib/proxy-fetch.js';
 import { createServer, type Server as NetServer, type Socket } from 'net';
 import { unlink } from 'fs/promises';
 import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
@@ -521,7 +522,7 @@ class BridgeProcess {
       const getToolByName = (name: string): Tool | undefined => {
         return this.cachedTools?.find((t: Tool) => t.name === name);
       };
-      customFetch = createX402FetchMiddleware(fetch, { wallet, getToolByName });
+      customFetch = createX402FetchMiddleware(proxyFetch as FetchLike, { wallet, getToolByName });
     }
 
     const clientConfig: CreateMcpClientOptions = {
@@ -1412,6 +1413,7 @@ async function main(): Promise<void> {
   setGlobalDispatcher(
     new EnvHttpProxyAgent(insecure ? { connect: { rejectUnauthorized: false } } : {})
   );
+  initProxyFetch({ insecure });
 
   try {
     const bridgeOptions: BridgeOptions = {

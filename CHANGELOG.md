@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- HTTP proxy support (`HTTP_PROXY`/`HTTPS_PROXY` env vars) now works for MCP server connections, OAuth token refresh, and x402 payment signing — previously the MCP SDK transport and OAuth calls bypassed the global proxy dispatcher
 - Session restart now auto-detects the `default` OAuth profile created after the session was established, fixing the `login` then `restart` flow for unauthorized sessions
 
 ### Changed

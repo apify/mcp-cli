@@ -39,6 +39,7 @@ import {
 import { createLogger, getVerbose } from '../lib/logger.js';
 import type { ServerConfig } from '../lib/types.js';
 import { ClientError } from '../lib/errors.js';
+import { proxyFetch } from '../lib/proxy-fetch.js';
 
 /**
  * Create a stdio transport for a local MCP server
@@ -79,10 +80,16 @@ export function createStreamableHttpTransport(
     maxRetries: 10, // Max 10 reconnection attempts
   };
 
-  const transport = new StreamableHTTPClientTransport(new URL(url), {
+  // Inject proxy-aware fetch so HTTP requests respect HTTP_PROXY/HTTPS_PROXY env vars.
+  // The MCP SDK's transport does not use undici's global dispatcher, so we must pass
+  // an explicit fetch function that routes through EnvHttpProxyAgent.
+  const transportOptions: StreamableHTTPClientTransportOptions = {
     reconnectionOptions: defaultReconnectionOptions,
+    fetch: proxyFetch as StreamableHTTPClientTransportOptions['fetch'],
     ...options,
-  });
+  };
+
+  const transport = new StreamableHTTPClientTransport(new URL(url), transportOptions);
 
   // Verify authProvider is correctly attached
   // @ts-expect-error accessing private property for debugging

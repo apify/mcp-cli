@@ -11,6 +11,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
+import { initProxyFetch } from '../lib/proxy-fetch.js';
 import { Command } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatHumanError, ClientError } from '../lib/index.js';
@@ -51,6 +52,7 @@ const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.j
   setGlobalDispatcher(
     new EnvHttpProxyAgent(insecure ? { connect: { rejectUnauthorized: false } } : {})
   );
+  initProxyFetch({ insecure });
 }
 
 /**
