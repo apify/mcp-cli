@@ -129,7 +129,11 @@ Commands:
   login <server>               Interactively login to a server using OAuth and save profile
   logout <server>              Delete an authentication profile for a server
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
-  x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
+  x402 init                    Create a new x402 wallet (EXPERIMENTAL)
+  x402 import <private-key>    Import an existing wallet from a private key
+  x402 info                    Show wallet info
+  x402 remove                  Remove the wallet
+  x402 sign <payment-required> Sign a payment [--amount <usd>] [--expiry <seconds>]
   help [command]               Show help for a specific command
 
 MCP session commands (after connecting):
@@ -709,6 +713,35 @@ mcpc x402 remove
 ```
 
 After creating a wallet, **fund it with USDC on Base** (mainnet or Sepolia testnet) to enable payments.
+
+### Manual payment signing
+
+You can manually sign a payment from a server's `PAYMENT-REQUIRED` header using `x402 sign`.
+This is useful for pre-signing payments or integrating with tools outside of `mcpc`.
+
+```bash
+# Sign a payment using the base64-encoded PAYMENT-REQUIRED header
+mcpc x402 sign <base64-payment-required>
+
+# Override the amount (in USD, e.g. 2.50 = $2.50)
+mcpc x402 sign <base64-payment-required> --amount 2.50
+
+# Override the expiry (in seconds from now)
+mcpc x402 sign <base64-payment-required> --expiry 7200
+
+# Combine overrides and use JSON output
+mcpc x402 sign <base64-payment-required> --amount 1.00 --expiry 3600 --json
+```
+
+**Options:**
+
+| Option              | Description                                                      |
+| ------------------- | ---------------------------------------------------------------- |
+| `--amount <usd>`    | Override the payment amount in USD (e.g. `0.50` for $0.50)       |
+| `--expiry <seconds>`| Override the payment expiry in seconds from now (e.g. `3600`)    |
+
+The command outputs the signed `PAYMENT-SIGNATURE` header value and an MCP config snippet
+that can be used directly with other MCP clients.
 
 ### Using x402 with MCP servers
 
