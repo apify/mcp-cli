@@ -579,11 +579,11 @@ Subcommands:
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     .action(() => {});
 
-  // help command: mcpc help [command]
+  // help command: mcpc help [command] (supports "help x402 sign" etc.)
   program
-    .command('help [command]')
+    .command('help [command] [subcommand]')
     .description('Show help for a specific command')
-    .action(async (cmdName?: string) => {
+    .action(async (cmdName?: string, subcommand?: string) => {
       if (!cmdName) {
         program.outputHelp();
         return;
@@ -591,7 +591,8 @@ Subcommands:
 
       // x402 has its own Commander program with full subcommand help
       if (cmdName === 'x402') {
-        await handleX402Command(['--help']);
+        const helpArgs = subcommand ? [subcommand, '--help'] : ['--help'];
+        await handleX402Command(helpArgs);
         return;
       }
 

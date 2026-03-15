@@ -232,7 +232,18 @@ export async function handleX402Command(args: string[]): Promise<void> {
   program.name('mcpc x402').description('x402 wallet management and payment signing');
 
   // Inherit global options so they parse correctly
-  program.option('-j, --json', 'Output in JSON format').option('--verbose', 'Enable debug logging');
+  program
+    .option('-j, --json', 'Output in JSON format')
+    .option('--verbose', 'Enable debug logging')
+    .helpOption('-h, --help', 'Display help')
+    .addHelpCommand('help [command]', 'Display help for command')
+    .addHelpText(
+      'after',
+      `
+sign options:
+  --amount <usd>      Override amount in USD
+  --expiry <seconds>  Override expiry in seconds`
+    );
 
   const resolveOutputMode = (cmd: Command): OutputMode => {
     const opts = cmd.optsWithGlobals();
@@ -270,6 +281,7 @@ export async function handleX402Command(args: string[]): Promise<void> {
   program
     .command('sign <payment-required>')
     .description('Sign a payment using the wallet')
+    .helpOption('-h, --help', 'Display help')
     .option('--amount <usd>', 'Override amount in USD')
     .option('--expiry <seconds>', 'Override expiry in seconds')
     .action(async (paymentRequired, opts, cmd) => {
