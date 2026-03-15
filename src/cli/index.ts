@@ -563,19 +563,6 @@ Without arguments, performs safe cleanup of stale data only.
   program
     .command('x402 [subcommand] [args...]')
     .description('Configure an x402 payment wallet (EXPERIMENTAL)')
-    .addHelpText(
-      'after',
-      `
-Subcommands:
-  init          Create a new x402 wallet
-  import <key>  Import wallet from private key
-  info          Show wallet info
-  sign <b64>    Sign payment from PAYMENT-REQUIRED header
-                  --amount <usd>      Override amount in USD
-                  --expiry <seconds>  Override expiry in seconds
-  remove        Remove the wallet
-`
-    )
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     .action(() => {});
 

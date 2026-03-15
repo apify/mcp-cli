@@ -130,7 +130,7 @@ Commands:
   logout <server>              Delete an authentication profile for a server
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
   x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
-  help [command]               Show help for a specific command
+  help [command] [subcommand]  Show help for a specific command
 
 MCP session commands (after connecting):
   <@session>                   Show MCP server info and capabilities
