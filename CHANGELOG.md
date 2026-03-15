@@ -16,10 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When `--profile` is not specified, only the `default` profile is used; non-default profiles require an explicit `--profile` flag
 - Revised session states: auth failures (401/403) now show as `unauthorized` (separate from `expired` which is for session ID expiry), with actionable login guidance; new `disconnected` display state surfaces when bridge is alive but server has been unreachable for >2 minutes
 - `DISCONNECTED_THRESHOLD_MS` is now derived from `KEEPALIVE_INTERVAL_MS` (2× ping interval + 5s buffer) via shared constants, eliminating duplicate magic numbers
+- Tools cache now fetches all pages (not just the first) on startup and on `tools/list_changed` notifications
+- `listAllTools` now uses bridge cache by default (no server call), with `forceFetch` option to bypass; replaces separate `getCachedTools` method
+- `tools-get` uses cached tools list first and only re-fetches from server if the tool is not found
 - `x402 sign` now takes the PAYMENT-REQUIRED header as a positional argument instead of `-r` flag (e.g. `mcpc x402 sign <base64>` instead of `mcpc x402 sign -r <base64>`)
 
 ### Added
 
+- `mcpc @session` now shows available tools list from bridge cache (no extra server call)
 - x402 payments are now also sent via the MCP `_meta["x402/payment"]` field on `tools/call` requests, in addition to the existing HTTP `PAYMENT-SIGNATURE` header — servers can choose which mechanism to consume
 - `_meta` parameter threaded through the full tool call chain (`IMcpClient`, `SessionClient`, bridge IPC, `McpClient`) for forward compatibility
 - `mcpc login` now falls back to accepting a pasted callback URL when the browser cannot be opened (e.g. headless servers, containers)

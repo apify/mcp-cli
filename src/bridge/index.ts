@@ -93,9 +93,6 @@ class BridgeProcess {
   // x402 wallet for automatic payment signing (received via IPC, stored in memory only)
   private x402Wallet: SignerWallet | null = null;
 
-  // Cached tools list for x402 proactive signing (updated via listChanged notifications)
-  private cachedTools: Tool[] | null = null;
-
   // Active async tasks (in-memory, also persisted to disk for crash recovery)
   private activeTasks: Map<string, Task> = new Map();
 
@@ -519,7 +516,8 @@ class BridgeProcess {
       // after it connects and receives the auto-refreshed tools list
       const wallet = this.x402Wallet;
       const getToolByName = (name: string): Tool | undefined => {
-        return this.cachedTools?.find((t: Tool) => t.name === name);
+        // McpClient caches tools in-memory after the first listAllTools call
+        return this.client?.getCachedTools()?.find((t: Tool) => t.name === name);
       };
       customFetch = createX402FetchMiddleware(fetch, { wallet, getToolByName });
     }
@@ -546,15 +544,15 @@ class BridgeProcess {
       ...(customFetch && { customFetch }),
       listChanged: {
         tools: {
-          // Let SDK auto-fetch the tools on list changed notification.
-          // Note that it fetches just the first page, not the subsequent using cursor
-          autoRefresh: true,
-          onChanged: (error: Error | null, tools: Tool[] | null) => {
-            logger.debug('Tools list changed', { error, count: tools?.length });
-            // Update local tools cache (used by x402 middleware for proactive signing)
-            if (tools) {
-              this.cachedTools = tools;
-              logger.debug(`Updated cached tools list (${tools.length} tools)`);
+          // We handle refresh ourselves to fetch ALL pages (SDK only fetches the first page).
+          // SDK's debounceMs still applies, preventing multiple rapid refreshes.
+          autoRefresh: false,
+          onChanged: () => {
+            logger.debug('Tools list changed notification received, refreshing all tools...');
+            if (this.client) {
+              this.client.listAllTools({ forceFetch: true }).catch((err) => {
+                logger.warn('Failed to refresh tools cache:', err);
+              });
             }
             // Broadcast notification to all connected clients
             this.broadcastNotification('tools/list_changed');
@@ -636,18 +634,11 @@ class BridgeProcess {
     // The SDK calls authProvider.tokens() before each request,
     // which triggers OAuthTokenManager.getValidAccessToken() to refresh if needed
 
-    // Pre-populate tools cache for x402 proactive signing
-    if (this.x402Wallet) {
-      try {
-        const toolsResult = await this.client.listTools();
-        if (toolsResult.tools) {
-          this.cachedTools = toolsResult.tools;
-          logger.debug(`Pre-populated tools cache (${this.cachedTools.length} tools) for x402`);
-        }
-      } catch (error) {
-        // Non-fatal: 402 fallback will still work without proactive signing
-        logger.warn('Failed to pre-populate tools cache for x402:', error);
-      }
+    // Pre-populate tools cache (used by x402 proactive signing and listAllTools IPC method)
+    if (serverDetails.capabilities?.tools) {
+      await this.client.listAllTools({ forceFetch: true }).catch((err) => {
+        logger.warn('Failed to pre-populate tools cache:', err);
+      });
     }
   }
 
@@ -1147,6 +1138,12 @@ class BridgeProcess {
             this.activeTasks.delete(params.taskId);
             await this.removePersistedTask(params.taskId).catch(() => {});
           }
+          break;
+        }
+
+        case 'listAllTools': {
+          const params = message.params as { forceFetch?: boolean } | undefined;
+          result = await this.client.listAllTools(params);
           break;
         }
 
