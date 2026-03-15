@@ -965,6 +965,7 @@ class BridgeProcess {
           const params = message.params as {
             name: string;
             arguments?: Record<string, unknown>;
+            _meta?: Record<string, unknown>;
             useTask?: boolean;
             detach?: boolean;
           };
@@ -972,7 +973,11 @@ class BridgeProcess {
             if (params.detach) {
               // Detached execution: start task and return task ID immediately
               // The tool continues running in the background on the server
-              const taskUpdate = await this.client.callToolDetached(params.name, params.arguments);
+              const taskUpdate = await this.client.callToolDetached(
+                params.name,
+                params.arguments,
+                params._meta
+              );
               this.activeTasks.set(taskUpdate.taskId, {
                 taskId: taskUpdate.taskId,
                 status: taskUpdate.status,
@@ -1011,7 +1016,8 @@ class BridgeProcess {
                 result = await this.client.callToolWithTask(
                   params.name,
                   params.arguments,
-                  wrappedOnUpdate
+                  wrappedOnUpdate,
+                  params._meta
                 );
               } finally {
                 // Clean up completed tasks from activeTasks and persistence
@@ -1031,7 +1037,7 @@ class BridgeProcess {
               }
             }
           } else {
-            result = await this.client.callTool(params.name, params.arguments);
+            result = await this.client.callTool(params.name, params.arguments, params._meta);
           }
           break;
         }
