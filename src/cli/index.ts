@@ -153,7 +153,15 @@ async function main(): Promise<void> {
   }
 
   // Check for help flag
+  // x402 has its own Commander program with full subcommand help, so pass --help through
   if (args.includes('--help') || args.includes('-h')) {
+    if (args.includes('x402')) {
+      const x402Index = args.indexOf('x402');
+      const x402Args = args.slice(x402Index + 1);
+      await handleX402Command(x402Args);
+      await closeFileLogger();
+      return;
+    }
     const program = createTopLevelProgram();
     await program.parseAsync(process.argv);
     return;
@@ -555,27 +563,23 @@ Without arguments, performs safe cleanup of stale data only.
   program
     .command('x402 [subcommand] [args...]')
     .description('Configure an x402 payment wallet (EXPERIMENTAL)')
-    .addHelpText(
-      'after',
-      `
-Subcommands:
-  init          Create a new x402 wallet
-  import <key>  Import wallet from private key
-  info          Show wallet info
-  sign <b64>    Sign payment from PAYMENT-REQUIRED header
-  remove        Remove the wallet
-`
-    )
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     .action(() => {});
 
-  // help command: mcpc help [command]
+  // help command: mcpc help [command] (supports "help x402 sign" etc.)
   program
-    .command('help [command]')
+    .command('help [command] [subcommand]')
     .description('Show help for a specific command')
-    .action((cmdName?: string) => {
+    .action(async (cmdName?: string, subcommand?: string) => {
       if (!cmdName) {
         program.outputHelp();
+        return;
+      }
+
+      // x402 has its own Commander program with full subcommand help
+      if (cmdName === 'x402') {
+        const helpArgs = subcommand ? [subcommand, '--help'] : ['--help'];
+        await handleX402Command(helpArgs);
         return;
       }
 
