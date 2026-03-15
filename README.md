@@ -129,11 +129,7 @@ Commands:
   login <server>               Interactively login to a server using OAuth and save profile
   logout <server>              Delete an authentication profile for a server
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
-  x402 init                    Create a new x402 wallet (EXPERIMENTAL)
-  x402 import <private-key>    Import an existing wallet from a private key
-  x402 info                    Show wallet info
-  x402 remove                  Remove the wallet
-  x402 sign <payment-required> Sign a payment [--amount <usd>] [--expiry <seconds>]
+  x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
   help [command]               Show help for a specific command
 
 MCP session commands (after connecting):
