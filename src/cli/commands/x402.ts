@@ -268,17 +268,13 @@ export async function handleX402Command(args: string[]): Promise<void> {
     });
 
   program
-    .command('sign')
+    .command('sign <payment-required>')
     .description('Sign a payment using the wallet')
-    .requiredOption(
-      '-r, --payment-required <base64>',
-      'PAYMENT-REQUIRED header from a 402 response'
-    )
     .option('--amount <usd>', 'Override amount in USD')
     .option('--expiry <seconds>', 'Override expiry in seconds')
-    .action(async (opts, cmd) => {
+    .action(async (paymentRequired, opts, cmd) => {
       await signPaymentCommand({
-        paymentRequired: opts.paymentRequired,
+        paymentRequired,
         amount: opts.amount,
         expiry: opts.expiry,
         outputMode: resolveOutputMode(cmd),

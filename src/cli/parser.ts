@@ -47,8 +47,6 @@ const OPTIONS_WITH_VALUES = [
   '-o',
   '--output',
   '--max-size',
-  '-r',
-  '--payment-required',
   '--amount',
   '--expiry',
 ];
