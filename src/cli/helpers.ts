@@ -8,7 +8,7 @@ import { ClientError } from '../lib/errors.js';
 import { normalizeServerUrl, isValidSessionName, getServerHost } from '../lib/utils.js';
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
-import { getAuthProfile, listAuthProfiles } from '../lib/auth/profiles.js';
+import { getAuthProfile } from '../lib/auth/profiles.js';
 import { logTarget } from './output.js';
 import { DEFAULT_AUTH_PROFILE } from '../lib/auth/oauth-utils.js';
 import { parseHeaderFlags } from './parser.js';
@@ -31,7 +31,7 @@ export async function resolveAuthProfile(
   serverUrl: string,
   target: string,
   specifiedProfile?: string,
-  context?: { sessionName?: string }
+  _context?: { sessionName?: string }
 ): Promise<string | undefined> {
   const host = getServerHost(serverUrl);
 
@@ -48,35 +48,18 @@ export async function resolveAuthProfile(
     return specifiedProfile;
   }
 
-  // No profile specified - try to use "default" profile if it exists
+  // No profile specified - only use "default" profile if it exists
+  // Non-default profiles require explicit --profile flag
   const defaultProfile = await getAuthProfile(serverUrl, DEFAULT_AUTH_PROFILE);
   if (defaultProfile) {
     logger.debug(`Using default auth profile for ${host}`);
     return DEFAULT_AUTH_PROFILE;
   }
 
-  // No default profile - check if ANY profile exists for this server
-  const allProfiles = await listAuthProfiles();
-  const serverProfiles = allProfiles.filter((p) => getServerHost(p.serverUrl) === host);
-
-  if (serverProfiles.length === 0) {
-    // No profiles at all - allow unauthenticated connection attempt
-    // If server requires auth, the connection error will provide guidance
-    logger.debug(`No auth profiles for ${host}, attempting unauthenticated connection`);
-    return undefined;
-  } else {
-    // Profiles exist but no default - suggest using --profile
-    const profileNames = serverProfiles.map((p) => p.name).join(', ');
-    const commandHint = context?.sessionName
-      ? `mcpc connect ${target} ${context.sessionName} --profile <name>`
-      : `mcpc login ${target} --profile <name>`;
-    throw new ClientError(
-      `No default authentication profile for ${host}.\n\n` +
-        `Available profiles: ${profileNames}\n\n` +
-        `To use a profile, run:\n` +
-        `  ${commandHint}`
-    );
-  }
+  // No default profile - allow unauthenticated connection attempt
+  // If server requires auth, the connection error will provide guidance
+  logger.debug(`No default auth profile for ${host}, attempting unauthenticated connection`);
+  return undefined;
 }
 
 /**

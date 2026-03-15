@@ -520,10 +520,45 @@ export class McpClient implements IMcpClient {
   ): Promise<CallToolResult> {
     try {
       this.logger.debug(`Calling tool with task: ${name}`, args);
+
+      // Track latest task info so progress notifications can reference it
+      let currentTaskId: string | undefined;
+      let currentStatus: TaskUpdate['status'] = 'working';
+
+      const onprogress = onUpdate
+        ? (progress: {
+            progress: number;
+            total?: number | undefined;
+            message?: string | undefined;
+          }): void => {
+            if (!currentTaskId) return;
+            this.logger.debug(
+              `Task ${currentTaskId} progress: ${progress.progress}/${progress.total ?? '?'}${progress.message ? ` - ${progress.message}` : ''}`
+            );
+            const update: TaskUpdate = {
+              taskId: currentTaskId,
+              status: currentStatus,
+            };
+            if (progress.message) {
+              update.progressMessage = progress.message;
+            }
+            update.progress = progress.progress;
+            if (progress.total !== undefined) {
+              update.progressTotal = progress.total;
+            }
+            onUpdate(update);
+          }
+        : undefined;
+
+      const requestOptions = { ...this.getRequestOptions(), task: {} };
+      if (onprogress) {
+        (requestOptions as Record<string, unknown>).onprogress = onprogress;
+      }
+
       const stream = this.client.experimental.tasks.callToolStream(
         { name, arguments: args || {} },
         CallToolResultSchema,
-        { ...this.getRequestOptions(), task: {} }
+        requestOptions
       );
 
       let result: CallToolResult | undefined;
@@ -532,11 +567,15 @@ export class McpClient implements IMcpClient {
         switch (message.type) {
           case 'taskCreated':
             this.logger.debug(`Task created: ${message.task.taskId}`);
+            currentTaskId = message.task.taskId;
+            currentStatus = message.task.status;
             onUpdate?.(taskToUpdate(message.task));
             break;
 
           case 'taskStatus':
             this.logger.debug(`Task ${message.task.taskId} status: ${message.task.status}`);
+            currentTaskId = message.task.taskId;
+            currentStatus = message.task.status;
             onUpdate?.(taskToUpdate(message.task));
             break;
 

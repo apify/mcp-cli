@@ -7,19 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Session restart now auto-detects the `default` OAuth profile created after the session was established, fixing the `login` then `restart` flow for unauthorized sessions
+
 ### Changed
+- When `--profile` is not specified, only the `default` profile is used; non-default profiles require an explicit `--profile` flag
 - Revised session states: auth failures (401/403) now show as `unauthorized` (separate from `expired` which is for session ID expiry), with actionable login guidance; new `disconnected` display state surfaces when bridge is alive but server has been unreachable for >2 minutes
 - `DISCONNECTED_THRESHOLD_MS` is now derived from `KEEPALIVE_INTERVAL_MS` (2× ping interval + 5s buffer) via shared constants, eliminating duplicate magic numbers
 - Tools cache now fetches all pages (not just the first) on startup and on `tools/list_changed` notifications
 - `listAllTools` now uses bridge cache by default (no server call), with `forceFetch` option to bypass; replaces separate `getCachedTools` method
 - `tools-get` uses cached tools list first and only re-fetches from server if the tool is not found
+- `x402 sign` now takes the PAYMENT-REQUIRED header as a positional argument instead of `-r` flag (e.g. `mcpc x402 sign <base64>` instead of `mcpc x402 sign -r <base64>`)
 
 ### Added
 
 - `mcpc @session` now shows available tools list from bridge cache (no extra server call)
 - `mcpc login` now falls back to accepting a pasted callback URL when the browser cannot be opened (e.g. headless servers, containers)
-- `--async` flag for `tools-call` to opt-in to async task execution (experimental) with a progress spinner showing elapsed time and server status messages in human mode
+- `--async` flag for `tools-call` to opt-in to async task execution (experimental) with a progress spinner showing elapsed time, server status messages, and progress notification messages in human mode
 - `--detach` flag for `tools-call` to start an async task and return the task ID immediately without waiting for completion (implies `--async`)
+- Press ESC during `--async` task execution to detach on the fly — the task continues in the background and the task ID is printed, same as `--detach`
 - New `tasks-list`, `tasks-get`, `tasks-cancel` commands for managing async tasks on the server
 - Task capability and `execution.taskSupport` displayed in `tools-get` and server info
 - E2E test server now includes a `slow-task` tool that supports async task execution
@@ -48,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed flaky E2E invariant check that failed when `lastSeenAt` changed between `--json` and `--json --verbose` calls
 - `--timeout` flag now correctly propagates to MCP requests via session bridge
 - `parseServerArg()` now handles well Windows drive-letter config paths as well as other ambiguous cases
+- `logging-set-level` JSON output no longer includes redundant `success` field
 
 ### Changed
 

@@ -258,6 +258,9 @@ export interface TaskUpdate {
   taskId: string;
   status: 'working' | 'input_required' | 'completed' | 'failed' | 'cancelled';
   statusMessage?: string;
+  progressMessage?: string; // Message from notifications/progress
+  progress?: number; // Current progress value from notifications/progress
+  progressTotal?: number; // Total progress value from notifications/progress
   createdAt?: string;
   lastUpdatedAt?: string;
 }
