@@ -18,6 +18,7 @@ import type {
   GetTaskResult,
   ListTasksResult,
   CancelTaskResult,
+  Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { createNoOpLogger, type Logger } from '../lib/logger.js';
@@ -103,6 +104,7 @@ export class McpClient implements IMcpClient {
   private transport?: TransportWithTermination;
   private hasConnected = false;
   private requestTimeout?: number;
+  private cachedTools: Tool[] | null = null;
 
   constructor(clientInfo: Implementation, options: McpClientOptions = {}) {
     this.logger = options.logger || createNoOpLogger();
@@ -282,7 +284,7 @@ export class McpClient implements IMcpClient {
   }
 
   /**
-   * List available tools
+   * List available tools (single page)
    */
   async listTools(cursor?: string): Promise<ListToolsResult> {
     try {
@@ -296,6 +298,42 @@ export class McpClient implements IMcpClient {
         originalError: error,
       });
     }
+  }
+
+  /**
+   * List all available tools across all pages.
+   * Returns cached tools if available; use refreshCache to bypass cache.
+   */
+  async listAllTools(options?: { refreshCache?: boolean }): Promise<ListToolsResult> {
+    if (!options?.refreshCache && this.cachedTools) {
+      return { tools: this.cachedTools };
+    }
+
+    const allTools: Tool[] = [];
+    let cursor: string | undefined = undefined;
+
+    do {
+      const result = await this.listTools(cursor);
+      allTools.push(...result.tools);
+      cursor = result.nextCursor;
+    } while (cursor);
+
+    this.cachedTools = allTools;
+    return { tools: allTools };
+  }
+
+  /**
+   * Get the cached tools list synchronously (returns null if not yet populated).
+   */
+  getCachedTools(): Tool[] | null {
+    return this.cachedTools;
+  }
+
+  /**
+   * Invalidate the cached tools list, forcing the next listAllTools call to re-fetch.
+   */
+  invalidateToolsCache(): void {
+    this.cachedTools = null;
   }
 
   /**
