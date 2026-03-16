@@ -154,12 +154,12 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     );
   }
 
-  async listAllTools(options?: { forceFetch?: boolean }): Promise<ListToolsResult> {
+  async listAllTools(options?: { refreshCache?: boolean }): Promise<ListToolsResult> {
     return this.withRetry(
       () =>
         this.bridgeClient.request(
           'listAllTools',
-          options?.forceFetch ? { forceFetch: true } : undefined,
+          options?.refreshCache ? { refreshCache: true } : undefined,
           this.requestTimeout
         ) as Promise<ListToolsResult>,
       'listAllTools'

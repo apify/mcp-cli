@@ -550,7 +550,7 @@ class BridgeProcess {
           onChanged: () => {
             logger.debug('Tools list changed notification received, refreshing all tools...');
             if (this.client) {
-              this.client.listAllTools({ forceFetch: true }).catch((err) => {
+              this.client.listAllTools({ refreshCache: true }).catch((err) => {
                 logger.warn('Failed to refresh tools cache:', err);
               });
             }
@@ -636,7 +636,7 @@ class BridgeProcess {
 
     // Pre-populate tools cache (used by x402 proactive signing and listAllTools IPC method)
     if (serverDetails.capabilities?.tools) {
-      await this.client.listAllTools({ forceFetch: true }).catch((err) => {
+      await this.client.listAllTools({ refreshCache: true }).catch((err) => {
         logger.warn('Failed to pre-populate tools cache:', err);
       });
     }
@@ -1142,7 +1142,7 @@ class BridgeProcess {
         }
 
         case 'listAllTools': {
-          const params = message.params as { forceFetch?: boolean } | undefined;
+          const params = message.params as { refreshCache?: boolean } | undefined;
           result = await this.client.listAllTools(params);
           break;
         }

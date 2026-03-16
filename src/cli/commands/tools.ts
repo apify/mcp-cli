@@ -27,7 +27,7 @@ export async function listTools(
   options: CommandOptions & { full?: boolean }
 ): Promise<void> {
   await withMcpClient(target, options, async (client, _context) => {
-    const result = await client.listAllTools({ forceFetch: true });
+    const result = await client.listAllTools({ refreshCache: true });
     console.log(
       formatOutput(result.tools, options.outputMode, options.full ? { full: true } : undefined)
     );
@@ -55,7 +55,7 @@ export async function getTool(
 
     if (!tool) {
       // Tool not in cache — force a fresh fetch in case the cache is stale
-      result = await client.listAllTools({ forceFetch: true });
+      result = await client.listAllTools({ refreshCache: true });
       tool = result.tools.find((t) => t.name === name);
     }
 

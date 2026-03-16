@@ -302,10 +302,10 @@ export class McpClient implements IMcpClient {
 
   /**
    * List all available tools across all pages.
-   * Returns cached tools if available; use forceFetch to bypass cache.
+   * Returns cached tools if available; use refreshCache to bypass cache.
    */
-  async listAllTools(options?: { forceFetch?: boolean }): Promise<ListToolsResult> {
-    if (!options?.forceFetch && this.cachedTools) {
+  async listAllTools(options?: { refreshCache?: boolean }): Promise<ListToolsResult> {
+    if (!options?.refreshCache && this.cachedTools) {
       return { tools: this.cachedTools };
     }
 
