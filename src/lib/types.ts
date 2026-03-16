@@ -372,6 +372,7 @@ export interface IMcpClient {
   // MCP operations
   ping(): Promise<void>;
   listTools(cursor?: string): Promise<ListToolsResult>;
+  listAllTools(options?: { refreshCache?: boolean }): Promise<ListToolsResult>;
   callTool(
     name: string,
     args?: Record<string, unknown>,

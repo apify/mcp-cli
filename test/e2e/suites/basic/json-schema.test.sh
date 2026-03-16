@@ -68,7 +68,7 @@ test_case "server details JSON has exact expected fields"
 run_mcpc "$SESSION" --json
 assert_success
 # MCP InitializeResult - validate exact top-level fields (no more, no less)
-expected_fields="_mcpc,capabilities,instructions,protocolVersion,serverInfo"
+expected_fields="_mcpc,capabilities,instructions,protocolVersion,serverInfo,tools"
 actual_fields=$(echo "$STDOUT" | jq -r 'keys | sort | join(",")')
 if [[ "$actual_fields" != "$expected_fields" ]]; then
   test_fail "unexpected top-level fields: expected [$expected_fields], got [$actual_fields]"
