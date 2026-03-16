@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--no-auto-restart` option for `connect` command to disable automatic bridge restart on crash (default: auto-restart enabled)
 - x402 payments are now also sent via the MCP `_meta["x402/payment"]` field on `tools/call` requests, in addition to the existing HTTP `PAYMENT-SIGNATURE` header — servers can choose which mechanism to consume
 - `_meta` parameter threaded through the full tool call chain (`IMcpClient`, `SessionClient`, bridge IPC, `McpClient`) for forward compatibility
 - `mcpc login` now falls back to accepting a pasted callback URL when the browser cannot be opened (e.g. headless servers, containers)

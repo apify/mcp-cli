@@ -88,6 +88,7 @@ export async function connectSession(
     proxyBearerToken?: string;
     x402?: boolean;
     insecure?: boolean;
+    autoRestart?: boolean;
   }
 ): Promise<void> {
   // Validate session name
@@ -233,6 +234,7 @@ export async function connectSession(
     ...(proxyConfig && { proxy: proxyConfig }),
     ...(options.x402 && { x402: true }),
     ...(options.insecure && { insecure: true }),
+    ...(options.autoRestart === false && { autoRestart: false }),
   };
 
   if (isReconnect) {

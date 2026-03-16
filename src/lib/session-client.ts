@@ -35,6 +35,7 @@ import { BridgeClient } from './bridge-client.js';
 import { ensureBridgeReady, restartBridge } from './bridge-manager.js';
 import { NetworkError } from './errors.js';
 import { getSocketPath, getLogsDir, generateRequestId } from './utils.js';
+import { getSession } from './sessions.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('session-client');
@@ -47,11 +48,13 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   private bridgeClient: BridgeClient;
   private sessionName: string;
   private requestTimeout?: number; // Per-request timeout in seconds
+  private autoRestart: boolean; // Whether to auto-restart bridge on crash
 
-  constructor(sessionName: string, bridgeClient: BridgeClient) {
+  constructor(sessionName: string, bridgeClient: BridgeClient, autoRestart = true) {
     super();
     this.sessionName = sessionName;
     this.bridgeClient = bridgeClient;
+    this.autoRestart = autoRestart;
     this.setupNotificationForwarding();
   }
 
@@ -94,6 +97,16 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         const logPath = `${getLogsDir()}/bridge-${this.sessionName}.log`;
         err.message = `${err.message}. For details, check logs at ${logPath}`;
         throw error;
+      }
+
+      // If auto-restart is disabled, don't retry
+      if (!this.autoRestart) {
+        const logPath = `${getLogsDir()}/bridge-${this.sessionName}.log`;
+        throw new NetworkError(
+          `Bridge for ${this.sessionName} connection failed (auto-restart is disabled).\n` +
+            `To restart manually, run: mcpc ${this.sessionName} restart\n` +
+            `For details, check logs at ${logPath}`
+        );
       }
 
       logger.debug(`Socket error during ${operationName}, will restart bridge...`);
@@ -323,6 +336,16 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         throw error;
       }
 
+      // If auto-restart is disabled, don't retry
+      if (!this.autoRestart) {
+        const logPath = `${getLogsDir()}/bridge-${this.sessionName}.log`;
+        throw new NetworkError(
+          `Bridge for ${this.sessionName} connection failed (auto-restart is disabled).\n` +
+            `To restart manually, run: mcpc ${this.sessionName} restart\n` +
+            `For details, check logs at ${logPath}`
+        );
+      }
+
       logger.debug(`Socket error during callToolWithTask, will restart bridge...`);
       await this.bridgeClient.close();
       await restartBridge(this.sessionName);
@@ -446,12 +469,16 @@ export async function createSessionClient(sessionName: string): Promise<SessionC
   // Ensure bridge is healthy (may restart it)
   const socketPath = await ensureBridgeReady(sessionName);
 
+  // Load session to check autoRestart setting
+  const session = await getSession(sessionName);
+  const autoRestart = session?.autoRestart !== false;
+
   // Connect to the healthy bridge
   const bridgeClient = new BridgeClient(socketPath);
   await bridgeClient.connect();
 
-  logger.debug(`Created SessionClient for ${sessionName}`);
-  return new SessionClient(sessionName, bridgeClient);
+  logger.debug(`Created SessionClient for ${sessionName} (autoRestart: ${autoRestart})`);
+  return new SessionClient(sessionName, bridgeClient, autoRestart);
 }
 
 /**
