@@ -136,7 +136,7 @@ export interface SessionData {
   profileName?: string; // Name of auth profile (for OAuth servers)
   x402?: boolean; // x402 auto-payment enabled for this session
   insecure?: boolean; // Skip TLS certificate verification
-  autoRestart?: boolean; // Auto-restart bridge on crash (default: true)
+  autoRestart?: boolean; // Auto-restart bridge on crash (default: false)
   pid?: number; // Bridge process PID
   protocolVersion?: string; // Negotiated MCP version
   mcpSessionId?: string; // Server-assigned MCP session ID for resumption (Streamable HTTP only)

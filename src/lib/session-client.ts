@@ -50,7 +50,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   private requestTimeout?: number; // Per-request timeout in seconds
   private autoRestart: boolean; // Whether to auto-restart bridge on crash
 
-  constructor(sessionName: string, bridgeClient: BridgeClient, autoRestart = true) {
+  constructor(sessionName: string, bridgeClient: BridgeClient, autoRestart = false) {
     super();
     this.sessionName = sessionName;
     this.bridgeClient = bridgeClient;
@@ -99,12 +99,13 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         throw error;
       }
 
-      // If auto-restart is disabled, don't retry
+      // Only auto-restart if explicitly enabled
       if (!this.autoRestart) {
         const logPath = `${getLogsDir()}/bridge-${this.sessionName}.log`;
         throw new NetworkError(
-          `Bridge for ${this.sessionName} connection failed (auto-restart is disabled).\n` +
+          `Bridge for ${this.sessionName} connection failed.\n` +
             `To restart manually, run: mcpc ${this.sessionName} restart\n` +
+            `To enable automatic restarts, recreate with: mcpc connect --auto-restart <server> ${this.sessionName}\n` +
             `For details, check logs at ${logPath}`
         );
       }
@@ -336,12 +337,13 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         throw error;
       }
 
-      // If auto-restart is disabled, don't retry
+      // Only auto-restart if explicitly enabled
       if (!this.autoRestart) {
         const logPath = `${getLogsDir()}/bridge-${this.sessionName}.log`;
         throw new NetworkError(
-          `Bridge for ${this.sessionName} connection failed (auto-restart is disabled).\n` +
+          `Bridge for ${this.sessionName} connection failed.\n` +
             `To restart manually, run: mcpc ${this.sessionName} restart\n` +
+            `To enable automatic restarts, recreate with: mcpc connect --auto-restart <server> ${this.sessionName}\n` +
             `For details, check logs at ${logPath}`
         );
       }
@@ -471,7 +473,7 @@ export async function createSessionClient(sessionName: string): Promise<SessionC
 
   // Load session to check autoRestart setting
   const session = await getSession(sessionName);
-  const autoRestart = session?.autoRestart !== false;
+  const autoRestart = session?.autoRestart === true;
 
   // Connect to the healthy bridge
   const bridgeClient = new BridgeClient(socketPath);

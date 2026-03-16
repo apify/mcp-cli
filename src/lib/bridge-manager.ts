@@ -567,12 +567,13 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     logger.debug(`Bridge process not alive for ${sessionName}, will try to restart it`);
   }
 
-  // Bridge not healthy - check if auto-restart is disabled
-  if (session.autoRestart === false) {
+  // Bridge not healthy - only auto-restart if explicitly enabled
+  if (session.autoRestart !== true) {
     const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
     throw new ClientError(
-      `Bridge for ${sessionName} is not running (auto-restart is disabled).\n` +
+      `Bridge for ${sessionName} is not running.\n` +
         `To restart manually, run: mcpc ${sessionName} restart\n` +
+        `To enable automatic restarts, recreate with: mcpc connect --auto-restart <server> ${sessionName}\n` +
         `For details, check logs at ${logPath}`
     );
   }

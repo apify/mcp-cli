@@ -375,7 +375,7 @@ Full docs: ${docsUrl}`
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
-    .option('--no-auto-restart', 'Disable automatic bridge restart on crash')
+    .option('--auto-restart', 'Automatically restart bridge on crash (default: no restart)')
     .addHelpText(
       'after',
       `
@@ -422,7 +422,7 @@ Server formats:
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
           ...(globalOpts.insecure && { insecure: true }),
-          ...(!opts.autoRestart && { autoRestart: false }),
+          ...(opts.autoRestart && { autoRestart: true }),
         });
       } else {
         await sessions.connectSession(server, sessionName, {
@@ -432,7 +432,7 @@ Server formats:
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
           ...(globalOpts.insecure && { insecure: true }),
-          ...(!opts.autoRestart && { autoRestart: false }),
+          ...(opts.autoRestart && { autoRestart: true }),
         });
       }
     });

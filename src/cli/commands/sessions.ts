@@ -234,7 +234,7 @@ export async function connectSession(
     ...(proxyConfig && { proxy: proxyConfig }),
     ...(options.x402 && { x402: true }),
     ...(options.insecure && { insecure: true }),
-    ...(options.autoRestart === false && { autoRestart: false }),
+    ...(options.autoRestart && { autoRestart: true }),
   };
 
   if (isReconnect) {
