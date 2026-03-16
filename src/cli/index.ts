@@ -375,7 +375,7 @@ Full docs: ${docsUrl}`
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
-    .option('--auto-restart', 'Automatically restart bridge on crash (default: no restart)')
+    .option('--auto-restart', 'Automatically restart session when it expires')
     .addHelpText(
       'after',
       `

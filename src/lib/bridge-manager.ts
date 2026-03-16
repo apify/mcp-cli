@@ -48,17 +48,26 @@ const logger = createLogger('bridge-manager');
  * Classify a bridge health check error as session expiry or auth failure and throw.
  * Session expiry (404/session-not-found) is checked first since it's more specific
  * than auth errors (401/403/unauthorized). Does nothing if neither pattern matches.
+ *
+ * When autoRestart is true, session expiry is marked but not thrown — the caller
+ * is expected to handle the restart. Returns 'expired' in this case.
  */
 async function classifyAndThrowSessionError(
   sessionName: string,
-  session: { server: ServerConfig },
+  session: { server: ServerConfig; autoRestart?: boolean },
   errorMessage: string,
   originalError?: Error
-): Promise<void> {
+): Promise<'expired' | void> {
   if (isSessionExpiredError(errorMessage)) {
     await updateSession(sessionName, { status: 'expired' }).catch((e) =>
       logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
     );
+
+    if (session.autoRestart) {
+      logger.debug(`Session ${sessionName} expired, auto-restart enabled — deferring to caller`);
+      return 'expired';
+    }
+
     const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
     throw new ClientError(
       `Session ${sessionName} expired (server rejected session ID). ` +
@@ -529,11 +538,41 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   }
 
   if (session.status === 'expired') {
+    if (session.autoRestart) {
+      logger.debug(`Session ${sessionName} expired, auto-restarting...`);
+      // Clear expired status so restartBridge can proceed
+      await updateSession(sessionName, { status: 'active' });
+      await restartBridge(sessionName);
+
+      const socketPath = getSocketPath(sessionName);
+      const result = await checkBridgeHealth(socketPath);
+      if (result.healthy) {
+        logger.debug(`Session ${sessionName} auto-restarted successfully after expiry`);
+        return socketPath;
+      }
+
+      // Auto-restart failed - classify the error (omit autoRestart to prevent retry loop)
+      const errorMsg = result.error?.message || 'unknown error';
+      await classifyAndThrowSessionError(
+        sessionName,
+        { server: session.server },
+        errorMsg,
+        result.error
+      );
+
+      const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
+      throw new ClientError(
+        `Session ${sessionName} failed to auto-restart after expiry: ${errorMsg}. ` +
+          `For details, check logs at ${logPath}`
+      );
+    }
+
     throw new ClientError(
       `Session ${sessionName} has expired. ` +
         `The MCP server indicated the session is no longer valid.\n` +
         `To restart the session, run: mcpc ${sessionName} restart\n` +
-        `To remove the expired session, run: mcpc ${sessionName} close`
+        `To remove the expired session, run: mcpc ${sessionName} close\n` +
+        `To enable automatic restarts on expiry, recreate with: mcpc connect --auto-restart <server> ${sessionName}`
     );
   }
 
@@ -553,7 +592,40 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     // Not healthy - check error type
     if (result.error) {
       const errorMessage = result.error.message || '';
-      await classifyAndThrowSessionError(sessionName, session, errorMessage, result.error);
+      const classification = await classifyAndThrowSessionError(
+        sessionName,
+        session,
+        errorMessage,
+        result.error
+      );
+      if (classification === 'expired') {
+        // Auto-restart handles expiry below via the shared restart path
+        logger.debug(`Session ${sessionName} expired during health check, auto-restarting...`);
+        await stopBridge(sessionName).catch(() => {});
+        await updateSession(sessionName, { status: 'active' });
+        await restartBridge(sessionName);
+
+        const retryResult = await checkBridgeHealth(socketPath);
+        if (retryResult.healthy) {
+          logger.debug(`Session ${sessionName} auto-restarted successfully after expiry`);
+          return socketPath;
+        }
+
+        const retryMsg = retryResult.error?.message || 'unknown error';
+        // On retry failure, don't loop — pass autoRestart=false equivalent by using a plain session
+        await classifyAndThrowSessionError(
+          sessionName,
+          { server: session.server },
+          retryMsg,
+          retryResult.error
+        );
+
+        const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
+        throw new ClientError(
+          `Session ${sessionName} failed to auto-restart after expiry: ${retryMsg}. ` +
+            `For details, check logs at ${logPath}`
+        );
+      }
       if (result.error instanceof NetworkError) {
         logger.debug(`Bridge process alive but socket not responding for ${sessionName}`);
       } else {
@@ -565,17 +637,6 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     }
   } else {
     logger.debug(`Bridge process not alive for ${sessionName}, will try to restart it`);
-  }
-
-  // Bridge not healthy - only auto-restart if explicitly enabled
-  if (session.autoRestart !== true) {
-    const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
-    throw new ClientError(
-      `Bridge for ${sessionName} is not running.\n` +
-        `To restart manually, run: mcpc ${sessionName} restart\n` +
-        `To enable automatic restarts, recreate with: mcpc connect --auto-restart <server> ${sessionName}\n` +
-        `For details, check logs at ${logPath}`
-    );
   }
 
   // Bridge not healthy - restart it
