@@ -394,15 +394,22 @@ class BridgeProcess {
         );
         this.mcpClientReadyRejecter(error as Error);
 
-        // If the error was due to session ID rejection or auth failure, mark session as expired
-        // User must explicitly use 'mcpc @session restart' to start a new session
+        // If the error was due to session ID rejection or auth failure, mark session status
+        // User must explicitly use 'mcpc @session restart' or 'mcpc login' to recover
         const errorMsg = (error as Error).message || '';
-        if (isSessionExpiredError(errorMsg) || isAuthenticationError(errorMsg)) {
-          logger.warn('Session rejected by server (expired or auth failure), marking as expired');
+        if (isSessionExpiredError(errorMsg)) {
+          logger.warn('Session rejected by server (expired session ID), marking as expired');
           try {
             await updateSession(this.options.sessionName, { status: 'expired' });
           } catch (updateError) {
             logger.error('Failed to mark session as expired:', updateError);
+          }
+        } else if (isAuthenticationError(errorMsg)) {
+          logger.warn('Server requires authentication, marking as unauthorized');
+          try {
+            await updateSession(this.options.sessionName, { status: 'unauthorized' });
+          } catch (updateError) {
+            logger.error('Failed to mark session as unauthorized:', updateError);
           }
         }
 

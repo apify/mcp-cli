@@ -35,7 +35,7 @@ import {
   storeKeychainSessionHeaders,
   storeKeychainProxyBearerToken,
 } from '../../lib/auth/keychain.js';
-import { ClientError } from '../../lib/index.js';
+import { AuthError, ClientError } from '../../lib/index.js';
 import { getWallet } from '../../lib/wallets.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
@@ -294,14 +294,24 @@ export async function connectSession(
     console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
   }
 
-  // Display server info via the new session.
+  // Display server info via the new session (best-effort).
   // showServerDetails blocks until the bridge is connected (via health check),
   // so by the time it returns or throws, we have definitive bridge status.
-  // Re-throw all errors — if the bridge can't connect, the user should know immediately.
-  await showServerDetails(name, {
-    ...options,
-    hideTarget: false, // Show session info prefix
-  });
+  // Re-throw auth errors (real failures requiring user action), but swallow others
+  // (TLS errors, timeouts, etc.) since the session was created and can be used later.
+  try {
+    await showServerDetails(name, {
+      ...options,
+      hideTarget: false, // Show session info prefix
+    });
+  } catch (detailsError) {
+    if (detailsError instanceof AuthError) {
+      throw detailsError;
+    }
+    logger.debug(
+      `showServerDetails failed for new session ${name}: ${(detailsError as Error).message}`
+    );
+  }
 }
 
 // DISCONNECTED_THRESHOLD_MS imported from ../../lib/types.js
