@@ -479,7 +479,7 @@ function formatToolsSummary(tools: Tool[]): string[] {
     if (execution?.taskSupport) parts.push('async');
     const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
     lines.push(
-      `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)}${chalk.dim(params)}${grayBacktick()}${suffix}`
+      `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)}${params}${grayBacktick()}${suffix}`
     );
   }
 
