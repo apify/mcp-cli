@@ -116,11 +116,19 @@ function keychainSet(account: string, value: string): Promise<void> {
   );
 }
 
-function keychainGet(account: string): Promise<string | null> {
-  return withKeychain(
+async function keychainGet(account: string): Promise<string | null> {
+  const result = await withKeychain(
     (EntryClass) => new EntryClass(SERVICE_NAME, account).getPassword() ?? null,
     () => fileGet(account)
   );
+  // If OS keychain returned null, also check file-based fallback.
+  // Another process (e.g. CLI) may have stored the value in the file because
+  // the OS keychain was unavailable for writes (setPassword throws) while
+  // getPassword silently returns null for missing entries.
+  if (result === null && keychainAvailable === true) {
+    return fileGet(account);
+  }
+  return result;
 }
 
 function keychainDelete(account: string): Promise<boolean> {
