@@ -29,7 +29,10 @@ export async function listTools(
   await withMcpClient(target, options, async (client, _context) => {
     const result = await client.listAllTools({ refreshCache: true });
     console.log(
-      formatOutput(result.tools, options.outputMode, options.full ? { full: true } : undefined)
+      formatOutput(result.tools, options.outputMode, {
+        ...(options.full && { full: true }),
+        sessionName: target,
+      })
     );
   });
 }
