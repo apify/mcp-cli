@@ -40,6 +40,7 @@ jest.mock('../../../src/lib/sessions.js', () => ({
 // Import after mock is set up
 import {
   formatSchemaType,
+  shortType,
   formatSimplifiedArgs,
   formatTools,
   formatToolDetail,
@@ -204,6 +205,44 @@ describe('formatSchemaType', () => {
     expect(formatSchemaType(undefined as unknown as Record<string, unknown>)).toBe('any');
     expect(formatSchemaType('string' as unknown as Record<string, unknown>)).toBe('any');
     expect(formatSchemaType({} as Record<string, unknown>)).toBe('any');
+  });
+});
+
+describe('shortType', () => {
+  it('should abbreviate primitive types', () => {
+    expect(shortType({ type: 'string' })).toBe('str');
+    expect(shortType({ type: 'number' })).toBe('num');
+    expect(shortType({ type: 'integer' })).toBe('num');
+    expect(shortType({ type: 'boolean' })).toBe('bool');
+    expect(shortType({ type: 'object' })).toBe('obj');
+  });
+
+  it('should format array types with brackets', () => {
+    expect(shortType({ type: 'array', items: { type: 'string' } })).toBe('[str]');
+    expect(shortType({ type: 'array', items: { type: 'number' } })).toBe('[num]');
+    expect(shortType({ type: 'array', items: { type: 'object' } })).toBe('[obj]');
+    expect(shortType({ type: 'array' })).toBe('[any]');
+  });
+
+  it('should handle nested arrays', () => {
+    expect(
+      shortType({ type: 'array', items: { type: 'array', items: { type: 'boolean' } } })
+    ).toBe('[[bool]]');
+  });
+
+  it('should handle union types, filtering null', () => {
+    expect(shortType({ type: ['string', 'null'] })).toBe('str');
+    expect(shortType({ type: ['number', 'string'] })).toBe('num | str');
+  });
+
+  it('should handle enums', () => {
+    expect(shortType({ enum: ['a', 'b', 'c'] })).toBe('enum');
+  });
+
+  it('should return "any" for invalid input', () => {
+    expect(shortType(null as unknown as Record<string, unknown>)).toBe('any');
+    expect(shortType(undefined as unknown as Record<string, unknown>)).toBe('any');
+    expect(shortType({} as Record<string, unknown>)).toBe('any');
   });
 });
 
@@ -397,8 +436,8 @@ describe('formatTools', () => {
 
     it('should show tool names in backticks', () => {
       const output = formatTools(sampleTools);
-      expect(output).toContain('`search_web`');
-      expect(output).toContain('`run_actor`');
+      expect(output).toContain('`search_web(');
+      expect(output).toContain('`run_actor(');
     });
 
     it('should use * bullet character', () => {
@@ -409,9 +448,9 @@ describe('formatTools', () => {
     it('should show inline parameters with short types after tool name', () => {
       const output = formatTools(sampleTools);
       // search_web: 1 required + 2 optional = 3 total, all shown
-      expect(output).toContain('`search_web`(query: str, maxResults?: num, language?: str)');
+      expect(output).toContain('`search_web(query: str, maxResults?: num, language?: str)`');
       // run_actor: 1 required + 4 optional = 5 total, show first 3 + ellipsis
-      expect(output).toContain('`run_actor`(actorId: str, input?: obj, memory?: num, \u2026)');
+      expect(output).toContain('`run_actor(actorId: str, input?: obj, memory?: num, \u2026)`');
     });
 
     it('should show annotations after parameters', () => {
@@ -476,7 +515,7 @@ describe('formatTools', () => {
       ];
 
       const output = formatTools(tools);
-      expect(output).toContain('`no_params_tool`()');
+      expect(output).toContain('`no_params_tool()`');
     });
 
     it('should handle tools with no description', () => {
@@ -491,7 +530,7 @@ describe('formatTools', () => {
       ];
 
       const output = formatTools(tools);
-      expect(output).toContain('`undocumented`(arg?: str)');
+      expect(output).toContain('`undocumented(arg?: str)`');
     });
 
     it('should handle empty tools array', () => {
@@ -515,8 +554,8 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain('`async_tool`() [async]');
-      expect(output).not.toContain('`sync_tool`() [');
+      expect(output).toContain('`async_tool()` [async]');
+      expect(output).not.toContain('`sync_tool()` [');
     });
 
     it('should show all params when 3 or fewer total', () => {
@@ -536,7 +575,7 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain('`simple_tool`(a: str, b?: num, c?: bool)');
+      expect(output).toContain('`simple_tool(a: str, b?: num, c?: bool)`');
     });
 
     it('should show at most 3 params with ellipsis for the rest', () => {
@@ -559,7 +598,7 @@ describe('formatTools', () => {
 
       const output = formatTools(tools);
       // Required params first, then optional; max 3 shown + ellipsis
-      expect(output).toContain('`many_required`(a: str, b: str, c: str, \u2026)');
+      expect(output).toContain('`many_required(a: str, b: str, c: str, \u2026)`');
     });
 
     it('should combine annotations and async indicator', () => {

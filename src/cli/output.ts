@@ -379,7 +379,7 @@ export function formatTools(tools: Tool[], options?: FormatOptions): string {
  * Convert a full JSON Schema type to a short abbreviation for inline display.
  * e.g., 'string' -> 'str', 'object' -> 'obj', 'array<string>' -> '[str]'
  */
-function shortType(schema: Record<string, unknown>): string {
+export function shortType(schema: Record<string, unknown>): string {
   if (!schema || typeof schema !== 'object') return 'any';
 
   const schemaType = schema.type;
@@ -458,7 +458,7 @@ function formatToolParamsInline(schema: Record<string, unknown>): string {
 
 /**
  * Format tools summary list (shared by compact and full modes)
- * Format: * `tool_name`(params) [annotations]
+ * Format: * `tool_name(params)` [annotations]
  */
 function formatToolsSummary(tools: Tool[]): string[] {
   const lines: string[] = [];
@@ -478,7 +478,7 @@ function formatToolsSummary(tools: Tool[]): string[] {
     const execution = toolAny.execution as Record<string, unknown> | undefined;
     if (execution?.taskSupport) parts.push('async');
     const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
-    lines.push(`${bullet} ${inBackticks(tool.name)}${chalk.dim(params)}${suffix}`);
+    lines.push(`${bullet} ${grayBacktick()}${chalk.cyan(tool.name)}${chalk.dim(params)}${grayBacktick()}${suffix}`);
   }
 
   return lines;
