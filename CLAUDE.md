@@ -535,17 +535,18 @@ For any non-trivial change (new feature, bug fix, behaviour change, or notable r
 
 When implementing features:
 
-1. **Keep core runtime-agnostic** - Use native APIs, avoid runtime-specific dependencies
-2. **Error handling** - Provide clear, actionable error messages; use appropriate exit codes
-3. **Retry logic** - Use exponential backoff for network operations (3 attempts for requests, 1s→30s for streams)
-4. **Concurrent safety** - Use file locking for shared state (`sessions.json`)
-5. **Security** - Never log credentials; use OS keychain; enforce HTTPS; validate certificates
-6. **Output formatting** - Support both human-readable (default) and JSON (`--json`) modes
-7. **Protocol compliance** - Follow MCP specification strictly; handle all notification types
-8. **Session management** - Always clean up resources; handle orphaned processes; provide reconnection
-9. **Hyphenated commands** - All MCP commands use hyphens: `tools-list`, `resources-read`, `prompts-list`
-10. **Command-first syntax** - Top-level commands come first (`connect`, `login`, `clean`); MCP operations always go through a named session (`mcpc @session <command>`)
-11. **JSON field naming** - Use consistent field names in JSON output:
+1. **Self-documenting CLI** - All features, options, and usage patterns must be documented in command `--help` output (Commander.js `.description()` and `.addHelpText()`), not just in the README. AI agents discover how to use mcpc purely by running `mcpc --help` and `mcpc <command> --help`, so help text is the primary documentation surface. Include examples in help text for non-obvious commands. The README can provide additional context but must not be the only place a feature is documented.
+2. **Keep core runtime-agnostic** - Use native APIs, avoid runtime-specific dependencies
+3. **Error handling** - Provide clear, actionable error messages; use appropriate exit codes
+4. **Retry logic** - Use exponential backoff for network operations (3 attempts for requests, 1s→30s for streams)
+5. **Concurrent safety** - Use file locking for shared state (`sessions.json`)
+6. **Security** - Never log credentials; use OS keychain; enforce HTTPS; validate certificates
+7. **Output formatting** - Support both human-readable (default) and JSON (`--json`) modes
+8. **Protocol compliance** - Follow MCP specification strictly; handle all notification types
+9. **Session management** - Always clean up resources; handle orphaned processes; provide reconnection
+10. **Hyphenated commands** - All MCP commands use hyphens: `tools-list`, `resources-read`, `prompts-list`
+11. **Command-first syntax** - Top-level commands come first (`connect`, `login`, `clean`); MCP operations always go through a named session (`mcpc @session <command>`)
+12. **JSON field naming** - Use consistent field names in JSON output:
     - `sessionName` (not `name`) for session identifiers
     - `server` (not `target`) for server URLs/addresses
     - No `success` wrapper - indicate errors via exit codes
