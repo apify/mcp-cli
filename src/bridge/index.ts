@@ -21,7 +21,7 @@ import {
   cleanupOrphanedLogFiles,
   isSessionExpiredError,
 } from '../lib/index.js';
-import { ClientError, NetworkError, isAuthenticationError } from '../lib/index.js';
+import { ClientError, NetworkError, AuthError, isAuthenticationError } from '../lib/index.js';
 import { getSession, loadSessions, updateSession } from '../lib/sessions.js';
 import type { AuthCredentials, X402WalletCredentials } from '../lib/types.js';
 import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
@@ -394,15 +394,22 @@ class BridgeProcess {
         );
         this.mcpClientReadyRejecter(error as Error);
 
-        // If the error was due to session ID rejection or auth failure, mark session as expired
-        // User must explicitly use 'mcpc @session restart' to start a new session
+        // If the error was due to session ID rejection or auth failure, mark session status
+        // User must explicitly use 'mcpc @session restart' or 'mcpc login' to recover
         const errorMsg = (error as Error).message || '';
-        if (isSessionExpiredError(errorMsg) || isAuthenticationError(errorMsg)) {
-          logger.warn('Session rejected by server (expired or auth failure), marking as expired');
+        if (isSessionExpiredError(errorMsg)) {
+          logger.warn('Session rejected by server (expired session ID), marking as expired');
           try {
             await updateSession(this.options.sessionName, { status: 'expired' });
           } catch (updateError) {
             logger.error('Failed to mark session as expired:', updateError);
+          }
+        } else if (isAuthenticationError(errorMsg)) {
+          logger.warn('Server requires authentication, marking as unauthorized');
+          try {
+            await updateSession(this.options.sessionName, { status: 'unauthorized' });
+          } catch (updateError) {
+            logger.error('Failed to mark session as unauthorized:', updateError);
           }
         }
 
@@ -1239,7 +1246,14 @@ class BridgeProcess {
     const message: IpcMessage = {
       type: 'response',
       error: {
-        code: error instanceof ClientError ? 1 : error instanceof NetworkError ? 3 : 2,
+        code:
+          error instanceof ClientError
+            ? 1
+            : error instanceof NetworkError
+              ? 3
+              : error instanceof AuthError
+                ? 4
+                : 2,
         message: error.message,
       },
     };

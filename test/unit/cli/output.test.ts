@@ -1383,7 +1383,7 @@ describe('formatSessionLine', () => {
     expect(output).toContain('HTTP');
     expect(output).toContain('OAuth');
     expect(output).toContain('default');
-    expect(output).toContain('MCP: 2025-11-25');
+    expect(output).not.toContain('MCP:');
   });
 
   it('should format stdio session', () => {

@@ -527,7 +527,7 @@ Example: `mcpc @apify logging-set-level debug`
 
 ## Common Implementation Patterns
 
-After making any code changes, always run `npm run lint` and fix **all** errors before committing. Do not skip or ignore lint failures. The lint command checks both ESLint rules and Prettier formatting. To auto-fix issues, run `npm run lint:fix`. If auto-fix doesn't resolve everything, manually fix the remaining errors. Never commit code that fails `npm run lint`.
+After making any code changes, always run `npm run lint` and fix **all** errors before committing. Do not skip or ignore lint failures. The lint command checks both ESLint rules and Prettier formatting. To auto-fix issues, run `npm run lint:fix`. If auto-fix doesn't resolve everything, manually fix the remaining errors. Never commit code that fails `npm run lint`. **As the very last step of every task**, run `npm run lint` once more and fix any remaining issues before considering the work done.
 
 After lint passes, run `npm test` (unit tests) and fix any failures before committing. If a test fails due to your changes, update the test or fix the code so all tests pass. Never commit code that fails unit tests.
 
