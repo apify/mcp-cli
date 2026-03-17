@@ -376,8 +376,45 @@ export function formatTools(tools: Tool[], options?: FormatOptions): string {
 }
 
 /**
+ * Format inline parameter signature for tool summary.
+ * Shows required params always; optional params shown only when there are
+ * ≤2 optional alongside <4 required, otherwise collapsed as "+N optional".
+ */
+function formatToolParamsInline(schema: Record<string, unknown>): string {
+  const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined;
+  if (!properties || Object.keys(properties).length === 0) return '()';
+
+  const requiredNames = (schema.required as string[]) || [];
+  const allNames = Object.keys(properties);
+  const requiredParams = allNames.filter((n) => requiredNames.includes(n));
+  const optionalParams = allNames.filter((n) => !requiredNames.includes(n));
+
+  const paramStrings: string[] = [];
+
+  // Always show required params
+  for (const name of requiredParams) {
+    const typeStr = formatSchemaType(properties[name]);
+    paramStrings.push(`${name}: ${typeStr}`);
+  }
+
+  // Show optional params inline only if ≤2 optional AND <4 required
+  const showOptionalInline = optionalParams.length <= 2 && requiredParams.length < 4;
+
+  if (showOptionalInline) {
+    for (const name of optionalParams) {
+      const typeStr = formatSchemaType(properties[name]);
+      paramStrings.push(`${name}?: ${typeStr}`);
+    }
+  } else if (optionalParams.length > 0) {
+    paramStrings.push(`+${optionalParams.length} optional`);
+  }
+
+  return `(${paramStrings.join(', ')})`;
+}
+
+/**
  * Format tools summary list (shared by compact and full modes)
- * Format: * `tool_name` [annotations]
+ * Format: * `tool_name`(params) [annotations]
  */
 function formatToolsSummary(tools: Tool[]): string[] {
   const lines: string[] = [];
@@ -388,6 +425,7 @@ function formatToolsSummary(tools: Tool[]): string[] {
   // Summary list of tools
   const bullet = chalk.dim('*');
   for (const tool of tools) {
+    const params = formatToolParamsInline(tool.inputSchema as Record<string, unknown>);
     const parts: string[] = [];
     const annotationsStr = formatToolAnnotations(tool.annotations);
     if (annotationsStr) parts.push(annotationsStr);
@@ -396,7 +434,7 @@ function formatToolsSummary(tools: Tool[]): string[] {
     const execution = toolAny.execution as Record<string, unknown> | undefined;
     if (execution?.taskSupport) parts.push('async');
     const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
-    lines.push(`${bullet} ${inBackticks(tool.name)}${suffix}`);
+    lines.push(`${bullet} ${inBackticks(tool.name)}${chalk.dim(params)}${suffix}`);
   }
 
   return lines;

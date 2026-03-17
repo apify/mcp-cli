@@ -406,7 +406,17 @@ describe('formatTools', () => {
       expect(output).toContain('* `');
     });
 
-    it('should show annotations after tool name', () => {
+    it('should show inline parameters after tool name', () => {
+      const output = formatTools(sampleTools);
+      // search_web: 1 required + 2 optional (≤2 optional, <4 required) → show all
+      expect(output).toContain(
+        '`search_web`(query: string, maxResults?: number, language?: string)'
+      );
+      // run_actor: 1 required + 4 optional (>2 optional) → collapse optional
+      expect(output).toContain('`run_actor`(actorId: string, +4 optional)');
+    });
+
+    it('should show annotations after parameters', () => {
       const output = formatTools(sampleTools);
       expect(output).toContain('[read-only]');
       expect(output).toContain('[destructive]');
@@ -468,7 +478,7 @@ describe('formatTools', () => {
       ];
 
       const output = formatTools(tools);
-      expect(output).toContain('`no_params_tool`');
+      expect(output).toContain('`no_params_tool`()');
     });
 
     it('should handle tools with no description', () => {
@@ -483,7 +493,7 @@ describe('formatTools', () => {
       ];
 
       const output = formatTools(tools);
-      expect(output).toContain('`undocumented`');
+      expect(output).toContain('`undocumented`(arg?: string)');
     });
 
     it('should handle empty tools array', () => {
@@ -507,8 +517,52 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain('`async_tool` [async]');
-      expect(output).not.toContain('`sync_tool` [');
+      expect(output).toContain('`async_tool`() [async]');
+      expect(output).not.toContain('`sync_tool`() [');
+    });
+
+    it('should show optional params inline when few required and few optional', () => {
+      const tools: Tool[] = [
+        {
+          name: 'simple_tool',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              a: { type: 'string' },
+              b: { type: 'number' },
+              c: { type: 'boolean' },
+            },
+            required: ['a'],
+          },
+        },
+      ] as Tool[];
+
+      const output = formatTools(tools);
+      expect(output).toContain('`simple_tool`(a: string, b?: number, c?: boolean)');
+    });
+
+    it('should collapse optional params when 4+ required fields', () => {
+      const tools: Tool[] = [
+        {
+          name: 'many_required',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              a: { type: 'string' },
+              b: { type: 'string' },
+              c: { type: 'string' },
+              d: { type: 'string' },
+              e: { type: 'number' },
+            },
+            required: ['a', 'b', 'c', 'd'],
+          },
+        },
+      ] as Tool[];
+
+      const output = formatTools(tools);
+      expect(output).toContain(
+        '`many_required`(a: string, b: string, c: string, d: string, +1 optional)'
+      );
     });
 
     it('should combine annotations and async indicator', () => {
