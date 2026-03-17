@@ -7,63 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Session restart now auto-detects the `default` OAuth profile created after the session was established, fixing the `login` then `restart` flow for unauthorized sessions
-
-### Changed
-
-- Renamed `--async` flag to `--task` in `tools-call` for consistency with MCP specification; `--detach` now implies `--task`
-- `[async]` annotation in `tools-list` and `tools-get` replaced with `[task:optional]`, `[task:required]`, or `[task:forbidden]`
-- When `--profile` is not specified, only the `default` profile is used; non-default profiles require an explicit `--profile` flag
-- Revised session states: auth failures (401/403) now show as `unauthorized` (separate from `expired` which is for session ID expiry), with actionable login guidance; new `disconnected` display state surfaces when bridge is alive but server has been unreachable for >2 minutes
-- `DISCONNECTED_THRESHOLD_MS` is now derived from `KEEPALIVE_INTERVAL_MS` (2× ping interval + 5s buffer) via shared constants, eliminating duplicate magic numbers
-- Tools cache now fetches all pages (not just the first) on startup and on `tools/list_changed` notifications
-- `listAllTools` now uses bridge cache by default (no server call), with `refreshCache` option to bypass; replaces separate `getCachedTools` method
-- `tools-get` uses cached tools list first and only re-fetches from server if the tool is not found
-- `x402 sign` now takes the PAYMENT-REQUIRED header as a positional argument instead of `-r` flag (e.g. `mcpc x402 sign <base64>` instead of `mcpc x402 sign -r <base64>`)
-
-### Added
-
-- `tools-list` now shows inline parameter signatures (e.g. `read_file(path: string, +4 optional)`) for quick scanning without `--full`
-- `mcpc @session` now shows available tools list from bridge cache (no extra server call)
-- x402 payments are now also sent via the MCP `_meta["x402/payment"]` field on `tools/call` requests, in addition to the existing HTTP `PAYMENT-SIGNATURE` header — servers can choose which mechanism to consume
-- `_meta` parameter threaded through the full tool call chain (`IMcpClient`, `SessionClient`, bridge IPC, `McpClient`) for forward compatibility
-- `mcpc login` now falls back to accepting a pasted callback URL when the browser cannot be opened (e.g. headless servers, containers)
-- `--task` flag for `tools-call` to opt-in to task execution (experimental) with a progress spinner showing elapsed time, server status messages, and progress notification messages in human mode
-- `--detach` flag for `tools-call` to start a task and return the task ID immediately without waiting for completion (implies `--task`)
-- Press ESC during `--task` task execution to detach on the fly — the task continues in the background and the task ID is printed, same as `--detach`
-- New `tasks-list`, `tasks-get`, `tasks-cancel` commands for managing async tasks on the server
-- Task capability and `execution.taskSupport` displayed in `tools-get` and server info
-- E2E test server now includes a `slow-task` tool that supports task execution
-- E2E tests for task execution, detached mode, task management (list/get/cancel), and synchronous fallback
-- `[task:optional|required|forbidden]` indicator in `tools-list` output for tools with task support
-- `--insecure` global option to skip TLS certificate verification, for MCP servers with self-signed certificates
-- E2E test for `--insecure` flag using a self-signed HTTPS test server wrapper
-- `--client-id` and `--client-secret` options for `mcpc login` command, for servers that don't support dynamic client registration
-- `mcpc close @session`, `mcpc restart @session`, and `mcpc shell @session` command-first syntax as alternatives to `mcpc @session close/restart/shell`
-- E2E tests now run under the Bun runtime (in addition to Node.js); use `./test/e2e/run.sh --runtime bun` or `npm run test:e2e:bun`
-- `--no-profile` option for `connect` command to skip OAuth profile auto-detection and connect anonymously
-
-### Fixed
-
-- `--task` and `--detach` tool calls now correctly send task creation parameters to the server, fixing "task stream ended without creating a task" errors
-- File lock retries now use randomized exponential backoff to reduce contention when multiple processes compete for the same lock
-- Explicit `--header "Authorization: Bearer ..."` is no longer silently ignored when a default OAuth profile exists for the same server; explicit CLI headers now take precedence over auto-detected profiles
-- Combining `--profile` with `--header "Authorization: ..."` now returns a clear error instead of silently stripping the header
-- `logTarget` no longer prints a misleading `[→ @name (HTTP)]` prefix when a session doesn't exist; only the error message is shown
-- `logging-set-level` JSON output no longer includes a `success` field; output is now `{"level":"<level>"}` consistent with the project's convention of indicating errors via exit codes
-- `--header` / `-H` option is now specific to the `connect` command instead of being shown as a global option in `mcpc --help`
-- Bridge now forwards `logging/message` notifications from the MCP server to connected clients, so `logging-set-level` actually takes effect in interactive shell sessions
-- IPC buffer between CLI and bridge process is now capped at 10 MB; sockets are destroyed if the limit is exceeded, preventing unbounded memory growth
-- `validateOptions()` no longer includes subcommand-specific options (`--full`, `--x402`, `--proxy`, etc.) in global known-options list; misplaced flags now produce clear "Unknown option" errors instead of confusing Commander rejections
-- Sessions requiring authentication now correctly show as `expired` instead of `live` when the server rejects unauthenticated connections
-- Auth errors wrapped in `NetworkError` by bridge IPC are now detected on first health check, avoiding unnecessary bridge restart
-- Fixed flaky E2E invariant check that failed when `lastSeenAt` changed between `--json` and `--json --verbose` calls
-- `--timeout` flag now correctly propagates to MCP requests via session bridge
-- `parseServerArg()` now handles well Windows drive-letter config paths as well as other ambiguous cases
-- `logging-set-level` JSON output no longer includes redundant `success` field
-
 ### Changed
 
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
@@ -79,7 +22,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Direct one-shot URL access (e.g. `mcpc mcp.apify.com tools-list`) is removed; create a session first with `mcpc connect`.
 
+- Renamed `--async` flag to `--task` in `tools-call` for consistency with MCP specification; `--detach` now implies `--task`
+- Revised session states: auth failures (401/403) now show as `unauthorized` (separate from `expired` which is for session ID expiry), with actionable login guidance; new `disconnected` state surfaces when bridge is alive but server has been unreachable for >2 minutes
+- When `--profile` is not specified, only the `default` profile is used; non-default profiles require an explicit `--profile` flag
 - `@napi-rs/keyring` native addon is now loaded lazily: `mcpc` starts and works normally even when `libsecret` (Linux) or the addon itself is missing; a one-time warning is emitted and credentials fall back to `~/.mcpc/credentials.json` (mode 0600)
+- `x402 sign` now takes the PAYMENT-REQUIRED header as a positional argument instead of `-r` flag (e.g. `mcpc x402 sign <base64>`)
+- `tools-list` and `tools-get` now show `[task:optional]`, `[task:required]`, or `[task:forbidden]` instead of `[async]`
+- Tools cache now fetches all pages on startup and on `tools/list_changed` notifications; `tools-get` uses cached list first and only re-fetches if the tool is not found
+- `--header` / `-H` option is now specific to the `connect` command instead of being shown as a global option
+
+### Added
+
+- New `tasks-list`, `tasks-get`, `tasks-cancel` commands for managing async tasks on the server
+- `--task` flag for `tools-call` to opt-in to task execution with a progress spinner showing elapsed time, server status messages, and progress notifications in human mode
+- `--detach` flag for `tools-call` to start a task and return the task ID immediately without waiting for completion (implies `--task`)
+- Press ESC during `--task` execution to detach on the fly — the task continues in the background and the task ID is printed
+- `--insecure` global option to skip TLS certificate verification, for MCP servers with self-signed certificates
+- `--client-id` and `--client-secret` options for `mcpc login` command, for servers that don't support dynamic client registration
+- `--no-profile` option for `connect` command to skip OAuth profile auto-detection and connect anonymously
+- `mcpc close @session`, `mcpc restart @session`, and `mcpc shell @session` command-first syntax as alternatives to `mcpc @session close/restart/shell`
+- `mcpc login` now falls back to accepting a pasted callback URL when the browser cannot be opened (e.g. headless servers, containers)
+- `tools-list` now shows inline parameter signatures (e.g. `read_file(path: string, +4 optional)`) for quick scanning without `--full`
+- `mcpc @session` now shows available tools list from bridge cache (no extra server call)
+- Task capability and `execution.taskSupport` displayed in `tools-get` and server info
+- x402 payments are now also sent via the MCP `_meta["x402/payment"]` field on `tools/call` requests, in addition to the existing HTTP header
+
+### Fixed
+
+- Explicit `--header "Authorization: Bearer ..."` is no longer silently ignored when a default OAuth profile exists for the same server; explicit CLI headers now take precedence over auto-detected profiles
+- Combining `--profile` with `--header "Authorization: ..."` now returns a clear error instead of silently stripping the header
+- Session restart now auto-detects the `default` OAuth profile created after the session was established, fixing the `login` then `restart` flow for unauthorized sessions
+- Sessions requiring authentication now correctly show as `expired` instead of `live` when the server rejects unauthenticated connections
+- Auth errors wrapped in `NetworkError` by bridge IPC are now detected on first health check, avoiding unnecessary bridge restart
+- `--timeout` flag now correctly propagates to MCP requests via session bridge
+- `--task` and `--detach` tool calls now correctly send task creation parameters to the server
+- Bridge now forwards `logging/message` notifications from the MCP server to connected clients, so `logging-set-level` actually takes effect in interactive shell sessions
+- IPC buffer between CLI and bridge process is now capped at 10 MB, preventing unbounded memory growth
+- `parseServerArg()` now handles Windows drive-letter config paths and other ambiguous cases
+- Misplaced subcommand-specific flags (e.g. `--full`, `--proxy`) now produce clear "Unknown option" errors instead of confusing rejections
+- `logging-set-level` JSON output no longer includes a redundant `success` field
+- `logTarget` no longer prints a misleading prefix when a session doesn't exist
+- File lock retries now use randomized exponential backoff to reduce contention
 
 ## [0.1.10] - 2026-03-01
 
