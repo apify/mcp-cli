@@ -212,7 +212,7 @@ describe('shortType', () => {
   it('should abbreviate primitive types', () => {
     expect(shortType({ type: 'string' })).toBe('str');
     expect(shortType({ type: 'number' })).toBe('num');
-    expect(shortType({ type: 'integer' })).toBe('num');
+    expect(shortType({ type: 'integer' })).toBe('int');
     expect(shortType({ type: 'boolean' })).toBe('bool');
     expect(shortType({ type: 'object' })).toBe('obj');
   });

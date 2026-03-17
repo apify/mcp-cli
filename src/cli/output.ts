@@ -411,7 +411,7 @@ export function shortType(schema: Record<string, unknown>): string {
 const SHORT_TYPE_MAP: Record<string, string> = {
   string: 'str',
   number: 'num',
-  integer: 'num',
+  integer: 'int',
   boolean: 'bool',
   object: 'obj',
   array: '[any]',
