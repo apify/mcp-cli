@@ -573,13 +573,25 @@ describe('formatTools', () => {
       expect(output).toContain('Available tools (0):');
     });
 
-    it('should show async indicator for tools with task support', () => {
+    it('should show task mode for tools with task support', () => {
       const tools = [
         {
-          name: 'async_tool',
-          description: 'A tool with async support',
+          name: 'optional_tool',
+          description: 'A tool with optional task support',
           inputSchema: { type: 'object', properties: {} },
           execution: { taskSupport: 'optional' },
+        },
+        {
+          name: 'required_tool',
+          description: 'A tool with required task support',
+          inputSchema: { type: 'object', properties: {} },
+          execution: { taskSupport: 'required' },
+        },
+        {
+          name: 'forbidden_tool',
+          description: 'A tool with forbidden task support',
+          inputSchema: { type: 'object', properties: {} },
+          execution: { taskSupport: 'forbidden' },
         },
         {
           name: 'sync_tool',
@@ -589,7 +601,9 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain('`async_tool()` [async]');
+      expect(output).toContain('`optional_tool()` [task:optional]');
+      expect(output).toContain('`required_tool()` [task:required]');
+      expect(output).toContain('`forbidden_tool()` [task:forbidden]');
       expect(output).not.toContain('`sync_tool()` [');
     });
 
@@ -636,7 +650,7 @@ describe('formatTools', () => {
       expect(output).toContain('`many_required(a: str, b: str, c: str, \u2026)`');
     });
 
-    it('should combine annotations and async indicator', () => {
+    it('should combine annotations and task indicator', () => {
       const tools = [
         {
           name: 'combined_tool',
@@ -647,7 +661,7 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain('[read-only, async]');
+      expect(output).toContain('[read-only, task:required]');
     });
   });
 });

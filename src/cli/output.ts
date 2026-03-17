@@ -473,10 +473,11 @@ function formatToolsSummary(tools: Tool[]): string[] {
     const parts: string[] = [];
     const annotationsStr = formatToolAnnotations(tool.annotations);
     if (annotationsStr) parts.push(annotationsStr);
-    // Show async indicator if tool supports task execution
+    // Show task execution mode
     const toolAny = tool as Record<string, unknown>;
     const execution = toolAny.execution as Record<string, unknown> | undefined;
-    if (execution?.taskSupport) parts.push('async');
+    const taskSupport = execution?.taskSupport as string | undefined;
+    if (taskSupport) parts.push(`task:${taskSupport}`);
     const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
     lines.push(
       `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)}${params}${grayBacktick()}${suffix}`
@@ -547,15 +548,6 @@ export function formatToolDetail(tool: Tool): string {
     lines.push(chalk.bold('Output:'));
     const outputArgs = formatSimplifiedArgs(tool.outputSchema as Record<string, unknown>, '');
     lines.push(...outputArgs);
-  }
-
-  // Task support (from execution.taskSupport)
-  const toolAny = tool as Record<string, unknown>;
-  const execution = toolAny.execution as Record<string, unknown> | undefined;
-  const taskSupport = execution?.taskSupport as string | undefined;
-  if (taskSupport) {
-    lines.push('');
-    lines.push(`${chalk.bold('Task support:')} ${taskSupport}`);
   }
 
   // Description in code block
