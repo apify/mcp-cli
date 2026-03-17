@@ -80,13 +80,16 @@ export function createStreamableHttpTransport(
     maxRetries: 10, // Max 10 reconnection attempts
   };
 
+  // Explicitly pass proxy-aware fetch so the MCP SDK transport respects
+  // HTTP_PROXY/HTTPS_PROXY env vars (its internal fetch ignores the global dispatcher).
+  // Custom fetch (e.g. x402 middleware) takes priority if provided.
+  const fetchFn =
+    options.fetch ?? (proxyFetch as NonNullable<StreamableHTTPClientTransportOptions['fetch']>);
+
   const transport = new StreamableHTTPClientTransport(new URL(url), {
     reconnectionOptions: defaultReconnectionOptions,
     ...options,
-    // Explicitly pass proxy-aware fetch so the MCP SDK transport respects
-    // HTTP_PROXY/HTTPS_PROXY env vars (its internal fetch ignores the global dispatcher).
-    // Custom fetch (e.g. x402 middleware) takes priority if provided.
-    fetch: (options.fetch ?? proxyFetch) as StreamableHTTPClientTransportOptions['fetch'],
+    fetch: fetchFn,
   });
 
   // Verify authProvider is correctly attached
