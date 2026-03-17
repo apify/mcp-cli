@@ -21,7 +21,7 @@ import {
   cleanupOrphanedLogFiles,
   isSessionExpiredError,
 } from '../lib/index.js';
-import { ClientError, NetworkError, isAuthenticationError } from '../lib/index.js';
+import { ClientError, NetworkError, AuthError, isAuthenticationError } from '../lib/index.js';
 import { getSession, loadSessions, updateSession } from '../lib/sessions.js';
 import type { AuthCredentials, X402WalletCredentials } from '../lib/types.js';
 import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
@@ -1239,7 +1239,14 @@ class BridgeProcess {
     const message: IpcMessage = {
       type: 'response',
       error: {
-        code: error instanceof ClientError ? 1 : error instanceof NetworkError ? 3 : 2,
+        code:
+          error instanceof ClientError
+            ? 1
+            : error instanceof NetworkError
+              ? 3
+              : error instanceof AuthError
+                ? 4
+                : 2,
         message: error.message,
       },
     };
