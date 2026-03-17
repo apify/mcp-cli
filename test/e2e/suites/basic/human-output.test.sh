@@ -31,8 +31,8 @@ test_pass
 test_case "tools-list contains tool names in backticks"
 run_mcpc "$SESSION" tools-list
 assert_success
-assert_contains "$STDOUT" "\`echo\`"
-assert_contains "$STDOUT" "\`add\`"
+assert_contains "$STDOUT" "\`echo("
+assert_contains "$STDOUT" "\`add("
 test_pass
 
 test_case "tools-list uses * bullet character"

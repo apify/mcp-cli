@@ -75,6 +75,8 @@ export function rainbow(text: string): string {
 export interface FormatOptions {
   /** Show full details (for tools-list, shows complete input schema) */
   full?: boolean;
+  /** Session name for contextual hints (e.g. @apify) */
+  sessionName?: string;
 }
 
 /**
@@ -370,12 +372,93 @@ export function formatTools(tools: Tool[], options?: FormatOptions): string {
   if (options?.full) {
     return formatToolsFull(tools);
   }
-  return formatToolsCompact(tools);
+  return formatToolsCompact(tools, options);
+}
+
+/**
+ * Convert a full JSON Schema type to a short abbreviation for inline display.
+ * e.g., 'string' -> 'str', 'object' -> 'obj', 'array<string>' -> '[str]'
+ */
+export function shortType(schema: Record<string, unknown>): string {
+  if (!schema || typeof schema !== 'object') return 'any';
+
+  const schemaType = schema.type;
+
+  // Handle array type with items → [itemType]
+  if (schemaType === 'array' && schema.items) {
+    const itemShort = shortType(schema.items as Record<string, unknown>);
+    return `[${itemShort}]`;
+  }
+  // Handle array without items
+  if (schemaType === 'array') return '[any]';
+
+  // Handle union types (e.g., ['string', 'null'])
+  if (Array.isArray(schemaType)) {
+    const filtered = schemaType.filter((t) => t !== 'null');
+    if (filtered.length === 1) return shortTypeName(filtered[0] as string);
+    return filtered.map((t) => shortTypeName(t as string)).join(' | ');
+  }
+
+  // Handle enum
+  if (schema.enum && Array.isArray(schema.enum)) return 'enum';
+
+  // Simple type
+  if (typeof schemaType === 'string') return shortTypeName(schemaType);
+
+  return 'any';
+}
+
+const SHORT_TYPE_MAP: Record<string, string> = {
+  string: 'str',
+  number: 'num',
+  integer: 'int',
+  boolean: 'bool',
+  object: 'obj',
+  array: '[any]',
+};
+
+function shortTypeName(type: string): string {
+  return SHORT_TYPE_MAP[type] || type;
+}
+
+/**
+ * Format inline parameter signature for tool summary.
+ * Shows at most 3 params (required first, then optional in declaration order).
+ * Uses short type names (str, num, obj, bool, [str]).
+ */
+export function formatToolParamsInline(schema: Record<string, unknown>): string {
+  const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined;
+  if (!properties || Object.keys(properties).length === 0) return '()';
+
+  const requiredNames = (schema.required as string[]) || [];
+  const allNames = Object.keys(properties);
+
+  // Build ordered list: required params first (in declaration order), then optional (in declaration order)
+  const ordered: { name: string; required: boolean }[] = [];
+  const requiredInOrder = allNames.filter((n) => requiredNames.includes(n));
+  const optionalInOrder = allNames.filter((n) => !requiredNames.includes(n));
+  for (const name of requiredInOrder) ordered.push({ name, required: true });
+  for (const name of optionalInOrder) ordered.push({ name, required: false });
+
+  const MAX_SHOWN = 3;
+  const shown = ordered.slice(0, MAX_SHOWN);
+  const hidden = ordered.length - shown.length;
+
+  const paramStrings: string[] = shown.map(({ name, required }) => {
+    const typeStr = shortType(properties[name] ?? {});
+    return required ? `${name}: ${typeStr}` : `${name}?: ${typeStr}`;
+  });
+
+  if (hidden > 0) {
+    paramStrings.push('\u2026');
+  }
+
+  return `(${paramStrings.join(', ')})`;
 }
 
 /**
  * Format tools summary list (shared by compact and full modes)
- * Format: * `tool_name` [annotations]
+ * Format: * `tool_name(params)` [annotations]
  */
 function formatToolsSummary(tools: Tool[]): string[] {
   const lines: string[] = [];
@@ -386,15 +469,19 @@ function formatToolsSummary(tools: Tool[]): string[] {
   // Summary list of tools
   const bullet = chalk.dim('*');
   for (const tool of tools) {
+    const params = formatToolParamsInline(tool.inputSchema as Record<string, unknown>);
     const parts: string[] = [];
     const annotationsStr = formatToolAnnotations(tool.annotations);
     if (annotationsStr) parts.push(annotationsStr);
-    // Show async indicator if tool supports task execution
+    // Show task execution mode
     const toolAny = tool as Record<string, unknown>;
     const execution = toolAny.execution as Record<string, unknown> | undefined;
-    if (execution?.taskSupport) parts.push('async');
+    const taskSupport = execution?.taskSupport as string | undefined;
+    if (taskSupport) parts.push(`task:${taskSupport}`);
     const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
-    lines.push(`${bullet} ${inBackticks(tool.name)}${suffix}`);
+    lines.push(
+      `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)}${params}${grayBacktick()}${suffix}`
+    );
   }
 
   return lines;
@@ -403,12 +490,15 @@ function formatToolsSummary(tools: Tool[]): string[] {
 /**
  * Format tools in compact form (just the summary list)
  */
-function formatToolsCompact(tools: Tool[]): string {
+function formatToolsCompact(tools: Tool[], options?: FormatOptions): string {
   const lines = formatToolsSummary(tools);
 
   // Footer hint
+  const session = options?.sessionName ? `${options.sessionName} ` : '';
   lines.push('');
-  lines.push('For full details, use "tools-list --full" or "tools-get <name>"');
+  lines.push(
+    `For full tool details, run \`mcpc ${session}tools-list --full\` or \`mcpc ${session}tools-get <name>\``
+  );
 
   return lines.join('\n');
 }
@@ -458,15 +548,6 @@ export function formatToolDetail(tool: Tool): string {
     lines.push(chalk.bold('Output:'));
     const outputArgs = formatSimplifiedArgs(tool.outputSchema as Record<string, unknown>, '');
     lines.push(...outputArgs);
-  }
-
-  // Task support (from execution.taskSupport)
-  const toolAny = tool as Record<string, unknown>;
-  const execution = toolAny.execution as Record<string, unknown> | undefined;
-  const taskSupport = execution?.taskSupport as string | undefined;
-  if (taskSupport) {
-    lines.push('');
-    lines.push(`${chalk.bold('Task support:')} ${taskSupport}`);
   }
 
   // Description in code block
@@ -919,11 +1000,6 @@ export function formatSessionLine(session: SessionData): string {
     }
   }
 
-  // Add MCP protocol version if available
-  if (session.protocolVersion) {
-    parts.push('MCP: ' + session.protocolVersion);
-  }
-
   const infoStr = chalk.dim('(') + chalk.dim(parts.join(', ')) + chalk.dim(')');
 
   // Add proxy info separately (not dimmed, for visibility)
@@ -947,7 +1023,6 @@ export interface LogTargetOptions {
   hide?: boolean | undefined;
   profileName?: string | undefined; // Auth profile being used (for http targets)
   serverConfig?: ServerConfig | undefined; // Resolved transport config (for non-session targets)
-  protocolVersion?: string | undefined; // MCP protocol version (for direct connections)
 }
 
 /**
@@ -972,8 +1047,6 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
 
   // For direct connections, use transportConfig if available
   const tc = options.serverConfig;
-  const mcpVersionStr = options.protocolVersion ? `, MCP: ${options.protocolVersion}` : '';
-
   if (tc?.command) {
     // Stdio transport: show command + args
     let targetStr = tc.command;
@@ -981,7 +1054,7 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
       targetStr += ' ' + tc.args.join(' ');
     }
     targetStr = truncateWithEllipsis(targetStr, 80);
-    console.log(`[→ ${targetStr} ${chalk.dim(`(stdio${mcpVersionStr})`)}]`);
+    console.log(`[→ ${targetStr} ${chalk.dim('(stdio)')}]`);
     return;
   }
 
@@ -990,9 +1063,6 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
   const parts: string[] = ['HTTP'];
   if (options.profileName) {
     parts.push('OAuth: ' + chalk.magenta(options.profileName));
-  }
-  if (options.protocolVersion) {
-    parts.push('MCP: ' + options.protocolVersion);
   }
   console.log(`[→ ${serverStr} ${chalk.dim('(' + parts.join(', ') + ')')}]\n`);
 }
@@ -1080,7 +1150,7 @@ export function formatServerDetails(
   const commands: string[] = [];
 
   if (capabilities?.tools) {
-    commands.push(`${bullet} ${bt}mcpc ${target} tools-list${bt}`);
+    commands.push(`${bullet} ${bt}mcpc ${target} tools-list [--full]${bt}`);
     commands.push(`${bullet} ${bt}mcpc ${target} tools-get <name>${bt}`);
     commands.push(
       `${bullet} ${bt}mcpc ${target} tools-call <name> [arg1:=val1 ... | <args-json> | <stdin]${bt}`
@@ -1116,7 +1186,7 @@ export function formatServerDetails(
 
   // Tools list (from bridge cache, no extra server call)
   if (tools && tools.length > 0) {
-    lines.push(formatToolsCompact(tools));
+    lines.push(formatToolsCompact(tools, { sessionName: target }));
     lines.push('');
   }
 

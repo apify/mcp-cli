@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Renamed `--async` flag to `--task` in `tools-call` for consistency with MCP specification; `--detach` now implies `--task`
+- `[async]` annotation in `tools-list` and `tools-get` replaced with `[task:optional]`, `[task:required]`, or `[task:forbidden]`
 - When `--profile` is not specified, only the `default` profile is used; non-default profiles require an explicit `--profile` flag
 - Revised session states: auth failures (401/403) now show as `unauthorized` (separate from `expired` which is for session ID expiry), with actionable login guidance; new `disconnected` display state surfaces when bridge is alive but server has been unreachable for >2 minutes
 - `DISCONNECTED_THRESHOLD_MS` is now derived from `KEEPALIVE_INTERVAL_MS` (2× ping interval + 5s buffer) via shared constants, eliminating duplicate magic numbers
@@ -24,18 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `--auto-restart` option for `connect` command to automatically restart expired sessions (server rejected session ID) instead of requiring manual `mcpc @session restart`
+- `tools-list` now shows inline parameter signatures (e.g. `read_file(path: string, +4 optional)`) for quick scanning without `--full`
 - `mcpc @session` now shows available tools list from bridge cache (no extra server call)
 - x402 payments are now also sent via the MCP `_meta["x402/payment"]` field on `tools/call` requests, in addition to the existing HTTP `PAYMENT-SIGNATURE` header — servers can choose which mechanism to consume
 - `_meta` parameter threaded through the full tool call chain (`IMcpClient`, `SessionClient`, bridge IPC, `McpClient`) for forward compatibility
 - `mcpc login` now falls back to accepting a pasted callback URL when the browser cannot be opened (e.g. headless servers, containers)
-- `--async` flag for `tools-call` to opt-in to async task execution (experimental) with a progress spinner showing elapsed time, server status messages, and progress notification messages in human mode
-- `--detach` flag for `tools-call` to start an async task and return the task ID immediately without waiting for completion (implies `--async`)
-- Press ESC during `--async` task execution to detach on the fly — the task continues in the background and the task ID is printed, same as `--detach`
+- `--task` flag for `tools-call` to opt-in to task execution (experimental) with a progress spinner showing elapsed time, server status messages, and progress notification messages in human mode
+- `--detach` flag for `tools-call` to start a task and return the task ID immediately without waiting for completion (implies `--task`)
+- Press ESC during `--task` task execution to detach on the fly — the task continues in the background and the task ID is printed, same as `--detach`
 - New `tasks-list`, `tasks-get`, `tasks-cancel` commands for managing async tasks on the server
 - Task capability and `execution.taskSupport` displayed in `tools-get` and server info
-- E2E test server now includes a `slow-task` tool that supports async task execution
-- E2E tests for async task execution, detached mode, task management (list/get/cancel), and synchronous fallback
-- `[async]` indicator in `tools-list` output for tools that support async task execution
+- E2E test server now includes a `slow-task` tool that supports task execution
+- E2E tests for task execution, detached mode, task management (list/get/cancel), and synchronous fallback
+- `[task:optional|required|forbidden]` indicator in `tools-list` output for tools with task support
 - `--insecure` global option to skip TLS certificate verification, for MCP servers with self-signed certificates
 - E2E test for `--insecure` flag using a self-signed HTTPS test server wrapper
 - `--client-id` and `--client-secret` options for `mcpc login` command, for servers that don't support dynamic client registration
@@ -45,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `--async` and `--detach` tool calls now correctly send task creation parameters to the server, fixing "task stream ended without creating a task" errors
+- `--task` and `--detach` tool calls now correctly send task creation parameters to the server, fixing "task stream ended without creating a task" errors
 - File lock retries now use randomized exponential backoff to reduce contention when multiple processes compete for the same lock
 - Explicit `--header "Authorization: Bearer ..."` is no longer silently ignored when a default OAuth profile exists for the same server; explicit CLI headers now take precedence over auto-detected profiles
 - Combining `--profile` with `--header "Authorization: ..."` now returns a clear error instead of silently stripping the header
