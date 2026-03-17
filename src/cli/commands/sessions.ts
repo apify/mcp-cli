@@ -30,7 +30,12 @@ import {
   consolidateSessions,
   getSession,
 } from '../../lib/sessions.js';
-import { startBridge, StartBridgeOptions, stopBridge } from '../../lib/bridge-manager.js';
+import {
+  startBridge,
+  StartBridgeOptions,
+  stopBridge,
+  restartBridge,
+} from '../../lib/bridge-manager.js';
 import {
   storeKeychainSessionHeaders,
   storeKeychainProxyBearerToken,
@@ -595,86 +600,31 @@ export async function restartSession(
   options: { outputMode: OutputMode; verbose?: boolean }
 ): Promise<void> {
   try {
-    // Get existing session
+    // Verify session exists
     const session = await getSession(name);
-
     if (!session) {
       throw new ClientError(`Session not found: ${name}`);
+    }
+
+    if (!session.server) {
+      throw new ClientError(`Session ${name} has no server configuration`);
     }
 
     if (options.outputMode === 'human') {
       console.log(chalk.yellow(`Restarting session ${name}...`));
     }
 
-    // Stop the bridge (even if it's alive)
-    try {
-      await stopBridge(name);
-    } catch {
-      // Bridge may already be stopped
-    }
-
-    // Get server config from session
-    const serverConfig = session.server;
-    if (!serverConfig) {
-      throw new ClientError(`Session ${name} has no server configuration`);
-    }
-
-    // Load headers from keychain if present
-    const { readKeychainSessionHeaders } = await import('../../lib/auth/keychain.js');
-    const headers = await readKeychainSessionHeaders(name);
-
-    // Start bridge process
-    const bridgeOptions: StartBridgeOptions = {
-      sessionName: name,
-      serverConfig: { ...serverConfig, ...(headers && { headers }) },
+    // Delegate to restartBridge with freshSession=true to create a clean MCP session
+    // and re-discover auth profiles (handles the case where user ran `mcpc login` after connect)
+    await restartBridge(name, {
+      freshSession: true,
       verbose: options.verbose || false,
-    };
+      resolveProfile: async (serverUrl, sessionName) => {
+        return resolveAuthProfile(serverUrl, serverUrl, undefined, { sessionName });
+      },
+    });
 
-    if (headers) {
-      bridgeOptions.headers = headers;
-    }
-
-    // Resolve auth profile: use stored profile, or auto-detect a "default" profile.
-    // This handles the case where user creates a session without auth, then later runs
-    // `mcpc login <server>` to create a default profile, and restarts the session.
-    const hasExplicitAuthHeader = headers?.Authorization !== undefined;
-    let profileName = session.profileName;
-    if (!profileName && serverConfig.url && !hasExplicitAuthHeader) {
-      profileName = await resolveAuthProfile(serverConfig.url, serverConfig.url, undefined, {
-        sessionName: name,
-      });
-      if (profileName) {
-        logger.debug(`Discovered auth profile "${profileName}" for session ${name}`);
-        await updateSession(name, { profileName });
-      }
-    }
-
-    if (profileName) {
-      bridgeOptions.profileName = profileName;
-    }
-
-    if (session.proxy) {
-      bridgeOptions.proxyConfig = session.proxy;
-    }
-
-    if (session.x402) {
-      bridgeOptions.x402 = session.x402;
-    }
-
-    if (session.insecure) {
-      bridgeOptions.insecure = session.insecure;
-    }
-
-    // NOTE: Do NOT pass mcpSessionId on explicit restart.
-    // Explicit restart should create a fresh session, not try to resume the old one.
-    // Session resumption is only attempted on automatic bridge restart (when bridge crashes
-    // and CLI detects it). If server rejects the session ID, session is marked as expired.
-
-    const { pid } = await startBridge(bridgeOptions);
-
-    // Update session with new bridge PID and clear any expired/crashed status
-    await updateSession(name, { pid, status: 'active' });
-    logger.debug(`Session ${name} restarted with bridge PID: ${pid}`);
+    logger.debug(`Session ${name} restarted successfully`);
 
     // Success message
     if (options.outputMode === 'human') {
