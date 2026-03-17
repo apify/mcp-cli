@@ -41,6 +41,7 @@ jest.mock('../../../src/lib/sessions.js', () => ({
 import {
   formatSchemaType,
   shortType,
+  formatToolParamsInline,
   formatSimplifiedArgs,
   formatTools,
   formatToolDetail,
@@ -225,9 +226,9 @@ describe('shortType', () => {
   });
 
   it('should handle nested arrays', () => {
-    expect(
-      shortType({ type: 'array', items: { type: 'array', items: { type: 'boolean' } } })
-    ).toBe('[[bool]]');
+    expect(shortType({ type: 'array', items: { type: 'array', items: { type: 'boolean' } } })).toBe(
+      '[[bool]]'
+    );
   });
 
   it('should handle union types, filtering null', () => {
@@ -243,6 +244,40 @@ describe('shortType', () => {
     expect(shortType(null as unknown as Record<string, unknown>)).toBe('any');
     expect(shortType(undefined as unknown as Record<string, unknown>)).toBe('any');
     expect(shortType({} as Record<string, unknown>)).toBe('any');
+  });
+});
+
+describe('formatToolParamsInline', () => {
+  it('should return () for empty or missing properties', () => {
+    expect(formatToolParamsInline({ type: 'object', properties: {} })).toBe('()');
+    expect(formatToolParamsInline({ type: 'object' })).toBe('()');
+    expect(formatToolParamsInline({})).toBe('()');
+  });
+
+  it('should show required params before optional params', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        optional1: { type: 'string' },
+        required1: { type: 'number' },
+      },
+      required: ['required1'],
+    };
+    expect(formatToolParamsInline(schema)).toBe('(required1: num, optional1?: str)');
+  });
+
+  it('should truncate to 3 params with ellipsis', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        a: { type: 'string' },
+        b: { type: 'string' },
+        c: { type: 'string' },
+        d: { type: 'string' },
+      },
+      required: ['a', 'b', 'c', 'd'],
+    };
+    expect(formatToolParamsInline(schema)).toBe('(a: str, b: str, c: str, \u2026)');
   });
 });
 

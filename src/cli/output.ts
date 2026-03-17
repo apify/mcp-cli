@@ -426,7 +426,7 @@ function shortTypeName(type: string): string {
  * Shows at most 3 params (required first, then optional in declaration order).
  * Uses short type names (str, num, obj, bool, [str]).
  */
-function formatToolParamsInline(schema: Record<string, unknown>): string {
+export function formatToolParamsInline(schema: Record<string, unknown>): string {
   const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined;
   if (!properties || Object.keys(properties).length === 0) return '()';
 
@@ -445,7 +445,7 @@ function formatToolParamsInline(schema: Record<string, unknown>): string {
   const hidden = ordered.length - shown.length;
 
   const paramStrings: string[] = shown.map(({ name, required }) => {
-    const typeStr = shortType(properties[name]);
+    const typeStr = shortType(properties[name] ?? {});
     return required ? `${name}: ${typeStr}` : `${name}?: ${typeStr}`;
   });
 
@@ -478,7 +478,9 @@ function formatToolsSummary(tools: Tool[]): string[] {
     const execution = toolAny.execution as Record<string, unknown> | undefined;
     if (execution?.taskSupport) parts.push('async');
     const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
-    lines.push(`${bullet} ${grayBacktick()}${chalk.cyan(tool.name)}${chalk.dim(params)}${grayBacktick()}${suffix}`);
+    lines.push(
+      `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)}${chalk.dim(params)}${grayBacktick()}${suffix}`
+    );
   }
 
   return lines;
