@@ -919,7 +919,6 @@ export function formatSessionLine(session: SessionData): string {
     }
   }
 
-
   const infoStr = chalk.dim('(') + chalk.dim(parts.join(', ')) + chalk.dim(')');
 
   // Add proxy info separately (not dimmed, for visibility)
