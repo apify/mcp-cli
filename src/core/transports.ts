@@ -39,6 +39,7 @@ import {
 import { createLogger, getVerbose } from '../lib/logger.js';
 import type { ServerConfig } from '../lib/types.js';
 import { ClientError } from '../lib/errors.js';
+import { proxyFetch } from '../lib/proxy.js';
 
 /**
  * Create a stdio transport for a local MCP server
@@ -82,6 +83,10 @@ export function createStreamableHttpTransport(
   const transport = new StreamableHTTPClientTransport(new URL(url), {
     reconnectionOptions: defaultReconnectionOptions,
     ...options,
+    // Explicitly pass proxy-aware fetch so the MCP SDK transport respects
+    // HTTP_PROXY/HTTPS_PROXY env vars (its internal fetch ignores the global dispatcher).
+    // Custom fetch (e.g. x402 middleware) takes priority if provided.
+    fetch: (options.fetch ?? proxyFetch) as StreamableHTTPClientTransportOptions['fetch'],
   });
 
   // Verify authProvider is correctly attached
