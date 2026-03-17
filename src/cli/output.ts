@@ -376,9 +376,55 @@ export function formatTools(tools: Tool[], options?: FormatOptions): string {
 }
 
 /**
+ * Convert a full JSON Schema type to a short abbreviation for inline display.
+ * e.g., 'string' -> 'str', 'object' -> 'obj', 'array<string>' -> '[str]'
+ */
+function shortType(schema: Record<string, unknown>): string {
+  if (!schema || typeof schema !== 'object') return 'any';
+
+  const schemaType = schema.type;
+
+  // Handle array type with items → [itemType]
+  if (schemaType === 'array' && schema.items) {
+    const itemShort = shortType(schema.items as Record<string, unknown>);
+    return `[${itemShort}]`;
+  }
+  // Handle array without items
+  if (schemaType === 'array') return '[any]';
+
+  // Handle union types (e.g., ['string', 'null'])
+  if (Array.isArray(schemaType)) {
+    const filtered = schemaType.filter((t) => t !== 'null');
+    if (filtered.length === 1) return shortTypeName(filtered[0] as string);
+    return filtered.map((t) => shortTypeName(t as string)).join(' | ');
+  }
+
+  // Handle enum
+  if (schema.enum && Array.isArray(schema.enum)) return 'enum';
+
+  // Simple type
+  if (typeof schemaType === 'string') return shortTypeName(schemaType);
+
+  return 'any';
+}
+
+const SHORT_TYPE_MAP: Record<string, string> = {
+  string: 'str',
+  number: 'num',
+  integer: 'num',
+  boolean: 'bool',
+  object: 'obj',
+  array: '[any]',
+};
+
+function shortTypeName(type: string): string {
+  return SHORT_TYPE_MAP[type] || type;
+}
+
+/**
  * Format inline parameter signature for tool summary.
- * Shows required params always; optional params shown only when there are
- * ≤2 optional alongside <4 required, otherwise collapsed as "+N optional".
+ * Shows at most 3 params (required first, then optional in declaration order).
+ * Uses short type names (str, num, obj, bool, [str]).
  */
 function formatToolParamsInline(schema: Record<string, unknown>): string {
   const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined;
@@ -386,27 +432,25 @@ function formatToolParamsInline(schema: Record<string, unknown>): string {
 
   const requiredNames = (schema.required as string[]) || [];
   const allNames = Object.keys(properties);
-  const requiredParams = allNames.filter((n) => requiredNames.includes(n));
-  const optionalParams = allNames.filter((n) => !requiredNames.includes(n));
 
-  const paramStrings: string[] = [];
+  // Build ordered list: required params first (in declaration order), then optional (in declaration order)
+  const ordered: { name: string; required: boolean }[] = [];
+  const requiredInOrder = allNames.filter((n) => requiredNames.includes(n));
+  const optionalInOrder = allNames.filter((n) => !requiredNames.includes(n));
+  for (const name of requiredInOrder) ordered.push({ name, required: true });
+  for (const name of optionalInOrder) ordered.push({ name, required: false });
 
-  // Always show required params
-  for (const name of requiredParams) {
-    const typeStr = formatSchemaType(properties[name]);
-    paramStrings.push(`${name}: ${typeStr}`);
-  }
+  const MAX_SHOWN = 3;
+  const shown = ordered.slice(0, MAX_SHOWN);
+  const hidden = ordered.length - shown.length;
 
-  // Show optional params inline only if ≤2 optional AND <4 required
-  const showOptionalInline = optionalParams.length <= 2 && requiredParams.length < 4;
+  const paramStrings: string[] = shown.map(({ name, required }) => {
+    const typeStr = shortType(properties[name]);
+    return required ? `${name}: ${typeStr}` : `${name}?: ${typeStr}`;
+  });
 
-  if (showOptionalInline) {
-    for (const name of optionalParams) {
-      const typeStr = formatSchemaType(properties[name]);
-      paramStrings.push(`${name}?: ${typeStr}`);
-    }
-  } else if (optionalParams.length > 0) {
-    paramStrings.push(`+${optionalParams.length} optional`);
+  if (hidden > 0) {
+    paramStrings.push('\u2026');
   }
 
   return `(${paramStrings.join(', ')})`;

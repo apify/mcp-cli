@@ -406,14 +406,12 @@ describe('formatTools', () => {
       expect(output).toContain('* `');
     });
 
-    it('should show inline parameters after tool name', () => {
+    it('should show inline parameters with short types after tool name', () => {
       const output = formatTools(sampleTools);
-      // search_web: 1 required + 2 optional (≤2 optional, <4 required) → show all
-      expect(output).toContain(
-        '`search_web`(query: string, maxResults?: number, language?: string)'
-      );
-      // run_actor: 1 required + 4 optional (>2 optional) → collapse optional
-      expect(output).toContain('`run_actor`(actorId: string, +4 optional)');
+      // search_web: 1 required + 2 optional = 3 total, all shown
+      expect(output).toContain('`search_web`(query: str, maxResults?: num, language?: str)');
+      // run_actor: 1 required + 4 optional = 5 total, show first 3 + ellipsis
+      expect(output).toContain('`run_actor`(actorId: str, input?: obj, memory?: num, \u2026)');
     });
 
     it('should show annotations after parameters', () => {
@@ -493,7 +491,7 @@ describe('formatTools', () => {
       ];
 
       const output = formatTools(tools);
-      expect(output).toContain('`undocumented`(arg?: string)');
+      expect(output).toContain('`undocumented`(arg?: str)');
     });
 
     it('should handle empty tools array', () => {
@@ -521,7 +519,7 @@ describe('formatTools', () => {
       expect(output).not.toContain('`sync_tool`() [');
     });
 
-    it('should show optional params inline when few required and few optional', () => {
+    it('should show all params when 3 or fewer total', () => {
       const tools: Tool[] = [
         {
           name: 'simple_tool',
@@ -538,10 +536,10 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain('`simple_tool`(a: string, b?: number, c?: boolean)');
+      expect(output).toContain('`simple_tool`(a: str, b?: num, c?: bool)');
     });
 
-    it('should collapse optional params when 4+ required fields', () => {
+    it('should show at most 3 params with ellipsis for the rest', () => {
       const tools: Tool[] = [
         {
           name: 'many_required',
@@ -560,9 +558,8 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain(
-        '`many_required`(a: string, b: string, c: string, d: string, +1 optional)'
-      );
+      // Required params first, then optional; max 3 shown + ellipsis
+      expect(output).toContain('`many_required`(a: str, b: str, c: str, \u2026)');
     });
 
     it('should combine annotations and async indicator', () => {
