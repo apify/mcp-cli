@@ -924,11 +924,6 @@ export function formatSessionLine(session: SessionData): string {
     }
   }
 
-  // Add MCP protocol version if available
-  if (session.protocolVersion) {
-    parts.push('MCP: ' + session.protocolVersion);
-  }
-
   const infoStr = chalk.dim('(') + chalk.dim(parts.join(', ')) + chalk.dim(')');
 
   // Add proxy info separately (not dimmed, for visibility)
@@ -952,7 +947,6 @@ export interface LogTargetOptions {
   hide?: boolean | undefined;
   profileName?: string | undefined; // Auth profile being used (for http targets)
   serverConfig?: ServerConfig | undefined; // Resolved transport config (for non-session targets)
-  protocolVersion?: string | undefined; // MCP protocol version (for direct connections)
 }
 
 /**
@@ -977,8 +971,6 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
 
   // For direct connections, use transportConfig if available
   const tc = options.serverConfig;
-  const mcpVersionStr = options.protocolVersion ? `, MCP: ${options.protocolVersion}` : '';
-
   if (tc?.command) {
     // Stdio transport: show command + args
     let targetStr = tc.command;
@@ -986,7 +978,7 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
       targetStr += ' ' + tc.args.join(' ');
     }
     targetStr = truncateWithEllipsis(targetStr, 80);
-    console.log(`[→ ${targetStr} ${chalk.dim(`(stdio${mcpVersionStr})`)}]`);
+    console.log(`[→ ${targetStr} ${chalk.dim('(stdio)')}]`);
     return;
   }
 
@@ -995,9 +987,6 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
   const parts: string[] = ['HTTP'];
   if (options.profileName) {
     parts.push('OAuth: ' + chalk.magenta(options.profileName));
-  }
-  if (options.protocolVersion) {
-    parts.push('MCP: ' + options.protocolVersion);
   }
   console.log(`[→ ${serverStr} ${chalk.dim('(' + parts.join(', ') + ')')}]\n`);
 }
