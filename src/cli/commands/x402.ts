@@ -233,6 +233,10 @@ export async function handleX402Command(args: string[]): Promise<void> {
     .name('mcpc x402')
     .description('x402 wallet management and payment signing (EXPERIMENTAL)');
 
+  program.configureHelp({
+    styleTitle: (str) => chalk.bold(str),
+  });
+
   // Inherit global options so they parse correctly
   program
     .option('-j, --json', 'Output in JSON format')
@@ -242,7 +246,7 @@ export async function handleX402Command(args: string[]): Promise<void> {
     .addHelpText(
       'after',
       `
-sign options:
+${chalk.bold('sign options:')}
   --amount <usd>      Override amount in USD
   --expiry <seconds>  Override expiry in seconds`
     );

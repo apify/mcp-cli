@@ -315,6 +315,7 @@ function createTopLevelProgram(): Command {
   program.configureHelp({
     subcommandTerm: (cmd) =>
       `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
+    styleTitle: (str) => chalk.bold(str),
   });
 
   // Use raw Markdown URL for pipes (AI agents), GitHub UI for TTY (humans)
@@ -341,7 +342,7 @@ function createTopLevelProgram(): Command {
   program.addHelpText(
     'after',
     `
-MCP session commands (after connecting):
+${chalk.bold('MCP session commands (after connecting):')}
   <@session>                   Show MCP server info and capabilities
   <@session> tools-list        List MCP tools
   <@session> tools-get <name>
@@ -378,7 +379,7 @@ Full docs: ${docsUrl}`
     .addHelpText(
       'after',
       `
-Server formats:
+${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
 `
@@ -527,7 +528,7 @@ Server formats:
     .addHelpText(
       'after',
       `
-Resources:
+${chalk.bold('Resources:')}
   sessions    Remove stale/crashed session records
   profiles    Remove authentication profiles
   logs        Remove bridge log files
