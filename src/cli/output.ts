@@ -1158,7 +1158,7 @@ export function formatServerDetails(
   const commands: string[] = [];
 
   if (capabilities?.tools) {
-    commands.push(`${bullet} ${bt}mcpc ${target} tools-list${bt}`);
+    commands.push(`${bullet} ${bt}mcpc ${target} tools-list [--full]${bt}`);
     commands.push(`${bullet} ${bt}mcpc ${target} tools-get <name>${bt}`);
     commands.push(
       `${bullet} ${bt}mcpc ${target} tools-call <name> [arg1:=val1 ... | <args-json> | <stdin]${bt}`
