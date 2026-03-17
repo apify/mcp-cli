@@ -686,12 +686,12 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tools-call <name> [args...]')
     .description('Call a tool with arguments (key:=value pairs or JSON)')
-    .option('--async', 'Use async task execution (experimental)')
-    .option('--detach', 'Start async task and return immediately with task ID (implies --async)')
+    .option('--task', 'Use task execution (experimental)')
+    .option('--detach', 'Start task and return immediately with task ID (implies --task)')
     .action(async (name, args, options, command) => {
       await tools.callTool(session, name, {
         args,
-        async: options.async,
+        task: options.task,
         detach: options.detach,
         ...getOptionsFromCommand(command),
       });

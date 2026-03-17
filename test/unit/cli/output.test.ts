@@ -40,6 +40,8 @@ jest.mock('../../../src/lib/sessions.js', () => ({
 // Import after mock is set up
 import {
   formatSchemaType,
+  shortType,
+  formatToolParamsInline,
   formatSimplifiedArgs,
   formatTools,
   formatToolDetail,
@@ -204,6 +206,78 @@ describe('formatSchemaType', () => {
     expect(formatSchemaType(undefined as unknown as Record<string, unknown>)).toBe('any');
     expect(formatSchemaType('string' as unknown as Record<string, unknown>)).toBe('any');
     expect(formatSchemaType({} as Record<string, unknown>)).toBe('any');
+  });
+});
+
+describe('shortType', () => {
+  it('should abbreviate primitive types', () => {
+    expect(shortType({ type: 'string' })).toBe('str');
+    expect(shortType({ type: 'number' })).toBe('num');
+    expect(shortType({ type: 'integer' })).toBe('int');
+    expect(shortType({ type: 'boolean' })).toBe('bool');
+    expect(shortType({ type: 'object' })).toBe('obj');
+  });
+
+  it('should format array types with brackets', () => {
+    expect(shortType({ type: 'array', items: { type: 'string' } })).toBe('[str]');
+    expect(shortType({ type: 'array', items: { type: 'number' } })).toBe('[num]');
+    expect(shortType({ type: 'array', items: { type: 'object' } })).toBe('[obj]');
+    expect(shortType({ type: 'array' })).toBe('[any]');
+  });
+
+  it('should handle nested arrays', () => {
+    expect(shortType({ type: 'array', items: { type: 'array', items: { type: 'boolean' } } })).toBe(
+      '[[bool]]'
+    );
+  });
+
+  it('should handle union types, filtering null', () => {
+    expect(shortType({ type: ['string', 'null'] })).toBe('str');
+    expect(shortType({ type: ['number', 'string'] })).toBe('num | str');
+  });
+
+  it('should handle enums', () => {
+    expect(shortType({ enum: ['a', 'b', 'c'] })).toBe('enum');
+  });
+
+  it('should return "any" for invalid input', () => {
+    expect(shortType(null as unknown as Record<string, unknown>)).toBe('any');
+    expect(shortType(undefined as unknown as Record<string, unknown>)).toBe('any');
+    expect(shortType({} as Record<string, unknown>)).toBe('any');
+  });
+});
+
+describe('formatToolParamsInline', () => {
+  it('should return () for empty or missing properties', () => {
+    expect(formatToolParamsInline({ type: 'object', properties: {} })).toBe('()');
+    expect(formatToolParamsInline({ type: 'object' })).toBe('()');
+    expect(formatToolParamsInline({})).toBe('()');
+  });
+
+  it('should show required params before optional params', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        optional1: { type: 'string' },
+        required1: { type: 'number' },
+      },
+      required: ['required1'],
+    };
+    expect(formatToolParamsInline(schema)).toBe('(required1: num, optional1?: str)');
+  });
+
+  it('should truncate to 3 params with ellipsis', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        a: { type: 'string' },
+        b: { type: 'string' },
+        c: { type: 'string' },
+        d: { type: 'string' },
+      },
+      required: ['a', 'b', 'c', 'd'],
+    };
+    expect(formatToolParamsInline(schema)).toBe('(a: str, b: str, c: str, \u2026)');
   });
 });
 
@@ -397,8 +471,8 @@ describe('formatTools', () => {
 
     it('should show tool names in backticks', () => {
       const output = formatTools(sampleTools);
-      expect(output).toContain('`search_web`');
-      expect(output).toContain('`run_actor`');
+      expect(output).toContain('`search_web(');
+      expect(output).toContain('`run_actor(');
     });
 
     it('should use * bullet character', () => {
@@ -406,7 +480,15 @@ describe('formatTools', () => {
       expect(output).toContain('* `');
     });
 
-    it('should show annotations after tool name', () => {
+    it('should show inline parameters with short types after tool name', () => {
+      const output = formatTools(sampleTools);
+      // search_web: 1 required + 2 optional = 3 total, all shown
+      expect(output).toContain('`search_web(query: str, maxResults?: num, language?: str)`');
+      // run_actor: 1 required + 4 optional = 5 total, show first 3 + ellipsis
+      expect(output).toContain('`run_actor(actorId: str, input?: obj, memory?: num, \u2026)`');
+    });
+
+    it('should show annotations after parameters', () => {
       const output = formatTools(sampleTools);
       expect(output).toContain('[read-only]');
       expect(output).toContain('[destructive]');
@@ -468,7 +550,7 @@ describe('formatTools', () => {
       ];
 
       const output = formatTools(tools);
-      expect(output).toContain('`no_params_tool`');
+      expect(output).toContain('`no_params_tool()`');
     });
 
     it('should handle tools with no description', () => {
@@ -483,7 +565,7 @@ describe('formatTools', () => {
       ];
 
       const output = formatTools(tools);
-      expect(output).toContain('`undocumented`');
+      expect(output).toContain('`undocumented(arg?: str)`');
     });
 
     it('should handle empty tools array', () => {
@@ -491,13 +573,25 @@ describe('formatTools', () => {
       expect(output).toContain('Available tools (0):');
     });
 
-    it('should show async indicator for tools with task support', () => {
+    it('should show task mode for tools with task support', () => {
       const tools = [
         {
-          name: 'async_tool',
-          description: 'A tool with async support',
+          name: 'optional_tool',
+          description: 'A tool with optional task support',
           inputSchema: { type: 'object', properties: {} },
           execution: { taskSupport: 'optional' },
+        },
+        {
+          name: 'required_tool',
+          description: 'A tool with required task support',
+          inputSchema: { type: 'object', properties: {} },
+          execution: { taskSupport: 'required' },
+        },
+        {
+          name: 'forbidden_tool',
+          description: 'A tool with forbidden task support',
+          inputSchema: { type: 'object', properties: {} },
+          execution: { taskSupport: 'forbidden' },
         },
         {
           name: 'sync_tool',
@@ -507,11 +601,56 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain('`async_tool` [async]');
-      expect(output).not.toContain('`sync_tool` [');
+      expect(output).toContain('`optional_tool()` [task:optional]');
+      expect(output).toContain('`required_tool()` [task:required]');
+      expect(output).toContain('`forbidden_tool()` [task:forbidden]');
+      expect(output).not.toContain('`sync_tool()` [');
     });
 
-    it('should combine annotations and async indicator', () => {
+    it('should show all params when 3 or fewer total', () => {
+      const tools: Tool[] = [
+        {
+          name: 'simple_tool',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              a: { type: 'string' },
+              b: { type: 'number' },
+              c: { type: 'boolean' },
+            },
+            required: ['a'],
+          },
+        },
+      ] as Tool[];
+
+      const output = formatTools(tools);
+      expect(output).toContain('`simple_tool(a: str, b?: num, c?: bool)`');
+    });
+
+    it('should show at most 3 params with ellipsis for the rest', () => {
+      const tools: Tool[] = [
+        {
+          name: 'many_required',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              a: { type: 'string' },
+              b: { type: 'string' },
+              c: { type: 'string' },
+              d: { type: 'string' },
+              e: { type: 'number' },
+            },
+            required: ['a', 'b', 'c', 'd'],
+          },
+        },
+      ] as Tool[];
+
+      const output = formatTools(tools);
+      // Required params first, then optional; max 3 shown + ellipsis
+      expect(output).toContain('`many_required(a: str, b: str, c: str, \u2026)`');
+    });
+
+    it('should combine annotations and task indicator', () => {
       const tools = [
         {
           name: 'combined_tool',
@@ -522,7 +661,7 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain('[read-only, async]');
+      expect(output).toContain('[read-only, task:required]');
     });
   });
 });
