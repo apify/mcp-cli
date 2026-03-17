@@ -75,6 +75,8 @@ export function rainbow(text: string): string {
 export interface FormatOptions {
   /** Show full details (for tools-list, shows complete input schema) */
   full?: boolean;
+  /** Session name for contextual hints (e.g. @apify) */
+  sessionName?: string;
 }
 
 /**
@@ -370,7 +372,7 @@ export function formatTools(tools: Tool[], options?: FormatOptions): string {
   if (options?.full) {
     return formatToolsFull(tools);
   }
-  return formatToolsCompact(tools);
+  return formatToolsCompact(tools, options);
 }
 
 /**
@@ -403,12 +405,15 @@ function formatToolsSummary(tools: Tool[]): string[] {
 /**
  * Format tools in compact form (just the summary list)
  */
-function formatToolsCompact(tools: Tool[]): string {
+function formatToolsCompact(tools: Tool[], options?: FormatOptions): string {
   const lines = formatToolsSummary(tools);
 
   // Footer hint
+  const session = options?.sessionName ? `${options.sessionName} ` : '';
   lines.push('');
-  lines.push('For full details, use "tools-list --full" or "tools-get <name>"');
+  lines.push(
+    `For full tool details, run \`mcpc ${session}tools-list --full\` or \`mcpc ${session}tools-get <name>\``
+  );
 
   return lines.join('\n');
 }
@@ -1116,7 +1121,7 @@ export function formatServerDetails(
 
   // Tools list (from bridge cache, no extra server call)
   if (tools && tools.length > 0) {
-    lines.push(formatToolsCompact(tools));
+    lines.push(formatToolsCompact(tools, { sessionName: target }));
     lines.push('');
   }
 
