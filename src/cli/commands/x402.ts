@@ -235,6 +235,7 @@ export async function handleX402Command(args: string[]): Promise<void> {
 
   program.configureHelp({
     styleTitle: (str) => chalk.bold(str),
+    styleSubcommandText: (str) => chalk.cyan(str),
   });
 
   // Inherit global options so they parse correctly

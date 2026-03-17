@@ -316,6 +316,7 @@ function createTopLevelProgram(): Command {
     subcommandTerm: (cmd) =>
       `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
     styleTitle: (str) => chalk.bold(str),
+    styleSubcommandText: (str) => chalk.cyan(str),
   });
 
   // Use raw Markdown URL for pipes (AI agents), GitHub UI for TTY (humans)
@@ -344,21 +345,21 @@ function createTopLevelProgram(): Command {
     `
 ${chalk.bold('MCP session commands (after connecting):')}
   <@session>                   Show MCP server info and capabilities
-  <@session> tools-list        List MCP tools
-  <@session> tools-get <name>
-  <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
-  <@session> prompts-list
-  <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
-  <@session> resources-list
-  <@session> resources-read <uri>
-  <@session> resources-subscribe <uri>
-  <@session> resources-unsubscribe <uri>
-  <@session> resources-templates-list
-  <@session> tasks-list
-  <@session> tasks-get <taskId>
-  <@session> tasks-cancel <taskId>
-  <@session> logging-set-level <level>
-  <@session> ping
+  <@session> ${chalk.cyan('tools-list')}        List MCP tools
+  <@session> ${chalk.cyan('tools-get')} <name>
+  <@session> ${chalk.cyan('tools-call')} <name> [arg:=val ... | <json> | <stdin]
+  <@session> ${chalk.cyan('prompts-list')}
+  <@session> ${chalk.cyan('prompts-get')} <name> [arg:=val ... | <json> | <stdin]
+  <@session> ${chalk.cyan('resources-list')}
+  <@session> ${chalk.cyan('resources-read')} <uri>
+  <@session> ${chalk.cyan('resources-subscribe')} <uri>
+  <@session> ${chalk.cyan('resources-unsubscribe')} <uri>
+  <@session> ${chalk.cyan('resources-templates-list')}
+  <@session> ${chalk.cyan('tasks-list')}
+  <@session> ${chalk.cyan('tasks-get')} <taskId>
+  <@session> ${chalk.cyan('tasks-cancel')} <taskId>
+  <@session> ${chalk.cyan('logging-set-level')} <level>
+  <@session> ${chalk.cyan('ping')}
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
 
