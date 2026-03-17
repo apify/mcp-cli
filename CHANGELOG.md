@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed auth loss when reconnecting an unauthorized session via `mcpc connect` — the `unauthorized` status was not cleared, causing all subsequent operations to fail with "Authentication required by server" even after successful reconnection
+
 ### Changed
 
 - `--auto-restart` help text now clarifies that restarting loses session state
