@@ -233,6 +233,8 @@ export async function connectSession(
     ...(proxyConfig && { proxy: proxyConfig }),
     ...(options.x402 && { x402: true }),
     ...(options.insecure && { insecure: true }),
+    // Clear any previous error status (unauthorized, expired) when reconnecting
+    ...(isReconnect && { status: 'active' }),
   };
 
   if (isReconnect) {
