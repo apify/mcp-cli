@@ -42,6 +42,10 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          # Use a PAT so the release job can push the version-bump
+          # commit and tag directly to main, bypassing branch-protection
+          # rulesets that block the default GITHUB_TOKEN.
+          token: ${{ secrets.RELEASE_PAT }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
