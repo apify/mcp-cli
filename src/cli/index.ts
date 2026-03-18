@@ -364,11 +364,13 @@ Run "mcpc" without arguments to show active sessions and OAuth profiles.
 Full docs: ${docsUrl}`
   );
 
-  // connect command: mcpc connect <server> @<name>
+  // connect command: mcpc connect <server> [@<name>]
   program
     .command('connect [server] [@session]')
-    .usage('<server> <@session>')
-    .description('Connect to an MCP server and start a new named @session')
+    .usage('<server> [@session]')
+    .description(
+      'Connect to an MCP server and start a named @session (name auto-generated if omitted)'
+    )
     .option('-H, --header <header>', 'HTTP header (can be repeated)')
     .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
     .option('--no-profile', 'Skip OAuth profile (connect anonymously)')
@@ -381,17 +383,17 @@ Full docs: ${docsUrl}`
 ${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
+
+${chalk.bold('Session name:')}
+  If @session is omitted, a name is auto-generated from the server hostname
+  (e.g. mcp.apify.com → @apify) or config entry name. If a session for the
+  same server already exists, it is reused (restarted if not live).
 `
     )
     .action(async (server, sessionName, opts, command) => {
       if (!server) {
         throw new ClientError(
           'Missing required argument: server\n\nExample: mcpc connect mcp.apify.com @myapp'
-        );
-      }
-      if (!sessionName) {
-        throw new ClientError(
-          'Missing required argument: @session\n\nExample: mcpc connect mcp.apify.com @myapp'
         );
       }
       const globalOpts = getOptionsFromCommand(command);
@@ -409,6 +411,16 @@ ${chalk.bold('Server formats:')}
           `Invalid server: "${server}"\n\n` +
             `Expected a URL (e.g. mcp.apify.com) or a config file entry (e.g. ~/.vscode/mcp.json:filesystem)`
         );
+      }
+
+      // Auto-generate session name if not provided
+      if (!sessionName) {
+        sessionName = await sessions.resolveSessionName(parsed, {
+          outputMode: globalOpts.outputMode,
+          profile: opts.profile,
+          headers,
+          noProfile: opts.noProfile,
+        });
       }
 
       if (parsed.type === 'config') {
