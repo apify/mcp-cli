@@ -10,7 +10,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
-import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
+import { initProxy } from '../lib/proxy.js';
 import { Command } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatHumanError, ClientError } from '../lib/index.js';
@@ -48,9 +48,7 @@ const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.j
 // Also handle --insecure flag to disable TLS certificate verification (for self-signed certs)
 {
   const insecure = process.argv.includes('--insecure');
-  setGlobalDispatcher(
-    new EnvHttpProxyAgent(insecure ? { connect: { rejectUnauthorized: false } } : {})
-  );
+  initProxy({ insecure });
 }
 
 /**
