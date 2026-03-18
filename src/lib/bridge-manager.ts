@@ -394,8 +394,11 @@ export async function restartBridge(
 
   const { pid } = await startBridge(bridgeOptions);
 
-  // Update session with new PID and clear any expired/crashed status
-  await updateSession(sessionName, { pid, status: 'active' });
+  // Update session with new PID.
+  // For fresh restarts (explicit user action), set status to active immediately.
+  // For automatic restarts (crash recovery), leave status unchanged — the caller
+  // (ensureBridgeReady) verifies health and classifies errors before updating status.
+  await updateSession(sessionName, { pid, ...(freshSession && { status: 'active' }) });
 
   logger.debug(`Bridge restarted for ${sessionName} with PID: ${pid}`);
 
@@ -568,17 +571,21 @@ async function autoRestartExpiredBridge(
   const socketPath = getSocketPath(sessionName);
   const result = await checkBridgeHealth(socketPath);
   if (result.healthy) {
+    await updateSession(sessionName, { status: 'active' });
     logger.debug(`Session ${sessionName} auto-restarted successfully after expiry`);
     return socketPath;
   }
 
-  // Auto-restart failed
+  // Auto-restart failed — classify the new error
   const errorMsg = result.error?.message || 'unknown error';
   const kind = await classifySessionError(sessionName, errorMsg);
 
   if (kind === 'unauthorized') {
     const target = session.server.url || session.server.command || sessionName;
-    throw createServerAuthError(target, { sessionName, originalError: result.error });
+    throw createServerAuthError(target, {
+      sessionName,
+      ...(result.error && { originalError: result.error }),
+    });
   }
 
   const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
@@ -666,6 +673,7 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   // Try getServerDetails on restarted bridge (blocks until MCP connected)
   const result = await checkBridgeHealth(socketPath);
   if (result.healthy) {
+    await updateSession(sessionName, { status: 'active' });
     logger.debug(`Bridge for ${sessionName} passed health check`);
     return socketPath;
   }
@@ -684,7 +692,10 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   }
   if (kind === 'unauthorized') {
     const target = session.server.url || session.server.command || sessionName;
-    throw createServerAuthError(target, { sessionName, originalError: result.error });
+    throw createServerAuthError(target, {
+      sessionName,
+      ...(result.error && { originalError: result.error }),
+    });
   }
 
   const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
