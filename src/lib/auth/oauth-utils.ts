@@ -5,6 +5,7 @@
 
 import { createLogger } from '../logger.js';
 import { AuthError } from '../errors.js';
+import { proxyFetch } from '../proxy.js';
 
 const logger = createLogger('oauth-utils');
 
@@ -50,7 +51,7 @@ export async function discoverTokenEndpoint(serverUrl: string): Promise<string |
   for (const url of discoveryUrls) {
     try {
       logger.debug(`Trying OAuth discovery at: ${url}`);
-      const response = await fetch(url, {
+      const response = await proxyFetch(url, {
         headers: { Accept: 'application/json' },
       });
 
@@ -94,7 +95,7 @@ export async function refreshAccessToken(
     client_id: clientId,
   });
 
-  const response = await fetch(tokenEndpoint, {
+  const response = await proxyFetch(tokenEndpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
