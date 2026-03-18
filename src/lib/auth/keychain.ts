@@ -81,16 +81,16 @@ function getEntry(): Promise<EntryConstructor> {
   return _entryPromise;
 }
 
-const PROBE_ACCOUNT = '__mcpc_probe__';
-
-/** Probe the OS keychain by performing a write, read, and delete. */
+/** Probe the OS keychain by performing a write, read-back, and delete. */
 async function probeKeychain(EntryClass: EntryConstructor): Promise<boolean> {
+  const probeAccount = `__mcpc_probe_${Date.now()}_${Math.random().toString(36).slice(2)}__`;
   try {
-    const entry = new EntryClass(SERVICE_NAME, PROBE_ACCOUNT);
-    entry.setPassword('probe');
-    entry.getPassword();
+    const entry = new EntryClass(SERVICE_NAME, probeAccount);
+    const probeValue = `probe-${Date.now()}`;
+    entry.setPassword(probeValue);
+    const readBack = entry.getPassword();
     entry.deletePassword();
-    return true;
+    return readBack === probeValue;
   } catch {
     return false;
   }
