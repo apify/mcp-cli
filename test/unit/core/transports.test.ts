@@ -3,7 +3,9 @@
  */
 
 import { createTransportFromConfig } from '../../../src/core/transports.js';
+import { StreamableHTTPClientTransport } from '../../../src/core/transports.js';
 import { ClientError } from '../../../src/lib/errors.js';
+import { proxyFetch } from '../../../src/lib/proxy.js';
 
 // Mock the SDK transports
 jest.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
@@ -67,5 +69,31 @@ describe('createTransportFromConfig', () => {
     });
 
     expect(transport).toBeDefined();
+  });
+
+  it('should inject proxyFetch into HTTP transport when no custom fetch is provided', () => {
+    const mock = StreamableHTTPClientTransport as jest.Mock;
+    mock.mockClear();
+    createTransportFromConfig({
+      url: 'https://mcp.example.com',
+    });
+
+    expect(mock).toHaveBeenCalledTimes(1);
+    const [, options] = mock.mock.calls[0];
+    expect(options.fetch).toBe(proxyFetch);
+  });
+
+  it('should preserve custom fetch when provided (e.g. x402 middleware)', () => {
+    const mock = StreamableHTTPClientTransport as jest.Mock;
+    mock.mockClear();
+    const customFetch = jest.fn();
+    createTransportFromConfig(
+      { url: 'https://mcp.example.com' },
+      { customFetch: customFetch as any }
+    );
+
+    expect(mock).toHaveBeenCalledTimes(1);
+    const [, options] = mock.mock.calls[0];
+    expect(options.fetch).toBe(customFetch);
   });
 });
