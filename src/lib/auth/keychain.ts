@@ -81,30 +81,58 @@ function getEntry(): Promise<EntryConstructor> {
   return _entryPromise;
 }
 
+const PROBE_ACCOUNT = '__mcpc_probe__';
+
+/** Probe the OS keychain by performing a write, read, and delete. */
+async function probeKeychain(EntryClass: EntryConstructor): Promise<boolean> {
+  try {
+    const entry = new EntryClass(SERVICE_NAME, PROBE_ACCOUNT);
+    entry.setPassword('probe');
+    entry.getPassword();
+    entry.deletePassword();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Serialise the one-time probe so concurrent callers don't race.
+let _probePromise: Promise<void> | null = null;
+
+async function ensureProbed(): Promise<void> {
+  if (keychainAvailable !== null) return;
+  if (_probePromise === null) {
+    _probePromise = (async () => {
+      try {
+        const EntryClass = await getEntry();
+        keychainAvailable = await probeKeychain(EntryClass);
+      } catch {
+        // import() itself failed (missing native addon / libsecret)
+        keychainAvailable = false;
+      }
+      if (!keychainAvailable && !getJsonMode()) {
+        logger.warn(
+          chalk.red(
+            `OS keychain unavailable, ` +
+              `falling back to file-based credential storage (${credentialsPath()}). ` +
+              `Install a keyring daemon (e.g. gnome-keyring or kwallet) for better security.`
+          )
+        );
+      }
+    })();
+  }
+  return _probePromise;
+}
+
 async function withKeychain<T>(
   keychainOp: (EntryClass: EntryConstructor) => T,
   fallback: () => Promise<T>
 ): Promise<T> {
+  await ensureProbed();
   if (keychainAvailable === false) return fallback();
 
-  try {
-    const EntryClass = await getEntry();
-    const result = keychainOp(EntryClass);
-    keychainAvailable = true;
-    return result;
-  } catch (error) {
-    if (keychainAvailable === null && !getJsonMode()) {
-      logger.warn(
-        chalk.red(
-          `OS keychain unavailable (${(error as Error).message}), ` +
-            `falling back to file-based credential storage (${credentialsPath()}). ` +
-            `Install a keyring daemon (e.g. gnome-keyring or kwallet) for better security.`
-        )
-      );
-    }
-    keychainAvailable = false;
-    return fallback();
-  }
+  const EntryClass = await getEntry();
+  return keychainOp(EntryClass);
 }
 
 function keychainSet(account: string, value: string): Promise<void> {
@@ -116,19 +144,11 @@ function keychainSet(account: string, value: string): Promise<void> {
   );
 }
 
-async function keychainGet(account: string): Promise<string | null> {
-  const result = await withKeychain(
+function keychainGet(account: string): Promise<string | null> {
+  return withKeychain(
     (EntryClass) => new EntryClass(SERVICE_NAME, account).getPassword() ?? null,
     () => fileGet(account)
   );
-  // If OS keychain returned null, also check file-based fallback.
-  // Another process (e.g. CLI) may have stored the value in the file because
-  // the OS keychain was unavailable for writes (setPassword throws) while
-  // getPassword silently returns null for missing entries.
-  if (result === null && keychainAvailable === true) {
-    return fileGet(account);
-  }
-  return result;
 }
 
 function keychainDelete(account: string): Promise<boolean> {
