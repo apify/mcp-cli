@@ -761,10 +761,11 @@ class BridgeProcess {
       } catch (e) {
         logger.error('Failed to update session status:', e);
       }
-      // Schedule shutdown after returning (so error response can be sent first)
-      setImmediate(() => {
+      // Delay shutdown so the error response socket.write() in the caller has
+      // time to flush to the client before the process tears down.
+      setTimeout(() => {
         this.shutdown().catch(() => process.exit(1));
-      });
+      }, 100);
     }
   }
 
