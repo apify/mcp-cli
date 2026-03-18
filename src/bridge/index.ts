@@ -698,10 +698,10 @@ class BridgeProcess {
     logger.debug(`Starting keepalive ping every ${KEEPALIVE_INTERVAL_MS / 1000}s`);
 
     this.keepaliveInterval = setInterval(() => {
-      this.sendKeepalivePing().catch((error) => {
+      this.sendKeepalivePing().catch(async (error) => {
         logger.error('Keepalive ping failed:', error);
         // If ping fails, the session might be expired - check and handle
-        this.handlePossibleExpiration(error as Error);
+        await this.handlePossibleExpiration(error as Error);
       });
     }, KEEPALIVE_INTERVAL_MS);
 
@@ -744,19 +744,28 @@ class BridgeProcess {
    * Session expiry is checked first since it's more specific (404/session-not-found),
    * while auth errors are broader (401/403/unauthorized) and could overlap.
    */
-  private handlePossibleExpiration(error: Error): void {
+  private async handlePossibleExpiration(error: Error): Promise<void> {
+    let status: 'expired' | 'unauthorized' | null = null;
     if (isSessionExpiredError(error.message)) {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
-      this.markSessionStatusAndExit('expired').catch((e) => {
-        logger.error('Failed to mark session as expired:', e);
-        process.exit(1);
-      });
+      status = 'expired';
     } else if (isAuthenticationError(error.message)) {
       logger.warn('Authentication rejected, marking session as unauthorized and shutting down');
-      this.markSessionStatusAndExit('unauthorized').catch((e) => {
-        logger.error('Failed to mark session as unauthorized:', e);
-        process.exit(1);
-      });
+      status = 'unauthorized';
+    }
+    if (status) {
+      // Update session status synchronously so it's visible to CLI immediately
+      try {
+        await updateSession(this.options.sessionName, { status });
+        logger.info(`Session ${this.options.sessionName} marked as ${status}`);
+      } catch (e) {
+        logger.error('Failed to update session status:', e);
+      }
+      // Delay shutdown so the error response socket.write() in the caller has
+      // time to flush to the client before the process tears down.
+      setTimeout(() => {
+        this.shutdown().catch(() => process.exit(1));
+      }, 100);
     }
   }
 
@@ -1168,10 +1177,11 @@ class BridgeProcess {
     } catch (error) {
       logger.error('Failed to forward MCP request to server:', error);
 
-      this.sendError(socket, error as Error, message.id);
+      // Update session status BEFORE sending error to CLI, so the status is
+      // visible when the CLI (or test) checks sessions.json immediately after
+      await this.handlePossibleExpiration(error as Error);
 
-      // Check if this error indicates session expiration
-      this.handlePossibleExpiration(error as Error);
+      this.sendError(socket, error as Error, message.id);
     }
   }
 
