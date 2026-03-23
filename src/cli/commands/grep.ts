@@ -69,7 +69,8 @@ function buildMatcher(pattern: string, options: GrepOptions): (text: string) => 
 }
 
 /**
- * Determine which types to search based on flags
+ * Determine which types to search based on flags.
+ * By default only tools are searched; --resources and --prompts are opt-in.
  */
 function getSearchTypes(options: GrepOptions): {
   searchTools: boolean;
@@ -78,9 +79,9 @@ function getSearchTypes(options: GrepOptions): {
 } {
   const anyFilter = options.tools || options.resources || options.prompts;
   return {
-    searchTools: !anyFilter || !!options.tools,
-    searchResources: !anyFilter || !!options.resources,
-    searchPrompts: !anyFilter || !!options.prompts,
+    searchTools: anyFilter ? !!options.tools : true,
+    searchResources: !!options.resources,
+    searchPrompts: !!options.prompts,
   };
 }
 

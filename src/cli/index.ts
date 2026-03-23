@@ -564,18 +564,20 @@ Without arguments, performs safe cleanup of stale data only.
   program
     .command('grep [pattern]')
     .usage('<pattern> [options]')
-    .description('Search tools, resources, and prompts across all active sessions')
-    .option('--tools', 'Search tools only')
-    .option('--resources', 'Search resources only')
-    .option('--prompts', 'Search prompts only')
+    .description(
+      'Search tools across all active sessions (use --resources/--prompts to include more)'
+    )
+    .option('--tools', 'Search tools (default if no type flags given)')
+    .option('--resources', 'Search resources')
+    .option('--prompts', 'Search prompts')
     .option('-E, --regex', 'Treat pattern as a regular expression')
     .option('-s, --case-sensitive', 'Case-sensitive matching')
     .addHelpText(
       'after',
       `
 ${chalk.bold('Examples:')}
-  mcpc grep "search"                        Search all sessions
-  mcpc grep "search" --tools                Search tools only
+  mcpc grep "search"                        Search tools in all sessions
+  mcpc grep "search" --resources --prompts  Also search resources and prompts
   mcpc grep -E "search|find" --tools        Regex search across tools
   mcpc @apify grep "actor"                  Search within a single session
   mcpc grep "file" --json                   JSON output for scripting
@@ -855,10 +857,10 @@ function registerSessionCommands(program: Command, session: string): void {
   // Grep command: @session grep <pattern>
   program
     .command('grep <pattern>')
-    .description('Search tools, resources, and prompts')
-    .option('--tools', 'Search tools only')
-    .option('--resources', 'Search resources only')
-    .option('--prompts', 'Search prompts only')
+    .description('Search tools (use --resources/--prompts to include more)')
+    .option('--tools', 'Search tools (default if no type flags given)')
+    .option('--resources', 'Search resources')
+    .option('--prompts', 'Search prompts')
     .option('-E, --regex', 'Treat pattern as a regular expression')
     .option('-s, --case-sensitive', 'Case-sensitive matching')
     .action(async (pattern, opts, command) => {
