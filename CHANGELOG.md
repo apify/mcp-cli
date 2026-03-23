@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New `mcpc grep <pattern>` command to search tools, resources, and prompts across all active sessions, with support for regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`), and single-session search (`mcpc @session grep`)
+- New `mcpc grep <pattern>` command to search tools, resources, and prompts across all active sessions or within a single session (`mcpc @session grep`). Supports regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`; defaults to tools only), case-sensitive mode (`--case-sensitive`), result limiting (`-m, --max-results <n>`), and JSON output. Matches against the full searchable text `@session/item-name <JSON schema>`. Unavailable sessions (crashed, disconnected, etc.) are shown with their status.
 
 ### Fixed
 
@@ -17,11 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HTTP proxy support (`HTTP_PROXY`/`HTTPS_PROXY` env vars) now works for MCP server connections, OAuth token refresh, and x402 payment signing — previously the MCP SDK transport and OAuth calls bypassed the global proxy dispatcher
 
 ### Changed
-
-- `grep` accepts `-m, --max-results <n>` to limit the number of results shown
-- `grep` now matches against the full searchable text `@session/item-name <JSON schema>`, so patterns can match session names, tool schemas, and other metadata
-- `grep` now shows unavailable sessions (crashed, disconnected, etc.) with their status instead of silently skipping them
-- `grep` now searches only tools by default; specify `--resources` or `--prompts` to search those types instead (combine with `--tools` to include tools too)
 
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
 
