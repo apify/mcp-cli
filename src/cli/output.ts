@@ -464,7 +464,7 @@ function formatToolsSummary(tools: Tool[]): string[] {
   const lines: string[] = [];
 
   // Header with tool count
-  lines.push(chalk.bold(`Available tools (${tools.length}):`));
+  lines.push(chalk.bold(`Tools (${tools.length}):`));
 
   // Summary list of tools
   const bullet = chalk.dim('*');
@@ -497,7 +497,7 @@ function formatToolsCompact(tools: Tool[], options?: FormatOptions): string {
   const session = options?.sessionName ? `${options.sessionName} ` : '';
   lines.push('');
   lines.push(
-    `For full tool details, run \`mcpc ${session}tools-list --full\` or \`mcpc ${session}tools-get <name>\``
+    `For full tool details and schema, run \`mcpc ${session}tools-list --full\` or \`mcpc ${session}tools-get <name>\``
   );
 
   return lines.join('\n');
@@ -570,7 +570,7 @@ export function formatResources(resources: Resource[]): string {
   const lines: string[] = [];
 
   // Header with resource count
-  lines.push(chalk.bold(`Available resources (${resources.length}):`));
+  lines.push(chalk.bold(`Resources (${resources.length}):`));
 
   // Summary list of resources
   const bullet = chalk.dim('*');
@@ -627,7 +627,7 @@ export function formatResourceTemplates(templates: ResourceTemplate[]): string {
   const lines: string[] = [];
 
   // Header with template count
-  lines.push(chalk.bold(`Available resource templates (${templates.length}):`));
+  lines.push(chalk.bold(`Resource templates (${templates.length}):`));
 
   // Summary list of templates
   const bullet = chalk.dim('*');
@@ -684,7 +684,7 @@ export function formatPrompts(prompts: Prompt[]): string {
   const lines: string[] = [];
 
   // Header with prompt count
-  lines.push(chalk.bold(`Available prompts (${prompts.length}):`));
+  lines.push(chalk.bold(`Prompts (${prompts.length}):`));
 
   // Summary list of prompts
   const bullet = chalk.dim('*');
@@ -1145,6 +1145,21 @@ export function formatServerDetails(
   }
   lines.push('');
 
+  // Tools list (from bridge cache, no extra server call)
+  if (tools && tools.length > 0) {
+    lines.push(formatToolsCompact(tools, { sessionName: target }));
+    lines.push('');
+  }
+
+  // Instructions in code block
+  const trimmed = instructions ? instructions.trim() : '';
+  if (trimmed) {
+    lines.push(chalk.bold('Instructions:'));
+    lines.push(chalk.gray('````'));
+    lines.push(trimmed);
+    lines.push(chalk.gray('````'));
+  }
+
   // Commands
   lines.push(chalk.bold('Available commands:'));
   const commands: string[] = [];
@@ -1183,21 +1198,6 @@ export function formatServerDetails(
 
   lines.push(commands.join('\n'));
   lines.push('');
-
-  // Tools list (from bridge cache, no extra server call)
-  if (tools && tools.length > 0) {
-    lines.push(formatToolsCompact(tools, { sessionName: target }));
-    lines.push('');
-  }
-
-  // Instructions in code block
-  const trimmed = instructions ? instructions.trim() : '';
-  if (trimmed) {
-    lines.push(chalk.bold('Instructions:'));
-    lines.push(chalk.gray('````'));
-    lines.push(trimmed);
-    lines.push(chalk.gray('````'));
-  }
 
   return lines.join('\n');
 }

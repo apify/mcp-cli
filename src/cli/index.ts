@@ -343,8 +343,8 @@ function createTopLevelProgram(): Command {
     `
 ${chalk.bold('MCP session commands (after connecting):')}
   <@session>                   Show MCP server info and capabilities
-  <@session> ${chalk.cyan('tools-list')}        List MCP tools
-  <@session> ${chalk.cyan('tools-get')} <name>
+  <@session> ${chalk.cyan('tools-list')}        List MCP server tools
+  <@session> ${chalk.cyan('tools-get')} <name>  Get tool details and schema
   <@session> ${chalk.cyan('tools-call')} <name> [arg:=val ... | <json> | <stdin]
   <@session> ${chalk.cyan('prompts-list')}
   <@session> ${chalk.cyan('prompts-get')} <name> [arg:=val ... | <json> | <stdin]
