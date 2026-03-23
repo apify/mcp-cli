@@ -466,7 +466,7 @@ describe('formatTools', () => {
   describe('compact format (default)', () => {
     it('should show header with tool count', () => {
       const output = formatTools(sampleTools);
-      expect(output).toContain('Available tools (2):');
+      expect(output).toContain('Tools (2):');
     });
 
     it('should show tool names in backticks', () => {
@@ -570,7 +570,7 @@ describe('formatTools', () => {
 
     it('should handle empty tools array', () => {
       const output = formatTools([]);
-      expect(output).toContain('Available tools (0):');
+      expect(output).toContain('Tools (0):');
     });
 
     it('should show task mode for tools with task support', () => {
@@ -1008,7 +1008,7 @@ describe('formatResources', () => {
     const output = formatResources(resources);
 
     // Should have header with count
-    expect(output).toContain('Available resources (2):');
+    expect(output).toContain('Resources (2):');
 
     // Should have summary list
     expect(output).toContain('* `file:///home/user/data.json`');
@@ -1024,7 +1024,7 @@ describe('formatResources', () => {
   it('should show empty list message for no resources', () => {
     const resources: Resource[] = [];
     const output = formatResources(resources);
-    expect(output).toContain('Available resources (0):');
+    expect(output).toContain('Resources (0):');
   });
 });
 
@@ -1092,7 +1092,7 @@ describe('formatResourceTemplates', () => {
     const output = formatResourceTemplates(templates);
 
     // Should have header with count
-    expect(output).toContain('Available resource templates (2):');
+    expect(output).toContain('Resource templates (2):');
 
     // Should have summary list
     expect(output).toContain('* `file:///{path}`');
@@ -1152,7 +1152,7 @@ describe('formatPrompts', () => {
     const output = formatPrompts(prompts);
 
     // Should have header with count
-    expect(output).toContain('Available prompts (2):');
+    expect(output).toContain('Prompts (2):');
 
     // Should have summary list
     expect(output).toContain('* `greeting`');

@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New `mcpc grep <pattern>` command to search tools, resources, and prompts across all active sessions or within a single session (`mcpc @session grep`). Supports regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`; defaults to tools only), case-sensitive mode (`--case-sensitive`), result limiting (`-m, --max-results <n>`), and JSON output. Matches against the full searchable text `@session/item-name <JSON schema>`. Unavailable sessions (crashed, disconnected, etc.) are shown with their status.
+- New `mcpc grep <pattern>` command to search tools, resources, and prompts across all active sessions, with support for regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`), and single-session search (`mcpc @session grep`)
+- Recovery hints for crashed and expired sessions in `mcpc` session list output
 
 ### Fixed
 
