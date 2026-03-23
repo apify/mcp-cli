@@ -25,6 +25,7 @@ export interface GrepOptions extends CommandOptions {
   prompts?: boolean | undefined;
   regex?: boolean | undefined;
   caseSensitive?: boolean | undefined;
+  maxResults?: number | undefined;
 }
 
 interface GrepResult {
@@ -191,6 +192,30 @@ function countMatches(result: GrepResult): number {
 }
 
 /**
+ * Truncate a GrepResult to at most `limit` total items (tools first, then resources, then prompts).
+ * Returns the truncated result and how many items were dropped.
+ */
+function truncateResult(
+  result: GrepResult,
+  limit: number
+): { result: GrepResult; truncated: number } {
+  const total = countMatches(result);
+  if (total <= limit) return { result, truncated: 0 };
+
+  let remaining = limit;
+  const tools = result.tools.slice(0, remaining);
+  remaining -= tools.length;
+  const resources = result.resources.slice(0, remaining);
+  remaining -= resources.length;
+  const prompts = result.prompts.slice(0, remaining);
+
+  return {
+    result: { tools, resources, prompts },
+    truncated: total - limit,
+  };
+}
+
+/**
  * Format a single tool as a compact bullet line (same style as tools-list)
  */
 function formatToolLine(tool: Tool): string {
@@ -284,25 +309,33 @@ export async function grepSession(
   const sessionRef = session.startsWith('@') ? session : `@${session}`;
 
   return await withMcpClient(session, options, async (client) => {
-    const result = await searchClient(client, matcher, options, sessionRef);
-    const total = countMatches(result);
+    const fullResult = await searchClient(client, matcher, options, sessionRef);
+    const total = countMatches(fullResult);
+
+    const { result, truncated } =
+      options.maxResults != null
+        ? truncateResult(fullResult, options.maxResults)
+        : { result: fullResult, truncated: 0 };
 
     if (options.outputMode === 'json') {
-      console.log(
-        formatJson({
-          tools: result.tools,
-          resources: result.resources,
-          prompts: result.prompts,
-          totalMatches: total,
-        })
-      );
+      const jsonOutput: Record<string, unknown> = {
+        tools: result.tools,
+        resources: result.resources,
+        prompts: result.prompts,
+        totalMatches: total,
+      };
+      if (truncated > 0) {
+        jsonOutput.truncated = truncated;
+      }
+      console.log(formatJson(jsonOutput));
     } else {
       if (total === 0) {
         console.log('No matches found.');
       } else {
         const lines = formatGrepResultHuman(result);
         lines.push('');
-        lines.push(chalk.dim(`${total} ${total === 1 ? 'match' : 'matches'}.`));
+        const suffix = truncated > 0 ? ` (showing ${countMatches(result)})` : '';
+        lines.push(chalk.dim(`${total} ${total === 1 ? 'match' : 'matches'}${suffix}.`));
         console.log(lines.join('\n'));
       }
     }
@@ -406,9 +439,27 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
 
   const totalMatches = results.reduce((sum, r) => sum + countMatches(r), 0);
 
+  // Apply max-results limit across all sessions
+  let displayResults = results;
+  let totalTruncated = 0;
+  if (options.maxResults != null) {
+    let remaining = options.maxResults;
+    displayResults = [];
+    for (const r of results) {
+      if (remaining <= 0) {
+        totalTruncated += countMatches(r);
+        continue;
+      }
+      const { result: truncR, truncated } = truncateResult(r, remaining);
+      remaining -= countMatches(truncR);
+      totalTruncated += truncated;
+      displayResults.push({ ...r, ...truncR });
+    }
+  }
+
   if (options.outputMode === 'json') {
     const jsonOutput: Record<string, unknown> = {
-      results: results.map((r) => ({
+      results: displayResults.map((r) => ({
         session: r.session,
         tools: r.tools,
         resources: r.resources,
@@ -416,6 +467,9 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
       })),
       totalMatches,
     };
+    if (totalTruncated > 0) {
+      jsonOutput.truncated = totalTruncated;
+    }
     if (errors.length > 0) {
       jsonOutput.errors = errors;
     }
@@ -431,7 +485,7 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
       lines.push(formatSkippedSession(skipped));
     }
 
-    for (const r of results) {
+    for (const r of displayResults) {
       const matchCount = countMatches(r);
       lines.push(
         `${chalk.cyan(r.session)} ${chalk.dim(`(${matchCount} ${matchCount === 1 ? 'match' : 'matches'})`)}`
@@ -450,9 +504,11 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     } else {
       if (totalMatches > 0) {
         const sessionCount = results.length;
+        const showing = totalMatches - totalTruncated;
+        const suffix = totalTruncated > 0 ? ` (showing ${showing})` : '';
         lines.push(
           chalk.dim(
-            `${totalMatches} ${totalMatches === 1 ? 'match' : 'matches'} across ${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'}.`
+            `${totalMatches} ${totalMatches === 1 ? 'match' : 'matches'} across ${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'}${suffix}.`
           )
         );
       } else if (lines.length > 0) {

@@ -570,6 +570,7 @@ Without arguments, performs safe cleanup of stale data only.
     .option('--prompts', 'Search prompts')
     .option('-E, --regex', 'Treat pattern as a regular expression')
     .option('-s, --case-sensitive', 'Case-sensitive matching')
+    .option('-m, --max-results <n>', 'Limit the number of results')
     .addHelpText(
       'after',
       `
@@ -584,6 +585,7 @@ ${chalk.bold('Examples:')}
   mcpc grep -E "search|find"               Regex search across tools
   mcpc @apify grep "actor"                  Search within a single session
   mcpc grep "file" --json                   JSON output for scripting
+  mcpc grep "actor" -m 5                    Show at most 5 results
 `
     )
     .action(async (pattern, opts, command) => {
@@ -593,12 +595,14 @@ ${chalk.bold('Examples:')}
         );
       }
       const globalOpts = getOptionsFromCommand(command);
+      const maxResults = opts.maxResults ? parseInt(opts.maxResults as string, 10) : undefined;
       const exitCode = await grepCmd.grepAllSessions(pattern, {
         tools: opts.tools as boolean | undefined,
         resources: opts.resources as boolean | undefined,
         prompts: opts.prompts as boolean | undefined,
         regex: opts.regex as boolean | undefined,
         caseSensitive: opts.caseSensitive as boolean | undefined,
+        maxResults,
         ...globalOpts,
       });
       process.exit(exitCode);
@@ -866,14 +870,17 @@ function registerSessionCommands(program: Command, session: string): void {
     .option('--prompts', 'Search prompts')
     .option('-E, --regex', 'Treat pattern as a regular expression')
     .option('-s, --case-sensitive', 'Case-sensitive matching')
+    .option('-m, --max-results <n>', 'Limit the number of results')
     .action(async (pattern, opts, command) => {
       const globalOpts = getOptionsFromCommand(command);
+      const maxResults = opts.maxResults ? parseInt(opts.maxResults as string, 10) : undefined;
       const exitCode = await grepCmd.grepSession(session, pattern, {
         tools: opts.tools as boolean | undefined,
         resources: opts.resources as boolean | undefined,
         prompts: opts.prompts as boolean | undefined,
         regex: opts.regex as boolean | undefined,
         caseSensitive: opts.caseSensitive as boolean | undefined,
+        maxResults,
         ...globalOpts,
       });
       process.exit(exitCode);
