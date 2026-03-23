@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `grep` now matches against the full searchable text `@session/item-name <JSON schema>`, so patterns can match session names, tool schemas, and other metadata
+- `grep` now shows unavailable sessions (crashed, disconnected, etc.) with their status instead of silently skipping them
 - `grep` now searches only tools by default; specify `--resources` or `--prompts` to search those types instead (combine with `--tools` to include tools too)
 
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
