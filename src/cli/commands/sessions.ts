@@ -233,6 +233,8 @@ export async function connectSession(
     ...(proxyConfig && { proxy: proxyConfig }),
     ...(options.x402 && { x402: true }),
     ...(options.insecure && { insecure: true }),
+    // Clear any previous error status (unauthorized, expired) when reconnecting
+    ...(isReconnect && { status: 'active' }),
   };
 
   if (isReconnect) {
@@ -294,16 +296,17 @@ export async function connectSession(
     console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
   }
 
-  // Display server info via the new session (best-effort)
-  // If bridge is still initializing, don't fail the connect — the session is already created.
-  // The next command (e.g. ping, tools-list) will wait for the bridge to be ready.
+  // Display server info via the new session (best-effort).
+  // showServerDetails blocks until the bridge is connected (via health check),
+  // so by the time it returns or throws, we have definitive bridge status.
+  // Re-throw auth errors (real failures requiring user action), but swallow others
+  // (TLS errors, timeouts, etc.) since the session was created and can be used later.
   try {
     await showServerDetails(name, {
       ...options,
       hideTarget: false, // Show session info prefix
     });
   } catch (detailsError) {
-    // Re-throw auth errors — these are real failures, not timing issues
     if (detailsError instanceof AuthError) {
       throw detailsError;
     }
@@ -546,8 +549,12 @@ export async function showServerDetails(
     const serverDetails = await client.getServerDetails();
     const { serverInfo, capabilities, instructions, protocolVersion } = serverDetails;
 
+    // Get tools list (uses bridge cache when available, no extra server call)
+    const cachedToolsResult = await client.listAllTools();
+    const tools = cachedToolsResult.tools;
+
     if (options.outputMode === 'human') {
-      console.log(formatServerDetails(serverDetails, target));
+      console.log(formatServerDetails(serverDetails, target, tools));
     } else {
       // JSON output MUST match MCP InitializeResult structure!
       // See https://modelcontextprotocol.io/specification/2025-11-25/schema#initializeresult
@@ -571,6 +578,7 @@ export async function showServerDetails(
             capabilities,
             serverInfo,
             instructions,
+            ...(tools.length > 0 && { tools }),
           },
           'json'
         )
