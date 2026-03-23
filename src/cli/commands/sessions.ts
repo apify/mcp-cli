@@ -457,7 +457,7 @@ export async function listSessionsAndAuthProfiles(options: {
       console.log(chalk.bold('No OAuth profiles.'));
       console.log(chalk.dim('  ↳ run: mcpc login mcp.example.com'));
     } else {
-      console.log(chalk.bold('Available OAuth profiles:'));
+      console.log(chalk.bold('Saved OAuth profiles:'));
       for (const profile of profiles) {
         const hostStr = getServerHost(profile.serverUrl);
         const nameStr = chalk.magenta(profile.name);
