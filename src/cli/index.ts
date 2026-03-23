@@ -375,6 +375,7 @@ Full docs: ${docsUrl}`
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
+    .option('--auto-restart', 'Automatically restart session when it expires (loses state)')
     .addHelpText(
       'after',
       `
@@ -421,6 +422,7 @@ ${chalk.bold('Server formats:')}
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
           ...(globalOpts.insecure && { insecure: true }),
+          ...(opts.autoRestart && { autoRestart: true }),
         });
       } else {
         await sessions.connectSession(server, sessionName, {
@@ -430,6 +432,7 @@ ${chalk.bold('Server formats:')}
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
           ...(globalOpts.insecure && { insecure: true }),
+          ...(opts.autoRestart && { autoRestart: true }),
         });
       }
     });

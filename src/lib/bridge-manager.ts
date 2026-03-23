@@ -44,38 +44,30 @@ import { getWallet } from './wallets.js';
 
 const logger = createLogger('bridge-manager');
 
+type SessionErrorKind = 'expired' | 'unauthorized' | 'unknown';
+
 /**
- * Classify a bridge health check error as session expiry or auth failure and throw.
- * Session expiry (404/session-not-found) is checked first since it's more specific
- * than auth errors (401/403/unauthorized). Does nothing if neither pattern matches.
+ * Classify a bridge health check error and update session status accordingly.
+ * Never throws — callers decide how to handle each classification.
  */
-async function classifyAndThrowSessionError(
+async function classifySessionError(
   sessionName: string,
-  session: { server: ServerConfig },
-  errorMessage: string,
-  originalError?: Error
-): Promise<void> {
+  errorMessage: string
+): Promise<SessionErrorKind> {
+  // Session expiry (404/session-not-found) checked first — more specific than auth errors (401/403)
   if (isSessionExpiredError(errorMessage)) {
     await updateSession(sessionName, { status: 'expired' }).catch((e) =>
       logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
     );
-    const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
-    throw new ClientError(
-      `Session ${sessionName} expired (server rejected session ID). ` +
-        `Use "mcpc ${sessionName} restart" to start a new session. ` +
-        `For details, check logs at ${logPath}`
-    );
+    return 'expired';
   }
   if (isAuthenticationError(errorMessage)) {
     await updateSession(sessionName, { status: 'unauthorized' }).catch((e) =>
       logger.warn(`Failed to mark session ${sessionName} as unauthorized:`, e)
     );
-    const target = session.server.url || session.server.command || sessionName;
-    throw createServerAuthError(target, {
-      sessionName,
-      ...(originalError && { originalError }),
-    });
+    return 'unauthorized';
   }
+  return 'unknown';
 }
 
 // Get the path to the bridge executable
@@ -288,15 +280,39 @@ export async function stopBridge(sessionName: string): Promise<void> {
   // Full cleanup happens in closeSession().
 }
 
+export interface RestartBridgeOptions {
+  /**
+   * When true, creates a fresh MCP session (no session ID resumption) and
+   * re-discovers auth profiles. Used for explicit user-initiated restarts.
+   * When false (default), attempts to resume the existing MCP session.
+   */
+  freshSession?: boolean;
+  /** Verbose logging flag passed to the bridge process */
+  verbose?: boolean;
+  /**
+   * Optional callback to resolve an auth profile name for the session.
+   * Only called when freshSession is true and the session has no stored profile.
+   * This allows the CLI layer to inject its own profile resolution logic.
+   */
+  resolveProfile?: (serverUrl: string, sessionName: string) => Promise<string | undefined>;
+}
+
 /**
  * Restart a bridge process for a session
- * Used for automatic recovery when connection to bridge fails
+ * Used for automatic recovery when connection to bridge fails, and also
+ * for explicit user-initiated restarts (with freshSession: true).
  *
  * Headers persist in keychain across bridge restarts, so they are
  * retrieved here and passed to startBridge() which sends them via IPC.
  */
-export async function restartBridge(sessionName: string): Promise<StartBridgeResult> {
-  logger.debug(`Trying to restart bridge for ${sessionName}...`);
+export async function restartBridge(
+  sessionName: string,
+  options: RestartBridgeOptions = {}
+): Promise<StartBridgeResult> {
+  const { freshSession = false, verbose, resolveProfile } = options;
+  logger.debug(
+    `Trying to restart bridge for ${sessionName}${freshSession ? ' (fresh session)' : ''}...`
+  );
 
   const session = await getSession(sessionName);
 
@@ -331,24 +347,42 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
     logger.debug(`Retrieved ${expectedHeaderKeys.length} headers from keychain for failover`);
   }
 
-  // Start a new bridge, preserving auth profile, proxy config, MCP session ID, and wallet
+  // Start a new bridge, preserving auth profile, proxy config, and wallet
   const bridgeOptions: StartBridgeOptions = {
     sessionName,
     serverConfig: serverConfig,
+    ...(verbose !== undefined && { verbose }),
   };
   if (headers) {
     bridgeOptions.headers = headers;
   }
-  if (session.profileName) {
-    bridgeOptions.profileName = session.profileName;
+
+  // Resolve auth profile: use stored profile, or re-discover via callback on fresh restart
+  let profileName = session.profileName;
+  if (freshSession && !profileName && serverConfig.url && resolveProfile) {
+    const hasExplicitAuthHeader = headers?.Authorization !== undefined;
+    if (!hasExplicitAuthHeader) {
+      profileName = await resolveProfile(serverConfig.url, sessionName);
+      if (profileName) {
+        logger.debug(`Discovered auth profile "${profileName}" for session ${sessionName}`);
+        await updateSession(sessionName, { profileName });
+      }
+    }
   }
+  if (profileName) {
+    bridgeOptions.profileName = profileName;
+  }
+
   if (session.proxy) {
     bridgeOptions.proxyConfig = session.proxy;
   }
-  if (session.mcpSessionId) {
+
+  // Only attempt MCP session resumption on automatic restarts (not fresh restarts)
+  if (!freshSession && session.mcpSessionId) {
     bridgeOptions.mcpSessionId = session.mcpSessionId;
     logger.debug(`Using saved MCP session ID for resumption: ${session.mcpSessionId}`);
   }
+
   if (session.x402) {
     bridgeOptions.x402 = session.x402;
     logger.debug('Using saved x402 flag');
@@ -360,8 +394,11 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
 
   const { pid } = await startBridge(bridgeOptions);
 
-  // Update session with new PID
-  await updateSession(sessionName, { pid });
+  // Update session with new PID.
+  // For fresh restarts (explicit user action), set status to active immediately.
+  // For automatic restarts (crash recovery), leave status unchanged — the caller
+  // (ensureBridgeReady) verifies health and classifies errors before updating status.
+  await updateSession(sessionName, { pid, ...(freshSession && { status: 'active' }) });
 
   logger.debug(`Bridge restarted for ${sessionName} with PID: ${pid}`);
 
@@ -516,6 +553,48 @@ async function checkBridgeHealth(socketPath: string): Promise<BridgeHealthResult
  * @returns The socket path of the healthy bridge
  * @throws ClientError if bridge cannot be made healthy
  */
+/**
+ * Auto-restart an expired session's bridge and verify health.
+ * Shared by both the "already expired" and "expired during health check" code paths.
+ *
+ * @returns The socket path if the restart succeeded
+ * @throws ClientError if the restart failed (with autoRestart disabled for retry to prevent loops)
+ */
+async function autoRestartExpiredBridge(
+  sessionName: string,
+  session: { server: ServerConfig },
+  context: string
+): Promise<string> {
+  logger.debug(`Session ${sessionName} expired (${context}), auto-restarting...`);
+  await restartBridge(sessionName);
+
+  const socketPath = getSocketPath(sessionName);
+  const result = await checkBridgeHealth(socketPath);
+  if (result.healthy) {
+    await updateSession(sessionName, { status: 'active' });
+    logger.debug(`Session ${sessionName} auto-restarted successfully after expiry`);
+    return socketPath;
+  }
+
+  // Auto-restart failed — classify the new error
+  const errorMsg = result.error?.message || 'unknown error';
+  const kind = await classifySessionError(sessionName, errorMsg);
+
+  if (kind === 'unauthorized') {
+    const target = session.server.url || session.server.command || sessionName;
+    throw createServerAuthError(target, {
+      sessionName,
+      ...(result.error && { originalError: result.error }),
+    });
+  }
+
+  const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
+  throw new ClientError(
+    `Session ${sessionName} failed to auto-restart after expiry: ${errorMsg}. ` +
+      `For details, check logs at ${logPath}`
+  );
+}
+
 export async function ensureBridgeReady(sessionName: string): Promise<string> {
   const session = await getSession(sessionName);
 
@@ -529,11 +608,16 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   }
 
   if (session.status === 'expired') {
+    if (session.autoRestart) {
+      return autoRestartExpiredBridge(sessionName, session, 'status was expired');
+    }
+
     throw new ClientError(
       `Session ${sessionName} has expired. ` +
         `The MCP server indicated the session is no longer valid.\n` +
         `To restart the session, run: mcpc ${sessionName} restart\n` +
-        `To remove the expired session, run: mcpc ${sessionName} close`
+        `To remove the expired session, run: mcpc ${sessionName} close\n` +
+        `To enable automatic restarts on expiry, recreate with: mcpc connect --auto-restart <server> ${sessionName}`
     );
   }
 
@@ -553,11 +637,27 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     // Not healthy - check error type
     if (result.error) {
       const errorMessage = result.error.message || '';
-      await classifyAndThrowSessionError(sessionName, session, errorMessage, result.error);
+      const kind = await classifySessionError(sessionName, errorMessage);
+
+      if (kind === 'expired' && session.autoRestart) {
+        await stopBridge(sessionName).catch(() => {});
+        return autoRestartExpiredBridge(sessionName, session, 'detected during health check');
+      }
+      if (kind === 'expired') {
+        const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
+        throw new ClientError(
+          `Session ${sessionName} expired (server rejected session ID). ` +
+            `Use "mcpc ${sessionName} restart" to start a new session. ` +
+            `For details, check logs at ${logPath}`
+        );
+      }
+      if (kind === 'unauthorized') {
+        const target = session.server.url || session.server.command || sessionName;
+        throw createServerAuthError(target, { sessionName, originalError: result.error });
+      }
       if (result.error instanceof NetworkError) {
         logger.debug(`Bridge process alive but socket not responding for ${sessionName}`);
       } else {
-        // Other MCP errors - propagate
         throw new ClientError(
           `Bridge for ${sessionName} failed to connect to MCP server: ${result.error.message}`
         );
@@ -573,15 +673,31 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   // Try getServerDetails on restarted bridge (blocks until MCP connected)
   const result = await checkBridgeHealth(socketPath);
   if (result.healthy) {
+    await updateSession(sessionName, { status: 'active' });
     logger.debug(`Bridge for ${sessionName} passed health check`);
     return socketPath;
   }
 
-  // Not healthy after restart - classify the error
+  // Not healthy after restart - classify and throw
   const errorMsg = result.error?.message || 'unknown error';
-  await classifyAndThrowSessionError(sessionName, session, errorMsg, result.error);
+  const kind = await classifySessionError(sessionName, errorMsg);
 
-  // Other errors - provide detailed error with log path
+  if (kind === 'expired') {
+    const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
+    throw new ClientError(
+      `Session ${sessionName} expired (server rejected session ID). ` +
+        `Use "mcpc ${sessionName} restart" to start a new session. ` +
+        `For details, check logs at ${logPath}`
+    );
+  }
+  if (kind === 'unauthorized') {
+    const target = session.server.url || session.server.command || sessionName;
+    throw createServerAuthError(target, {
+      sessionName,
+      ...(result.error && { originalError: result.error }),
+    });
+  }
+
   const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
   throw new ClientError(
     `Bridge for ${sessionName} failed after restart: ${errorMsg}. ` +

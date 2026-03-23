@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `--auto-restart` help text now clarifies that restarting loses session state
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
 
   | Before                                        | After                                                      |
@@ -51,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mcpc @session` now shows available tools list from bridge cache (no extra server call)
 - Task capability and `execution.taskSupport` displayed in `tools-get` and server info
 - x402 payments are now also sent via the MCP `_meta["x402/payment"]` field on `tools/call` requests, in addition to the existing HTTP header
+- `--auto-restart` option for `connect` command to automatically restart expired sessions (server rejected session ID) instead of requiring manual `mcpc @session restart`
 
 ### Fixed
 
