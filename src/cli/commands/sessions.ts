@@ -443,10 +443,14 @@ export async function listSessionsAndAuthProfiles(options: {
 
         console.log(`  ${formatSessionLine(session)} ${statusStr}`);
 
-        // Show recovery hint for unauthorized sessions
+        // Show recovery hints for non-live sessions
         if (status === 'unauthorized') {
           const target = getServerHost(session.server.url || session.server.command || '');
           console.log(chalk.dim(`    ↳ run: mcpc login ${target} && mcpc ${session.name} restart`));
+        } else if (status === 'crashed') {
+          console.log(chalk.dim(`    ↳ run: mcpc ${session.name}`));
+        } else if (status === 'expired') {
+          console.log(chalk.dim(`    ↳ run: mcpc ${session.name} restart`));
         }
       }
     }
