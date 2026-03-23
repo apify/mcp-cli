@@ -70,15 +70,17 @@ function buildMatcher(pattern: string, options: GrepOptions): (text: string) => 
 
 /**
  * Determine which types to search based on flags.
- * By default only tools are searched; --resources and --prompts are opt-in.
+ * If no type flags are given, defaults to tools only.
+ * If any type flag is given, search exactly the specified types.
  */
 function getSearchTypes(options: GrepOptions): {
   searchTools: boolean;
   searchResources: boolean;
   searchPrompts: boolean;
 } {
+  const anyFilter = options.tools || options.resources || options.prompts;
   return {
-    searchTools: options.tools !== false,
+    searchTools: anyFilter ? !!options.tools : true,
     searchResources: !!options.resources,
     searchPrompts: !!options.prompts,
   };

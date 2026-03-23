@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test: Grep command (search tools, resources, prompts)
-# Tests grep with default flags, --resources, --prompts, --no-tools, --json, and regex
+# Tests grep with default flags, --tools, --resources, --prompts, --json, and regex
 
 source "$(dirname "$0")/../../lib/framework.sh"
 test_init "basic/grep"
@@ -52,61 +52,76 @@ assert_exit_code 1
 test_pass
 
 # =============================================================================
-# Test: --resources flag
+# Test: --resources flag (searches resources only, not tools)
 # =============================================================================
 
-test_case "grep --resources includes resources"
+test_case "grep --resources searches resources"
 run_mcpc "$SESSION" grep "static" --resources
 assert_success
 assert_contains "$STDOUT" "test://static/hello"
 test_pass
 
-test_case "grep --resources still searches tools"
+test_case "grep --resources does not search tools"
 run_mcpc "$SESSION" grep "echo" --resources
-assert_success
-assert_contains "$STDOUT" "echo"
+# 'echo' only matches a tool, not a resource
+assert_exit_code 1
 test_pass
 
 # =============================================================================
-# Test: --prompts flag
+# Test: --prompts flag (searches prompts only, not tools)
 # =============================================================================
 
-test_case "grep --prompts includes prompts"
+test_case "grep --prompts searches prompts"
 run_mcpc "$SESSION" grep "greeting" --prompts
 assert_success
 assert_contains "$STDOUT" "greeting"
 test_pass
 
-test_case "grep --prompts still searches tools"
+test_case "grep --prompts does not search tools"
 run_mcpc "$SESSION" grep "echo" --prompts
+# 'echo' only matches a tool, not a prompt
+assert_exit_code 1
+test_pass
+
+# =============================================================================
+# Test: --tools flag (explicit)
+# =============================================================================
+
+test_case "grep --tools searches tools explicitly"
+run_mcpc "$SESSION" grep "echo" --tools
 assert_success
 assert_contains "$STDOUT" "echo"
 test_pass
 
-# =============================================================================
-# Test: --no-tools flag
-# =============================================================================
-
-test_case "grep --no-tools --resources excludes tools"
-run_mcpc "$SESSION" grep "echo" --no-tools --resources
-# 'echo' only matches a tool, not a resource
+test_case "grep --tools does not search resources"
+run_mcpc "$SESSION" grep "static" --tools
 assert_exit_code 1
-test_pass
-
-test_case "grep --no-tools --resources finds resources"
-run_mcpc "$SESSION" grep "static" --no-tools --resources
-assert_success
-assert_contains "$STDOUT" "test://static/hello"
 test_pass
 
 # =============================================================================
 # Test: Combined flags
 # =============================================================================
 
-test_case "grep --resources --prompts searches all three types"
-run_mcpc "$SESSION" grep "e" --resources --prompts
+test_case "grep --tools --resources searches both"
+run_mcpc "$SESSION" grep "echo" --tools --resources
 assert_success
-# Should match tools (echo, write-file), resources, and prompts
+assert_contains "$STDOUT" "echo"
+test_pass
+
+test_case "grep --tools --prompts searches both"
+run_mcpc "$SESSION" grep "greeting" --tools --prompts
+assert_success
+assert_contains "$STDOUT" "greeting"
+test_pass
+
+test_case "grep --resources --prompts does not search tools"
+run_mcpc "$SESSION" grep "echo" --resources --prompts
+assert_exit_code 1
+test_pass
+
+test_case "grep --tools --resources --prompts searches everything"
+run_mcpc "$SESSION" grep "e" --tools --resources --prompts
+assert_success
 assert_not_empty "$STDOUT"
 test_pass
 
@@ -155,10 +170,17 @@ assert_json "$STDOUT" '.resources | length == 0'
 assert_json "$STDOUT" '.prompts | length == 0'
 test_pass
 
-test_case "grep --json --resources includes resources"
+test_case "grep --json --resources searches only resources"
 run_mcpc --json "$SESSION" grep "static" --resources
 assert_success
 assert_json "$STDOUT" '.resources | length > 0'
+assert_json "$STDOUT" '.tools | length == 0'
+test_pass
+
+test_case "grep --json --tools --resources searches both"
+run_mcpc --json "$SESSION" grep "echo" --tools --resources
+assert_success
+assert_json "$STDOUT" '.tools | length > 0'
 test_pass
 
 # =============================================================================

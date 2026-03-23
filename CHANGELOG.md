@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `grep` now searches only tools by default; use `--resources` and/or `--prompts` to include those types
+- `grep` now searches only tools by default; specify `--resources` or `--prompts` to search those types instead (combine with `--tools` to include tools too)
 
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
 
