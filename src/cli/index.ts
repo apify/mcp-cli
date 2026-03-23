@@ -24,6 +24,7 @@ import * as logging from './commands/logging.js';
 import * as utilities from './commands/utilities.js';
 import * as auth from './commands/auth.js';
 import * as tasks from './commands/tasks.js';
+import * as grepCmd from './commands/grep.js';
 import { handleX402Command } from './commands/x402.js';
 import { clean } from './commands/clean.js';
 import type { OutputMode } from '../lib/index.js';
@@ -358,6 +359,7 @@ ${chalk.bold('MCP session commands (after connecting):')}
   <@session> ${chalk.cyan('tasks-cancel')} <taskId>
   <@session> ${chalk.cyan('logging-set-level')} <level>
   <@session> ${chalk.cyan('ping')}
+  <@session> ${chalk.cyan('grep')} <pattern>         Search tools, resources, and prompts
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
 
@@ -556,6 +558,45 @@ Without arguments, performs safe cleanup of stale data only.
         logs: resources.includes('logs'),
         all: resources.includes('all'),
       });
+    });
+
+  // grep command: mcpc grep <pattern>
+  program
+    .command('grep [pattern]')
+    .usage('<pattern> [options]')
+    .description('Search tools, resources, and prompts across all active sessions')
+    .option('--tools', 'Search tools only')
+    .option('--resources', 'Search resources only')
+    .option('--prompts', 'Search prompts only')
+    .option('-E, --regex', 'Treat pattern as a regular expression')
+    .option('-s, --case-sensitive', 'Case-sensitive matching')
+    .addHelpText(
+      'after',
+      `
+${chalk.bold('Examples:')}
+  mcpc grep "search"                        Search all sessions
+  mcpc grep "search" --tools                Search tools only
+  mcpc grep -E "search|find" --tools        Regex search across tools
+  mcpc @apify grep "actor"                  Search within a single session
+  mcpc grep "file" --json                   JSON output for scripting
+`
+    )
+    .action(async (pattern, opts, command) => {
+      if (!pattern) {
+        throw new ClientError(
+          'Missing required argument: pattern\n\nUsage: mcpc grep <pattern>\n\nExample: mcpc grep "search"'
+        );
+      }
+      const globalOpts = getOptionsFromCommand(command);
+      const exitCode = await grepCmd.grepAllSessions(pattern, {
+        tools: opts.tools as boolean | undefined,
+        resources: opts.resources as boolean | undefined,
+        prompts: opts.prompts as boolean | undefined,
+        regex: opts.regex as boolean | undefined,
+        caseSensitive: opts.caseSensitive as boolean | undefined,
+        ...globalOpts,
+      });
+      process.exit(exitCode);
     });
 
   // x402 command: mcpc x402 <subcommand>
@@ -809,6 +850,28 @@ function registerSessionCommands(program: Command, session: string): void {
     .description('Ping the MCP server to check if it is alive')
     .action(async (_options, command) => {
       await utilities.ping(session, getOptionsFromCommand(command));
+    });
+
+  // Grep command: @session grep <pattern>
+  program
+    .command('grep <pattern>')
+    .description('Search tools, resources, and prompts')
+    .option('--tools', 'Search tools only')
+    .option('--resources', 'Search resources only')
+    .option('--prompts', 'Search prompts only')
+    .option('-E, --regex', 'Treat pattern as a regular expression')
+    .option('-s, --case-sensitive', 'Case-sensitive matching')
+    .action(async (pattern, opts, command) => {
+      const globalOpts = getOptionsFromCommand(command);
+      const exitCode = await grepCmd.grepSession(session, pattern, {
+        tools: opts.tools as boolean | undefined,
+        resources: opts.resources as boolean | undefined,
+        prompts: opts.prompts as boolean | undefined,
+        regex: opts.regex as boolean | undefined,
+        caseSensitive: opts.caseSensitive as boolean | undefined,
+        ...globalOpts,
+      });
+      process.exit(exitCode);
     });
 }
 

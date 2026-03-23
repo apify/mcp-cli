@@ -81,6 +81,7 @@ export const KNOWN_COMMANDS = [
   'restart',
   'shell',
   'clean',
+  'grep',
   'x402',
 ];
 
@@ -110,6 +111,7 @@ export const KNOWN_SESSION_COMMANDS = [
   'tasks-list',
   'tasks-get',
   'tasks-cancel',
+  'grep',
 ];
 
 /**

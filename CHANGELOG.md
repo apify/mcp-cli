@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New `mcpc grep <pattern>` command to search tools, resources, and prompts across all active sessions, with support for regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`), and single-session search (`mcpc @session grep`)
+
 ### Fixed
 
 - Fixed auth loss when reconnecting an unauthorized session via `mcpc connect` — the `unauthorized` status was not cleared, causing all subsequent operations to fail with "Authentication required by server" even after successful reconnection

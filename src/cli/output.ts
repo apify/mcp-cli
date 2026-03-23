@@ -211,7 +211,7 @@ export function formatHuman(data: unknown, options?: FormatOptions): string {
 /**
  * Format tool annotations as a compact string
  */
-function formatToolAnnotations(annotations: Tool['annotations']): string | null {
+export function formatToolAnnotations(annotations: Tool['annotations']): string | null {
   if (!annotations) return null;
 
   const parts: string[] = [];
@@ -297,7 +297,7 @@ export function formatSchemaType(schema: Record<string, unknown>): string {
 /**
  * Format backticks in gray color for subtle Markdown-like display
  */
-function grayBacktick(): string {
+export function grayBacktick(): string {
   return chalk.gray('`');
 }
 
@@ -305,7 +305,7 @@ function grayBacktick(): string {
  * Wrap text in gray backticks with cyan coloring for code-like terms
  * Used for tool names, argument names, and other identifiers
  */
-function inBackticks(text: string): string {
+export function inBackticks(text: string): string {
   return `${grayBacktick()}${chalk.cyan(text)}${grayBacktick()}`;
 }
 
