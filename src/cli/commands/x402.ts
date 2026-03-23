@@ -260,28 +260,28 @@ ${chalk.bold('sign options:')}
   program
     .command('init')
     .description('Create a new x402 wallet')
-    .action(async (_opts, cmd) => {
+    .action(async (_opts: unknown, cmd: Command) => {
       await initWallet({ outputMode: resolveOutputMode(cmd) });
     });
 
   program
     .command('import <private-key>')
     .description('Import an existing wallet from a private key')
-    .action(async (privateKey, _opts, cmd) => {
+    .action(async (privateKey: string, _opts: unknown, cmd: Command) => {
       await importWallet({ privateKey, outputMode: resolveOutputMode(cmd) });
     });
 
   program
     .command('info')
     .description('Show wallet info')
-    .action(async (_opts, cmd) => {
+    .action(async (_opts: unknown, cmd: Command) => {
       await walletInfo({ outputMode: resolveOutputMode(cmd) });
     });
 
   program
     .command('remove')
     .description('Remove the wallet')
-    .action(async (_opts, cmd) => {
+    .action(async (_opts: unknown, cmd: Command) => {
       await removeWalletCmd({ outputMode: resolveOutputMode(cmd) });
     });
 
@@ -291,14 +291,16 @@ ${chalk.bold('sign options:')}
     .helpOption('-h, --help', 'Display help')
     .option('--amount <usd>', 'Override amount in USD')
     .option('--expiry <seconds>', 'Override expiry in seconds')
-    .action(async (paymentRequired, opts, cmd) => {
-      await signPaymentCommand({
-        paymentRequired,
-        amount: opts.amount,
-        expiry: opts.expiry,
-        outputMode: resolveOutputMode(cmd),
-      });
-    });
+    .action(
+      async (paymentRequired: string, opts: { amount?: string; expiry?: string }, cmd: Command) => {
+        await signPaymentCommand({
+          paymentRequired,
+          amount: opts.amount,
+          expiry: opts.expiry,
+          outputMode: resolveOutputMode(cmd),
+        });
+      }
+    );
 
   // Show help if no subcommand
   if (args.length === 0) {

@@ -82,7 +82,7 @@ function getEntry(): Promise<EntryConstructor> {
 }
 
 /** Probe the OS keychain by performing a write, read-back, and delete. */
-async function probeKeychain(EntryClass: EntryConstructor): Promise<boolean> {
+function probeKeychain(EntryClass: EntryConstructor): boolean {
   const probeAccount = `__mcpc_probe_${Date.now()}_${Math.random().toString(36).slice(2)}__`;
   try {
     const entry = new EntryClass(SERVICE_NAME, probeAccount);
@@ -105,7 +105,7 @@ async function ensureProbed(): Promise<void> {
     _probePromise = (async () => {
       try {
         const EntryClass = await getEntry();
-        keychainAvailable = await probeKeychain(EntryClass);
+        keychainAvailable = probeKeychain(EntryClass);
       } catch {
         // import() itself failed (missing native addon / libsecret)
         keychainAvailable = false;

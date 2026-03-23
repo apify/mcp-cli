@@ -349,7 +349,7 @@ function promptForCallbackUrl(): {
       try {
         resolve(extractCodeFromUrl(trimmed));
       } catch (e) {
-        reject(e);
+        reject(e instanceof Error ? e : new Error(String(e)));
       }
     });
 

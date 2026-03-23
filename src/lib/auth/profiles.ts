@@ -146,7 +146,10 @@ export async function saveAuthProfile(profile: AuthProfile): Promise<void> {
       }
 
       // Update profile
-      storage.profiles[host]![profile.name] = profile;
+      const serverProfiles = storage.profiles[host];
+      if (serverProfiles) {
+        serverProfiles[profile.name] = profile;
+      }
 
       await saveAuthProfilesInternal(storage);
       logger.debug(`Saved auth profile: ${profile.name} for ${host}`);

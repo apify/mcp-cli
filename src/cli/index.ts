@@ -6,7 +6,7 @@
  */
 
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
@@ -563,7 +563,7 @@ Without arguments, performs safe cleanup of stale data only.
   program
     .command('x402 [subcommand] [args...]')
     .description('Configure an x402 payment wallet (EXPERIMENTAL)')
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
+
     .action(() => {});
 
   // help command: mcpc help [command] (supports "help x402 sign" etc.)

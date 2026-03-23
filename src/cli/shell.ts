@@ -87,7 +87,7 @@ function addToHistory(ctx: ShellContext, line: string): void {
  */
 function displayNotification(notification: NotificationData): void {
   const timestamp = new Date().toLocaleTimeString();
-  let message = '';
+  let message: string;
 
   switch (notification.method) {
     case 'tools/list_changed':

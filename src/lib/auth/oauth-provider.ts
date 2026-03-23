@@ -303,7 +303,7 @@ export class OAuthProvider implements OAuthClientProvider {
     }
 
     // Extract user info from OIDC id_token if present
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
     const idToken = (tokens as any).id_token as string | undefined;
     if (idToken) {
       const claims = decodeJwtPayload(idToken);
@@ -327,6 +327,7 @@ export class OAuthProvider implements OAuthClientProvider {
     this._authProfile = profile;
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     // Runtime mode: not supported
     if (this.isRuntimeMode()) {
@@ -341,10 +342,12 @@ export class OAuthProvider implements OAuthClientProvider {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async saveCodeVerifier(codeVerifier: string): Promise<void> {
     this._codeVerifier = codeVerifier;
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async codeVerifier(): Promise<string> {
     if (!this._codeVerifier) {
       throw new Error('Code verifier not found');
