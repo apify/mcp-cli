@@ -229,10 +229,28 @@ async function signPaymentCommand(options: SignOptions): Promise<void> {
 
 export async function handleX402Command(args: string[]): Promise<void> {
   const program = new Command();
-  program.name('mcpc x402').description('x402 wallet management and payment signing');
+  program
+    .name('mcpc x402')
+    .description('x402 wallet management and payment signing (EXPERIMENTAL)');
+
+  program.configureHelp({
+    styleTitle: (str) => chalk.bold(str),
+    styleSubcommandText: (str) => chalk.cyan(str),
+  });
 
   // Inherit global options so they parse correctly
-  program.option('-j, --json', 'Output in JSON format').option('--verbose', 'Enable debug logging');
+  program
+    .option('-j, --json', 'Output in JSON format')
+    .option('--verbose', 'Enable debug logging')
+    .helpOption('-h, --help', 'Display help')
+    .helpCommand('help [command]', 'Display help for command')
+    .addHelpText(
+      'after',
+      `
+${chalk.bold('sign options:')}
+  --amount <usd>      Override amount in USD
+  --expiry <seconds>  Override expiry in seconds`
+    );
 
   const resolveOutputMode = (cmd: Command): OutputMode => {
     const opts = cmd.optsWithGlobals();
@@ -268,17 +286,14 @@ export async function handleX402Command(args: string[]): Promise<void> {
     });
 
   program
-    .command('sign')
+    .command('sign <payment-required>')
     .description('Sign a payment using the wallet')
-    .requiredOption(
-      '-r, --payment-required <base64>',
-      'PAYMENT-REQUIRED header from a 402 response'
-    )
+    .helpOption('-h, --help', 'Display help')
     .option('--amount <usd>', 'Override amount in USD')
     .option('--expiry <seconds>', 'Override expiry in seconds')
-    .action(async (opts, cmd) => {
+    .action(async (paymentRequired, opts, cmd) => {
       await signPaymentCommand({
-        paymentRequired: opts.paymentRequired,
+        paymentRequired,
         amount: opts.amount,
         expiry: opts.expiry,
         outputMode: resolveOutputMode(cmd),

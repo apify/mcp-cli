@@ -10,7 +10,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
-import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
+import { initProxy } from '../lib/proxy.js';
 import { Command } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatHumanError, ClientError } from '../lib/index.js';
@@ -48,9 +48,7 @@ const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.j
 // Also handle --insecure flag to disable TLS certificate verification (for self-signed certs)
 {
   const insecure = process.argv.includes('--insecure');
-  setGlobalDispatcher(
-    new EnvHttpProxyAgent(insecure ? { connect: { rejectUnauthorized: false } } : {})
-  );
+  initProxy({ insecure });
 }
 
 /**
@@ -153,7 +151,15 @@ async function main(): Promise<void> {
   }
 
   // Check for help flag
+  // x402 has its own Commander program with full subcommand help, so pass --help through
   if (args.includes('--help') || args.includes('-h')) {
+    if (args.includes('x402')) {
+      const x402Index = args.indexOf('x402');
+      const x402Args = args.slice(x402Index + 1);
+      await handleX402Command(x402Args);
+      await closeFileLogger();
+      return;
+    }
     const program = createTopLevelProgram();
     await program.parseAsync(process.argv);
     return;
@@ -307,6 +313,8 @@ function createTopLevelProgram(): Command {
   program.configureHelp({
     subcommandTerm: (cmd) =>
       `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
+    styleTitle: (str) => chalk.bold(str),
+    styleSubcommandText: (str) => chalk.cyan(str),
   });
 
   // Use raw Markdown URL for pipes (AI agents), GitHub UI for TTY (humans)
@@ -333,23 +341,23 @@ function createTopLevelProgram(): Command {
   program.addHelpText(
     'after',
     `
-MCP session commands (after connecting):
+${chalk.bold('MCP session commands (after connecting):')}
   <@session>                   Show MCP server info and capabilities
-  <@session> tools-list        List MCP tools
-  <@session> tools-get <name>
-  <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
-  <@session> prompts-list
-  <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
-  <@session> resources-list
-  <@session> resources-read <uri>
-  <@session> resources-subscribe <uri>
-  <@session> resources-unsubscribe <uri>
-  <@session> resources-templates-list
-  <@session> tasks-list
-  <@session> tasks-get <taskId>
-  <@session> tasks-cancel <taskId>
-  <@session> logging-set-level <level>
-  <@session> ping
+  <@session> ${chalk.cyan('tools-list')}        List MCP tools
+  <@session> ${chalk.cyan('tools-get')} <name>
+  <@session> ${chalk.cyan('tools-call')} <name> [arg:=val ... | <json> | <stdin]
+  <@session> ${chalk.cyan('prompts-list')}
+  <@session> ${chalk.cyan('prompts-get')} <name> [arg:=val ... | <json> | <stdin]
+  <@session> ${chalk.cyan('resources-list')}
+  <@session> ${chalk.cyan('resources-read')} <uri>
+  <@session> ${chalk.cyan('resources-subscribe')} <uri>
+  <@session> ${chalk.cyan('resources-unsubscribe')} <uri>
+  <@session> ${chalk.cyan('resources-templates-list')}
+  <@session> ${chalk.cyan('tasks-list')}
+  <@session> ${chalk.cyan('tasks-get')} <taskId>
+  <@session> ${chalk.cyan('tasks-cancel')} <taskId>
+  <@session> ${chalk.cyan('logging-set-level')} <level>
+  <@session> ${chalk.cyan('ping')}
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
 
@@ -370,7 +378,7 @@ Full docs: ${docsUrl}`
     .addHelpText(
       'after',
       `
-Server formats:
+${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
 `
@@ -519,7 +527,7 @@ Server formats:
     .addHelpText(
       'after',
       `
-Resources:
+${chalk.bold('Resources:')}
   sessions    Remove stale/crashed session records
   profiles    Remove authentication profiles
   logs        Remove bridge log files
@@ -555,27 +563,23 @@ Without arguments, performs safe cleanup of stale data only.
   program
     .command('x402 [subcommand] [args...]')
     .description('Configure an x402 payment wallet (EXPERIMENTAL)')
-    .addHelpText(
-      'after',
-      `
-Subcommands:
-  init          Create a new x402 wallet
-  import <key>  Import wallet from private key
-  info          Show wallet info
-  sign -r <b64> Sign payment from PAYMENT-REQUIRED header
-  remove        Remove the wallet
-`
-    )
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     .action(() => {});
 
-  // help command: mcpc help [command]
+  // help command: mcpc help [command] (supports "help x402 sign" etc.)
   program
-    .command('help [command]')
+    .command('help [command] [subcommand]')
     .description('Show help for a specific command')
-    .action((cmdName?: string) => {
+    .action(async (cmdName?: string, subcommand?: string) => {
       if (!cmdName) {
         program.outputHelp();
+        return;
+      }
+
+      // x402 has its own Commander program with full subcommand help
+      if (cmdName === 'x402') {
+        const helpArgs = subcommand ? [subcommand, '--help'] : ['--help'];
+        await handleX402Command(helpArgs);
         return;
       }
 
@@ -682,12 +686,12 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tools-call <name> [args...]')
     .description('Call a tool with arguments (key:=value pairs or JSON)')
-    .option('--async', 'Use async task execution (experimental)')
-    .option('--detach', 'Start async task and return immediately with task ID (implies --async)')
+    .option('--task', 'Use task execution (experimental)')
+    .option('--detach', 'Start task and return immediately with task ID (implies --task)')
     .action(async (name, args, options, command) => {
       await tools.callTool(session, name, {
         args,
-        async: options.async,
+        task: options.task,
         detach: options.detach,
         ...getOptionsFromCommand(command),
       });

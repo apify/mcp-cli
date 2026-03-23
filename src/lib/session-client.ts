@@ -154,12 +154,32 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     );
   }
 
-  async callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult> {
+  async listAllTools(options?: { refreshCache?: boolean }): Promise<ListToolsResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'listAllTools',
+          options?.refreshCache ? { refreshCache: true } : undefined,
+          this.requestTimeout
+        ) as Promise<ListToolsResult>,
+      'listAllTools'
+    );
+  }
+
+  async callTool(
+    name: string,
+    args?: Record<string, unknown>,
+    meta?: Record<string, unknown>
+  ): Promise<CallToolResult> {
+    const params: Record<string, unknown> = { name, arguments: args };
+    if (meta) {
+      params._meta = meta;
+    }
     return this.withRetry(
       () =>
         this.bridgeClient.request(
           'callTool',
-          { name, arguments: args },
+          params,
           this.requestTimeout
         ) as Promise<CallToolResult>,
       'callTool'
@@ -268,7 +288,8 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   async callToolWithTask(
     name: string,
     args?: Record<string, unknown>,
-    onUpdate?: (update: TaskUpdate) => void
+    onUpdate?: (update: TaskUpdate) => void,
+    meta?: Record<string, unknown>
   ): Promise<CallToolResult> {
     let capturedTaskId: string | undefined;
 
@@ -287,7 +308,12 @@ export class SessionClient extends EventEmitter implements IMcpClient {
         };
 
         this.bridgeClient
-          .request('callTool', { name, arguments: args, useTask: true }, this.requestTimeout, id)
+          .request(
+            'callTool',
+            { name, arguments: args, useTask: true, ...(meta && { _meta: meta }) },
+            this.requestTimeout,
+            id
+          )
           .then((result) => {
             cleanup();
             resolve(result as CallToolResult);
@@ -333,12 +359,16 @@ export class SessionClient extends EventEmitter implements IMcpClient {
   /**
    * Call a tool in detached mode — returns task ID immediately without waiting
    */
-  async callToolDetached(name: string, args?: Record<string, unknown>): Promise<TaskUpdate> {
+  async callToolDetached(
+    name: string,
+    args?: Record<string, unknown>,
+    meta?: Record<string, unknown>
+  ): Promise<TaskUpdate> {
     return this.withRetry(
       () =>
         this.bridgeClient.request(
           'callTool',
-          { name, arguments: args, useTask: true, detach: true },
+          { name, arguments: args, useTask: true, detach: true, ...(meta && { _meta: meta }) },
           this.requestTimeout
         ) as Promise<TaskUpdate>,
       'callToolDetached'

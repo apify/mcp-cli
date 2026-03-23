@@ -27,18 +27,12 @@ export async function listTools(
   options: CommandOptions & { full?: boolean }
 ): Promise<void> {
   await withMcpClient(target, options, async (client, _context) => {
-    // Fetch all tools across all pages
-    const allTools = [];
-    let cursor: string | undefined = undefined;
-
-    do {
-      const result = await client.listTools(cursor);
-      allTools.push(...result.tools);
-      cursor = result.nextCursor;
-    } while (cursor);
-
+    const result = await client.listAllTools({ refreshCache: true });
     console.log(
-      formatOutput(allTools, options.outputMode, options.full ? { full: true } : undefined)
+      formatOutput(result.tools, options.outputMode, {
+        ...(options.full && { full: true }),
+        sessionName: target,
+      })
     );
   });
 }
@@ -58,12 +52,15 @@ export async function getTool(
   }
 
   await withMcpClient(target, options, async (client, _context) => {
-    // List all tools and find the matching one
-    // TODO: It is wasteful to always re-fetch the full list (applies also to prompts),
-    //  especially considering that MCP SDK client caches these.
-    //  We should use SDK's or our own cache on bridge to make this more efficient
-    const result = await client.listTools();
-    const tool = result.tools.find((t) => t.name === name);
+    // Use cached tools first, then re-fetch from server if tool not found
+    let result = await client.listAllTools();
+    let tool = result.tools.find((t) => t.name === name);
+
+    if (!tool) {
+      // Tool not in cache — force a fresh fetch in case the cache is stale
+      result = await client.listAllTools({ refreshCache: true });
+      tool = result.tools.find((t) => t.name === name);
+    }
 
     if (!tool) {
       throw new ClientError(`Tool not found: ${name}`);
@@ -110,7 +107,7 @@ function formatElapsed(ms: number): string {
 
 /**
  * Check if task-augmented execution should be used for a tool call.
- * Async tasks are opt-in via --async or --detach flags.
+ * Tasks are opt-in via --task or --detach flags.
  */
 async function shouldUseTask(
   client: import('../../lib/types.js').IMcpClient,
@@ -168,15 +165,15 @@ function setupEscListener(
  * 1. Positional args: key:=value pairs or inline JSON
  * 2. Stdin: pipe JSON input (echo '{"key":"value"}' | mcpc ...)
  *
- * Use --async for task-augmented execution with progress spinner.
- * Use --detach to start an async task and return the task ID immediately.
+ * Use --task for task-augmented execution with progress spinner.
+ * Use --detach to start a task and return the task ID immediately.
  */
 export async function callTool(
   target: string,
   name: string,
   options: CommandOptions & {
     args?: string[];
-    async?: boolean;
+    task?: boolean;
     detach?: boolean;
   }
 ): Promise<void> {
@@ -231,18 +228,16 @@ export async function callTool(
       }
     }
 
-    // --detach implies --async
-    const useAsync = options.detach || options.async;
+    // --detach implies --task
+    const taskRequested = options.detach || options.task;
     // Check if we should use task-augmented execution
-    const useTask = await shouldUseTask(client, useAsync);
+    const useTask = await shouldUseTask(client, taskRequested);
 
-    // Warn if --async/--detach was requested but server doesn't support tasks
-    if (useAsync && !useTask) {
+    // Warn if --task/--detach was requested but server doesn't support tasks
+    if (taskRequested && !useTask) {
       if (options.outputMode === 'human') {
         console.log(
-          formatWarning(
-            'Server does not support async tasks, falling back to synchronous execution'
-          )
+          formatWarning('Server does not support tasks, falling back to synchronous execution')
         );
       }
     }

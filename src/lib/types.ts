@@ -371,7 +371,12 @@ export interface IMcpClient {
   // MCP operations
   ping(): Promise<void>;
   listTools(cursor?: string): Promise<ListToolsResult>;
-  callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult>;
+  listAllTools(options?: { refreshCache?: boolean }): Promise<ListToolsResult>;
+  callTool(
+    name: string,
+    args?: Record<string, unknown>,
+    meta?: Record<string, unknown>
+  ): Promise<CallToolResult>;
   listResources(cursor?: string): Promise<ListResourcesResult>;
   listResourceTemplates(cursor?: string): Promise<ListResourceTemplatesResult>;
   readResource(uri: string): Promise<ReadResourceResult>;
@@ -385,9 +390,14 @@ export interface IMcpClient {
   callToolWithTask(
     name: string,
     args?: Record<string, unknown>,
-    onUpdate?: (update: TaskUpdate) => void
+    onUpdate?: (update: TaskUpdate) => void,
+    meta?: Record<string, unknown>
   ): Promise<CallToolResult>;
-  callToolDetached(name: string, args?: Record<string, unknown>): Promise<TaskUpdate>;
+  callToolDetached(
+    name: string,
+    args?: Record<string, unknown>,
+    meta?: Record<string, unknown>
+  ): Promise<TaskUpdate>;
   pollTask(taskId: string, onUpdate?: (update: TaskUpdate) => void): Promise<CallToolResult>;
   listTasks(cursor?: string): Promise<ListTasksResult>;
   getTask(taskId: string): Promise<GetTaskResult>;

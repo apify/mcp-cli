@@ -5,6 +5,10 @@
  * 1. Proactively sign payments when tool metadata includes _meta.x402
  * 2. Handle HTTP 402 responses by parsing PAYMENT-REQUIRED, signing, and retrying once
  *
+ * Payment is injected in two places simultaneously (server decides which to use):
+ * - HTTP header: PAYMENT-SIGNATURE (base64-encoded payment payload)
+ * - JSON-RPC body: params._meta["x402/payment"] (payment payload object)
+ *
  * This middleware is injected into the transport via the SDK's `fetch` option.
  */
 
@@ -20,6 +24,9 @@ import {
 import { createLogger } from '../logger.js';
 
 const logger = createLogger('x402-middleware');
+
+/** MCP _meta key for x402 payment (per x402 MCP spec) */
+const MCP_PAYMENT_META_KEY = 'x402/payment';
 
 /** Payment information from tool's _meta.x402 */
 interface ToolPaymentMeta {
@@ -77,7 +84,7 @@ export function createX402FetchMiddleware(
     const proactiveHeader = await tryProactiveSigning(init, wallet, getToolByName);
     if (proactiveHeader) {
       logger.debug('Proactively signing x402 payment for tools/call');
-      const enhancedInit = injectPaymentHeader(init, proactiveHeader);
+      const enhancedInit = injectPayment(init, proactiveHeader);
       const response = await baseFetch(url, enhancedInit);
 
       // If proactive signing succeeded (not 402), return immediately
@@ -214,7 +221,7 @@ async function handle402Fallback(
     );
 
     // Retry with payment signature (once only)
-    const retryInit = injectPaymentHeader(originalInit, result.paymentSignatureBase64);
+    const retryInit = injectPayment(originalInit, result.paymentSignatureBase64);
     return await baseFetch(url, retryInit);
   } catch (error) {
     logger.warn('402 fallback signing failed:', error);
@@ -257,14 +264,65 @@ function extractToolCallName(body: RequestInit['body'] | undefined): string | un
 }
 
 /**
- * Clone a RequestInit and add/overwrite the PAYMENT-SIGNATURE header.
+ * Inject payment into both the HTTP header and the JSON-RPC body _meta.
+ * The same payment payload is used for both channels so the server can pick either.
  */
-function injectPaymentHeader(init: RequestInit | undefined, paymentSignature: string): RequestInit {
+function injectPayment(init: RequestInit | undefined, paymentSignatureBase64: string): RequestInit {
+  // 1. HTTP header (existing mechanism)
   const headers = new Headers(init?.headers);
-  headers.set('PAYMENT-SIGNATURE', paymentSignature);
+  headers.set('PAYMENT-SIGNATURE', paymentSignatureBase64);
 
-  return {
-    ...init,
-    headers,
-  };
+  const result: RequestInit = { ...init, headers };
+
+  // 2. JSON-RPC body _meta (x402 MCP spec mechanism)
+  if (init?.body && typeof init.body === 'string') {
+    try {
+      const paymentPayload = JSON.parse(
+        Buffer.from(paymentSignatureBase64, 'base64').toString('utf-8')
+      ) as Record<string, unknown>;
+      result.body = injectPaymentMeta(init.body, paymentPayload);
+    } catch (error) {
+      logger.debug('Failed to inject payment into body _meta:', error);
+      // Fall back to header-only — body injection is best-effort
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Inject payment payload into the _meta field of a single tools/call JSON-RPC request.
+ * Batch requests are left untouched (header-only) — a single payment cannot safely
+ * apply to multiple tools/call entries that may have different pricing.
+ */
+function injectPaymentMeta(body: string, paymentPayload: Record<string, unknown>): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+
+    // IMPORTANT: Skip batch requests. Injecting the same payment into every tools/call
+    // entry in a batch is wrong — each tool may have different pricing, and one signed
+    // payment cannot safely apply to multiple calls. Batches still get the HTTP header
+    // (PAYMENT-SIGNATURE), which the server can use as a fallback.
+    if (Array.isArray(parsed)) {
+      return body;
+    }
+
+    const req = parsed as JsonRpcRequest;
+    if (req.method === 'tools/call' && req.params) {
+      return JSON.stringify({
+        ...req,
+        params: {
+          ...req.params,
+          _meta: {
+            ...((req.params._meta as Record<string, unknown>) || {}),
+            [MCP_PAYMENT_META_KEY]: paymentPayload,
+          },
+        },
+      });
+    }
+
+    return body;
+  } catch {
+    return body;
+  }
 }
