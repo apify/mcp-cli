@@ -47,6 +47,27 @@ npm run test:e2e            # Run e2e tests only
 npm run test:coverage       # Run all tests with coverage
 ```
 
+### E2E test prerequisites
+
+E2E tests require `mcpc` to be built first:
+
+```bash
+npm run build
+npm link
+```
+
+Some E2E tests connect to a real remote MCP server and require OAuth authentication profiles.
+Without these profiles, the affected tests will be skipped or fail.
+
+To set them up, [create a free Apify account](https://console.apify.com/sign-up) (you can use the same account for both profiles), then run:
+
+```bash
+mcpc login mcp.apify.com --profile e2e-test1
+mcpc login mcp.apify.com --profile e2e-test2
+```
+
+The test runner does not take any destructive actions.
+
 ## Release process
 
 Use the release script to publish a new version
