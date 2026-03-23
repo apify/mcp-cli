@@ -128,6 +128,7 @@ Commands:
   shell <@session>             Open interactive shell for a session
   login <server>               Interactively login to a server using OAuth and save profile
   logout <server>              Delete an authentication profile for a server
+  grep <pattern>               Search tools across all active sessions
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
   x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
   help [command] [subcommand]  Show help for a specific command
@@ -149,6 +150,7 @@ MCP session commands (after connecting):
   <@session> tasks-cancel <taskId>
   <@session> logging-set-level <level>
   <@session> ping
+  <@session> grep <pattern>         Search tools, resources, and prompts
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
 ```
@@ -264,6 +266,41 @@ mcpc @apify shell
 
 Shell commands: `help`, `exit`/`quit`/Ctrl+D, Ctrl+C to cancel.
 Arrow keys navigate history (saved to `~/.mcpc/history`).
+
+### Grep (search across sessions)
+
+`mcpc grep` searches tools, resources, and prompts across all active sessions or within a single session:
+
+```bash
+# Search tools in all active sessions (default: tools only)
+mcpc grep "search"
+
+# Search within a single session
+mcpc @apify grep "actor"
+
+# Search resources or prompts instead of tools
+mcpc grep "config" --resources
+mcpc grep "greeting" --prompts
+
+# Combine type flags
+mcpc grep "data" --tools --resources --prompts
+
+# Regex search
+mcpc grep -E "search|find"
+
+# Case-sensitive search (default is case-insensitive)
+mcpc grep "Search" --case-sensitive
+
+# Limit results
+mcpc grep "e" -m 5
+
+# JSON output for scripting
+mcpc grep "actor" --json
+```
+
+By default, `grep` searches only tools. Use `--resources` or `--prompts` to search those types
+(combine with `--tools` to include tools too). Sessions that are crashed or unavailable are shown
+with their status rather than silently skipped.
 
 ### JSON mode
 

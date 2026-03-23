@@ -486,10 +486,7 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     }
 
     for (const r of displayResults) {
-      const matchCount = countMatches(r);
-      lines.push(
-        `${chalk.cyan(r.session)} ${chalk.dim(`(${matchCount} ${matchCount === 1 ? 'match' : 'matches'})`)}`
-      );
+      lines.push(chalk.cyan(r.session));
       lines.push(...formatGrepResultHuman(r, '  '));
       lines.push('');
     }
