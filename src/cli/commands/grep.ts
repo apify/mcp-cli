@@ -239,7 +239,7 @@ function formatGrepResultHuman(result: GrepResult, indent: string = ''): string[
 // ─── Single-session grep ─────────────────────────────────────────────
 
 /**
- * Search a single session for matching tools, resources, and prompts.
+ * Search a single session for matching tools, resources, and prompts. 
  * Returns exit code (0 = matches found, 1 = no matches).
  */
 export async function grepSession(
