@@ -527,24 +527,26 @@ Example: `mcpc @apify logging-set-level debug`
 
 ## Common Implementation Patterns
 
-After making any code changes, always run `npm run lint` and fix all errors before finishing. The lint command checks both ESLint rules and
-Prettier formatting; run `npx prettier --write` on any files flagged for formatting issues or `npm run lint` to fix the entire repo.
+After making any code changes, always run `npm run lint` and fix **all** errors before committing. Do not skip or ignore lint failures. The lint command checks both ESLint rules and Prettier formatting. To auto-fix issues, run `npm run lint:fix`. If auto-fix doesn't resolve everything, manually fix the remaining errors. Never commit code that fails `npm run lint`. **As the very last step of every task**, run `npm run lint` once more and fix any remaining issues before considering the work done.
 
-For any non-trivial change (new feature, bug fix, behaviour change, or notable refactor), add an entry to the `[Unreleased]` section of `CHANGELOG.md` before finishing. Use the appropriate category (`Added`, `Changed`, `Fixed`, `Removed`). Skip purely internal changes such as test-only edits or code style fixes.
+After lint passes, run `npm test` (unit tests) and fix any failures before committing. If a test fails due to your changes, update the test or fix the code so all tests pass. Never commit code that fails unit tests.
+
+For any non-trivial change (new feature, bug fix, behaviour change, or notable refactor), add an entry to the `[Unreleased]` section of `CHANGELOG.md` before finishing. Use the appropriate category (`Added`, `Changed`, `Fixed`, `Removed`). Skip purely internal changes such as test-only edits, code style fixes, or minor cosmetic/styling tweaks (e.g. changing colors, adjusting whitespace, renaming labels).
 
 When implementing features:
 
-1. **Keep core runtime-agnostic** - Use native APIs, avoid runtime-specific dependencies
-2. **Error handling** - Provide clear, actionable error messages; use appropriate exit codes
-3. **Retry logic** - Use exponential backoff for network operations (3 attempts for requests, 1s→30s for streams)
-4. **Concurrent safety** - Use file locking for shared state (`sessions.json`)
-5. **Security** - Never log credentials; use OS keychain; enforce HTTPS; validate certificates
-6. **Output formatting** - Support both human-readable (default) and JSON (`--json`) modes
-7. **Protocol compliance** - Follow MCP specification strictly; handle all notification types
-8. **Session management** - Always clean up resources; handle orphaned processes; provide reconnection
-9. **Hyphenated commands** - All MCP commands use hyphens: `tools-list`, `resources-read`, `prompts-list`
-10. **Command-first syntax** - Top-level commands come first (`connect`, `login`, `clean`); MCP operations always go through a named session (`mcpc @session <command>`)
-11. **JSON field naming** - Use consistent field names in JSON output:
+1. **Self-documenting CLI** - All features, options, and usage patterns must be documented in command `--help` output (Commander.js `.description()` and `.addHelpText()`), not just in the README. AI agents discover how to use mcpc purely by running `mcpc --help` and `mcpc <command> --help`, so help text is the primary documentation surface. Include examples in help text for non-obvious commands. The README can provide additional context but must not be the only place a feature is documented.
+2. **Keep core runtime-agnostic** - Use native APIs, avoid runtime-specific dependencies
+3. **Error handling** - Provide clear, actionable error messages; use appropriate exit codes
+4. **Retry logic** - Use exponential backoff for network operations (3 attempts for requests, 1s→30s for streams)
+5. **Concurrent safety** - Use file locking for shared state (`sessions.json`)
+6. **Security** - Never log credentials; use OS keychain; enforce HTTPS; validate certificates
+7. **Output formatting** - Support both human-readable (default) and JSON (`--json`) modes
+8. **Protocol compliance** - Follow MCP specification strictly; handle all notification types
+9. **Session management** - Always clean up resources; handle orphaned processes; provide reconnection
+10. **Hyphenated commands** - All MCP commands use hyphens: `tools-list`, `resources-read`, `prompts-list`
+11. **Command-first syntax** - Top-level commands come first (`connect`, `login`, `clean`); MCP operations always go through a named session (`mcpc @session <command>`)
+12. **JSON field naming** - Use consistent field names in JSON output:
     - `sessionName` (not `name`) for session identifiers
     - `server` (not `target`) for server URLs/addresses
     - No `success` wrapper - indicate errors via exit codes

@@ -51,6 +51,15 @@ jest.mock('@napi-rs/keyring', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock chalk — its ESM subpath imports (#ansi-styles) break under Jest/ts-jest
+// ---------------------------------------------------------------------------
+
+jest.mock('chalk', () => ({
+  __esModule: true,
+  default: { red: (s: string) => s },
+}));
+
+// ---------------------------------------------------------------------------
 // Isolated home directory — tests never touch the real ~/.mcpc
 // ---------------------------------------------------------------------------
 

@@ -96,7 +96,7 @@ console.log(prompt('mcpc'));
 console.log('MCP sessions:');
 console.log(sessionLine('@playwright', 'npx @playwright/mcp@latest', 'stdio', 'live'));
 console.log(sessionLine('@fs', 'npx -y @modelcontextprotocol/server-filesystem /Users/bob', 'stdio', 'live'));
-console.log(sessionLine('@apify', 'https://mcp.apify.com', `HTTP, OAuth: ${chalk.magenta('default')}, MCP: 2025-11-25`, 'live'));
+console.log(sessionLine('@apify', 'https://mcp.apify.com', `HTTP, OAuth: ${chalk.magenta('default')}`, 'live'));
 console.log();
 console.log('Available OAuth profiles:');
 console.log(`  mcp.apify.com / ${chalk.magenta('default')}, created 35m ago`);
@@ -104,7 +104,7 @@ console.log();
 
 console.log(comment('List MCP server tools'));
 console.log(prompt('mcpc @apify tools-list'));
-// console.log(`[${chalk.cyan('@apify')} → https://mcp.apify.com ${chalk.dim(`(HTTP, OAuth: ${chalk.magenta('default')}, MCP: 2025-11-25)`)}]`);
+// console.log(`[${chalk.cyan('@apify')} → https://mcp.apify.com ${chalk.dim(`(HTTP, OAuth: ${chalk.magenta('default')})`)}]`);
 console.log();
 console.log('Available tools (3):');
 console.log(toolLine('search-actors', ['read-only', 'idempotent']));

@@ -130,7 +130,7 @@ Commands:
   logout <server>              Delete an authentication profile for a server
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
   x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
-  help [command]               Show help for a specific command
+  help [command] [subcommand]  Show help for a specific command
 
 MCP session commands (after connecting):
   <@session>                   Show MCP server info and capabilities
@@ -316,29 +316,34 @@ Still, sessions can fail due to network disconnects, bridge process crash, or se
 
 **Session states:**
 
-| State            | Meaning                                                                                       |
-| ---------------- | --------------------------------------------------------------------------------------------- |
-| 🟢 **`live`**    | Bridge process is running; server might or might not be operational                           |
-| 🟡 **`crashed`** | Bridge process crashed or was killed; will auto-restart on next use                           |
-| 🔴 **`expired`** | Server rejected the session (auth failed, session ID invalid); requires `close` and reconnect |
+| State                 | Meaning                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------- |
+| 🟢 **`live`**         | Bridge process running and server responding                                                      |
+| 🟡 **`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds                 |
+| 🟡 **`crashed`**      | Bridge process crashed or was killed; auto-restarts on next use                                   |
+| 🔴 **`unauthorized`** | Server rejected authentication (401/403) or token refresh failed; requires `login` then `restart` |
+| 🔴 **`expired`**      | Server rejected session ID (404); requires `restart`                                              |
 
 Here's how `mcpc` handles various bridge process and server connection states:
 
 - While the **bridge process is running**:
   - If **server positively responds** to pings, the session is marked 🟢 **`live`**, and everything is fine.
-  - If **server stops responding**, the bridge will keep trying to reconnect in the background.
-  - If **server negatively responds** to indicate `MCP-Session-Id` is no longer valid
-    or authentication permanently failed (HTTP 401 or 403),
-    the bridge process will flag the session as 🔴 **`expired`** and **terminate** to avoid wasting resources.
-    Any future attempt to use the session (`mcpc @my-session ...`) will fail.
+  - If **server stops responding**, the session is marked 🟡 **`disconnected`**.
+    The bridge will keep trying to reconnect in the background and will return to 🟢 **`live`** once the server responds again.
+  - If **server rejects authentication** (HTTP 401 or 403) or token refresh fails,
+    the session is marked 🔴 **`unauthorized`**.
+    You need to re-authenticate with `mcpc login <server>` and then `mcpc @my-session restart`.
+  - If **server rejects the session ID** (HTTP 404), indicating the MCP session is no longer valid,
+    the session is marked 🔴 **`expired`**.
+    You need to restart the session with `mcpc @my-session restart` to establish a new connection.
 - If the **bridge process crashes**, `mcpc` will mark the session as 🟡 **`crashed`** on first use.
   Next time you run `mcpc @my-session ...`, it will attempt to restart the bridge process.
   - If bridge **restart succeeds**, everything starts again (see above).
   - If bridge **restart fails**, `mcpc @my-session ...` returns error, and session remains marked 🟡 **`crashed`**.
 
 Note that `mcpc` never automatically removes sessions from the list.
-Instead, it keeps them flagged as 🟡 **`crashed`** or 🔴 **`expired`**,
-and any future attempts to use them will fail.
+Instead, it keeps them flagged as 🟡 **`crashed`**, 🔴 **`unauthorized`**, or 🔴 **`expired`**,
+and any future attempts to use them will show the appropriate error with recovery instructions.
 
 To **remove the session from the list**, you need to explicitly close it:
 
@@ -704,6 +709,35 @@ mcpc x402 remove
 ```
 
 After creating a wallet, **fund it with USDC on Base** (mainnet or Sepolia testnet) to enable payments.
+
+### Manual payment signing
+
+You can manually sign a payment from a server's `PAYMENT-REQUIRED` header using `x402 sign`.
+This is useful for pre-signing payments or integrating with tools outside of `mcpc`.
+
+```bash
+# Sign a payment using the base64-encoded PAYMENT-REQUIRED header
+mcpc x402 sign <base64-payment-required>
+
+# Override the amount (in USD, e.g. 2.50 = $2.50)
+mcpc x402 sign <base64-payment-required> --amount 2.50
+
+# Override the expiry (in seconds from now)
+mcpc x402 sign <base64-payment-required> --expiry 7200
+
+# Combine overrides and use JSON output
+mcpc x402 sign <base64-payment-required> --amount 1.00 --expiry 3600 --json
+```
+
+**Options:**
+
+| Option              | Description                                                      |
+| ------------------- | ---------------------------------------------------------------- |
+| `--amount <usd>`    | Override the payment amount in USD (e.g. `0.50` for $0.50)       |
+| `--expiry <seconds>`| Override the payment expiry in seconds from now (e.g. `3600`)    |
+
+The command outputs the signed `PAYMENT-SIGNATURE` header value and an MCP config snippet
+that can be used directly with other MCP clients.
 
 ### Using x402 with MCP servers
 
@@ -1147,23 +1181,25 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 <!-- Stars and activity as of March 2026. -->
 
-| Tool | Lang | Stars | Active | Tools | Resources | Prompts | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
-|---|---|--:|---|---|---|---|---|---|---|---|---|---|---|
-| **[apify/mcpc](https://github.com/apify/mcpc)** | TS | ~350 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
-| [steipete/mcporter](https://github.com/steipete/mcporter) | TS | ~2.6k | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
-| [IBM/mcp-cli](https://github.com/IBM/mcp-cli) | Python | ~1.9k | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
-| [f/mcptools](https://github.com/f/mcptools) | Go | ~1.5k | ⚠️ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | — |
-| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli) | TS | ~950 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
-| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) | Python | ~670 | ⚠️ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ |
-| [thellimist/clihub](https://github.com/thellimist/clihub) | Go | ~590 | ✅ | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | — |
-| [wong2/mcp-cli](https://github.com/wong2/mcp-cli) | JS | ~420 | ⚠️ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | — | — |
-| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) | Python | ~170 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim) | Go | ~46 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
-| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go | ~13 | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
+| Tool                                                                    | Lang   | Stars | Active | Tools | Resources | Prompts | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
+| ----------------------------------------------------------------------- | ------ | ----: | ------ | ----- | --------- | ------- | --------- | -------- | ----- | ----- | ---- | ----------- | --- |
+| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~350 | ✅     | ✅    | ✅        | ✅      | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
+| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~2.6k | ✅     | ✅    | —         | —       | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
+| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k | ✅     | ✅    | ✅        | ✅      | ✅        | ✅       | ✅    | ✅    | ✅   | —           | ✅  |
+| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k | ⚠️     | ✅    | ✅        | ✅      | ✅        | —        | —     | ✅    | ✅   | —           | —   |
+| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     |  ~950 | ✅     | ✅    | —         | —       | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
+| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 | ⚠️     | ✅    | ✅        | ✅      | —         | —        | —     | ✅    | —    | —           | ✅  |
+| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~590 | ✅     | ✅    | —         | —       | —         | —        | ✅    | ✅    | ✅   | ✅          | —   |
+| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~420 | ⚠️     | ✅    | ✅        | ✅      | —         | —        | ✅    | —     | ✅   | —           | —   |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python |  ~170 | ✅     | ✅    | ✅        | ✅      | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —   |
+| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~46 | ✅     | ✅    | —         | —       | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —   |
+| [evantahler/mcpx](https://github.com/evantahler/mcpx)                   | TS     |   ~26 | ✅     | ✅    | ✅        | ✅      | ✅        | —        | ✅    | ✅    | ✅   | ✅          | —   |
+| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~13 | ✅     | ✅    | —         | —       | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
 
 **Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **LLM** = requires/uses an LLM.
 
 **Notes:**
+
 - [thellimist/clihub](https://github.com/thellimist/clihub) is a code generator that compiles MCP tools into standalone CLI binaries, rather than a runtime client ([HN discussion](https://news.ycombinator.com/item?id=47157398)).
 - [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli) also supports OpenAPI specs directly and uses a custom TOON encoding for token-efficient tool schemas.
 - [IBM/mcp-cli](https://github.com/IBM/mcp-cli) and [mcp-client-cli](https://github.com/adhikasp/mcp-client-cli) integrate an LLM (Ollama, OpenAI, etc.) for chat-style interaction, while the other tools are pure CLI clients.
