@@ -17,7 +17,7 @@ import {
   inBackticks,
 } from '../output.js';
 import type { IMcpClient } from '../../lib/types.js';
-import { getBridgeStatus, formatBridgeStatus, formatTimeAgo } from './sessions.js';
+import { getBridgeStatus, formatBridgeStatus } from './sessions.js';
 
 export interface GrepOptions extends CommandOptions {
   tools?: boolean | undefined;
@@ -48,7 +48,6 @@ interface SessionGrepError {
 interface SessionGrepSkipped {
   session: string;
   status: string;
-  lastSeenAt?: string | undefined;
 }
 
 /**
@@ -316,13 +315,11 @@ export async function grepSession(
 
 /**
  * Format a skipped (unavailable) session line for human output.
- * Example: "@testx ○ crashed, 6 days ago"
+ * Example: "@testx ○ crashed"
  */
 function formatSkippedSession(skipped: SessionGrepSkipped): string {
   const { dot, text } = formatBridgeStatus(skipped.status as 'crashed');
-  const timeAgo = formatTimeAgo(skipped.lastSeenAt);
-  const timePart = timeAgo ? `, ${timeAgo}` : '';
-  return `${chalk.cyan(skipped.session)} ${dot} ${text}${chalk.dim(timePart)}`;
+  return `${chalk.cyan(skipped.session)} ${dot} ${text}`;
 }
 
 /**
@@ -369,7 +366,6 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
       skippedSessions.push({
         session: toSessionRef(session.name),
         status,
-        lastSeenAt: session.lastSeenAt,
       });
     }
   }
