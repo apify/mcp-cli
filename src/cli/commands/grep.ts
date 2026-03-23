@@ -302,10 +302,13 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     return 1;
   }
 
+  // Ensure session name has @ prefix
+  const toSessionRef = (name: string): string => (name.startsWith('@') ? name : `@${name}`);
+
   // Query all sessions in parallel
   const settled = await Promise.allSettled(
     sessionEntries.map(async (session): Promise<SessionGrepResult> => {
-      const sessionName = `@${session.name}`;
+      const sessionName = toSessionRef(session.name);
       const result = await withSessionClient(sessionName, async (client) => {
         return searchClient(client, matcher, options);
       });
@@ -330,7 +333,7 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     } else {
       const reason: unknown = outcome.reason;
       errors.push({
-        session: `@${sessionEntries[i]!.name}`,
+        session: toSessionRef(sessionEntries[i]!.name),
         error: reason instanceof Error ? reason.message : String(reason),
       });
     }
