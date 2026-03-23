@@ -77,9 +77,8 @@ function getSearchTypes(options: GrepOptions): {
   searchResources: boolean;
   searchPrompts: boolean;
 } {
-  const anyFilter = options.tools || options.resources || options.prompts;
   return {
-    searchTools: anyFilter ? !!options.tools : true,
+    searchTools: options.tools !== false,
     searchResources: !!options.resources,
     searchPrompts: !!options.prompts,
   };

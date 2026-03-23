@@ -567,9 +567,9 @@ Without arguments, performs safe cleanup of stale data only.
     .description(
       'Search tools across all active sessions (use --resources/--prompts to include more)'
     )
-    .option('--tools', 'Search tools (default if no type flags given)')
-    .option('--resources', 'Search resources')
-    .option('--prompts', 'Search prompts')
+    .option('--no-tools', 'Exclude tools from search')
+    .option('--resources', 'Also search resources')
+    .option('--prompts', 'Also search prompts')
     .option('-E, --regex', 'Treat pattern as a regular expression')
     .option('-s, --case-sensitive', 'Case-sensitive matching')
     .addHelpText(
@@ -578,7 +578,7 @@ Without arguments, performs safe cleanup of stale data only.
 ${chalk.bold('Examples:')}
   mcpc grep "search"                        Search tools in all sessions
   mcpc grep "search" --resources --prompts  Also search resources and prompts
-  mcpc grep -E "search|find" --tools        Regex search across tools
+  mcpc grep -E "search|find"               Regex search across tools
   mcpc @apify grep "actor"                  Search within a single session
   mcpc grep "file" --json                   JSON output for scripting
 `
@@ -858,9 +858,9 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('grep <pattern>')
     .description('Search tools (use --resources/--prompts to include more)')
-    .option('--tools', 'Search tools (default if no type flags given)')
-    .option('--resources', 'Search resources')
-    .option('--prompts', 'Search prompts')
+    .option('--no-tools', 'Exclude tools from search')
+    .option('--resources', 'Also search resources')
+    .option('--prompts', 'Also search prompts')
     .option('-E, --regex', 'Treat pattern as a regular expression')
     .option('-s, --case-sensitive', 'Case-sensitive matching')
     .action(async (pattern, opts, command) => {
