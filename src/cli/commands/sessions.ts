@@ -448,7 +448,7 @@ export async function listSessionsAndAuthProfiles(options: {
           const target = getServerHost(session.server.url || session.server.command || '');
           console.log(chalk.dim(`    ↳ run: mcpc login ${target} && mcpc ${session.name} restart`));
         } else if (status === 'crashed') {
-          console.log(chalk.dim(`    ↳ run: mcpc ${session.name} to reconnect`));
+          console.log(chalk.dim(`    ↳ run: mcpc ${session.name}`));
         } else if (status === 'expired') {
           console.log(chalk.dim(`    ↳ run: mcpc ${session.name} restart`));
         }
