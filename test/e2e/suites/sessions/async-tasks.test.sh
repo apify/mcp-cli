@@ -17,16 +17,16 @@ assert_success
 _SESSIONS_CREATED+=("$SESSION")
 test_pass
 
-# ── Async execution ──────────────────────────────────────────
+# ── Task execution ───────────────────────────────────────────
 
-test_case "tools-call --async runs with task progress"
-run_mcpc "$SESSION" tools-call --async slow-task ms:=500 steps:=2
+test_case "tools-call --task runs with task progress"
+run_mcpc "$SESSION" tools-call --task slow-task ms:=500 steps:=2
 assert_success
 assert_contains "$STDOUT" "Completed 2 steps in 500ms"
 test_pass
 
-test_case "tools-call --async --json returns result"
-run_mcpc --json "$SESSION" tools-call --async slow-task ms:=500 steps:=2
+test_case "tools-call --task --json returns result"
+run_mcpc --json "$SESSION" tools-call --task slow-task ms:=500 steps:=2
 assert_success
 assert_json_valid "$STDOUT"
 assert_contains "$STDOUT" "Completed 2 steps in 500ms"
@@ -119,9 +119,9 @@ assert_json_eq "$STDOUT" '.status' 'completed'
 assert_contains "$STDOUT" "Done (2 steps)"
 test_pass
 
-# ── Synchronous fallback (no --async) ────────────────────────
+# ── Synchronous fallback (no --task) ─────────────────────────
 
-test_case "tools-call without --async runs synchronously"
+test_case "tools-call without --task runs synchronously"
 run_xmcpc "$SESSION" tools-call slow-task ms:=200 steps:=1
 assert_success
 assert_contains "$STDOUT" "Completed 1 steps in 200ms"

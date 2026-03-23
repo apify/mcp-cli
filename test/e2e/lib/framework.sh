@@ -682,10 +682,11 @@ start_proxy_server() {
   npx tsx test/e2e/server/proxy-server.ts >"$log" 2>&1 &
   _PROXY_SERVER_PID=$!
 
-  # Wait for PROXY_PORT= line in log (up to 10 seconds)
+  # Wait for PROXY_CONTROL_PORT= line in log (up to 10 seconds)
+  # (PROXY_CONTROL_PORT is output after PROXY_PORT, so both are ready)
   local max_wait=50
   local waited=0
-  while ! grep -q "^PROXY_PORT=" "$log" 2>/dev/null; do
+  while ! grep -q "^PROXY_CONTROL_PORT=" "$log" 2>/dev/null; do
     sleep 0.2
     ((waited++)) || true
     if [[ $waited -ge $max_wait ]]; then
@@ -696,11 +697,24 @@ start_proxy_server() {
     fi
   done
 
-  local proxy_port
+  local proxy_port control_port
   proxy_port=$(grep "^PROXY_PORT=" "$log" | cut -d= -f2 | tr -d '[:space:]')
+  control_port=$(grep "^PROXY_CONTROL_PORT=" "$log" | cut -d= -f2 | tr -d '[:space:]')
 
   export PROXY_URL="http://127.0.0.1:${proxy_port}"
-  echo "# Proxy server started at $PROXY_URL (PID: $_PROXY_SERVER_PID)"
+  export PROXY_CONTROL_URL="http://127.0.0.1:${control_port}"
+  echo "# Proxy server started at $PROXY_URL (control: $PROXY_CONTROL_URL, PID: $_PROXY_SERVER_PID)"
+}
+
+# Get the number of requests that have been routed through the proxy server.
+# Usage: count=$(proxy_request_count)
+proxy_request_count() {
+  curl -s "$PROXY_CONTROL_URL/request-count" | grep -o '"count":[0-9]*' | cut -d: -f2
+}
+
+# Reset the proxy request counter to zero.
+proxy_reset_count() {
+  curl -s -X POST "$PROXY_CONTROL_URL/reset" >/dev/null
 }
 
 # Start an HTTPS wrapper around the test server using a self-signed certificate.

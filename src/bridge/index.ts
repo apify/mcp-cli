@@ -5,7 +5,7 @@
  * It communicates with the CLI via Unix domain sockets
  */
 
-import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
+import { initProxy, proxyFetch } from '../lib/proxy.js';
 import { createServer, type Server as NetServer, type Socket } from 'net';
 import { unlink } from 'fs/promises';
 import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
@@ -21,7 +21,7 @@ import {
   cleanupOrphanedLogFiles,
   isSessionExpiredError,
 } from '../lib/index.js';
-import { ClientError, NetworkError, isAuthenticationError } from '../lib/index.js';
+import { ClientError, NetworkError, AuthError, isAuthenticationError } from '../lib/index.js';
 import { getSession, loadSessions, updateSession } from '../lib/sessions.js';
 import type { AuthCredentials, X402WalletCredentials } from '../lib/types.js';
 import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
@@ -394,15 +394,22 @@ class BridgeProcess {
         );
         this.mcpClientReadyRejecter(error as Error);
 
-        // If the error was due to session ID rejection or auth failure, mark session as expired
-        // User must explicitly use 'mcpc @session restart' to start a new session
+        // If the error was due to session ID rejection or auth failure, mark session status
+        // User must explicitly use 'mcpc @session restart' or 'mcpc login' to recover
         const errorMsg = (error as Error).message || '';
-        if (isSessionExpiredError(errorMsg) || isAuthenticationError(errorMsg)) {
-          logger.warn('Session rejected by server (expired or auth failure), marking as expired');
+        if (isSessionExpiredError(errorMsg)) {
+          logger.warn('Session rejected by server (expired session ID), marking as expired');
           try {
             await updateSession(this.options.sessionName, { status: 'expired' });
           } catch (updateError) {
             logger.error('Failed to mark session as expired:', updateError);
+          }
+        } else if (isAuthenticationError(errorMsg)) {
+          logger.warn('Server requires authentication, marking as unauthorized');
+          try {
+            await updateSession(this.options.sessionName, { status: 'unauthorized' });
+          } catch (updateError) {
+            logger.error('Failed to mark session as unauthorized:', updateError);
           }
         }
 
@@ -519,7 +526,7 @@ class BridgeProcess {
         // McpClient caches tools in-memory after the first listAllTools call
         return this.client?.getCachedTools()?.find((t: Tool) => t.name === name);
       };
-      customFetch = createX402FetchMiddleware(fetch, { wallet, getToolByName });
+      customFetch = createX402FetchMiddleware(proxyFetch as FetchLike, { wallet, getToolByName });
     }
 
     const clientConfig: CreateMcpClientOptions = {
@@ -691,10 +698,10 @@ class BridgeProcess {
     logger.debug(`Starting keepalive ping every ${KEEPALIVE_INTERVAL_MS / 1000}s`);
 
     this.keepaliveInterval = setInterval(() => {
-      this.sendKeepalivePing().catch((error) => {
+      this.sendKeepalivePing().catch(async (error) => {
         logger.error('Keepalive ping failed:', error);
         // If ping fails, the session might be expired - check and handle
-        this.handlePossibleExpiration(error as Error);
+        await this.handlePossibleExpiration(error as Error);
       });
     }, KEEPALIVE_INTERVAL_MS);
 
@@ -737,19 +744,28 @@ class BridgeProcess {
    * Session expiry is checked first since it's more specific (404/session-not-found),
    * while auth errors are broader (401/403/unauthorized) and could overlap.
    */
-  private handlePossibleExpiration(error: Error): void {
+  private async handlePossibleExpiration(error: Error): Promise<void> {
+    let status: 'expired' | 'unauthorized' | null = null;
     if (isSessionExpiredError(error.message)) {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
-      this.markSessionStatusAndExit('expired').catch((e) => {
-        logger.error('Failed to mark session as expired:', e);
-        process.exit(1);
-      });
+      status = 'expired';
     } else if (isAuthenticationError(error.message)) {
       logger.warn('Authentication rejected, marking session as unauthorized and shutting down');
-      this.markSessionStatusAndExit('unauthorized').catch((e) => {
-        logger.error('Failed to mark session as unauthorized:', e);
-        process.exit(1);
-      });
+      status = 'unauthorized';
+    }
+    if (status) {
+      // Update session status synchronously so it's visible to CLI immediately
+      try {
+        await updateSession(this.options.sessionName, { status });
+        logger.info(`Session ${this.options.sessionName} marked as ${status}`);
+      } catch (e) {
+        logger.error('Failed to update session status:', e);
+      }
+      // Delay shutdown so the error response socket.write() in the caller has
+      // time to flush to the client before the process tears down.
+      setTimeout(() => {
+        this.shutdown().catch(() => process.exit(1));
+      }, 100);
     }
   }
 
@@ -1161,10 +1177,11 @@ class BridgeProcess {
     } catch (error) {
       logger.error('Failed to forward MCP request to server:', error);
 
-      this.sendError(socket, error as Error, message.id);
+      // Update session status BEFORE sending error to CLI, so the status is
+      // visible when the CLI (or test) checks sessions.json immediately after
+      await this.handlePossibleExpiration(error as Error);
 
-      // Check if this error indicates session expiration
-      this.handlePossibleExpiration(error as Error);
+      this.sendError(socket, error as Error, message.id);
     }
   }
 
@@ -1239,7 +1256,14 @@ class BridgeProcess {
     const message: IpcMessage = {
       type: 'response',
       error: {
-        code: error instanceof ClientError ? 1 : error instanceof NetworkError ? 3 : 2,
+        code:
+          error instanceof ClientError
+            ? 1
+            : error instanceof NetworkError
+              ? 3
+              : error instanceof AuthError
+                ? 4
+                : 2,
         message: error.message,
       },
     };
@@ -1406,9 +1430,7 @@ async function main(): Promise<void> {
 
   // Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
   // Also handle --insecure flag to disable TLS certificate verification
-  setGlobalDispatcher(
-    new EnvHttpProxyAgent(insecure ? { connect: { rejectUnauthorized: false } } : {})
-  );
+  initProxy({ insecure });
 
   try {
     const bridgeOptions: BridgeOptions = {
