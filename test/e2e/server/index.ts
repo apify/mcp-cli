@@ -7,6 +7,9 @@
  *   PAGINATION_SIZE - items per page, 0 = no pagination (default: 0)
  *   LATENCY_MS - artificial latency in ms (default: 0)
  *   REQUIRE_AUTH - require Authorization header (default: false)
+ *   NO_TOOLS - disable tools capability (default: false)
+ *   NO_RESOURCES - disable resources capability (default: false)
+ *   NO_PROMPTS - disable prompts capability (default: false)
  *
  * Control endpoints (for test manipulation):
  *   GET  /health - health check
@@ -42,6 +45,9 @@ const PORT = parseInt(process.env.PORT || '13456', 10);
 const PAGINATION_SIZE = parseInt(process.env.PAGINATION_SIZE || '0', 10);
 const LATENCY_MS = parseInt(process.env.LATENCY_MS || '0', 10);
 const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true';
+const NO_TOOLS = process.env.NO_TOOLS === 'true';
+const NO_RESOURCES = process.env.NO_RESOURCES === 'true';
+const NO_PROMPTS = process.env.NO_PROMPTS === 'true';
 
 // Control state (manipulated via /control/* endpoints)
 let failNextCount = 0;
@@ -229,305 +235,316 @@ const mcpServers = new Map<string, Server>();
 
 // Create a new MCP server instance (one per session)
 function createMcpServer(): Server {
+  // Build capabilities based on env config
+  const capabilities: Record<string, unknown> = {
+    logging: {},
+  };
+  if (!NO_TOOLS) {
+    capabilities.tools = { listChanged: true };
+    capabilities.tasks = {
+      list: {},
+      cancel: {},
+      requests: { tools: { call: {} } },
+    };
+  }
+  if (!NO_RESOURCES) {
+    capabilities.resources = { subscribe: true, listChanged: true };
+  }
+  if (!NO_PROMPTS) {
+    capabilities.prompts = { listChanged: true };
+  }
+
   const server = new Server(
     {
       name: 'e2e-test-server',
       version: '1.0.0',
     },
     {
-      capabilities: {
-        tools: { listChanged: true },
-        resources: { subscribe: true, listChanged: true },
-        prompts: { listChanged: true },
-        logging: {},
-        tasks: {
-          list: {},
-          cancel: {},
-          requests: {
-            tools: {
-              call: {},
-            },
-          },
-        },
-      },
+      capabilities,
       instructions:
         'E2E test server for mcpc. Provides sample tools, resources, and prompts for testing.',
     }
   );
 
-  // Tools
-  server.setRequestHandler(ListToolsRequestSchema, async (request) => {
-    await maybeDelay();
-    if (shouldFail()) {
-      throw new Error('Simulated failure');
-    }
-
-    const { items, nextCursor } = paginate(TOOLS, request.params?.cursor);
-    return { tools: items, nextCursor };
-  });
-
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    await maybeDelay();
-    if (shouldFail()) {
-      throw new Error('Simulated failure');
-    }
-
-    const { name, arguments: args } = request.params;
-
-    switch (name) {
-      case 'echo':
-        return {
-          content: [{ type: 'text', text: String(args?.message || '') }],
-        };
-
-      case 'add': {
-        const a = Number(args?.a || 0);
-        const b = Number(args?.b || 0);
-        return {
-          content: [{ type: 'text', text: String(a + b) }],
-        };
+  // Tools (only register handlers if capability is enabled)
+  if (!NO_TOOLS) {
+    server.setRequestHandler(ListToolsRequestSchema, async (request) => {
+      await maybeDelay();
+      if (shouldFail()) {
+        throw new Error('Simulated failure');
       }
 
-      case 'fail':
-        throw new Error(String(args?.message || 'Tool intentionally failed'));
+      const { items, nextCursor } = paginate(TOOLS, request.params?.cursor);
+      return { tools: items, nextCursor };
+    });
 
-      case 'slow': {
-        const ms = Number(args?.ms || 1000);
-        await new Promise((resolve) => setTimeout(resolve, ms));
-        return {
-          content: [{ type: 'text', text: `Waited ${ms}ms` }],
-        };
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      await maybeDelay();
+      if (shouldFail()) {
+        throw new Error('Simulated failure');
       }
 
-      case 'write-file':
-        // Simulate write (don't actually write)
-        return {
-          content: [{ type: 'text', text: `Would write to ${args?.path}` }],
-        };
+      const { name, arguments: args } = request.params;
 
-      case 'slow-task': {
-        const ms = Number(args?.ms || 3000);
-        const steps = Number(args?.steps || 3);
-        const taskParam = request.params.task;
-
-        if (taskParam) {
-          // Task-augmented execution: create task and run in background
-          const taskId = randomUUID();
-          const now = new Date().toISOString();
-          const task: Task = {
-            taskId,
-            status: 'working',
-            ttl: null,
-            createdAt: now,
-            lastUpdatedAt: now,
-            statusMessage: 'Starting...',
+      switch (name) {
+        case 'echo':
+          return {
+            content: [{ type: 'text', text: String(args?.message || '') }],
           };
-          const abortController = new AbortController();
-          taskStore.set(taskId, { task, abortController });
 
-          // Run the work in background
-          void (async () => {
-            const stepDuration = ms / steps;
-            for (let i = 1; i <= steps; i++) {
-              await new Promise((resolve) => setTimeout(resolve, stepDuration));
-              if (abortController.signal.aborted) {
-                return;
-              }
-              const entry = taskStore.get(taskId);
-              if (entry) {
-                entry.task.status = i < steps ? 'working' : 'completed';
-                entry.task.statusMessage =
-                  i < steps ? `Processing step ${i}/${steps}` : `Done (${steps} steps)`;
-                entry.task.lastUpdatedAt = new Date().toISOString();
-                if (i === steps) {
-                  entry.result = {
-                    content: [
-                      {
-                        type: 'text',
-                        text: `Completed ${steps} steps in ${ms}ms`,
-                      },
-                    ],
-                  };
-                }
-              }
-            }
-          })();
-
-          // Return CreateTaskResult immediately
-          return { task } as unknown as { content: { type: string; text: string }[] };
+        case 'add': {
+          const a = Number(args?.a || 0);
+          const b = Number(args?.b || 0);
+          return {
+            content: [{ type: 'text', text: String(a + b) }],
+          };
         }
 
-        // Synchronous execution (no task param)
-        await new Promise((resolve) => setTimeout(resolve, ms));
+        case 'fail':
+          throw new Error(String(args?.message || 'Tool intentionally failed'));
+
+        case 'slow': {
+          const ms = Number(args?.ms || 1000);
+          await new Promise((resolve) => setTimeout(resolve, ms));
+          return {
+            content: [{ type: 'text', text: `Waited ${ms}ms` }],
+          };
+        }
+
+        case 'write-file':
+          // Simulate write (don't actually write)
+          return {
+            content: [{ type: 'text', text: `Would write to ${args?.path}` }],
+          };
+
+        case 'slow-task': {
+          const ms = Number(args?.ms || 3000);
+          const steps = Number(args?.steps || 3);
+          const taskParam = request.params.task;
+
+          if (taskParam) {
+            // Task-augmented execution: create task and run in background
+            const taskId = randomUUID();
+            const now = new Date().toISOString();
+            const task: Task = {
+              taskId,
+              status: 'working',
+              ttl: null,
+              createdAt: now,
+              lastUpdatedAt: now,
+              statusMessage: 'Starting...',
+            };
+            const abortController = new AbortController();
+            taskStore.set(taskId, { task, abortController });
+
+            // Run the work in background
+            void (async () => {
+              const stepDuration = ms / steps;
+              for (let i = 1; i <= steps; i++) {
+                await new Promise((resolve) => setTimeout(resolve, stepDuration));
+                if (abortController.signal.aborted) {
+                  return;
+                }
+                const entry = taskStore.get(taskId);
+                if (entry) {
+                  entry.task.status = i < steps ? 'working' : 'completed';
+                  entry.task.statusMessage =
+                    i < steps ? `Processing step ${i}/${steps}` : `Done (${steps} steps)`;
+                  entry.task.lastUpdatedAt = new Date().toISOString();
+                  if (i === steps) {
+                    entry.result = {
+                      content: [
+                        {
+                          type: 'text',
+                          text: `Completed ${steps} steps in ${ms}ms`,
+                        },
+                      ],
+                    };
+                  }
+                }
+              }
+            })();
+
+            // Return CreateTaskResult immediately
+            return { task } as unknown as { content: { type: string; text: string }[] };
+          }
+
+          // Synchronous execution (no task param)
+          await new Promise((resolve) => setTimeout(resolve, ms));
+          return {
+            content: [{ type: 'text', text: `Completed ${steps} steps in ${ms}ms` }],
+          };
+        }
+
+        default:
+          throw new Error(`Unknown tool: ${name}`);
+      }
+    });
+
+    // Task management handlers
+    server.setRequestHandler(GetTaskRequestSchema, async (request) => {
+      const { taskId } = request.params;
+      const entry = taskStore.get(taskId);
+      if (!entry) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
+      return entry.task;
+    });
+
+    server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
+      const { taskId } = request.params;
+      const entry = taskStore.get(taskId);
+      if (!entry) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
+      // Block until task reaches terminal state
+      while (entry.task.status === 'working' || entry.task.status === 'input_required') {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+      if (entry.result) {
+        return entry.result;
+      }
+      throw new Error(`Task ${taskId} has no result (status: ${entry.task.status})`);
+    });
+
+    server.setRequestHandler(ListTasksRequestSchema, async () => {
+      const allTasks = Array.from(taskStore.values()).map((e) => e.task);
+      return { tasks: allTasks };
+    });
+
+    server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
+      const { taskId } = request.params;
+      const entry = taskStore.get(taskId);
+      if (!entry) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
+      if (
+        entry.task.status === 'completed' ||
+        entry.task.status === 'failed' ||
+        entry.task.status === 'cancelled'
+      ) {
+        throw new Error(`Cannot cancel task in terminal state: ${entry.task.status}`);
+      }
+      entry.task.status = 'cancelled';
+      entry.task.lastUpdatedAt = new Date().toISOString();
+      entry.abortController?.abort();
+      return entry.task;
+    });
+  } // end if (!NO_TOOLS)
+
+  // Resources (only register handlers if capability is enabled)
+  if (!NO_RESOURCES) {
+    server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+      await maybeDelay();
+      if (shouldFail()) {
+        throw new Error('Simulated failure');
+      }
+
+      const { items, nextCursor } = paginate(RESOURCES, request.params?.cursor);
+      return { resources: items, nextCursor };
+    });
+
+    server.setRequestHandler(ListResourceTemplatesRequestSchema, async (request) => {
+      await maybeDelay();
+      if (shouldFail()) {
+        throw new Error('Simulated failure');
+      }
+
+      const { items, nextCursor } = paginate(RESOURCE_TEMPLATES, request.params?.cursor);
+      return { resourceTemplates: items, nextCursor };
+    });
+
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      await maybeDelay();
+      if (shouldFail()) {
+        throw new Error('Simulated failure');
+      }
+
+      const { uri } = request.params;
+
+      if (uri === 'test://static/hello') {
         return {
-          content: [{ type: 'text', text: `Completed ${steps} steps in ${ms}ms` }],
+          contents: [{ uri, mimeType: 'text/plain', text: 'Hello, World!' }],
         };
       }
 
-      default:
-        throw new Error(`Unknown tool: ${name}`);
-    }
-  });
-
-  // Task management handlers
-  server.setRequestHandler(GetTaskRequestSchema, async (request) => {
-    const { taskId } = request.params;
-    const entry = taskStore.get(taskId);
-    if (!entry) {
-      throw new Error(`Task not found: ${taskId}`);
-    }
-    return entry.task;
-  });
-
-  server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
-    const { taskId } = request.params;
-    const entry = taskStore.get(taskId);
-    if (!entry) {
-      throw new Error(`Task not found: ${taskId}`);
-    }
-    // Block until task reaches terminal state
-    while (entry.task.status === 'working' || entry.task.status === 'input_required') {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-    if (entry.result) {
-      return entry.result;
-    }
-    throw new Error(`Task ${taskId} has no result (status: ${entry.task.status})`);
-  });
-
-  server.setRequestHandler(ListTasksRequestSchema, async () => {
-    const allTasks = Array.from(taskStore.values()).map((e) => e.task);
-    return { tasks: allTasks };
-  });
-
-  server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
-    const { taskId } = request.params;
-    const entry = taskStore.get(taskId);
-    if (!entry) {
-      throw new Error(`Task not found: ${taskId}`);
-    }
-    if (
-      entry.task.status === 'completed' ||
-      entry.task.status === 'failed' ||
-      entry.task.status === 'cancelled'
-    ) {
-      throw new Error(`Cannot cancel task in terminal state: ${entry.task.status}`);
-    }
-    entry.task.status = 'cancelled';
-    entry.task.lastUpdatedAt = new Date().toISOString();
-    entry.abortController?.abort();
-    return entry.task;
-  });
-
-  // Resources
-  server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
-    await maybeDelay();
-    if (shouldFail()) {
-      throw new Error('Simulated failure');
-    }
-
-    const { items, nextCursor } = paginate(RESOURCES, request.params?.cursor);
-    return { resources: items, nextCursor };
-  });
-
-  server.setRequestHandler(ListResourceTemplatesRequestSchema, async (request) => {
-    await maybeDelay();
-    if (shouldFail()) {
-      throw new Error('Simulated failure');
-    }
-
-    const { items, nextCursor } = paginate(RESOURCE_TEMPLATES, request.params?.cursor);
-    return { resourceTemplates: items, nextCursor };
-  });
-
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    await maybeDelay();
-    if (shouldFail()) {
-      throw new Error('Simulated failure');
-    }
-
-    const { uri } = request.params;
-
-    if (uri === 'test://static/hello') {
-      return {
-        contents: [{ uri, mimeType: 'text/plain', text: 'Hello, World!' }],
-      };
-    }
-
-    if (uri === 'test://static/json') {
-      return {
-        contents: [
-          {
-            uri,
-            mimeType: 'application/json',
-            text: JSON.stringify({ test: true, value: 42 }),
-          },
-        ],
-      };
-    }
-
-    if (uri === 'test://dynamic/time') {
-      return {
-        contents: [{ uri, mimeType: 'text/plain', text: new Date().toISOString() }],
-      };
-    }
-
-    throw new Error(`Resource not found: ${uri}`);
-  });
-
-  // Prompts
-  server.setRequestHandler(ListPromptsRequestSchema, async (request) => {
-    await maybeDelay();
-    if (shouldFail()) {
-      throw new Error('Simulated failure');
-    }
-
-    const { items, nextCursor } = paginate(PROMPTS, request.params?.cursor);
-    return { prompts: items, nextCursor };
-  });
-
-  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-    await maybeDelay();
-    if (shouldFail()) {
-      throw new Error('Simulated failure');
-    }
-
-    const { name, arguments: args } = request.params;
-
-    if (name === 'greeting') {
-      const userName = args?.name || 'World';
-      const style = args?.style || 'casual';
-      const greeting = style === 'formal' ? `Good day, ${userName}.` : `Hey ${userName}!`;
-
-      return {
-        messages: [
-          {
-            role: 'user',
-            content: { type: 'text', text: greeting },
-          },
-        ],
-      };
-    }
-
-    if (name === 'summarize') {
-      const text = args?.text || '';
-      const maxLength = args?.maxLength ? parseInt(args.maxLength, 10) : 100;
-
-      return {
-        messages: [
-          {
-            role: 'user',
-            content: {
-              type: 'text',
-              text: `Please summarize the following text in ${maxLength} characters or less:\n\n${text}`,
+      if (uri === 'test://static/json') {
+        return {
+          contents: [
+            {
+              uri,
+              mimeType: 'application/json',
+              text: JSON.stringify({ test: true, value: 42 }),
             },
-          },
-        ],
-      };
-    }
+          ],
+        };
+      }
 
-    throw new Error(`Prompt not found: ${name}`);
-  });
+      if (uri === 'test://dynamic/time') {
+        return {
+          contents: [{ uri, mimeType: 'text/plain', text: new Date().toISOString() }],
+        };
+      }
+
+      throw new Error(`Resource not found: ${uri}`);
+    });
+  } // end if (!NO_RESOURCES)
+
+  // Prompts (only register handlers if capability is enabled)
+  if (!NO_PROMPTS) {
+    server.setRequestHandler(ListPromptsRequestSchema, async (request) => {
+      await maybeDelay();
+      if (shouldFail()) {
+        throw new Error('Simulated failure');
+      }
+
+      const { items, nextCursor } = paginate(PROMPTS, request.params?.cursor);
+      return { prompts: items, nextCursor };
+    });
+
+    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      await maybeDelay();
+      if (shouldFail()) {
+        throw new Error('Simulated failure');
+      }
+
+      const { name, arguments: args } = request.params;
+
+      if (name === 'greeting') {
+        const userName = args?.name || 'World';
+        const style = args?.style || 'casual';
+        const greeting = style === 'formal' ? `Good day, ${userName}.` : `Hey ${userName}!`;
+
+        return {
+          messages: [
+            {
+              role: 'user',
+              content: { type: 'text', text: greeting },
+            },
+          ],
+        };
+      }
+
+      if (name === 'summarize') {
+        const text = args?.text || '';
+        const maxLength = args?.maxLength ? parseInt(args.maxLength, 10) : 100;
+
+        return {
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: `Please summarize the following text in ${maxLength} characters or less:\n\n${text}`,
+              },
+            },
+          ],
+        };
+      }
+
+      throw new Error(`Prompt not found: ${name}`);
+    });
+  } // end if (!NO_PROMPTS)
 
   return server;
 }
@@ -705,6 +722,9 @@ async function main() {
     );
     console.log(`  Latency: ${LATENCY_MS}ms`);
     console.log(`  Auth required: ${REQUIRE_AUTH}`);
+    if (NO_TOOLS) console.log(`  Tools: DISABLED`);
+    if (NO_RESOURCES) console.log(`  Resources: DISABLED`);
+    if (NO_PROMPTS) console.log(`  Prompts: DISABLED`);
   });
 
   // Graceful shutdown

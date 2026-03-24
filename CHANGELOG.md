@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New `mcpc grep <pattern>` command to search tools, resources, prompts, and server instructions across all active sessions, with support for regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`, `--instructions`), single-session search (`mcpc @session grep`), and capability-aware querying (skips unsupported list operations)
+- Recovery hints for crashed and expired sessions in `mcpc` session list output
+
 ### Fixed
 
 - Fixed `mcpc help <command>` showing truncated usage line (e.g. `Usage: resources-read <uri>`) — now correctly shows `Usage: mcpc <@session> resources-read <uri>`
