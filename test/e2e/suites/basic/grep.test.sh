@@ -109,19 +109,19 @@ test_case "grep --json --instructions returns instructions field"
 run_mcpc --json "$SESSION" grep "sample tools" --instructions
 assert_success
 assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '.instructions == true'
+assert_json "$STDOUT" '.sessions[0].instructions == true'
 test_pass
 
 test_case "grep --json default includes instructions field"
 run_mcpc --json "$SESSION" grep "sample tools"
 assert_success
-assert_json "$STDOUT" '.instructions == true'
+assert_json "$STDOUT" '.sessions[0].instructions == true'
 test_pass
 
 test_case "grep --json instructions false when no match"
 run_mcpc --json "$SESSION" grep "echo"
 assert_success
-assert_json "$STDOUT" '.instructions == false'
+assert_json "$STDOUT" '.sessions[0].instructions == false'
 test_pass
 
 # =============================================================================
@@ -234,32 +234,35 @@ test_pass
 # Test: JSON output
 # =============================================================================
 
-test_case "grep --json returns valid JSON with tools"
+test_case "grep --json returns valid JSON with sessions wrapper"
 run_mcpc --json "$SESSION" grep "echo"
 assert_success
 assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '.tools | length > 0'
-assert_json "$STDOUT" '.tools[0].name == "echo"'
+assert_json "$STDOUT" '.sessions | length == 1'
+assert_json "$STDOUT" '.sessions[0].status == "live"'
+assert_json "$STDOUT" '.sessions[0].tools | length > 0'
+assert_json "$STDOUT" '.sessions[0].tools[0].name == "echo"'
+assert_json "$STDOUT" '.totalMatches.tools > 0'
 test_pass
 
 test_case "grep --json returns empty resources/prompts by default"
 run_mcpc --json "$SESSION" grep "echo"
 assert_success
-assert_json "$STDOUT" '.resources | length == 0'
-assert_json "$STDOUT" '.prompts | length == 0'
+assert_json "$STDOUT" '.sessions[0].resources | length == 0'
+assert_json "$STDOUT" '.sessions[0].prompts | length == 0'
 test_pass
 
 test_case "grep --json --resources searches only resources"
 run_mcpc --json "$SESSION" grep "static" --resources
 assert_success
-assert_json "$STDOUT" '.resources | length > 0'
-assert_json "$STDOUT" '.tools | length == 0'
+assert_json "$STDOUT" '.sessions[0].resources | length > 0'
+assert_json "$STDOUT" '.sessions[0].tools | length == 0'
 test_pass
 
 test_case "grep --json --tools --resources searches both"
 run_mcpc --json "$SESSION" grep "echo" --tools --resources
 assert_success
-assert_json "$STDOUT" '.tools | length > 0'
+assert_json "$STDOUT" '.sessions[0].tools | length > 0'
 test_pass
 
 # =============================================================================

@@ -109,34 +109,38 @@ test_pass
 # Test: Global grep JSON output
 # =============================================================================
 
-test_case "global grep --json returns valid JSON with results array"
+test_case "global grep --json returns valid JSON with sessions array"
 run_mcpc --json grep "echo"
 assert_success
 assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '.results | length > 0'
-assert_json "$STDOUT" '.totalMatches > 0'
+assert_json "$STDOUT" '[.sessions[] | select(.status == "live")] | length > 0'
+assert_json "$STDOUT" '.totalMatches.tools > 0'
 test_pass
 
-test_case "global grep --json results contain session names"
+test_case "global grep --json sessions contain name and status"
 run_mcpc --json grep "echo"
 assert_success
-assert_json "$STDOUT" '.results[0].session != null'
-assert_json "$STDOUT" '.results[0].tools | length > 0'
+assert_json "$STDOUT" '.sessions[0].name != null'
+assert_json "$STDOUT" '.sessions[0].status == "live"'
+assert_json "$STDOUT" '[.sessions[] | select(.tools | length > 0)] | length > 0'
 test_pass
 
-test_case "global grep --json with no matches returns empty results"
+test_case "global grep --json with no matches includes sessions with empty arrays"
 run_mcpc --json grep "zzz_nonexistent_zzz"
 assert_exit_code 1
 assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '.results | length == 0'
-assert_json "$STDOUT" '.totalMatches == 0'
+assert_json "$STDOUT" '.totalMatches.tools == 0'
+assert_json "$STDOUT" '.totalMatches.resources == 0'
+assert_json "$STDOUT" '.totalMatches.prompts == 0'
+# Sessions are still present (they were queried, just no matches)
+assert_json "$STDOUT" '[.sessions[] | select(.status == "live")] | length > 0'
 test_pass
 
 test_case "global grep --json --resources searches only resources"
 run_mcpc --json grep "static" --resources
 assert_success
-assert_json "$STDOUT" '.results[0].resources | length > 0'
-assert_json "$STDOUT" '.results[0].tools | length == 0'
+assert_json "$STDOUT" '[.sessions[] | select(.resources | length > 0)] | length > 0'
+assert_json "$STDOUT" '[.sessions[] | select(.status == "live")] | first | .tools | length == 0'
 test_pass
 
 # =============================================================================
@@ -147,9 +151,9 @@ test_case "global grep -m limits results"
 run_mcpc --json grep "e" --tools --resources --prompts -m 1
 assert_success
 # totalMatches should be > 1 but only 1 shown
-assert_json "$STDOUT" '.totalMatches > 1'
-# Count displayed items across all sessions
-DISPLAYED=$(echo "$STDOUT" | jq '[.results[] | (.tools | length) + (.resources | length) + (.prompts | length)] | add')
+assert_json "$STDOUT" '(.totalMatches.tools + .totalMatches.resources + .totalMatches.prompts) > 1'
+# Count displayed items across all sessions (only live sessions have arrays)
+DISPLAYED=$(echo "$STDOUT" | jq '[.sessions[] | select(.status == "live") | (.tools | length) + (.resources | length) + (.prompts | length)] | add')
 assert_eq "$DISPLAYED" "1"
 test_pass
 
@@ -166,7 +170,7 @@ test_pass
 test_case "global grep --json includes instructions in results"
 run_mcpc --json grep "sample tools, resources, and prompts"
 assert_success
-assert_json "$STDOUT" '.results[0].instructions == true'
+assert_json "$STDOUT" '[.sessions[] | select(.instructions == true)] | length > 0'
 test_pass
 
 # =============================================================================
@@ -269,8 +273,8 @@ run_mcpc --json grep "echo"
 # No sessions means no matches — exit code 1 but valid JSON
 assert_exit_code 1
 assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '.results | length == 0'
-assert_json "$STDOUT" '.totalMatches == 0'
+assert_json "$STDOUT" '.sessions | length == 0'
+assert_json "$STDOUT" '.totalMatches.tools == 0'
 test_pass
 
 test_done
