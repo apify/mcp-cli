@@ -351,15 +351,25 @@ export async function consolidateSessions(
       const now = Date.now();
       for (const [name, session] of Object.entries(storage.sessions)) {
         if (session?.status === 'crashed' && !session.pid) {
+          // Skip if a restart was already attempted within the cooldown window
           const lastAttempt = session.lastRestartAttemptAt
             ? new Date(session.lastRestartAttemptAt).getTime()
             : 0;
-          if (now - lastAttempt > AUTO_RESTART_COOLDOWN_MS) {
-            session.lastRestartAttemptAt = new Date(now).toISOString();
-            hasChanges = true;
-            result.sessionsToRestart.push(name);
-            logger.debug(`Marking session ${name} for auto-restart`);
+          if (now - lastAttempt <= AUTO_RESTART_COOLDOWN_MS) {
+            continue;
           }
+          // Skip if bridge was recently alive — it may have just crashed and needs
+          // time for cleanup before we restart (also avoids conflicts with parallel
+          // sessions sharing the same home directory)
+          const lastSeen = session.lastSeenAt ? new Date(session.lastSeenAt).getTime() : 0;
+          if (lastSeen > 0 && now - lastSeen <= AUTO_RESTART_COOLDOWN_MS) {
+            logger.debug(`Skipping auto-restart for ${name}: bridge was recently alive`);
+            continue;
+          }
+          session.lastRestartAttemptAt = new Date(now).toISOString();
+          hasChanges = true;
+          result.sessionsToRestart.push(name);
+          logger.debug(`Marking session ${name} for auto-restart`);
         }
       }
 
