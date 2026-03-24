@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-24
+
 ### Added
 
 - New `mcpc grep <pattern>` command to search tools, resources, prompts, and instructions across all active sessions, with regex, type filters, and single-session search support
@@ -167,7 +169,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive shell mode
 - JSON output mode for scripting
 
-[Unreleased]: https://github.com/apify/mcpc/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/apify/mcpc/compare/v0.1.10...v0.2.0
 [0.1.10]: https://github.com/apify/mcpc/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/apify/mcpc/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/apify/mcpc/compare/v0.1.7...v0.1.8
