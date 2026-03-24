@@ -540,15 +540,26 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     const truncatedResultsByName = new Map(displayResultsWithMatches.map((r) => [r.name, r]));
     const sessionEntries = [
       ...results.map((r) => {
-        // Use truncated version if available, otherwise use the original
-        const display = truncatedResultsByName.get(r.name) ?? r;
+        if (options.maxResults == null) {
+          // No truncation — use original result
+          return {
+            name: r.name,
+            status: 'live' as const,
+            instructions: r.instructions,
+            tools: r.tools,
+            resources: r.resources,
+            prompts: r.prompts,
+          };
+        }
+        // With truncation: use truncated version if available, otherwise show empty
+        const display = truncatedResultsByName.get(r.name);
         return {
           name: r.name,
           status: 'live' as const,
-          instructions: display.instructions,
-          tools: display.tools,
-          resources: display.resources,
-          prompts: display.prompts,
+          instructions: display?.instructions ?? false,
+          tools: display?.tools ?? [],
+          resources: display?.resources ?? [],
+          prompts: display?.prompts ?? [],
         };
       }),
       ...errors.map((e) => ({
