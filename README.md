@@ -13,7 +13,7 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 
 - 🌎 **Compatible** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
-- 🔧 **Strong MCP support** - Instructions, tools, resources, prompts, dynamic discovery.
+- 🔧 **Strong MCP support** - Instructions, tools, resources, prompts, async tasks, dynamic discovery.
 - 🔌 **Code mode** - JSON output enables integration with CLI tools like `jq` and scripting.
 - 🤖 **AI sandboxing** - MCP proxy server to securely access authenticated sessions from AI-generated code.
 - 🔒 **Secure** - Full OAuth 2.1 support, OS keychain for credentials storage.
@@ -846,7 +846,7 @@ The bridge process manages the full MCP session lifecycle:
 | 🔔 [**Notifications**](#list-change-notifications) | ✅ Supported                      |
 | 📄 [**Pagination**](#pagination)                   | ✅ Supported                      |
 | 🏓 [**Ping**](#ping)                               | ✅ Supported                      |
-| ⏳ **Async tasks**                                 | 🚧 Planned                        |
+| ⏳ [**Async tasks**](#async-tasks)                  | ✅ Supported                      |
 | 📁 **Roots**                                       | 🚧 Planned                        |
 | ❓ **Elicitation**                                 | 🚧 Planned                        |
 | 🔤 **Completion**                                  | 🚧 Planned                        |
@@ -997,6 +997,35 @@ Send a ping to check if a server connection is alive:
 mcpc @apify ping
 mcpc @apify ping --json
 ```
+
+#### Async tasks
+
+MCP servers can execute tools as [async tasks](https://modelcontextprotocol.io/specification/latest/server/utilities/tasks)
+that run in the background and report progress. `mcpc` supports the full task lifecycle:
+
+```bash
+# Call a tool as a task (waits for completion, shows progress spinner)
+mcpc @apify tools-call long-running-job input:="data" --task
+
+# Start a task and return immediately with the task ID
+mcpc @apify tools-call long-running-job input:="data" --detach
+
+# List active tasks
+mcpc @apify tasks-list
+
+# Check task status
+mcpc @apify tasks-get <taskId>
+
+# Cancel a running task
+mcpc @apify tasks-cancel <taskId>
+```
+
+With `--task`, the CLI shows a progress spinner with elapsed time, server status messages,
+and progress notifications. Press **ESC** during execution to detach and get the task ID
+for later retrieval. With `--detach`, the task starts and returns the task ID immediately.
+
+`tools-list` and `tools-get` show task support annotations per tool:
+`[task:optional]`, `[task:required]`, or `[task:forbidden]`.
 
 ## Configuration
 
@@ -1222,22 +1251,22 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 <!-- Stars and activity as of March 2026. -->
 
-| Tool                                                                    | Lang   | Stars | Active | Tools | Resources | Prompts | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
-| ----------------------------------------------------------------------- | ------ | ----: | ------ | ----- | --------- | ------- | --------- | -------- | ----- | ----- | ---- | ----------- | --- |
-| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~350 | ✅     | ✅    | ✅        | ✅      | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
-| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~2.6k | ✅     | ✅    | —         | —       | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
-| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k | ✅     | ✅    | ✅        | ✅      | ✅        | ✅       | ✅    | ✅    | ✅   | —           | ✅  |
-| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k | ⚠️     | ✅    | ✅        | ✅      | ✅        | —        | —     | ✅    | ✅   | —           | —   |
-| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     |  ~950 | ✅     | ✅    | —         | —       | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
-| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 | ⚠️     | ✅    | ✅        | ✅      | —         | —        | —     | ✅    | —    | —           | ✅  |
-| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~590 | ✅     | ✅    | —         | —       | —         | —        | ✅    | ✅    | ✅   | ✅          | —   |
-| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~420 | ⚠️     | ✅    | ✅        | ✅      | —         | —        | ✅    | —     | ✅   | —           | —   |
-| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python |  ~170 | ✅     | ✅    | ✅        | ✅      | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —   |
-| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~46 | ✅     | ✅    | —         | —       | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —   |
-| [evantahler/mcpx](https://github.com/evantahler/mcpx)                   | TS     |   ~26 | ✅     | ✅    | ✅        | ✅      | ✅        | —        | ✅    | ✅    | ✅   | ✅          | —   |
-| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~13 | ✅     | ✅    | —         | —       | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
+| Tool                                                                    | Lang   | Stars | Active | Tools | Resources | Prompts | Tasks | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
+| ----------------------------------------------------------------------- | ------ | ----: | ------ | ----- | --------- | ------- | ----- | --------- | -------- | ----- | ----- | ---- | ----------- | --- |
+| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~400 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
+| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~3.2k | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
+| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | ✅  |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python | ~1.7k | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —   |
+| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k | ⚠️     | ✅    | ✅        | ✅      | —     | ✅        | —        | —     | ✅    | ✅   | —           | —   |
+| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     | ~1.0k | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
+| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | —     | ✅    | —    | —           | ✅  |
+| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~640 | ✅     | ✅    | —         | —       | —     | —         | —        | ✅    | ✅    | ✅   | ✅          | —   |
+| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~430 | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | ✅    | —     | ✅   | —           | —   |
+| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~53 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —   |
+| [evantahler/mcpx](https://github.com/evantahler/mcpx)                   | TS     |   ~26 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | —        | ✅    | ✅    | ✅   | ✅          | —   |
+| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~15 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
 
-**Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **LLM** = requires/uses an LLM.
+**Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **Tasks** = [async tasks](https://modelcontextprotocol.io/specification/latest/server/utilities/tasks), **LLM** = requires/uses an LLM.
 
 **Notes:**
 
