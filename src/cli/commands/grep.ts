@@ -3,7 +3,7 @@
  */
 
 import chalk from 'chalk';
-import type { Tool, Resource, Prompt, CommandOptions } from '../../lib/types.js';
+import type { Tool, Resource, Prompt, CommandOptions, SessionData } from '../../lib/types.js';
 import { ClientError } from '../../lib/errors.js';
 import { isProcessAlive } from '../../lib/utils.js';
 import { consolidateSessions } from '../../lib/sessions.js';
@@ -17,6 +17,7 @@ import {
   inBackticks,
 } from '../output.js';
 import type { IMcpClient } from '../../lib/types.js';
+import { getBridgeStatus, formatBridgeStatus } from './sessions.js';
 
 export interface GrepOptions extends CommandOptions {
   tools?: boolean | undefined;
@@ -24,6 +25,7 @@ export interface GrepOptions extends CommandOptions {
   prompts?: boolean | undefined;
   regex?: boolean | undefined;
   caseSensitive?: boolean | undefined;
+  maxResults?: number | undefined;
 }
 
 interface GrepResult {
@@ -42,6 +44,11 @@ interface SessionGrepResult {
 interface SessionGrepError {
   session: string;
   error: string;
+}
+
+interface SessionGrepSkipped {
+  session: string;
+  status: string;
 }
 
 /**
@@ -69,7 +76,9 @@ function buildMatcher(pattern: string, options: GrepOptions): (text: string) => 
 }
 
 /**
- * Determine which types to search based on flags
+ * Determine which types to search based on flags.
+ * If no type flags are given, defaults to tools only.
+ * If any type flag is given, search exactly the specified types.
  */
 function getSearchTypes(options: GrepOptions): {
   searchTools: boolean;
@@ -78,10 +87,34 @@ function getSearchTypes(options: GrepOptions): {
 } {
   const anyFilter = options.tools || options.resources || options.prompts;
   return {
-    searchTools: !anyFilter || !!options.tools,
-    searchResources: !anyFilter || !!options.resources,
-    searchPrompts: !anyFilter || !!options.prompts,
+    searchTools: anyFilter ? !!options.tools : true,
+    searchResources: !!options.resources,
+    searchPrompts: !!options.prompts,
   };
+}
+
+/**
+ * Build the searchable text for a tool, including session context.
+ * Format: "@session/tool-name <JSON schema>"
+ */
+function buildToolSearchText(tool: Tool, sessionName: string): string {
+  return `${sessionName}/${tool.name} ${JSON.stringify(tool, null, 2)}`;
+}
+
+/**
+ * Build the searchable text for a resource, including session context.
+ * Format: "@session/resource-uri <JSON schema>"
+ */
+function buildResourceSearchText(resource: Resource, sessionName: string): string {
+  return `${sessionName}/${resource.uri} ${JSON.stringify(resource, null, 2)}`;
+}
+
+/**
+ * Build the searchable text for a prompt, including session context.
+ * Format: "@session/prompt-name <JSON schema>"
+ */
+function buildPromptSearchText(prompt: Prompt, sessionName: string): string {
+  return `${sessionName}/${prompt.name} ${JSON.stringify(prompt, null, 2)}`;
 }
 
 /**
@@ -90,7 +123,8 @@ function getSearchTypes(options: GrepOptions): {
 async function searchClient(
   client: IMcpClient,
   matcher: (text: string) => boolean,
-  options: GrepOptions
+  options: GrepOptions,
+  sessionName: string = ''
 ): Promise<GrepResult> {
   const { searchTools, searchResources, searchPrompts } = getSearchTypes(options);
 
@@ -102,19 +136,18 @@ async function searchClient(
   ]);
 
   // Filter tools
-  const matchedTools = (toolsResult?.tools ?? []).filter(
-    (t) => matcher(t.name) || (t.description && matcher(t.description))
+  const matchedTools = (toolsResult?.tools ?? []).filter((t) =>
+    matcher(buildToolSearchText(t, sessionName))
   );
 
-  // Filter resources (also match on URI)
-  const matchedResources = (resourcesResult ?? []).filter(
-    (r) =>
-      matcher(r.uri) || (r.name && matcher(r.name)) || (r.description && matcher(r.description))
+  // Filter resources
+  const matchedResources = (resourcesResult ?? []).filter((r) =>
+    matcher(buildResourceSearchText(r, sessionName))
   );
 
   // Filter prompts
-  const matchedPrompts = (promptsResult ?? []).filter(
-    (p) => matcher(p.name) || (p.description && matcher(p.description))
+  const matchedPrompts = (promptsResult ?? []).filter((p) =>
+    matcher(buildPromptSearchText(p, sessionName))
   );
 
   return {
@@ -156,6 +189,30 @@ async function fetchAllPrompts(client: IMcpClient): Promise<Prompt[]> {
 
 function countMatches(result: GrepResult): number {
   return result.tools.length + result.resources.length + result.prompts.length;
+}
+
+/**
+ * Truncate a GrepResult to at most `limit` total items (tools first, then resources, then prompts).
+ * Returns the truncated result and how many items were dropped.
+ */
+function truncateResult(
+  result: GrepResult,
+  limit: number
+): { result: GrepResult; truncated: number } {
+  const total = countMatches(result);
+  if (total <= limit) return { result, truncated: 0 };
+
+  let remaining = limit;
+  const tools = result.tools.slice(0, remaining);
+  remaining -= tools.length;
+  const resources = result.resources.slice(0, remaining);
+  remaining -= resources.length;
+  const prompts = result.prompts.slice(0, remaining);
+
+  return {
+    result: { tools, resources, prompts },
+    truncated: total - limit,
+  };
 }
 
 /**
@@ -249,26 +306,36 @@ export async function grepSession(
 ): Promise<number> {
   const matcher = buildMatcher(pattern, options);
 
+  const sessionRef = session.startsWith('@') ? session : `@${session}`;
+
   return await withMcpClient(session, options, async (client) => {
-    const result = await searchClient(client, matcher, options);
-    const total = countMatches(result);
+    const fullResult = await searchClient(client, matcher, options, sessionRef);
+    const total = countMatches(fullResult);
+
+    const { result, truncated } =
+      options.maxResults != null
+        ? truncateResult(fullResult, options.maxResults)
+        : { result: fullResult, truncated: 0 };
 
     if (options.outputMode === 'json') {
-      console.log(
-        formatJson({
-          tools: result.tools,
-          resources: result.resources,
-          prompts: result.prompts,
-          totalMatches: total,
-        })
-      );
+      const jsonOutput: Record<string, unknown> = {
+        tools: result.tools,
+        resources: result.resources,
+        prompts: result.prompts,
+        totalMatches: total,
+      };
+      if (truncated > 0) {
+        jsonOutput.truncated = truncated;
+      }
+      console.log(formatJson(jsonOutput));
     } else {
       if (total === 0) {
         console.log('No matches found.');
       } else {
         const lines = formatGrepResultHuman(result);
         lines.push('');
-        lines.push(chalk.dim(`${total} ${total === 1 ? 'match' : 'matches'}.`));
+        const suffix = truncated > 0 ? ` (showing ${countMatches(result)})` : '';
+        lines.push(chalk.dim(`${total} ${total === 1 ? 'match' : 'matches'}${suffix}.`));
         console.log(lines.join('\n'));
       }
     }
@@ -280,17 +347,34 @@ export async function grepSession(
 // ─── Multi-session grep ──────────────────────────────────────────────
 
 /**
- * Search all active sessions for matching tools, resources, and prompts.
+ * Format a skipped (unavailable) session line for human output.
+ * Example: "@testx ○ crashed"
+ */
+function formatSkippedSession(skipped: SessionGrepSkipped): string {
+  const { dot, text } = formatBridgeStatus(skipped.status as 'crashed');
+  return `${chalk.cyan(skipped.session)} ${dot} ${text}`;
+}
+
+/**
+ * Determine if a session is queryable (bridge process alive)
+ */
+function isSessionQueryable(session: SessionData): boolean {
+  return !!session.pid && isProcessAlive(session.pid);
+}
+
+/**
+ * Search all sessions for matching tools, resources, and prompts.
+ * Shows unavailable sessions with their status.
  * Returns exit code (0 = matches found, 1 = no matches).
  */
 export async function grepAllSessions(pattern: string, options: GrepOptions): Promise<number> {
   const matcher = buildMatcher(pattern, options);
 
-  // Load active sessions
+  // Load all sessions
   const { sessions } = await consolidateSessions(false);
-  const sessionEntries = Object.values(sessions).filter((s) => s.pid && isProcessAlive(s.pid));
+  const allSessionEntries = Object.values(sessions);
 
-  if (sessionEntries.length === 0) {
+  if (allSessionEntries.length === 0) {
     if (options.outputMode === 'json') {
       console.log(formatJson({ results: [], errors: [], totalMatches: 0 }));
     } else {
@@ -300,12 +384,31 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     return 1;
   }
 
-  // Query all sessions in parallel
+  // Ensure session name has @ prefix
+  const toSessionRef = (name: string): string => (name.startsWith('@') ? name : `@${name}`);
+
+  // Separate queryable sessions from unavailable ones
+  const queryableSessions: SessionData[] = [];
+  const skippedSessions: SessionGrepSkipped[] = [];
+
+  for (const session of allSessionEntries) {
+    if (isSessionQueryable(session)) {
+      queryableSessions.push(session);
+    } else {
+      const status = getBridgeStatus(session);
+      skippedSessions.push({
+        session: toSessionRef(session.name),
+        status,
+      });
+    }
+  }
+
+  // Query all queryable sessions in parallel
   const settled = await Promise.allSettled(
-    sessionEntries.map(async (session): Promise<SessionGrepResult> => {
-      const sessionName = `@${session.name}`;
+    queryableSessions.map(async (session): Promise<SessionGrepResult> => {
+      const sessionName = toSessionRef(session.name);
       const result = await withSessionClient(sessionName, async (client) => {
-        return searchClient(client, matcher, options);
+        return searchClient(client, matcher, options, sessionName);
       });
       return {
         session: sessionName,
@@ -328,7 +431,7 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     } else {
       const reason: unknown = outcome.reason;
       errors.push({
-        session: `@${sessionEntries[i]!.name}`,
+        session: toSessionRef(queryableSessions[i]!.name),
         error: reason instanceof Error ? reason.message : String(reason),
       });
     }
@@ -336,9 +439,27 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
 
   const totalMatches = results.reduce((sum, r) => sum + countMatches(r), 0);
 
+  // Apply max-results limit across all sessions
+  let displayResults = results;
+  let totalTruncated = 0;
+  if (options.maxResults != null) {
+    let remaining = options.maxResults;
+    displayResults = [];
+    for (const r of results) {
+      if (remaining <= 0) {
+        totalTruncated += countMatches(r);
+        continue;
+      }
+      const { result: truncR, truncated } = truncateResult(r, remaining);
+      remaining -= countMatches(truncR);
+      totalTruncated += truncated;
+      displayResults.push({ ...r, ...truncR });
+    }
+  }
+
   if (options.outputMode === 'json') {
     const jsonOutput: Record<string, unknown> = {
-      results: results.map((r) => ({
+      results: displayResults.map((r) => ({
         session: r.session,
         tools: r.tools,
         resources: r.resources,
@@ -346,18 +467,26 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
       })),
       totalMatches,
     };
+    if (totalTruncated > 0) {
+      jsonOutput.truncated = totalTruncated;
+    }
     if (errors.length > 0) {
       jsonOutput.errors = errors;
+    }
+    if (skippedSessions.length > 0) {
+      jsonOutput.skipped = skippedSessions;
     }
     console.log(formatJson(jsonOutput));
   } else {
     const lines: string[] = [];
 
-    for (const r of results) {
-      const matchCount = countMatches(r);
-      lines.push(
-        `${chalk.cyan(r.session)} ${chalk.dim(`(${matchCount} ${matchCount === 1 ? 'match' : 'matches'})`)}`
-      );
+    // Show unavailable sessions first
+    for (const skipped of skippedSessions) {
+      lines.push(formatSkippedSession(skipped));
+    }
+
+    for (const r of displayResults) {
+      lines.push(chalk.cyan(r.session));
       lines.push(...formatGrepResultHuman(r, '  '));
       lines.push('');
     }
@@ -367,15 +496,22 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
       lines.push(chalk.yellow(`Warning: ${err.session} \u2014 ${err.error}`));
     }
 
-    if (totalMatches === 0) {
+    if (totalMatches === 0 && skippedSessions.length === 0) {
       console.log('No matches found.');
     } else {
-      const sessionCount = results.length;
-      lines.push(
-        chalk.dim(
-          `${totalMatches} ${totalMatches === 1 ? 'match' : 'matches'} across ${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'}.`
-        )
-      );
+      if (totalMatches > 0) {
+        const sessionCount = results.length;
+        const showing = totalMatches - totalTruncated;
+        const suffix = totalTruncated > 0 ? ` (showing ${showing})` : '';
+        lines.push(
+          chalk.dim(
+            `${totalMatches} ${totalMatches === 1 ? 'match' : 'matches'} across ${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'}${suffix}.`
+          )
+        );
+      } else if (lines.length > 0) {
+        lines.push('');
+        lines.push('No matches found.');
+      }
       console.log(lines.join('\n'));
     }
   }
