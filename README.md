@@ -272,18 +272,14 @@ Arrow keys navigate history (saved to `~/.mcpc/history`).
 `mcpc grep` searches tools, resources, and prompts across all active sessions or within a single session:
 
 ```bash
-# Search tools in all active sessions (default: tools only)
+# Search tools and server instructions in all active sessions
 mcpc grep "search"
 
 # Search within a single session
 mcpc @apify grep "actor"
 
-# Search resources or prompts instead of tools
-mcpc grep "config" --resources
-mcpc grep "greeting" --prompts
-
-# Combine type flags
-mcpc grep "data" --tools --resources --prompts
+# Search resources and prompts instead of the default tools and instructions
+mcpc grep "config" --resources --prompts
 
 # Regex search
 mcpc grep "search|find" -E
@@ -303,10 +299,10 @@ By default, `grep` searches only tools. Use `--resources` or `--prompts` to sear
 with their status rather than silently skipped.
 
 The `grep` command is useful for **dynamic tool discovery**, 
-also called [Advanced tool use](https://www.anthropic.com/engineering/advanced-tool-use) by Anthropic
+also called [Tool search tool](https://www.anthropic.com/engineering/advanced-tool-use) by Anthropic
 or [Dynamic context discovery](https://cursor.com/blog/dynamic-context-discovery) by Cursor.
-Rather than loading all tools into context, the AI agent can use `grep` to discover the right tool
-for the job,and only load the matching tools into the context to reduce token usage and improve accuracy.
+Rather than loading all tools into AI agent's context, the agent can use `grep` to discover the right tool
+for the job, and only load the relevant tools into the context when needed to reduce token usage and improve accuracy.
 
 <!-- TODO: explain this more, show diagram -->
 
