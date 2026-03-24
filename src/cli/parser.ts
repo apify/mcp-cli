@@ -42,6 +42,8 @@ const OPTIONS_WITH_VALUES = [
   '--proxy',
   '--proxy-bearer-token',
   '--scope',
+  '-m',
+  '--max-results',
   '--client-id',
   '--client-secret',
   '-o',

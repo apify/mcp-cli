@@ -1145,12 +1145,6 @@ export function formatServerDetails(
   }
   lines.push('');
 
-  // Tools list (from bridge cache, no extra server call)
-  if (tools && tools.length > 0) {
-    lines.push(formatToolsCompact(tools, { sessionName: target }));
-    lines.push('');
-  }
-
   // Instructions in code block
   const trimmed = instructions ? instructions.trim() : '';
   if (trimmed) {
@@ -1158,6 +1152,13 @@ export function formatServerDetails(
     lines.push(chalk.gray('````'));
     lines.push(trimmed);
     lines.push(chalk.gray('````'));
+    lines.push('');
+  }
+
+  // Tools list (from bridge cache, no extra server call)
+  if (tools && tools.length > 0) {
+    lines.push(formatToolsCompact(tools, { sessionName: target }));
+    lines.push('');
   }
 
   // Commands

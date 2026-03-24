@@ -343,8 +343,9 @@ function createTopLevelProgram(): Command {
     'after',
     `
 ${chalk.bold('MCP session commands (after connecting):')}
-  <@session>                   Show MCP server info and capabilities
-  <@session> ${chalk.cyan('tools-list')}        List MCP server tools
+  <@session>                   Show MCP server info, capabilities, and tools
+  <@session> ${chalk.cyan('grep')} <pattern>    Search tools, resources, or prompts
+  <@session> ${chalk.cyan('tools-list')}        List all server tools
   <@session> ${chalk.cyan('tools-get')} <name>  Get tool details and schema
   <@session> ${chalk.cyan('tools-call')} <name> [arg:=val ... | <json> | <stdin]
   <@session> ${chalk.cyan('prompts-list')}
@@ -359,7 +360,6 @@ ${chalk.bold('MCP session commands (after connecting):')}
   <@session> ${chalk.cyan('tasks-cancel')} <taskId>
   <@session> ${chalk.cyan('logging-set-level')} <level>
   <@session> ${chalk.cyan('ping')}
-  <@session> ${chalk.cyan('grep')} <pattern>         Search tools, resources, and prompts
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
 
@@ -564,21 +564,29 @@ Without arguments, performs safe cleanup of stale data only.
   program
     .command('grep [pattern]')
     .usage('<pattern> [options]')
-    .description('Search tools, resources, and prompts across all active sessions')
-    .option('--tools', 'Search tools only')
-    .option('--resources', 'Search resources only')
-    .option('--prompts', 'Search prompts only')
+    .description('Search tools and instructions across all active sessions')
+    .option('--tools', 'Search tools')
+    .option('--resources', 'Search resources')
+    .option('--prompts', 'Search prompts')
+    .option('--instructions', 'Search server instructions')
     .option('-E, --regex', 'Treat pattern as a regular expression')
     .option('-s, --case-sensitive', 'Case-sensitive matching')
+    .option('-m, --max-results <n>', 'Limit the number of results')
     .addHelpText(
       'after',
       `
+${chalk.bold('Type filters:')}
+  By default, tools and instructions are searched. Use --resources or --prompts
+  to search those instead. Combine flags to search multiple types (e.g. --tools --resources).
+
 ${chalk.bold('Examples:')}
-  mcpc grep "search"                        Search all sessions
-  mcpc grep "search" --tools                Search tools only
-  mcpc grep -E "search|find" --tools        Regex search across tools
+  mcpc grep "search"                        Search tools and instructions in all sessions
+  mcpc grep "search" --resources            Search resources only
+  mcpc grep "search" --tools --prompts      Search tools and prompts
+  mcpc grep "search|find" -E                Regex search across tools and instructions
   mcpc @apify grep "actor"                  Search within a single session
   mcpc grep "file" --json                   JSON output for scripting
+  mcpc grep "actor" -m 5                    Show at most 5 results
 `
     )
     .action(async (pattern, opts, command) => {
@@ -588,12 +596,15 @@ ${chalk.bold('Examples:')}
         );
       }
       const globalOpts = getOptionsFromCommand(command);
+      const maxResults = opts.maxResults ? parseInt(opts.maxResults as string, 10) : undefined;
       const exitCode = await grepCmd.grepAllSessions(pattern, {
         tools: opts.tools as boolean | undefined,
         resources: opts.resources as boolean | undefined,
         prompts: opts.prompts as boolean | undefined,
+        instructions: opts.instructions as boolean | undefined,
         regex: opts.regex as boolean | undefined,
         caseSensitive: opts.caseSensitive as boolean | undefined,
+        maxResults,
         ...globalOpts,
       });
       process.exit(exitCode);
@@ -635,6 +646,7 @@ ${chalk.bold('Examples:')}
 
       // Check session subcommands
       const dummyProgram = new Command();
+      dummyProgram.name('mcpc <@session>');
       registerSessionCommands(dummyProgram, '@dummy');
       const sessionCmd = dummyProgram.commands.find(
         (c) => c.name() === cmdName || c.aliases().includes(cmdName)
@@ -855,20 +867,25 @@ function registerSessionCommands(program: Command, session: string): void {
   // Grep command: @session grep <pattern>
   program
     .command('grep <pattern>')
-    .description('Search tools, resources, and prompts')
-    .option('--tools', 'Search tools only')
-    .option('--resources', 'Search resources only')
-    .option('--prompts', 'Search prompts only')
+    .description('Search tools and instructions')
+    .option('--tools', 'Search tools')
+    .option('--resources', 'Search resources')
+    .option('--prompts', 'Search prompts')
+    .option('--instructions', 'Search server instructions')
     .option('-E, --regex', 'Treat pattern as a regular expression')
     .option('-s, --case-sensitive', 'Case-sensitive matching')
+    .option('-m, --max-results <n>', 'Limit the number of results')
     .action(async (pattern, opts, command) => {
       const globalOpts = getOptionsFromCommand(command);
+      const maxResults = opts.maxResults ? parseInt(opts.maxResults as string, 10) : undefined;
       const exitCode = await grepCmd.grepSession(session, pattern, {
         tools: opts.tools as boolean | undefined,
         resources: opts.resources as boolean | undefined,
         prompts: opts.prompts as boolean | undefined,
+        instructions: opts.instructions as boolean | undefined,
         regex: opts.regex as boolean | undefined,
         caseSensitive: opts.caseSensitive as boolean | undefined,
+        maxResults,
         ...globalOpts,
       });
       process.exit(exitCode);

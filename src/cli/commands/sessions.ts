@@ -325,7 +325,7 @@ export async function connectSession(
 
 // DISCONNECTED_THRESHOLD_MS imported from ../../lib/types.js
 
-type DisplayStatus =
+export type DisplayStatus =
   | 'live'
   | 'connecting'
   | 'reconnecting'
@@ -337,7 +337,7 @@ type DisplayStatus =
 /**
  * Determine bridge status for a session
  */
-function getBridgeStatus(session: {
+export function getBridgeStatus(session: {
   status?: string;
   pid?: number;
   lastSeenAt?: string;
@@ -368,7 +368,7 @@ function getBridgeStatus(session: {
 /**
  * Format bridge status for display with dot indicator
  */
-function formatBridgeStatus(status: DisplayStatus): { dot: string; text: string } {
+export function formatBridgeStatus(status: DisplayStatus): { dot: string; text: string } {
   switch (status) {
     case 'live':
       return { dot: chalk.green('●'), text: chalk.green('live') };
@@ -390,7 +390,7 @@ function formatBridgeStatus(status: DisplayStatus): { dot: string; text: string 
 /**
  * Format time ago in human-friendly way
  */
-function formatTimeAgo(isoDate: string | undefined): string {
+export function formatTimeAgo(isoDate: string | undefined): string {
   if (!isoDate) return '';
 
   const date = new Date(isoDate);
