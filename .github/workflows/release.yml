@@ -223,5 +223,4 @@ jobs:
           VERSION="${{ steps.release.outputs.version }}"
           gh release create "v${VERSION}" \
             --title "v${VERSION}" \
-            --generate-notes \
-            --target "v${VERSION}"
+            --generate-notes
