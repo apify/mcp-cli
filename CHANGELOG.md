@@ -34,7 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Direct one-shot URL access (e.g. `mcpc mcp.apify.com tools-list`) is removed; create a session first with `mcpc connect`.
 
-- Renamed `--async` flag to `--task` in `tools-call` for consistency with MCP specification
 - Revised session states: `unauthorized` (401/403), `disconnected` (bridge alive but server unreachable >2min), and `expired` (session ID rejected), each with actionable guidance
 - When `--profile` is not specified, only the `default` profile is used; non-default profiles require an explicit `--profile` flag
 - `@napi-rs/keyring` native addon is now loaded lazily; falls back to `~/.mcpc/credentials.json` when unavailable
