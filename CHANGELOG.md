@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `mcpc help <command>` showing truncated usage line (e.g. `Usage: resources-read <uri>`) — now correctly shows `Usage: mcpc <@session> resources-read <uri>`
 - Fixed auth loss when reconnecting an unauthorized session via `mcpc connect` — the `unauthorized` status was not cleared, causing all subsequent operations to fail with "Authentication required by server" even after successful reconnection
 - HTTP proxy support (`HTTP_PROXY`/`HTTPS_PROXY` env vars) now works for MCP server connections, OAuth token refresh, and x402 payment signing — previously the MCP SDK transport and OAuth calls bypassed the global proxy dispatcher
 

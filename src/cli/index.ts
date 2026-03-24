@@ -594,6 +594,7 @@ Without arguments, performs safe cleanup of stale data only.
 
       // Check session subcommands
       const dummyProgram = new Command();
+      dummyProgram.name('mcpc <@session>');
       registerSessionCommands(dummyProgram, '@dummy');
       const sessionCmd = dummyProgram.commands.find(
         (c) => c.name() === cmdName || c.aliases().includes(cmdName)
