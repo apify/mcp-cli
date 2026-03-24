@@ -42,6 +42,8 @@ const OPTIONS_WITH_VALUES = [
   '--proxy',
   '--proxy-bearer-token',
   '--scope',
+  '-m',
+  '--max-results',
   '--client-id',
   '--client-secret',
   '-o',
@@ -81,6 +83,7 @@ export const KNOWN_COMMANDS = [
   'restart',
   'shell',
   'clean',
+  'grep',
   'x402',
 ];
 
@@ -110,6 +113,7 @@ export const KNOWN_SESSION_COMMANDS = [
   'tasks-list',
   'tasks-get',
   'tasks-cancel',
+  'grep',
 ];
 
 /**

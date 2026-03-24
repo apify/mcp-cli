@@ -129,13 +129,15 @@ Commands:
   login <server>               Interactively login to a server using OAuth and save profile
   logout <server>              Delete an authentication profile for a server
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
+  grep <pattern>               Search tools and instructions across all active sessions
   x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
   help [command] [subcommand]  Show help for a specific command
 
 MCP session commands (after connecting):
-  <@session>                   Show MCP server info and capabilities
-  <@session> tools-list        List MCP tools
-  <@session> tools-get <name>
+  <@session>                   Show MCP server info, capabilities, and tools
+  <@session> grep <pattern>    Search tools, resources, or prompts
+  <@session> tools-list        List all server tools
+  <@session> tools-get <name>  Get tool details and schema
   <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
   <@session> prompts-list
   <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
@@ -264,6 +266,49 @@ mcpc @apify shell
 
 Shell commands: `help`, `exit`/`quit`/Ctrl+D, Ctrl+C to cancel.
 Arrow keys navigate history (saved to `~/.mcpc/history`).
+
+### Grep (search across sessions)
+
+`mcpc grep` searches tools, resources, and prompts across all active sessions or within a single session:
+
+```bash
+# Search tools in all active sessions (default: tools only)
+mcpc grep "search"
+
+# Search within a single session
+mcpc @apify grep "actor"
+
+# Search resources or prompts instead of tools
+mcpc grep "config" --resources
+mcpc grep "greeting" --prompts
+
+# Combine type flags
+mcpc grep "data" --tools --resources --prompts
+
+# Regex search
+mcpc grep "search|find" -E
+
+# Case-sensitive search (default is case-insensitive)
+mcpc grep "Search" --case-sensitive
+
+# Limit results
+mcpc grep "e" -m 5
+
+# JSON output for scripting
+mcpc grep "actor" --json
+```
+
+By default, `grep` searches only tools. Use `--resources` or `--prompts` to search those types
+(combine with `--tools` to include tools too). Sessions that are crashed or unavailable are shown
+with their status rather than silently skipped.
+
+The `grep` command is useful for **dynamic tool discovery**, 
+also called [Advanced tool use](https://www.anthropic.com/engineering/advanced-tool-use) by Anthropic
+or [Dynamic context discovery](https://cursor.com/blog/dynamic-context-discovery) by Cursor.
+Rather than loading all tools into context, the AI agent can use `grep` to discover the right tool
+for the job,and only load the matching tools into the context to reduce token usage and improve accuracy.
+
+<!-- TODO: explain this more, show diagram -->
 
 ### JSON mode
 
