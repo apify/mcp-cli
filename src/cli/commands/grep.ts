@@ -37,7 +37,7 @@ interface GrepResult {
 }
 
 interface SessionGrepResult {
-  session: string;
+  name: string;
   tools: Tool[];
   resources: Resource[];
   prompts: Prompt[];
@@ -45,12 +45,12 @@ interface SessionGrepResult {
 }
 
 interface SessionGrepError {
-  session: string;
+  name: string;
   error: string;
 }
 
 interface SessionGrepSkipped {
-  session: string;
+  name: string;
   status: string;
 }
 
@@ -217,12 +217,37 @@ async function fetchAllPrompts(client: IMcpClient): Promise<Prompt[]> {
 
 // ─── Output formatting ──────────────────────────────────────────────
 
+interface MatchCounts {
+  tools: number;
+  resources: number;
+  prompts: number;
+}
+
 function countMatches(result: GrepResult): number {
   return (
     result.tools.length +
     result.resources.length +
     result.prompts.length +
     (result.instructions ? 1 : 0)
+  );
+}
+
+function countMatchesByType(result: GrepResult): MatchCounts {
+  return {
+    tools: result.tools.length,
+    resources: result.resources.length,
+    prompts: result.prompts.length,
+  };
+}
+
+function sumMatchesByType(results: GrepResult[]): MatchCounts {
+  return results.reduce(
+    (acc, r) => ({
+      tools: acc.tools + r.tools.length,
+      resources: acc.resources + r.resources.length,
+      prompts: acc.prompts + r.prompts.length,
+    }),
+    { tools: 0, resources: 0, prompts: 0 }
   );
 }
 
@@ -362,11 +387,17 @@ export async function grepSession(
 
     if (options.outputMode === 'json') {
       const jsonOutput: Record<string, unknown> = {
-        instructions: result.instructions,
-        tools: result.tools,
-        resources: result.resources,
-        prompts: result.prompts,
-        totalMatches: total,
+        sessions: [
+          {
+            name: sessionRef,
+            status: 'live',
+            instructions: result.instructions,
+            tools: result.tools,
+            resources: result.resources,
+            prompts: result.prompts,
+          },
+        ],
+        totalMatches: countMatchesByType(fullResult),
       };
       if (truncated > 0) {
         jsonOutput.truncated = truncated;
@@ -396,7 +427,7 @@ export async function grepSession(
  */
 function formatSkippedSession(skipped: SessionGrepSkipped): string {
   const { dot, text } = formatBridgeStatus(skipped.status as 'crashed');
-  return `${chalk.cyan(skipped.session)} ${dot} ${text}`;
+  return `${chalk.cyan(skipped.name)} ${dot} ${text}`;
 }
 
 /**
@@ -420,7 +451,9 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
 
   if (allSessionEntries.length === 0) {
     if (options.outputMode === 'json') {
-      console.log(formatJson({ results: [], errors: [], totalMatches: 0 }));
+      console.log(
+        formatJson({ sessions: [], totalMatches: { tools: 0, resources: 0, prompts: 0 } })
+      );
     } else {
       console.log(chalk.bold('No active sessions.'));
       console.log(chalk.dim('  \u21B3 run: mcpc connect mcp.example.com @test'));
@@ -441,7 +474,7 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     } else {
       const status = getBridgeStatus(session);
       skippedSessions.push({
-        session: toSessionRef(session.name),
+        name: toSessionRef(session.name),
         status,
       });
     }
@@ -455,7 +488,7 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
         return searchClient(client, matcher, options, sessionName);
       });
       return {
-        session: sessionName,
+        name: sessionName,
         ...result,
       };
     })
@@ -463,33 +496,34 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
 
   // Separate successes and failures
   const results: SessionGrepResult[] = [];
+  const resultsWithMatches: SessionGrepResult[] = [];
   const errors: SessionGrepError[] = [];
 
   for (const [i, outcome] of settled.entries()) {
     if (outcome.status === 'fulfilled') {
-      const r = outcome.value;
-      // Only include sessions with matches
-      if (countMatches(r) > 0) {
-        results.push(r);
+      results.push(outcome.value);
+      if (countMatches(outcome.value) > 0) {
+        resultsWithMatches.push(outcome.value);
       }
     } else {
       const reason: unknown = outcome.reason;
       errors.push({
-        session: toSessionRef(queryableSessions[i]!.name),
+        name: toSessionRef(queryableSessions[i]!.name),
         error: reason instanceof Error ? reason.message : String(reason),
       });
     }
   }
 
-  const totalMatches = results.reduce((sum, r) => sum + countMatches(r), 0);
+  const totalMatches = sumMatchesByType(results);
+  const totalMatchCount = results.reduce((sum, r) => sum + countMatches(r), 0);
 
-  // Apply max-results limit across all sessions
-  let displayResults = results;
+  // Apply max-results limit across all sessions (only affects sessions with matches)
+  let displayResultsWithMatches = resultsWithMatches;
   let totalTruncated = 0;
   if (options.maxResults != null) {
     let remaining = options.maxResults;
-    displayResults = [];
-    for (const r of results) {
+    displayResultsWithMatches = [];
+    for (const r of resultsWithMatches) {
       if (remaining <= 0) {
         totalTruncated += countMatches(r);
         continue;
@@ -497,29 +531,43 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
       const { result: truncR, truncated } = truncateResult(r, remaining);
       remaining -= countMatches(truncR);
       totalTruncated += truncated;
-      displayResults.push({ ...r, ...truncR });
+      displayResultsWithMatches.push({ ...r, ...truncR });
     }
   }
 
   if (options.outputMode === 'json') {
-    const jsonOutput: Record<string, unknown> = {
-      results: displayResults.map((r) => ({
-        session: r.session,
-        instructions: r.instructions,
-        tools: r.tools,
-        resources: r.resources,
-        prompts: r.prompts,
+    // Build unified sessions array: live results (all, even zero matches), errors, and skipped
+    const truncatedResultsByName = new Map(displayResultsWithMatches.map((r) => [r.name, r]));
+    const sessionEntries = [
+      ...results.map((r) => {
+        // Use truncated version if available, otherwise use the original
+        const display = truncatedResultsByName.get(r.name) ?? r;
+        return {
+          name: r.name,
+          status: 'live' as const,
+          instructions: display.instructions,
+          tools: display.tools,
+          resources: display.resources,
+          prompts: display.prompts,
+        };
+      }),
+      ...errors.map((e) => ({
+        name: e.name,
+        status: 'error' as const,
+        error: e.error,
       })),
+      ...skippedSessions.map((s) => ({
+        name: s.name,
+        status: s.status,
+      })),
+    ];
+
+    const jsonOutput: Record<string, unknown> = {
+      sessions: sessionEntries,
       totalMatches,
     };
     if (totalTruncated > 0) {
       jsonOutput.truncated = totalTruncated;
-    }
-    if (errors.length > 0) {
-      jsonOutput.errors = errors;
-    }
-    if (skippedSessions.length > 0) {
-      jsonOutput.skipped = skippedSessions;
     }
     console.log(formatJson(jsonOutput));
   } else {
@@ -530,27 +578,27 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
       lines.push(formatSkippedSession(skipped));
     }
 
-    for (const r of displayResults) {
-      lines.push(chalk.cyan(r.session));
+    for (const r of displayResultsWithMatches) {
+      lines.push(chalk.cyan(r.name));
       lines.push(...formatGrepResultHuman(r, '  '));
       lines.push('');
     }
 
     // Show warnings for failed sessions
     for (const err of errors) {
-      lines.push(chalk.yellow(`Warning: ${err.session} \u2014 ${err.error}`));
+      lines.push(chalk.yellow(`Warning: ${err.name} \u2014 ${err.error}`));
     }
 
-    if (totalMatches === 0 && skippedSessions.length === 0) {
+    if (totalMatchCount === 0 && skippedSessions.length === 0) {
       console.log('No matches found.');
     } else {
-      if (totalMatches > 0) {
-        const sessionCount = results.length;
-        const showing = totalMatches - totalTruncated;
+      if (totalMatchCount > 0) {
+        const sessionCount = resultsWithMatches.length;
+        const showing = totalMatchCount - totalTruncated;
         const suffix = totalTruncated > 0 ? ` (showing ${showing})` : '';
         lines.push(
           chalk.dim(
-            `${totalMatches} ${totalMatches === 1 ? 'match' : 'matches'} across ${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'}${suffix}.`
+            `${totalMatchCount} ${totalMatchCount === 1 ? 'match' : 'matches'} across ${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'}${suffix}.`
           )
         );
       } else if (lines.length > 0) {
@@ -561,5 +609,5 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     }
   }
 
-  return totalMatches > 0 ? 0 : 1;
+  return totalMatchCount > 0 ? 0 : 1;
 }
