@@ -3,7 +3,7 @@
 # Tests mcpc grep <pattern> without a session target, searching all active sessions
 
 source "$(dirname "$0")/../../lib/framework.sh"
-test_init "basic/grep-global"
+test_init "basic/grep-global" --isolated
 
 # Start test server
 start_test_server
