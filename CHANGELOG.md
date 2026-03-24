@@ -9,20 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New `mcpc grep <pattern>` command to search tools, resources, and prompts across all active sessions, with support for regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`), and single-session search (`mcpc @session grep`)
-- `grep` now also searches server instructions by default (with `--instructions` flag for explicit control)
+- New `mcpc grep <pattern>` command to search tools, resources, prompts, and server instructions across all active sessions, with support for regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`, `--instructions`), single-session search (`mcpc @session grep`), and capability-aware querying (skips unsupported list operations)
 - Recovery hints for crashed and expired sessions in `mcpc` session list output
 
 ### Fixed
 
-- `grep` no longer calls `list_tools`, `list_resources`, or `list_prompts` on servers that don't advertise those capabilities, avoiding "Method not found" errors
 - Fixed `mcpc help <command>` showing truncated usage line (e.g. `Usage: resources-read <uri>`) — now correctly shows `Usage: mcpc <@session> resources-read <uri>`
 - Fixed auth loss when reconnecting an unauthorized session via `mcpc connect` — the `unauthorized` status was not cleared, causing all subsequent operations to fail with "Authentication required by server" even after successful reconnection
 - HTTP proxy support (`HTTP_PROXY`/`HTTPS_PROXY` env vars) now works for MCP server connections, OAuth token refresh, and x402 payment signing — previously the MCP SDK transport and OAuth calls bypassed the global proxy dispatcher
 
 ### Changed
 
-- **Breaking (JSON):** `grep` command's `--json` output now nests the `truncated` field inside `totalMatches` instead of being a separate top-level field
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
 
   | Before                                        | After                                                      |
