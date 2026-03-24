@@ -1,5 +1,5 @@
 /**
- * Grep command handler - search tools, resources, and prompts
+ * Grep command handler - search tools, resources, prompts, and instructions
  */
 
 import chalk from 'chalk';
@@ -23,6 +23,7 @@ export interface GrepOptions extends CommandOptions {
   tools?: boolean | undefined;
   resources?: boolean | undefined;
   prompts?: boolean | undefined;
+  instructions?: boolean | undefined;
   regex?: boolean | undefined;
   caseSensitive?: boolean | undefined;
   maxResults?: number | undefined;
@@ -32,6 +33,7 @@ interface GrepResult {
   tools: Tool[];
   resources: Resource[];
   prompts: Prompt[];
+  instructions: boolean;
 }
 
 interface SessionGrepResult {
@@ -39,6 +41,7 @@ interface SessionGrepResult {
   tools: Tool[];
   resources: Resource[];
   prompts: Prompt[];
+  instructions: boolean;
 }
 
 interface SessionGrepError {
@@ -77,19 +80,21 @@ function buildMatcher(pattern: string, options: GrepOptions): (text: string) => 
 
 /**
  * Determine which types to search based on flags.
- * If no type flags are given, defaults to tools only.
+ * If no type flags are given, defaults to tools and instructions.
  * If any type flag is given, search exactly the specified types.
  */
 function getSearchTypes(options: GrepOptions): {
   searchTools: boolean;
   searchResources: boolean;
   searchPrompts: boolean;
+  searchInstructions: boolean;
 } {
-  const anyFilter = options.tools || options.resources || options.prompts;
+  const anyFilter = options.tools || options.resources || options.prompts || options.instructions;
   return {
     searchTools: anyFilter ? !!options.tools : true,
     searchResources: !!options.resources,
     searchPrompts: !!options.prompts,
+    searchInstructions: anyFilter ? !!options.instructions : true,
   };
 }
 
@@ -118,7 +123,16 @@ function buildPromptSearchText(prompt: Prompt, sessionName: string): string {
 }
 
 /**
- * Search a single MCP client for matching items
+ * Build the searchable text for server instructions, including session context.
+ * Format: "@session <instructions text>"
+ */
+function buildInstructionsSearchText(instructions: string, sessionName: string): string {
+  return `${sessionName} ${instructions}`;
+}
+
+/**
+ * Search a single MCP client for matching items.
+ * Respects server capabilities — only fetches types the server supports.
  */
 async function searchClient(
   client: IMcpClient,
@@ -126,13 +140,23 @@ async function searchClient(
   options: GrepOptions,
   sessionName: string = ''
 ): Promise<GrepResult> {
-  const { searchTools, searchResources, searchPrompts } = getSearchTypes(options);
+  const { searchTools, searchResources, searchPrompts, searchInstructions } =
+    getSearchTypes(options);
 
-  // Fetch all lists in parallel (only the types we need)
+  // Always fetch server details (needed for capabilities check and instructions search)
+  const serverDetails = await client.getServerDetails();
+  const capabilities = serverDetails.capabilities;
+
+  // Only fetch types that are both requested AND supported by the server
+  const canListTools = searchTools && !!capabilities?.tools;
+  const canListResources = searchResources && !!capabilities?.resources;
+  const canListPrompts = searchPrompts && !!capabilities?.prompts;
+
+  // Fetch all lists in parallel (only the types we need and the server supports)
   const [toolsResult, resourcesResult, promptsResult] = await Promise.all([
-    searchTools ? client.listAllTools() : null,
-    searchResources ? fetchAllResources(client) : null,
-    searchPrompts ? fetchAllPrompts(client) : null,
+    canListTools ? client.listAllTools() : null,
+    canListResources ? fetchAllResources(client) : null,
+    canListPrompts ? fetchAllPrompts(client) : null,
   ]);
 
   // Filter tools
@@ -150,10 +174,16 @@ async function searchClient(
     matcher(buildPromptSearchText(p, sessionName))
   );
 
+  // Match instructions
+  const instructionsText = searchInstructions ? serverDetails.instructions : undefined;
+  const matchedInstructions =
+    !!instructionsText && matcher(buildInstructionsSearchText(instructionsText, sessionName));
+
   return {
     tools: matchedTools,
     resources: matchedResources,
     prompts: matchedPrompts,
+    instructions: matchedInstructions,
   };
 }
 
@@ -188,12 +218,17 @@ async function fetchAllPrompts(client: IMcpClient): Promise<Prompt[]> {
 // ─── Output formatting ──────────────────────────────────────────────
 
 function countMatches(result: GrepResult): number {
-  return result.tools.length + result.resources.length + result.prompts.length;
+  return (
+    result.tools.length +
+    result.resources.length +
+    result.prompts.length +
+    (result.instructions ? 1 : 0)
+  );
 }
 
 /**
  * Truncate a GrepResult to at most `limit` total items (tools first, then resources, then prompts).
- * Returns the truncated result and how many items were dropped.
+ * Instructions count as 1 item if matched. Returns the truncated result and how many items were dropped.
  */
 function truncateResult(
   result: GrepResult,
@@ -203,6 +238,11 @@ function truncateResult(
   if (total <= limit) return { result, truncated: 0 };
 
   let remaining = limit;
+
+  // Instructions always come first (it's just 1 item)
+  const instructions = result.instructions && remaining > 0 ? true : false;
+  if (instructions) remaining--;
+
   const tools = result.tools.slice(0, remaining);
   remaining -= tools.length;
   const resources = result.resources.slice(0, remaining);
@@ -210,7 +250,7 @@ function truncateResult(
   const prompts = result.prompts.slice(0, remaining);
 
   return {
-    result: { tools, resources, prompts },
+    result: { tools, resources, prompts, instructions },
     truncated: total - limit,
   };
 }
@@ -271,6 +311,9 @@ function formatResultSection(
  */
 function formatGrepResultHuman(result: GrepResult, indent: string = ''): string[] {
   const lines: string[] = [];
+  if (result.instructions) {
+    lines.push(`${indent}${chalk.bold('Instructions')}`);
+  }
   lines.push(
     ...formatResultSection('Tools', result.tools, formatToolLine as (item: never) => string, indent)
   );
@@ -319,6 +362,7 @@ export async function grepSession(
 
     if (options.outputMode === 'json') {
       const jsonOutput: Record<string, unknown> = {
+        instructions: result.instructions,
         tools: result.tools,
         resources: result.resources,
         prompts: result.prompts,
@@ -461,6 +505,7 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     const jsonOutput: Record<string, unknown> = {
       results: displayResults.map((r) => ({
         session: r.session,
+        instructions: r.instructions,
         tools: r.tools,
         resources: r.resources,
         prompts: r.prompts,
