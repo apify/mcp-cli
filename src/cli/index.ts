@@ -575,12 +575,19 @@ Without arguments, performs safe cleanup of stale data only.
     .addHelpText(
       'after',
       `
+${chalk.bold('Pattern types:')}
+  Substring (default): mcpc grep "file"      Case-insensitive substring match
+  Glob wildcards:      mcpc grep "*file*"    * matches any characters, ? matches one character
+  Regex:               mcpc grep "f.le" -E   Full regular expression syntax
+
 ${chalk.bold('Type filters:')}
   By default, tools and instructions are searched. Use --resources or --prompts
   to search those instead. Combine flags to search multiple types (e.g. --tools --resources).
 
 ${chalk.bold('Examples:')}
   mcpc grep "search"                        Search tools and instructions in all sessions
+  mcpc grep "*file*"                        Glob: match any tool containing "file"
+  mcpc grep "*@apify/*"                     Glob: match any tool from the apify session
   mcpc grep "search" --resources            Search resources only
   mcpc grep "search" --tools --prompts      Search tools and prompts
   mcpc grep "search|find" -E                Regex search across tools and instructions

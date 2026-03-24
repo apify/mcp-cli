@@ -55,6 +55,25 @@ interface SessionGrepSkipped {
 }
 
 /**
+ * Convert a glob pattern to a RegExp.
+ * Escapes all regex metacharacters except * and ?, then converts:
+ *   *  →  .*   (zero or more of any character)
+ *   ?  →  .    (exactly one character)
+ */
+function globToRegExp(pattern: string, caseSensitive: boolean): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const regexStr = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(regexStr, caseSensitive ? '' : 'i');
+}
+
+/**
+ * Return true if the pattern contains unescaped glob wildcards (* or ?).
+ */
+function isGlobPattern(pattern: string): boolean {
+  return /[*?]/.test(pattern);
+}
+
+/**
  * Build a match function from the pattern and options
  */
 function buildMatcher(pattern: string, options: GrepOptions): (text: string) => boolean {
@@ -67,6 +86,11 @@ function buildMatcher(pattern: string, options: GrepOptions): (text: string) => 
         `Invalid regex pattern: ${pattern}\n${err instanceof Error ? err.message : String(err)}`
       );
     }
+    return (text: string) => re.test(text);
+  }
+
+  if (isGlobPattern(pattern)) {
+    const re = globToRegExp(pattern, !!options.caseSensitive);
     return (text: string) => re.test(text);
   }
 

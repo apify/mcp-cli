@@ -216,6 +216,45 @@ assert_contains "$STDOUT" "add"
 test_pass
 
 # =============================================================================
+# Test: Glob pattern search
+# =============================================================================
+
+test_case "grep glob *echo* matches tool by wildcard"
+run_mcpc "$SESSION" grep "*echo*"
+assert_success
+assert_contains "$STDOUT" "echo"
+test_pass
+
+test_case "grep glob *ech? matches tool with single-char wildcard"
+run_mcpc "$SESSION" grep "*ech?"
+assert_success
+assert_contains "$STDOUT" "echo"
+test_pass
+
+test_case "grep glob with no matches returns exit code 1"
+run_mcpc "$SESSION" grep "*zzz_nonexistent_zzz*"
+assert_exit_code 1
+test_pass
+
+test_case "grep glob is case-insensitive by default"
+run_mcpc "$SESSION" grep "*ECHO*"
+assert_success
+assert_contains "$STDOUT" "echo"
+test_pass
+
+test_case "grep glob --case-sensitive respects case"
+run_mcpc "$SESSION" grep "*ECHO*" --case-sensitive
+assert_exit_code 1
+test_pass
+
+test_case "grep glob --json returns valid JSON"
+run_mcpc --json "$SESSION" grep "*echo*"
+assert_success
+assert_json_valid "$STDOUT"
+assert_json "$STDOUT" '.sessions[0].tools | length > 0'
+test_pass
+
+# =============================================================================
 # Test: Case sensitivity
 # =============================================================================
 

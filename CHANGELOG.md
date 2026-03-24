@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New `mcpc grep <pattern>` command to search tools, resources, prompts, and server instructions across all active sessions, with support for regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`, `--instructions`), single-session search (`mcpc @session grep`), and capability-aware querying (skips unsupported list operations)
+- New `mcpc grep <pattern>` command to search tools, resources, prompts, and server instructions across all active sessions, with support for glob wildcards (`*file*`, `?ile`), regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`, `--instructions`), single-session search (`mcpc @session grep`), and capability-aware querying (skips unsupported list operations)
 - Recovery hints for crashed and expired sessions in `mcpc` session list output
 
 ### Fixed
