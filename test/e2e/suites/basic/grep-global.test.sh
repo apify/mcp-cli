@@ -154,6 +154,99 @@ assert_eq "$DISPLAYED" "1"
 test_pass
 
 # =============================================================================
+# Test: Global grep with instructions
+# =============================================================================
+
+test_case "global grep default matches instructions"
+run_mcpc grep "sample tools, resources, and prompts"
+assert_success
+assert_contains "$STDOUT" "Instructions"
+test_pass
+
+test_case "global grep --json includes instructions in results"
+run_mcpc --json grep "sample tools, resources, and prompts"
+assert_success
+assert_json "$STDOUT" '.results[0].instructions == true'
+test_pass
+
+# =============================================================================
+# Test: Server with limited capabilities (no tools/prompts)
+# =============================================================================
+
+# Start a second server with no tools and no prompts
+MINIMAL_SERVER_PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("",0)); print(s.getsockname()[1]); s.close()')
+cd "$PROJECT_ROOT"
+env PORT=$MINIMAL_SERVER_PORT NO_TOOLS=true NO_PROMPTS=true npx tsx test/e2e/server/index.ts >"$_TEST_RUN_DIR/minimal-server.log" 2>&1 &
+_MINIMAL_SERVER_PID=$!
+# Wait for it to be ready
+waited=0
+while ! curl -s "http://localhost:$MINIMAL_SERVER_PORT/health" >/dev/null 2>&1; do
+  sleep 0.2
+  ((waited++)) || true
+  if [[ $waited -ge 50 ]]; then
+    echo "Error: Minimal test server failed to start" >&2
+    cat "$_TEST_RUN_DIR/minimal-server.log" >&2
+    kill $_MINIMAL_SERVER_PID 2>/dev/null || true
+    exit 1
+  fi
+done
+MINIMAL_SERVER_URL="http://localhost:$MINIMAL_SERVER_PORT"
+_create_test_auth_profile "localhost:$MINIMAL_SERVER_PORT"
+echo "# Minimal server started at $MINIMAL_SERVER_URL (PID: $_MINIMAL_SERVER_PID)"
+
+SESSION_MINIMAL=$(session_name "grep-min")
+
+test_case "setup: create session to minimal server (no tools, no prompts)"
+run_mcpc connect "$MINIMAL_SERVER_URL" "$SESSION_MINIMAL" --header "X-Test: true"
+assert_success
+_SESSIONS_CREATED+=("$SESSION_MINIMAL")
+test_pass
+
+test_case "grep tool name does not error on minimal server (gracefully skips)"
+run_mcpc "$SESSION_MINIMAL" grep "echo"
+# No tools capability, so no tools match — but should not error
+assert_exit_code 1
+test_pass
+
+test_case "grep --resources on minimal server returns resources"
+run_mcpc "$SESSION_MINIMAL" grep "static" --resources
+assert_success
+assert_contains "$STDOUT" "test://static/hello"
+test_pass
+
+test_case "grep --prompts on minimal server returns no matches (no prompts capability)"
+run_mcpc "$SESSION_MINIMAL" grep "greeting" --prompts
+assert_exit_code 1
+test_pass
+
+test_case "grep instructions on minimal server still works"
+run_mcpc "$SESSION_MINIMAL" grep "sample tools" --instructions
+assert_success
+assert_contains "$STDOUT" "Instructions"
+test_pass
+
+test_case "global grep with mixed-capability sessions shows results from both"
+# SESSION1 has full capabilities, SESSION_MINIMAL has only resources + instructions
+run_mcpc grep "e" --tools --resources --instructions
+assert_success
+# SESSION1 should have tools
+assert_contains "$STDOUT" "$SESSION1"
+# SESSION_MINIMAL should appear (has resources + instructions matching)
+assert_contains "$STDOUT" "$SESSION_MINIMAL"
+test_pass
+
+test_case "cleanup: close minimal session"
+run_mcpc "$SESSION_MINIMAL" close
+assert_success
+_SESSIONS_CREATED=("${_SESSIONS_CREATED[@]/$SESSION_MINIMAL}")
+test_pass
+
+# Kill minimal server (tsx spawns node as child)
+pkill -P $_MINIMAL_SERVER_PID 2>/dev/null || true
+kill $_MINIMAL_SERVER_PID 2>/dev/null || true
+wait $_MINIMAL_SERVER_PID 2>/dev/null || true
+
+# =============================================================================
 # Test: Global grep with no sessions
 # =============================================================================
 

@@ -52,6 +52,79 @@ assert_exit_code 1
 test_pass
 
 # =============================================================================
+# Test: Default grep searches instructions too
+# =============================================================================
+
+test_case "grep default matches instructions"
+run_mcpc "$SESSION" grep "sample tools, resources, and prompts"
+assert_success
+assert_contains "$STDOUT" "Instructions"
+test_pass
+
+test_case "grep default matches session name in instructions search text"
+# The instructions search text is "@session <instructions>", so searching for session name matches
+run_mcpc "$SESSION" grep "$SESSION"
+assert_success
+assert_contains "$STDOUT" "Instructions"
+test_pass
+
+# =============================================================================
+# Test: --instructions flag (explicit)
+# =============================================================================
+
+test_case "grep --instructions searches instructions"
+run_mcpc "$SESSION" grep "sample tools, resources, and prompts" --instructions
+assert_success
+assert_contains "$STDOUT" "Instructions"
+test_pass
+
+test_case "grep --instructions does not search tools"
+run_mcpc "$SESSION" grep "echo" --instructions
+# 'echo' only matches a tool, not instructions
+assert_exit_code 1
+test_pass
+
+test_case "grep --instructions does not search resources"
+run_mcpc "$SESSION" grep "static" --instructions
+assert_exit_code 1
+test_pass
+
+test_case "grep --instructions does not search prompts"
+run_mcpc "$SESSION" grep "greeting" --instructions
+assert_exit_code 1
+test_pass
+
+# =============================================================================
+# Test: --instructions combined with other flags
+# =============================================================================
+
+test_case "grep --tools --instructions searches both"
+run_mcpc "$SESSION" grep "e" --tools --instructions
+assert_success
+assert_contains "$STDOUT" "Tools"
+assert_contains "$STDOUT" "Instructions"
+test_pass
+
+test_case "grep --json --instructions returns instructions field"
+run_mcpc --json "$SESSION" grep "sample tools" --instructions
+assert_success
+assert_json_valid "$STDOUT"
+assert_json "$STDOUT" '.instructions == true'
+test_pass
+
+test_case "grep --json default includes instructions field"
+run_mcpc --json "$SESSION" grep "sample tools"
+assert_success
+assert_json "$STDOUT" '.instructions == true'
+test_pass
+
+test_case "grep --json instructions false when no match"
+run_mcpc --json "$SESSION" grep "echo"
+assert_success
+assert_json "$STDOUT" '.instructions == false'
+test_pass
+
+# =============================================================================
 # Test: --resources flag (searches resources only, not tools)
 # =============================================================================
 
@@ -119,8 +192,14 @@ run_mcpc "$SESSION" grep "echo" --resources --prompts
 assert_exit_code 1
 test_pass
 
-test_case "grep --tools --resources --prompts searches everything"
-run_mcpc "$SESSION" grep "e" --tools --resources --prompts
+test_case "grep --tools --resources --prompts does not search instructions"
+run_mcpc "$SESSION" grep "sample tools, resources, and prompts" --tools --resources --prompts
+# This matches instructions text but --instructions was not specified
+assert_exit_code 1
+test_pass
+
+test_case "grep --tools --resources --prompts --instructions searches everything"
+run_mcpc "$SESSION" grep "e" --tools --resources --prompts --instructions
 assert_success
 assert_not_empty "$STDOUT"
 test_pass
