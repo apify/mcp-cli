@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking (JSON):** `grep` command's `--json` output now nests the `truncated` field inside `totalMatches` instead of being a separate top-level field
 - **Breaking:** CLI syntax redesigned to command-first style. All commands now start with a verb; MCP operations require a named session.
 
   | Before                                        | After                                                      |
