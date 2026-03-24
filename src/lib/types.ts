@@ -105,11 +105,19 @@ export interface ProxyConfig {
 /**
  * Session status
  * - active: Session is healthy and can be used
+ * - connecting: Bridge is starting up for the first time (initial connect in progress)
+ * - reconnecting: Bridge crashed and is being automatically restarted
  * - unauthorized: Server rejected authentication (401/403) or token refresh failed. Recovery: login then restart.
  * - expired: Server indicated session is no longer valid (e.g., 404 response). Recovery: restart.
  * - crashed: Bridge process crashed, session might or might not be usable. Bridge will be restarted on next command.
  */
-export type SessionStatus = 'active' | 'unauthorized' | 'expired' | 'crashed';
+export type SessionStatus =
+  | 'active'
+  | 'connecting'
+  | 'reconnecting'
+  | 'unauthorized'
+  | 'expired'
+  | 'crashed';
 
 /**
  * Notification timestamps for list change events
@@ -150,7 +158,7 @@ export interface SessionData {
   // Timestamps (ISO 8601 strings)
   createdAt: string; // When the session was created
   lastSeenAt?: string; // Last successful server response (ping, command, etc.)
-  lastRestartAttemptAt?: string; // Last auto-restart attempt (ISO 8601, for cooldown)
+  lastConnectionAttemptAt?: string; // Last connection/reconnection attempt (ISO 8601, for cooldown)
 }
 
 /**

@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New `mcpc grep <pattern>` command to search tools, resources, and prompts across all active sessions, with support for regex (`-E`), type filters (`--tools`, `--resources`, `--prompts`), and single-session search (`mcpc @session grep`)
 - Recovery hints for crashed and expired sessions in `mcpc` session list output
-- Auto-restart crashed bridge processes in the background when enumerating sessions (`mcpc` or `mcpc grep`), with a 10-second cooldown between restart attempts
+- Auto-reconnect crashed bridge processes in the background when enumerating sessions (`mcpc` or `mcpc grep`), with a 10-second cooldown between reconnection attempts
+- New `connecting` and `reconnecting` session states shown during initial connection and auto-reconnection of crashed bridges
 
 ### Fixed
 

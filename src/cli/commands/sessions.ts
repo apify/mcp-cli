@@ -34,7 +34,7 @@ import {
   startBridge,
   StartBridgeOptions,
   stopBridge,
-  autoRestartCrashedSessions,
+  reconnectCrashedSessions,
 } from '../../lib/bridge-manager.js';
 import {
   storeKeychainSessionHeaders,
@@ -249,6 +249,8 @@ export async function connectSession(
     await saveSession(name, {
       server: sessionTransportConfig,
       createdAt: new Date().toISOString(),
+      status: 'connecting',
+      lastConnectionAttemptAt: new Date().toISOString(),
       ...sessionUpdate,
     });
     logger.debug(`Initial session record created for: ${name}`);
@@ -279,8 +281,8 @@ export async function connectSession(
 
     const { pid } = await startBridge(bridgeOptions);
 
-    // Update session with bridge info (socket path is computed from session name)
-    await updateSession(name, { pid });
+    // Update session with bridge info and mark as active (clears 'connecting' status)
+    await updateSession(name, { pid, status: 'active' });
     logger.debug(`Session ${name} updated with bridge PID: ${pid}`);
   } catch (error) {
     // Clean up on bridge start failure
@@ -323,7 +325,14 @@ export async function connectSession(
 
 // DISCONNECTED_THRESHOLD_MS imported from ../../lib/types.js
 
-type DisplayStatus = 'live' | 'disconnected' | 'crashed' | 'unauthorized' | 'expired';
+type DisplayStatus =
+  | 'live'
+  | 'connecting'
+  | 'reconnecting'
+  | 'disconnected'
+  | 'crashed'
+  | 'unauthorized'
+  | 'expired';
 
 /**
  * Determine bridge status for a session
@@ -338,6 +347,10 @@ function getBridgeStatus(session: {
   }
   if (session.status === 'expired') {
     return 'expired';
+  }
+  // Transient states: connecting (initial) or reconnecting (after crash)
+  if (session.status === 'connecting' || session.status === 'reconnecting') {
+    return session.status;
   }
   if (!session.pid || !isProcessAlive(session.pid)) {
     return 'crashed';
@@ -359,6 +372,10 @@ function formatBridgeStatus(status: DisplayStatus): { dot: string; text: string 
   switch (status) {
     case 'live':
       return { dot: chalk.green('●'), text: chalk.green('live') };
+    case 'connecting':
+      return { dot: chalk.yellow('●'), text: chalk.yellow('connecting') };
+    case 'reconnecting':
+      return { dot: chalk.yellow('●'), text: chalk.yellow('reconnecting') };
     case 'disconnected':
       return { dot: chalk.yellow('●'), text: chalk.yellow('disconnected') };
     case 'crashed':
@@ -405,7 +422,7 @@ export async function listSessionsAndAuthProfiles(options: {
   const sessions = Object.values(consolidateResult.sessions);
 
   // Auto-restart crashed bridges in the background (fire-and-forget)
-  autoRestartCrashedSessions(consolidateResult.sessionsToRestart);
+  reconnectCrashedSessions(consolidateResult.sessionsToRestart);
 
   // Load auth profiles from disk
   const profiles = await listAuthProfiles();

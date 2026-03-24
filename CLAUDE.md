@@ -178,8 +178,10 @@ mcpc/
 
 **Session States:**
 - 🟢 **live** - Bridge process running and server responding (lastSeenAt within 2 minutes)
+- 🟡 **connecting** - Initial bridge connection in progress (first `connect`)
+- 🟡 **reconnecting** - Bridge crashed and is being automatically reconnected
 - 🟡 **disconnected** - Bridge process running but server unreachable (lastSeenAt stale >2min); auto-recovers when server responds
-- 🟡 **crashed** - Bridge process crashed or killed; auto-restarts on next use
+- 🟡 **crashed** - Bridge process crashed or killed; auto-reconnects in the background
 - 🔴 **unauthorized** - Server rejected authentication (401/403) or token refresh failed; requires `login` then `restart`
 - 🔴 **expired** - Server rejected session ID (404); requires `restart`
 

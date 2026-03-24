@@ -7,7 +7,7 @@ import type { Tool, Resource, Prompt, CommandOptions } from '../../lib/types.js'
 import { ClientError } from '../../lib/errors.js';
 import { isProcessAlive } from '../../lib/utils.js';
 import { consolidateSessions } from '../../lib/sessions.js';
-import { autoRestartCrashedSessions } from '../../lib/bridge-manager.js';
+import { reconnectCrashedSessions } from '../../lib/bridge-manager.js';
 import { withSessionClient } from '../../lib/session-client.js';
 import { withMcpClient } from '../helpers.js';
 import {
@@ -293,7 +293,7 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
   const sessionEntries = Object.values(sessions).filter((s) => s.pid && isProcessAlive(s.pid));
 
   // Auto-restart crashed bridges in the background (fire-and-forget)
-  autoRestartCrashedSessions(consolidateResult.sessionsToRestart);
+  reconnectCrashedSessions(consolidateResult.sessionsToRestart);
 
   if (sessionEntries.length === 0) {
     if (options.outputMode === 'json') {

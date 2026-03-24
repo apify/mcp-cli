@@ -33,6 +33,7 @@ import type {
 import type { ListResourceTemplatesResult } from '@modelcontextprotocol/sdk/types.js';
 import { BridgeClient } from './bridge-client.js';
 import { ensureBridgeReady, restartBridge } from './bridge-manager.js';
+import { updateSession } from './sessions.js';
 import { NetworkError } from './errors.js';
 import { getSocketPath, getLogsDir, generateRequestId } from './utils.js';
 import { createLogger } from './logger.js';
@@ -102,6 +103,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
       await this.bridgeClient.close();
 
       // Restart bridge
+      await updateSession(this.sessionName, { status: 'reconnecting' });
       await restartBridge(this.sessionName);
 
       // Reconnect using computed socket path
@@ -109,6 +111,7 @@ export class SessionClient extends EventEmitter implements IMcpClient {
       this.bridgeClient = new BridgeClient(socketPath);
       this.setupNotificationForwarding();
       await this.bridgeClient.connect();
+      await updateSession(this.sessionName, { status: 'active' });
 
       logger.debug(`Reconnected to bridge for ${this.sessionName}, retrying ${operationName}`);
 

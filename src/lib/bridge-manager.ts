@@ -568,11 +568,13 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   }
 
   // Bridge not healthy - restart it
+  await updateSession(sessionName, { status: 'reconnecting' });
   await restartBridge(sessionName);
 
   // Try getServerDetails on restarted bridge (blocks until MCP connected)
   const result = await checkBridgeHealth(socketPath);
   if (result.healthy) {
+    await updateSession(sessionName, { status: 'active' });
     logger.debug(`Bridge for ${sessionName} passed health check`);
     return socketPath;
   }
@@ -590,17 +592,32 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
 }
 
 /**
- * Auto-restart crashed bridge sessions in the background.
- * Fire-and-forget: does not wait for restarts to complete.
- * Called after consolidateSessions() identifies crashed sessions eligible for restart.
+ * Reconnect crashed bridge sessions in the background.
+ * Fire-and-forget: does not wait for reconnections to complete.
+ * Called after consolidateSessions() identifies crashed sessions eligible for reconnection.
  *
- * @param sessionNames - Names of sessions to restart (from consolidateSessions result)
+ * Unlike explicit "restart" (which creates a fresh MCP session), this preserves
+ * the existing MCP session ID for resumption when possible.
+ *
+ * @param sessionNames - Names of sessions to reconnect (from consolidateSessions result)
  */
-export function autoRestartCrashedSessions(sessionNames: string[]): void {
+export function reconnectCrashedSessions(sessionNames: string[]): void {
   for (const name of sessionNames) {
-    logger.debug(`Auto-restarting crashed bridge for session: ${name}`);
-    restartBridge(name).catch((err) => {
-      logger.debug(`Auto-restart failed for ${name}: ${(err as Error).message}`);
-    });
+    logger.debug(`Reconnecting crashed bridge for session: ${name}`);
+    restartBridge(name)
+      .then(async () => {
+        // Bridge reconnected — clear 'reconnecting' status
+        await updateSession(name, { status: 'active' });
+        logger.debug(`Reconnection succeeded for ${name}, status set to active`);
+      })
+      .catch(async (err) => {
+        logger.debug(`Reconnection failed for ${name}: ${(err as Error).message}`);
+        // Revert to 'crashed' so the next consolidation can retry
+        try {
+          await updateSession(name, { status: 'crashed' });
+        } catch {
+          // Ignore - session may have been deleted
+        }
+      });
   }
 }
