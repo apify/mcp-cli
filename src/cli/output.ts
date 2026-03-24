@@ -446,7 +446,7 @@ export function formatToolParamsInline(schema: Record<string, unknown>): string 
 
   const paramStrings: string[] = shown.map(({ name, required }) => {
     const typeStr = shortType(properties[name] ?? {});
-    return required ? `${name}: ${typeStr}` : `${name}?: ${typeStr}`;
+    return required ? `${name}:${typeStr}` : `${name}?:${typeStr}`;
   });
 
   if (hidden > 0) {
@@ -480,7 +480,7 @@ function formatToolsSummary(tools: Tool[]): string[] {
     if (taskSupport) parts.push(`task:${taskSupport}`);
     const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
     lines.push(
-      `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)}${params}${grayBacktick()}${suffix}`
+      `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)} ${params}${grayBacktick()}${suffix}`
     );
   }
 
