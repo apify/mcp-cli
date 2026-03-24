@@ -286,7 +286,7 @@ mcpc grep "greeting" --prompts
 mcpc grep "data" --tools --resources --prompts
 
 # Regex search
-mcpc grep -E "search|find"
+mcpc grep "search|find" -E
 
 # Case-sensitive search (default is case-insensitive)
 mcpc grep "Search" --case-sensitive
@@ -301,6 +301,14 @@ mcpc grep "actor" --json
 By default, `grep` searches only tools. Use `--resources` or `--prompts` to search those types
 (combine with `--tools` to include tools too). Sessions that are crashed or unavailable are shown
 with their status rather than silently skipped.
+
+The `grep` command is useful for **dynamic tool discovery**, 
+also called [Advanced tool use](https://www.anthropic.com/engineering/advanced-tool-use) by Anthropic
+or [Dynamic context discovery](https://cursor.com/blog/dynamic-context-discovery) by Cursor.
+Rather than loading all tools into context, the AI agent can use `grep` to discover the right tool
+for the job,and only load the matching tools into the context to reduce token usage and improve accuracy.
+
+<!-- TODO: explain this more, show diagram -->
 
 ### JSON mode
 
