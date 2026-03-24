@@ -6,30 +6,7 @@
 
 
 - the README should show explain each command, show the full options from "mcpc help command" - perhaps this could be on start of the readme,
-  with links to the more detailed sections below
-
-
-- mcp-cli inspiration
-Add glob-based tool search across all servers like `mcpc grep *mail*` or `mcpc grep *@session/mail*`.
-    Consider making `tools-list` more succinct for discovery.
-  Use https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool for inspiration/compatibility?
-- 
-
-      $ mcpc grep "*file*"
-      $ mcpc grep "@github/*"
-      $ mcpc grep -F "anything really"
-  
-RETURNS
-      @github
-        - create_or_update_file(name: string, )
-      @filesystem
-        - read_file
-      @filesystem
-        - write_file
-
-Then we can have
-$ mcpc @github tools-call get_file_contents arg:="yes" # NOW
-$ mcpc @github/get_file_contents arg:="yes"  # NEW
+  with links to the more detailed sections below. In general the README deserves one iteration.
 
 
 
@@ -49,13 +26,15 @@ $ mcpc @github/get_file_contents arg:="yes"  # NEW
 - Make "mcpc connect mcp.apify.com" work without @session, and generate session name on best effort basis (e.g. use the main hostname without TLD 
 + suffix)
 
-
-- Show tools also when running just "mcpc @apify"
-
 - mcpc @apify tools-get fetch-actor-details => should print also "object" properties in human mode
 
 - mcpc @apify tools-call xxx --help / "mcpc @apify/xxx --help" should print tools-get + command info
- 
+
+- mcp-cli inspiration
+
+$ mcpc @github tools-call get_file_contents arg:="yes" # NOW
+$ mcpc @github/get_file_contents arg:="yes"  # NEW
+
 
 
 ## Code mode
@@ -76,7 +55,8 @@ $ mcpc @github/get_file_contents arg:="yes"  # NEW
   automatically update the -o file on changes, without it just keep track of changed files in
   bridge process' cache, and report in resources-list/resources-read operatio
 
-- Add support for "mcpc close @session", "mcpc restart @session" and "mcpc shell @session" - add to docs
+- Add support for "mcpc close @session", "mcpc restart @session" and "mcpc shell @session" aliases - add info only to "mcpc help restart" or "mcpc 
+  help close", no need to mention this in main --help
   
 - Add ASCII diagrams to README to help explain major concepts: tool calling, auth, bridge process, etc.
   For inspiration, see https://github.com/philschmid/mcp-cli
@@ -91,11 +71,10 @@ $ mcpc @github/get_file_contents arg:="yes"  # NEW
 - security: For auth profiles, fetch the detailed user info via http, save to profiles.json and show in 'mcpc', ensure the info is up-to-date
 - nit: Implement typing tab-completions (e.g. "mcpc @ap...") - not sure if that's even possible
 - Consider adding `--dry-run` https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/
-- Show protocolVersion also for stdio - but for that we need to update the SDK to save it! See setProtocolVersion
+  For tool call it could return synthetic resutls conforming the schema.
+- Show protocolVersion also for stdio in "mcpc --json" - but for that we need to update the SDK to save it! See setProtocolVersion
 
-- nit: show also header / open auth statuses for HTTP servers?
-
-- consider adding --idle-timeout to "connect" and then automatically disconnet from remote server, to avoid handing infinitely
+- consider adding --idle-timeout to "connect" and then automatically disconnect from remote server, to avoid handing infinitely
 
 
 ## Later
