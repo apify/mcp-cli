@@ -588,3 +588,19 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
       `For details, check logs at ${logPath}`
   );
 }
+
+/**
+ * Auto-restart crashed bridge sessions in the background.
+ * Fire-and-forget: does not wait for restarts to complete.
+ * Called after consolidateSessions() identifies crashed sessions eligible for restart.
+ *
+ * @param sessionNames - Names of sessions to restart (from consolidateSessions result)
+ */
+export function autoRestartCrashedSessions(sessionNames: string[]): void {
+  for (const name of sessionNames) {
+    logger.debug(`Auto-restarting crashed bridge for session: ${name}`);
+    restartBridge(name).catch((err) => {
+      logger.debug(`Auto-restart failed for ${name}: ${(err as Error).message}`);
+    });
+  }
+}

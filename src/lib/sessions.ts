@@ -243,6 +243,8 @@ export interface ConsolidateSessionsResult {
   expiredSessions: number;
   /** Updated sessions map (for use by caller) */
   sessions: Record<string, SessionData>;
+  /** Session names eligible for automatic background restart */
+  sessionsToRestart: string[];
 }
 
 /**
@@ -258,6 +260,7 @@ export async function consolidateSessions(
     crashedBridges: 0,
     expiredSessions: 0,
     sessions: {},
+    sessionsToRestart: [],
   };
 
   const filePath = getSessionsFilePath();
@@ -339,6 +342,24 @@ export async function consolidateSessions(
           session.status = 'crashed';
           result.crashedBridges++;
           hasChanges = true;
+        }
+      }
+
+      // Identify crashed sessions eligible for automatic restart
+      // Cooldown: socket connect timeout (5s) + 5s buffer = 10s
+      const AUTO_RESTART_COOLDOWN_MS = 10_000;
+      const now = Date.now();
+      for (const [name, session] of Object.entries(storage.sessions)) {
+        if (session?.status === 'crashed' && !session.pid) {
+          const lastAttempt = session.lastRestartAttemptAt
+            ? new Date(session.lastRestartAttemptAt).getTime()
+            : 0;
+          if (now - lastAttempt > AUTO_RESTART_COOLDOWN_MS) {
+            session.lastRestartAttemptAt = new Date(now).toISOString();
+            hasChanges = true;
+            result.sessionsToRestart.push(name);
+            logger.debug(`Marking session ${name} for auto-restart`);
+          }
         }
       }
 

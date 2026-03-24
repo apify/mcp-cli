@@ -150,6 +150,7 @@ export interface SessionData {
   // Timestamps (ISO 8601 strings)
   createdAt: string; // When the session was created
   lastSeenAt?: string; // Last successful server response (ping, command, etc.)
+  lastRestartAttemptAt?: string; // Last auto-restart attempt (ISO 8601, for cooldown)
 }
 
 /**

@@ -30,7 +30,12 @@ import {
   consolidateSessions,
   getSession,
 } from '../../lib/sessions.js';
-import { startBridge, StartBridgeOptions, stopBridge } from '../../lib/bridge-manager.js';
+import {
+  startBridge,
+  StartBridgeOptions,
+  stopBridge,
+  autoRestartCrashedSessions,
+} from '../../lib/bridge-manager.js';
 import {
   storeKeychainSessionHeaders,
   storeKeychainProxyBearerToken,
@@ -398,6 +403,9 @@ export async function listSessionsAndAuthProfiles(options: {
   // Consolidate sessions first (cleans up crashed bridges, removes expired sessions)
   const consolidateResult = await consolidateSessions(false);
   const sessions = Object.values(consolidateResult.sessions);
+
+  // Auto-restart crashed bridges in the background (fire-and-forget)
+  autoRestartCrashedSessions(consolidateResult.sessionsToRestart);
 
   // Load auth profiles from disk
   const profiles = await listAuthProfiles();
