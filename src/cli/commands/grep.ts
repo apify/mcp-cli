@@ -386,6 +386,7 @@ export async function grepSession(
         : { result: fullResult, truncated: 0 };
 
     if (options.outputMode === 'json') {
+      const matchCounts = countMatchesByType(fullResult);
       const jsonOutput: Record<string, unknown> = {
         sessions: [
           {
@@ -397,11 +398,11 @@ export async function grepSession(
             prompts: result.prompts,
           },
         ],
-        totalMatches: countMatchesByType(fullResult),
+        totalMatches: {
+          ...matchCounts,
+          ...(truncated > 0 ? { truncated } : {}),
+        },
       };
-      if (truncated > 0) {
-        jsonOutput.truncated = truncated;
-      }
       console.log(formatJson(jsonOutput));
     } else {
       if (total === 0) {
@@ -575,11 +576,11 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
 
     const jsonOutput: Record<string, unknown> = {
       sessions: sessionEntries,
-      totalMatches,
+      totalMatches: {
+        ...totalMatches,
+        ...(totalTruncated > 0 ? { truncated: totalTruncated } : {}),
+      },
     };
-    if (totalTruncated > 0) {
-      jsonOutput.truncated = totalTruncated;
-    }
     console.log(formatJson(jsonOutput));
   } else {
     const lines: string[] = [];
