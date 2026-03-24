@@ -343,8 +343,9 @@ function createTopLevelProgram(): Command {
     'after',
     `
 ${chalk.bold('MCP session commands (after connecting):')}
-  <@session>                   Show MCP server info and capabilities
-  <@session> ${chalk.cyan('tools-list')}        List MCP server tools
+  <@session>                   Show MCP server info, capabilities, and tools
+  <@session> ${chalk.cyan('grep')} <pattern>    Search tools, resources, or prompts
+  <@session> ${chalk.cyan('tools-list')}        List all server tools
   <@session> ${chalk.cyan('tools-get')} <name>  Get tool details and schema
   <@session> ${chalk.cyan('tools-call')} <name> [arg:=val ... | <json> | <stdin]
   <@session> ${chalk.cyan('prompts-list')}
@@ -359,7 +360,6 @@ ${chalk.bold('MCP session commands (after connecting):')}
   <@session> ${chalk.cyan('tasks-cancel')} <taskId>
   <@session> ${chalk.cyan('logging-set-level')} <level>
   <@session> ${chalk.cyan('ping')}
-  <@session> ${chalk.cyan('grep')} <pattern>         Search tools, resources, and prompts
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
 
@@ -583,7 +583,7 @@ ${chalk.bold('Examples:')}
   mcpc grep "search"                        Search tools and instructions in all sessions
   mcpc grep "search" --resources            Search resources only
   mcpc grep "search" --tools --prompts      Search tools and prompts
-  mcpc grep -E "search|find"               Regex search across tools and instructions
+  mcpc grep "search|find" -E                Regex search across tools and instructions
   mcpc @apify grep "actor"                  Search within a single session
   mcpc grep "file" --json                   JSON output for scripting
   mcpc grep "actor" -m 5                    Show at most 5 results

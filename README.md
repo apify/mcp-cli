@@ -128,15 +128,16 @@ Commands:
   shell <@session>             Open interactive shell for a session
   login <server>               Interactively login to a server using OAuth and save profile
   logout <server>              Delete an authentication profile for a server
-  grep <pattern>               Search tools across all active sessions
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
+  grep <pattern>               Search tools and instructions across all active sessions
   x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
   help [command] [subcommand]  Show help for a specific command
 
 MCP session commands (after connecting):
-  <@session>                   Show MCP server info and capabilities
-  <@session> tools-list        List MCP tools
-  <@session> tools-get <name>
+  <@session>                   Show MCP server info, capabilities, and tools
+  <@session> grep <pattern>    Search tools, resources, or prompts
+  <@session> tools-list        List all server tools
+  <@session> tools-get <name>  Get tool details and schema
   <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
   <@session> prompts-list
   <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
@@ -150,7 +151,6 @@ MCP session commands (after connecting):
   <@session> tasks-cancel <taskId>
   <@session> logging-set-level <level>
   <@session> ping
-  <@session> grep <pattern>         Search tools, resources, and prompts
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
 ```
