@@ -64,23 +64,23 @@ test_pass
 run_mcpc "$AUTH_SESSION" close 2>/dev/null || true
 
 # =============================================================================
-# Test: OAuth-enabled remote server without profile hints at login
+# Test: Auth-required server without credentials hints at login
 # =============================================================================
 
-# Use mcp.slack.com which requires OAuth authentication
-OAUTH_SERVER="https://mcp.slack.com/mcp"
+# Use the local test server (already started with REQUIRE_AUTH=true)
+# This avoids depending on external servers which makes tests flaky
 
-test_case "OAuth server session creation without profile shows login hint"
-SESSION=$(session_name "oauth-noprof")
-run_mcpc connect "$OAUTH_SERVER" "$SESSION"
+test_case "Auth-required server session creation shows login hint"
+SESSION=$(session_name "auth-noprof")
+run_mcpc connect "$TEST_SERVER_URL" "$SESSION"
 assert_failure
 # Should hint at login command
 assert_contains "$STDERR" "login"
 test_pass
 
-test_case "OAuth server session creation without profile (JSON) shows login hint"
-SESSION=$(session_name "oauth-noprof2")
-run_mcpc --json connect "$OAUTH_SERVER" "$SESSION"
+test_case "Auth-required server session creation (JSON) shows login hint"
+SESSION=$(session_name "auth-noprof2")
+run_mcpc --json connect "$TEST_SERVER_URL" "$SESSION"
 assert_failure
 assert_json_valid "$STDERR"
 # JSON error should also contain login hint
