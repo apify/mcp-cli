@@ -1,6 +1,6 @@
 {
   "name": "@apify/mcpc",
-  "version": "0.1.10",
+  "version": "0.2.0",
   "description": "Universal command-line client for the Model Context Protocol (MCP).",
   "type": "module",
   "keywords": [
@@ -50,7 +50,8 @@
     "prepublishOnly": "if [ -z \"$MCPC_RELEASE\" ]; then echo '\\n❌ Direct npm publish is not allowed.\\n   Please use: npm run release\\n' && exit 1; fi",
     "release": "bash scripts/publish.sh",
     "release:minor": "bash scripts/publish.sh minor",
-    "release:major": "bash scripts/publish.sh major"
+    "release:major": "bash scripts/publish.sh major",
+    "release:pre": "bash scripts/publish.sh --pre-release"
   },
   "dependencies": {
     "@inquirer/input": "^5.0.3",

@@ -1,27 +1,20 @@
 #!/bin/bash
 
-# Publish script for mcpc
-# - Ensures releases are from main branch only
-# - Ensures working directory is clean
-# - Ensures branch is up-to-date with remote
-# - Runs lint, build, and tests
-# - Bumps version (patch by default, or specify: major, minor, patch)
-# - Creates git tag
-# - Pushes commit and tag
-# - Publishes to npm
+# Thin wrapper that validates preconditions and triggers the release.yml
+# GitHub Actions workflow. All actual release work (lint, build, test,
+# version bump, changelog, npm publish, GitHub release) happens in CI.
 
 set -e
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Default values
+# Defaults
 VERSION_TYPE="patch"
+RELEASE_TYPE="release"
 RELEASE_BRANCH="main"
-ALLOW_ANY_BRANCH=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -30,67 +23,58 @@ while [[ $# -gt 0 ]]; do
       VERSION_TYPE="$1"
       shift
       ;;
-    --allow-branch)
-      ALLOW_ANY_BRANCH=true
+    --pre-release)
+      RELEASE_TYPE="pre-release"
       shift
       ;;
     -h|--help)
-      echo "Usage: ./scripts/publish.sh [major|minor|patch] [--allow-branch]"
+      echo "Usage: ./scripts/publish.sh [major|minor|patch] [--pre-release]"
+      echo ""
+      echo "Triggers the release.yml GitHub Actions workflow."
       echo ""
       echo "Options:"
       echo "  major|minor|patch  Version bump type (default: patch)"
-      echo "  --allow-branch     Allow release from any branch (not recommended)"
+      echo "  --pre-release      Create a pre-release (beta) instead of a stable release"
+      echo ""
+      echo "Examples:"
+      echo "  npm run release              # patch release"
+      echo "  npm run release:minor        # minor release"
+      echo "  npm run release:pre          # patch pre-release"
+      echo "  npm run release:pre -- minor # minor pre-release"
       exit 0
       ;;
     *)
       echo -e "${RED}Unknown option: $1${NC}"
-      echo "Usage: ./scripts/publish.sh [major|minor|patch] [--allow-branch]"
+      echo "Usage: ./scripts/publish.sh [major|minor|patch] [--pre-release]"
       exit 1
       ;;
   esac
 done
 
-echo -e "${YELLOW}📦 Publishing mcpc ($VERSION_TYPE version bump)${NC}"
+echo -e "${YELLOW}📦 Triggering $RELEASE_TYPE ($VERSION_TYPE)${NC}"
 echo ""
 
-# Check if logged in to npm
-echo "Checking npm login..."
-if ! npm whoami > /dev/null 2>&1; then
-  echo -e "${RED}❌ Not logged in to npm. Please run: npm login${NC}"
-  exit 1
-fi
-NPM_USER=$(npm whoami)
-echo -e "${GREEN}✓ Logged in to npm as: $NPM_USER${NC}"
-
-# Check if gh CLI is installed and authenticated
-echo "Checking GitHub CLI..."
+# Check gh CLI
 if ! command -v gh &> /dev/null; then
-  echo -e "${RED}❌ GitHub CLI (gh) not installed. Please install: brew install gh${NC}"
+  echo -e "${RED}❌ GitHub CLI (gh) not installed. Install: https://cli.github.com/${NC}"
   exit 1
 fi
-if ! gh auth status &> /dev/null; then
-  echo -e "${RED}❌ Not logged in to GitHub CLI. Please run: gh auth login${NC}"
+if ! gh auth status &> /dev/null 2>&1; then
+  echo -e "${RED}❌ Not logged in to GitHub CLI. Run: gh auth login${NC}"
   exit 1
 fi
 echo -e "${GREEN}✓ GitHub CLI authenticated${NC}"
 
-# Check current branch
+# Check branch
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-echo "Current branch: $BRANCH"
-
-if [ "$BRANCH" != "$RELEASE_BRANCH" ] && [ "$ALLOW_ANY_BRANCH" = false ]; then
-  echo -e "${RED}❌ Releases must be from '$RELEASE_BRANCH' branch.${NC}"
-  echo -e "   Current branch: $BRANCH"
-  echo ""
-  echo "Options:"
-  echo "  1. Switch to $RELEASE_BRANCH: git checkout $RELEASE_BRANCH"
-  echo "  2. Override (not recommended): npm run release -- --allow-branch"
+if [[ "$RELEASE_TYPE" == "release" && "$BRANCH" != "$RELEASE_BRANCH" ]]; then
+  echo -e "${RED}❌ Releases must be from '$RELEASE_BRANCH' branch (current: $BRANCH).${NC}"
+  echo "   Switch to main: git checkout $RELEASE_BRANCH"
   exit 1
 fi
-echo -e "${GREEN}✓ On release branch: $BRANCH${NC}"
+echo -e "${GREEN}✓ On branch: $BRANCH${NC}"
 
 # Check for uncommitted changes
-echo "Checking for uncommitted changes..."
 if ! git diff-index --quiet HEAD --; then
   echo -e "${RED}❌ Uncommitted changes detected. Please commit or stash them first.${NC}"
   git status --short
@@ -98,157 +82,46 @@ if ! git diff-index --quiet HEAD --; then
 fi
 echo -e "${GREEN}✓ Working directory is clean${NC}"
 
-# Check for untracked files (excluding common patterns)
-UNTRACKED=$(git ls-files --others --exclude-standard)
-if [ -n "$UNTRACKED" ]; then
-  echo -e "${YELLOW}⚠️  Untracked files detected:${NC}"
-  echo "$UNTRACKED"
-  read -p "Continue anyway? (y/N) " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Cancelled."
-    exit 0
-  fi
-fi
-
-# Fetch and check if up-to-date with remote
-echo "Fetching from remote..."
+# Check branch is up-to-date with remote
 git fetch origin "$BRANCH" 2>/dev/null || true
-
 LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse "origin/$BRANCH" 2>/dev/null || echo "")
 
-if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
-  BEHIND=$(git rev-list --count HEAD..origin/"$BRANCH")
-  AHEAD=$(git rev-list --count origin/"$BRANCH"..HEAD)
-
-  if [ "$BEHIND" -gt 0 ]; then
-    echo -e "${RED}❌ Branch is behind origin/$BRANCH by $BEHIND commit(s). Please pull first.${NC}"
+if [[ -n "$REMOTE" && "$LOCAL" != "$REMOTE" ]]; then
+  BEHIND=$(git rev-list --count HEAD.."origin/$BRANCH")
+  AHEAD=$(git rev-list --count "origin/$BRANCH"..HEAD)
+  if [[ "$BEHIND" -gt 0 ]]; then
+    echo -e "${RED}❌ Branch is behind origin/$BRANCH by $BEHIND commit(s). Pull first.${NC}"
     exit 1
   fi
-
-  if [ "$AHEAD" -gt 0 ]; then
-    echo -e "${RED}❌ Branch is ahead of origin/$BRANCH by $AHEAD commit(s). Please push first.${NC}"
-    echo "   Run: git push origin $BRANCH"
+  if [[ "$AHEAD" -gt 0 ]]; then
+    echo -e "${RED}❌ Branch is ahead of origin/$BRANCH by $AHEAD commit(s). Push first.${NC}"
     exit 1
   fi
 fi
-echo -e "${GREEN}✓ Branch is up-to-date${NC}"
+echo -e "${GREEN}✓ Branch is up-to-date with remote${NC}"
 
-# Run lint
+# Trigger the workflow
 echo ""
-echo "Running lint..."
-npm run lint
-echo -e "${GREEN}✓ Lint passed${NC}"
+echo "Triggering release.yml workflow..."
+gh workflow run release.yml \
+  --ref "$BRANCH" \
+  -f type="$RELEASE_TYPE" \
+  -f version="$VERSION_TYPE"
+echo -e "${GREEN}✓ Workflow triggered${NC}"
 
-# Run build
+# Wait briefly for the run to appear, then fetch its URL
 echo ""
-echo "Building..."
-npm run build
-echo -e "${GREEN}✓ Build succeeded${NC}"
+echo "Fetching workflow run URL..."
+sleep 3
+RUN_ID=$(gh run list --workflow=release.yml --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
 
-# Update README (TOC, etc.)
-echo ""
-echo "Updating README..."
-npm run build:readme
-echo -e "${GREEN}✓ README updated${NC}"
-
-# Run tests
-echo ""
-echo "Running tests..."
-npm run test:unit && ./test/e2e/run.sh --no-build --parallel 1
-echo -e "${GREEN}✓ Tests passed${NC}"
-
-# Get current version
-CURRENT_VERSION=$(node -p "require('./package.json').version")
-echo ""
-echo "Current version: $CURRENT_VERSION"
-
-# Check CHANGELOG.md has unreleased entries
-echo ""
-UNRELEASED_CONTENT=$(awk '/^## \[Unreleased\]/{found=1; next} found && /^## \[/{exit} found{print}' CHANGELOG.md | grep -v '^[[:space:]]*$' || true)
-if [ -z "$UNRELEASED_CONTENT" ]; then
-  echo -e "${YELLOW}⚠️  The [Unreleased] section in CHANGELOG.md appears to be empty.${NC}"
-  echo ""
-  echo "   Ask Claude to update it before releasing:"
-  echo -e "   ${GREEN}Tell Claude: \"Update CHANGELOG.md [Unreleased] section for the upcoming release\"${NC}"
-  echo ""
-  read -p "   Continue anyway without changelog entries? (y/N) " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Cancelled. Update the changelog and re-run."
-    exit 0
-  fi
+if [[ -n "$RUN_ID" ]]; then
+  REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null || echo "apify/mcp-cli")
+  RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
+  echo -e "${GREEN}✓ Monitor the release:${NC} $RUN_URL"
+  # Try to open in browser
+  open "$RUN_URL" 2>/dev/null || xdg-open "$RUN_URL" 2>/dev/null || true
 else
-  echo -e "${GREEN}✓ CHANGELOG.md has unreleased entries${NC}"
+  echo -e "${YELLOW}Could not fetch run URL. Check: https://github.com/apify/mcp-cli/actions/workflows/release.yml${NC}"
 fi
-
-# Bump version (without git tag - we'll do it manually)
-echo "Bumping $VERSION_TYPE version..."
-npm version "$VERSION_TYPE" --no-git-tag-version
-
-# Get new version
-NEW_VERSION=$(node -p "require('./package.json').version")
-echo -e "${GREEN}New version: $NEW_VERSION${NC}"
-
-# Update CHANGELOG.md - replace [Unreleased] with new version
-echo ""
-echo "Updating CHANGELOG.md..."
-TODAY=$(date +%Y-%m-%d)
-if [ -f "CHANGELOG.md" ]; then
-  # Check if there are unreleased changes
-  if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
-    # Replace [Unreleased] with new version and add new [Unreleased] section
-    sed -i.bak "s/^## \[Unreleased\]/## [Unreleased]\n\n## [$NEW_VERSION] - $TODAY/" CHANGELOG.md
-    rm -f CHANGELOG.md.bak
-
-    # Update the comparison links at the bottom
-    # Add new unreleased link and update the old one
-    if grep -q "^\[Unreleased\]:" CHANGELOG.md; then
-      sed -i.bak "s|\[Unreleased\]: \(.*\)/compare/v[0-9.]*\.\.\.HEAD|[Unreleased]: \1/compare/v$NEW_VERSION...HEAD\n[$NEW_VERSION]: \1/compare/v$CURRENT_VERSION...v$NEW_VERSION|" CHANGELOG.md
-      rm -f CHANGELOG.md.bak
-    fi
-
-    echo -e "${GREEN}✓ CHANGELOG.md updated${NC}"
-  else
-    echo -e "${YELLOW}⚠️  No [Unreleased] section found in CHANGELOG.md${NC}"
-  fi
-else
-  echo -e "${YELLOW}⚠️  CHANGELOG.md not found${NC}"
-fi
-
-# Create git commit and tag
-echo ""
-echo "Creating git commit and tag..."
-git add package.json package-lock.json CHANGELOG.md
-git commit -m "v$NEW_VERSION"
-git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
-
-echo -e "${GREEN}✓ Created tag v$NEW_VERSION${NC}"
-
-# Push commit and tag
-echo ""
-echo "Pushing to origin..."
-git push origin "$BRANCH"
-git push origin "v$NEW_VERSION"
-echo -e "${GREEN}✓ Pushed commit and tag${NC}"
-
-# Publish to npm
-echo ""
-echo "Publishing to npm..."
-MCPC_RELEASE=1 npm publish --access public
-echo -e "${GREEN}✓ Published to npm${NC}"
-
-# Create GitHub release with auto-generated notes
-echo ""
-echo "Creating GitHub release..."
-gh release create "v$NEW_VERSION" \
-  --title "v$NEW_VERSION" \
-  --generate-notes
-echo -e "${GREEN}✓ Created GitHub release${NC}"
-
-echo ""
-echo -e "${GREEN}✅ Successfully published mcpc@$NEW_VERSION${NC}"
-echo ""
-echo "🔗 npm: https://www.npmjs.com/package/@apify/mcpc"
-echo "🔗 release: https://github.com/apify/mcpc/releases/tag/v$NEW_VERSION"

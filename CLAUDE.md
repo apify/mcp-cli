@@ -647,12 +647,19 @@ All MCP operations go through named sessions. Sessions are persistent bridge pro
 
 ## Releasing
 
-The release process is automated via `npm run release` (runs `scripts/publish.sh`). Before releasing:
+The release process is automated via GitHub Actions (`release.yml`). The local `npm run release` command is a thin wrapper that validates preconditions and triggers the workflow.
+
+Before releasing:
 
 1. **Update CHANGELOG.md** with all changes since the last release
-2. Run `npm run release` (or `npm run release minor` / `npm run release major`)
+2. Ensure your branch is clean, up-to-date with `origin/main`, and all CI checks pass
+3. Run `npm run release` (or `npm run release:minor` / `npm run release:major`)
 
-The script will: run tests, bump version, create git tag, push, publish to npm, and create GitHub release.
+The script validates preconditions locally, then triggers the `release.yml` GitHub Actions workflow which handles: lint, build, test, version bump, changelog update, README update, git commit/tag/push, npm publish (with provenance), and GitHub release creation.
+
+For pre-releases: `npm run release:pre` (or `npm run release:pre -- minor`)
+
+Monitor the release progress at the GitHub Actions URL that opens automatically.
 
 ### Changelog maintenance
 
