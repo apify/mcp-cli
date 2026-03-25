@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Release process migrated from local `scripts/publish.sh` to GitHub Actions; `npm run release` now triggers the CI workflow instead of running locally
+
 ## [0.2.0] - 2026-03-24
 
 ### Added
