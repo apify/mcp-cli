@@ -43,8 +43,13 @@ const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.j
 };
 import { ProxyServer } from './proxy-server.js';
 import type { ProxyConfig } from '../lib/types.js';
-import { createX402FetchMiddleware } from '../lib/x402/fetch-middleware.js';
-import type { SignerWallet } from '../lib/x402/signer.js';
+import {
+  createX402FetchMiddleware,
+  extractPaymentRequiredFromError,
+  extractAcceptFromErrorData,
+  type X402PaymentCache,
+} from '../lib/x402/fetch-middleware.js';
+import { signPayment, type SignerWallet } from '../lib/x402/signer.js';
 import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 // HTTP proxy and TLS settings are configured in main() after parsing --insecure flag
@@ -92,6 +97,9 @@ class BridgeProcess {
 
   // x402 wallet for automatic payment signing (received via IPC, stored in memory only)
   private x402Wallet: SignerWallet | null = null;
+
+  // Shared payment signature cache — middleware reads/writes, bridge invalidates on JSON-RPC 402
+  private x402PaymentCache: X402PaymentCache = { signature: null };
 
   // Active async tasks (in-memory, also persisted to disk for crash recovery)
   private activeTasks: Map<string, Task> = new Map();
@@ -534,7 +542,11 @@ class BridgeProcess {
         // McpClient caches tools in-memory after the first listAllTools call
         return this.client?.getCachedTools()?.find((t: Tool) => t.name === name);
       };
-      customFetch = createX402FetchMiddleware(proxyFetch as FetchLike, { wallet, getToolByName });
+      customFetch = createX402FetchMiddleware(proxyFetch as FetchLike, {
+        wallet,
+        getToolByName,
+        paymentCache: this.x402PaymentCache,
+      });
     }
 
     const clientConfig: CreateMcpClientOptions = {
@@ -940,6 +952,52 @@ class BridgeProcess {
   }
 
   /**
+   * Handle a JSON-RPC 402 payment required error by signing a fresh payment,
+   * caching it, and retrying the tool call once.
+   *
+   * Returns true if the error was a 402 and was handled (result set via callback).
+   * Returns false if the error is not a 402 (caller should rethrow).
+   */
+  private async handlePaymentRequiredRetry(
+    error: unknown,
+    retryFn: () => Promise<unknown>
+  ): Promise<{ handled: true; result: unknown } | { handled: false }> {
+    if (!this.x402Wallet) return { handled: false };
+
+    const errorData = extractPaymentRequiredFromError(error);
+    if (!errorData) return { handled: false };
+
+    const parsed = extractAcceptFromErrorData(errorData);
+    if (!parsed) {
+      logger.warn('JSON-RPC 402 error but could not extract supported payment terms');
+      return { handled: false };
+    }
+
+    logger.debug('JSON-RPC 402 received, signing fresh payment and retrying...');
+
+    // Invalidate cache and sign fresh
+    this.x402PaymentCache.signature = null;
+    try {
+      const signed = await signPayment({
+        wallet: this.x402Wallet,
+        accept: parsed.accept,
+        resource: parsed.resource,
+      });
+      this.x402PaymentCache.signature = signed.paymentSignatureBase64;
+      logger.debug(
+        `Fresh payment signed for retry: $${signed.amountUsd.toFixed(4)} to ${signed.to} on ${signed.networkLabel}`
+      );
+    } catch (signError) {
+      logger.warn('Failed to sign fresh payment for 402 retry:', signError);
+      return { handled: false };
+    }
+
+    // Retry once with the new cached payment
+    const result = await retryFn();
+    return { handled: true, result };
+  }
+
+  /**
    * Forward an MCP request to the MCP server
    * Blocks until MCP client is connected, propagates connection errors to caller
    */
@@ -993,28 +1051,32 @@ class BridgeProcess {
             useTask?: boolean;
             detach?: boolean;
           };
-          if (params.useTask && this.client.supportsTasksForToolCall()) {
-            if (params.detach) {
-              // Detached execution: start task and return task ID immediately
-              // The tool continues running in the background on the server
-              const taskUpdate = await this.client.callToolDetached(
-                params.name,
-                params.arguments,
-                params._meta
-              );
-              this.activeTasks.set(taskUpdate.taskId, {
-                taskId: taskUpdate.taskId,
-                status: taskUpdate.status,
-                statusMessage: taskUpdate.statusMessage,
-                createdAt: taskUpdate.createdAt ?? new Date().toISOString(),
-                lastUpdatedAt: taskUpdate.lastUpdatedAt ?? new Date().toISOString(),
-              } as Task);
-              await this.persistActiveTask(taskUpdate.taskId, params.name);
-              result = taskUpdate;
-            } else {
+
+          // Helper to execute the tool call (used for initial attempt and 402 retry)
+          // Capture client ref — guaranteed non-null by check at top of handleMcpRequest
+          const client = this.client;
+          const executeToolCall = async (): Promise<unknown> => {
+            if (params.useTask && client.supportsTasksForToolCall()) {
+              if (params.detach) {
+                // Detached execution: start task and return task ID immediately
+                const taskUpdate = await client.callToolDetached(
+                  params.name,
+                  params.arguments,
+                  params._meta
+                );
+                this.activeTasks.set(taskUpdate.taskId, {
+                  taskId: taskUpdate.taskId,
+                  status: taskUpdate.status,
+                  statusMessage: taskUpdate.statusMessage,
+                  createdAt: taskUpdate.createdAt ?? new Date().toISOString(),
+                  lastUpdatedAt: taskUpdate.lastUpdatedAt ?? new Date().toISOString(),
+                } as Task);
+                await this.persistActiveTask(taskUpdate.taskId, params.name);
+                return taskUpdate;
+              }
+
               // Task-augmented tool call: stream updates to requesting socket
               const onUpdate = (update: TaskUpdate): void => {
-                // Track active task
                 this.activeTasks.set(update.taskId, {
                   taskId: update.taskId,
                   status: update.status,
@@ -1022,7 +1084,6 @@ class BridgeProcess {
                   createdAt: update.createdAt ?? new Date().toISOString(),
                   lastUpdatedAt: update.lastUpdatedAt ?? new Date().toISOString(),
                 } as Task);
-                // Send task update to requesting client
                 if (message.id) {
                   this.sendResponse(socket, {
                     type: 'task-update',
@@ -1037,14 +1098,13 @@ class BridgeProcess {
                 onUpdate(update);
               }, params.name);
               try {
-                result = await this.client.callToolWithTask(
+                return await client.callToolWithTask(
                   params.name,
                   params.arguments,
                   wrappedOnUpdate,
                   params._meta
                 );
               } finally {
-                // Clean up completed tasks from activeTasks and persistence
                 for (const [tid, task] of this.activeTasks) {
                   if (
                     task.status === 'completed' ||
@@ -1060,8 +1120,20 @@ class BridgeProcess {
                 }
               }
             }
-          } else {
-            result = await this.client.callTool(params.name, params.arguments, params._meta);
+
+            return client.callTool(params.name, params.arguments, params._meta);
+          };
+
+          // Execute with automatic 402 payment retry
+          try {
+            result = await executeToolCall();
+          } catch (error) {
+            const retry = await this.handlePaymentRequiredRetry(error, executeToolCall);
+            if (retry.handled) {
+              result = retry.result;
+            } else {
+              throw error;
+            }
           }
           break;
         }

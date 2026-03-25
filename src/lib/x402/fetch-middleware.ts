@@ -2,12 +2,16 @@
  * x402 fetch middleware for MCP transport
  *
  * Wraps the fetch function used by StreamableHTTPClientTransport to:
- * 1. Proactively sign payments when tool metadata includes _meta.x402
- * 2. Handle HTTP 402 responses by parsing PAYMENT-REQUIRED, signing, and retrying once
+ * 1. Reuse a cached payment signature across tool calls within a session
+ * 2. Sign a fresh payment on the first call (or after cache invalidation)
+ * 3. Handle HTTP 402 responses by parsing PAYMENT-REQUIRED, signing, and retrying once
  *
  * Payment is injected in two places simultaneously (server decides which to use):
  * - HTTP header: PAYMENT-SIGNATURE (base64-encoded payment payload)
  * - JSON-RPC body: params._meta["x402/payment"] (payment payload object)
+ *
+ * The cache is shared with the bridge layer, which invalidates it on JSON-RPC 402
+ * errors and signs a fresh payment before retrying the tool call.
  *
  * This middleware is injected into the transport via the SDK's `fetch` option.
  */
@@ -51,6 +55,15 @@ interface JsonRpcRequest {
 }
 
 /**
+ * Shared mutable cache for payment signatures between the fetch middleware and the bridge.
+ * The middleware reads and writes cached signatures; the bridge invalidates on JSON-RPC 402.
+ */
+export interface X402PaymentCache {
+  /** Base64-encoded payment signature, or null if not yet signed / invalidated */
+  signature: string | null;
+}
+
+/**
  * Options for creating the x402 fetch middleware
  */
 export interface X402FetchMiddlewareOptions {
@@ -63,6 +76,9 @@ export interface X402FetchMiddlewareOptions {
    * This is called per tools/call request for proactive signing.
    */
   getToolByName?: (name: string) => Tool | undefined;
+
+  /** Shared mutable cache for reusing payment signatures across tool calls */
+  paymentCache: X402PaymentCache;
 }
 
 /**
@@ -77,32 +93,32 @@ export function createX402FetchMiddleware(
   baseFetch: FetchLike,
   options: X402FetchMiddlewareOptions
 ): FetchLike {
-  const { wallet, getToolByName } = options;
+  const { wallet, getToolByName, paymentCache } = options;
 
   return async (url: string | URL, init?: RequestInit): Promise<Response> => {
-    // Try proactive signing for tools/call requests
-    const proactiveHeader = await tryProactiveSigning(init, wallet, getToolByName);
-    if (proactiveHeader) {
-      logger.debug('Proactively signing x402 payment for tools/call');
-      const enhancedInit = injectPayment(init, proactiveHeader);
+    // Try to get a payment signature (cached or freshly signed) for tools/call requests
+    const paymentSignature = await getOrSignPayment(init, wallet, getToolByName, paymentCache);
+    if (paymentSignature) {
+      const enhancedInit = injectPayment(init, paymentSignature);
       const response = await baseFetch(url, enhancedInit);
 
-      // If proactive signing succeeded (not 402), return immediately
+      // If payment succeeded (not HTTP 402), return immediately
       if (response.status !== 402) {
         return response;
       }
 
-      // Proactive signing failed with 402 — fall through to 402 fallback
-      logger.debug('Proactive payment rejected (402), falling back to 402 handler');
-      return handle402Fallback(url, init, response, baseFetch, wallet);
+      // HTTP 402 — invalidate cache and fall through to fallback
+      logger.debug('Payment rejected (HTTP 402), invalidating cache');
+      paymentCache.signature = null;
+      return handle402Fallback(url, init, response, baseFetch, wallet, paymentCache);
     }
 
-    // No proactive signing — make request normally
+    // No payment needed — make request normally
     const response = await baseFetch(url, init);
 
-    // Check for 402 fallback
+    // Check for HTTP 402 fallback
     if (response.status === 402) {
-      return handle402Fallback(url, init, response, baseFetch, wallet);
+      return handle402Fallback(url, init, response, baseFetch, wallet, paymentCache);
     }
 
     return response;
@@ -110,13 +126,15 @@ export function createX402FetchMiddleware(
 }
 
 /**
- * Try to proactively sign a payment based on tool metadata.
- * Returns the base64-encoded PAYMENT-SIGNATURE header, or undefined if not applicable.
+ * Get a cached payment signature or sign a fresh one for a tools/call request.
+ * Returns the base64-encoded PAYMENT-SIGNATURE, or undefined if the request
+ * is not a tools/call for a payment-required tool.
  */
-async function tryProactiveSigning(
+async function getOrSignPayment(
   init: RequestInit | undefined,
   wallet: SignerWallet,
-  getToolByName?: (name: string) => Tool | undefined
+  getToolByName: ((name: string) => Tool | undefined) | undefined,
+  paymentCache: X402PaymentCache
 ): Promise<string | undefined> {
   if (!getToolByName || !init?.body) {
     return undefined;
@@ -136,7 +154,7 @@ async function tryProactiveSigning(
   // Look up tool metadata
   const tool = getToolByName(toolName);
   if (!tool) {
-    logger.debug(`Tool "${toolName}" not found in cache, skipping proactive signing`);
+    logger.debug(`Tool "${toolName}" not found in cache, skipping payment`);
     return undefined;
   }
 
@@ -147,15 +165,21 @@ async function tryProactiveSigning(
     return undefined;
   }
 
-  // Check if we have enough info to sign proactively
+  // Return cached signature if available
+  if (paymentCache.signature) {
+    logger.debug(`Using cached payment signature for tool "${toolName}"`);
+    return paymentCache.signature;
+  }
+
+  // Check if we have enough info to sign
   if (!x402.scheme || !x402.network || !x402.amount || !x402.asset || !x402.payTo) {
     logger.debug(
-      `Tool "${toolName}" has x402 metadata but missing fields, skipping proactive signing`
+      `Tool "${toolName}" has x402 metadata but missing fields, skipping payment signing`
     );
     return undefined;
   }
 
-  // Build accept from tool metadata
+  // Build accept from tool metadata and sign fresh
   const accept: PaymentRequiredAccept = {
     scheme: x402.scheme,
     network: x402.network,
@@ -169,24 +193,27 @@ async function tryProactiveSigning(
   try {
     const result = await signPayment({ wallet, accept });
     logger.debug(
-      `Proactive payment signed: $${result.amountUsd.toFixed(4)} to ${result.to} on ${result.networkLabel}`
+      `Fresh payment signed: $${result.amountUsd.toFixed(4)} to ${result.to} on ${result.networkLabel}`
     );
+    paymentCache.signature = result.paymentSignatureBase64;
     return result.paymentSignatureBase64;
   } catch (error) {
-    logger.warn(`Proactive signing failed for tool "${toolName}":`, error);
+    logger.warn(`Payment signing failed for tool "${toolName}":`, error);
     return undefined;
   }
 }
 
 /**
  * Handle a 402 response by parsing PAYMENT-REQUIRED, signing, and retrying once.
+ * Also updates the payment cache with the freshly signed payment.
  */
 async function handle402Fallback(
   url: string | URL,
   originalInit: RequestInit | undefined,
   response402: Response,
   baseFetch: FetchLike,
-  wallet: SignerWallet
+  wallet: SignerWallet,
+  paymentCache: X402PaymentCache
 ): Promise<Response> {
   // Extract PAYMENT-REQUIRED header (case-insensitive)
   const paymentRequiredBase64 =
@@ -219,6 +246,9 @@ async function handle402Fallback(
     logger.debug(
       `402 fallback payment signed: $${result.amountUsd.toFixed(4)} to ${result.to} on ${result.networkLabel}`
     );
+
+    // Cache the freshly signed payment for subsequent calls
+    paymentCache.signature = result.paymentSignatureBase64;
 
     // Retry with payment signature (once only)
     const retryInit = injectPayment(originalInit, result.paymentSignatureBase64);
@@ -261,6 +291,73 @@ function extractToolCallName(body: RequestInit['body'] | undefined): string | un
   } catch {
     return undefined;
   }
+}
+
+/** JSON-RPC error code for x402 payment required */
+const MCP_PAYMENT_REQUIRED_CODE = 402;
+
+/**
+ * Extract `PaymentRequiredAccept` from a JSON-RPC 402 error's data field.
+ * Returns the first "exact" scheme accept entry, or undefined if not found.
+ *
+ * The error data is expected to have the shape: `{ x402Version, accepts: [...] }`
+ */
+export function extractAcceptFromErrorData(errorData: unknown):
+  | {
+      accept: PaymentRequiredAccept;
+      resource?: { url?: string; description?: string; mimeType?: string };
+    }
+  | undefined {
+  if (!errorData || typeof errorData !== 'object') return undefined;
+
+  const data = errorData as Record<string, unknown>;
+  if (!Array.isArray(data.accepts) || data.accepts.length === 0) return undefined;
+
+  const accept = (data.accepts as PaymentRequiredAccept[]).find((a) => a.scheme === 'exact');
+  if (!accept || !accept.payTo || !accept.amount || !accept.network || !accept.asset) {
+    return undefined;
+  }
+
+  const resource = data.resource as
+    | { url?: string; description?: string; mimeType?: string }
+    | undefined;
+  if (resource) {
+    return { accept, resource };
+  }
+  return { accept };
+}
+
+/**
+ * Check if an error from the MCP SDK is a JSON-RPC 402 payment required error.
+ * Returns the error data if it is, undefined otherwise.
+ *
+ * The SDK throws McpError with `.code` and `.data` properties.
+ * McpClient wraps it as ServerError with `{ originalError: sdkError }`.
+ */
+export function extractPaymentRequiredFromError(
+  error: unknown
+): Record<string, unknown> | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+
+  // Check if this is a ServerError wrapping an SDK McpError
+  const details = (error as { details?: unknown }).details;
+  if (details && typeof details === 'object') {
+    const originalError = (details as { originalError?: unknown }).originalError;
+    if (originalError && typeof originalError === 'object') {
+      const sdkError = originalError as { code?: number; data?: unknown };
+      if (sdkError.code === MCP_PAYMENT_REQUIRED_CODE && sdkError.data) {
+        return sdkError.data as Record<string, unknown>;
+      }
+    }
+  }
+
+  // Also check if the error itself has code/data (direct SDK error)
+  const directError = error as { code?: number; data?: unknown };
+  if (directError.code === MCP_PAYMENT_REQUIRED_CODE && directError.data) {
+    return directError.data as Record<string, unknown>;
+  }
+
+  return undefined;
 }
 
 /**
