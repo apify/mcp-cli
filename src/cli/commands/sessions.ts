@@ -35,7 +35,12 @@ import {
   storeKeychainSessionHeaders,
   storeKeychainProxyBearerToken,
 } from '../../lib/auth/keychain.js';
-import { AuthError, ClientError } from '../../lib/index.js';
+import {
+  AuthError,
+  ClientError,
+  isAuthenticationError,
+  createServerAuthError,
+} from '../../lib/index.js';
 import { getWallet } from '../../lib/wallets.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
@@ -309,6 +314,11 @@ export async function connectSession(
   } catch (detailsError) {
     if (detailsError instanceof AuthError) {
       throw detailsError;
+    }
+    // Fallback: check error message for auth patterns (error may have been wrapped
+    // as ClientError/ServerError during bridge IPC serialization)
+    if (detailsError instanceof Error && isAuthenticationError(detailsError.message)) {
+      throw createServerAuthError(serverConfig.url || target, { sessionName: name });
     }
     logger.debug(
       `showServerDetails failed for new session ${name}: ${(detailsError as Error).message}`
