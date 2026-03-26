@@ -45,8 +45,8 @@ import { ProxyServer } from './proxy-server.js';
 import type { ProxyConfig } from '../lib/types.js';
 import {
   createX402FetchMiddleware,
-  extractPaymentRequiredFromError,
-  extractAcceptFromErrorData,
+  extractPaymentRequiredFromResult,
+  extractAcceptFromPaymentRequired,
   type X402PaymentCache,
 } from '../lib/x402/fetch-middleware.js';
 import { signPayment, type SignerWallet } from '../lib/x402/signer.js';
@@ -98,7 +98,7 @@ class BridgeProcess {
   // x402 wallet for automatic payment signing (received via IPC, stored in memory only)
   private x402Wallet: SignerWallet | null = null;
 
-  // Shared payment signature cache — middleware reads/writes, bridge invalidates on JSON-RPC 402
+  // Shared payment signature cache — middleware reads/writes, bridge invalidates on payment-required results
   private x402PaymentCache: X402PaymentCache = { signature: null };
 
   // Active async tasks (in-memory, also persisted to disk for crash recovery)
@@ -952,28 +952,28 @@ class BridgeProcess {
   }
 
   /**
-   * Handle a JSON-RPC 402 payment required error by signing a fresh payment,
-   * caching it, and retrying the tool call once.
+   * Handle a tool result that contains x402 payment-required data.
+   * Signs a fresh payment, caches it, and retries the tool call once.
    *
-   * Returns true if the error was a 402 and was handled (result set via callback).
-   * Returns false if the error is not a 402 (caller should rethrow).
+   * Returns { handled: true, result } if payment was signed and retry succeeded.
+   * Returns { handled: false } if the result is not a payment-required response.
    */
   private async handlePaymentRequiredRetry(
-    error: unknown,
+    toolResult: unknown,
     retryFn: () => Promise<unknown>
   ): Promise<{ handled: true; result: unknown } | { handled: false }> {
     if (!this.x402Wallet) return { handled: false };
 
-    const errorData = extractPaymentRequiredFromError(error);
-    if (!errorData) return { handled: false };
+    const paymentRequired = extractPaymentRequiredFromResult(toolResult);
+    if (!paymentRequired) return { handled: false };
 
-    const parsed = extractAcceptFromErrorData(errorData);
+    const parsed = extractAcceptFromPaymentRequired(paymentRequired);
     if (!parsed) {
-      logger.warn('JSON-RPC 402 error but could not extract supported payment terms');
+      logger.warn('Payment-required tool result but could not extract supported payment terms');
       return { handled: false };
     }
 
-    logger.debug('JSON-RPC 402 received, signing fresh payment and retrying...');
+    logger.debug('Payment-required tool result received, signing fresh payment and retrying...');
 
     // Invalidate cache and sign fresh
     this.x402PaymentCache.signature = null;
@@ -1124,16 +1124,11 @@ class BridgeProcess {
             return client.callTool(params.name, params.arguments, params._meta);
           };
 
-          // Execute with automatic 402 payment retry
-          try {
-            result = await executeToolCall();
-          } catch (error) {
-            const retry = await this.handlePaymentRequiredRetry(error, executeToolCall);
-            if (retry.handled) {
-              result = retry.result;
-            } else {
-              throw error;
-            }
+          // Execute with automatic x402 payment retry on payment-required tool results
+          result = await executeToolCall();
+          const retry = await this.handlePaymentRequiredRetry(result, executeToolCall);
+          if (retry.handled) {
+            result = retry.result;
           }
           break;
         }

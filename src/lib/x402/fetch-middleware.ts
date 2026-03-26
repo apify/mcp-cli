@@ -10,8 +10,8 @@
  * - HTTP header: PAYMENT-SIGNATURE (base64-encoded payment payload)
  * - JSON-RPC body: params._meta["x402/payment"] (payment payload object)
  *
- * The cache is shared with the bridge layer, which invalidates it on JSON-RPC 402
- * errors and signs a fresh payment before retrying the tool call.
+ * The cache is shared with the bridge layer, which invalidates it when the server
+ * returns a payment-required tool result and signs a fresh payment before retrying.
  *
  * This middleware is injected into the transport via the SDK's `fetch` option.
  */
@@ -293,32 +293,29 @@ function extractToolCallName(body: RequestInit['body'] | undefined): string | un
   }
 }
 
-/** JSON-RPC error code for x402 payment required */
-const MCP_PAYMENT_REQUIRED_CODE = 402;
-
 /**
- * Extract `PaymentRequiredAccept` from a JSON-RPC 402 error's data field.
+ * Extract `PaymentRequiredAccept` from a PaymentRequired object.
  * Returns the first "exact" scheme accept entry, or undefined if not found.
  *
- * The error data is expected to have the shape: `{ x402Version, accepts: [...] }`
+ * The data is expected to have the shape: `{ x402Version, accepts: [...] }`
  */
-export function extractAcceptFromErrorData(errorData: unknown):
+export function extractAcceptFromPaymentRequired(data: unknown):
   | {
       accept: PaymentRequiredAccept;
       resource?: { url?: string; description?: string; mimeType?: string };
     }
   | undefined {
-  if (!errorData || typeof errorData !== 'object') return undefined;
+  if (!data || typeof data !== 'object') return undefined;
 
-  const data = errorData as Record<string, unknown>;
-  if (!Array.isArray(data.accepts) || data.accepts.length === 0) return undefined;
+  const obj = data as Record<string, unknown>;
+  if (!Array.isArray(obj.accepts) || obj.accepts.length === 0) return undefined;
 
-  const accept = (data.accepts as PaymentRequiredAccept[]).find((a) => a.scheme === 'exact');
+  const accept = (obj.accepts as PaymentRequiredAccept[]).find((a) => a.scheme === 'exact');
   if (!accept || !accept.payTo || !accept.amount || !accept.network || !accept.asset) {
     return undefined;
   }
 
-  const resource = data.resource as
+  const resource = obj.resource as
     | { url?: string; description?: string; mimeType?: string }
     | undefined;
   if (resource) {
@@ -327,37 +324,69 @@ export function extractAcceptFromErrorData(errorData: unknown):
   return { accept };
 }
 
-/**
- * Check if an error from the MCP SDK is a JSON-RPC 402 payment required error.
- * Returns the error data if it is, undefined otherwise.
- *
- * The SDK throws McpError with `.code` and `.data` properties.
- * McpClient wraps it as ServerError with `{ originalError: sdkError }`.
- */
-export function extractPaymentRequiredFromError(
-  error: unknown
-): Record<string, unknown> | undefined {
-  if (!error || typeof error !== 'object') return undefined;
+/** Content item from MCP tool result */
+interface ToolResultContent {
+  type: string;
+  text?: string;
+  [key: string]: unknown;
+}
 
-  // Check if this is a ServerError wrapping an SDK McpError
-  const details = (error as { details?: unknown }).details;
-  if (details && typeof details === 'object') {
-    const originalError = (details as { originalError?: unknown }).originalError;
-    if (originalError && typeof originalError === 'object') {
-      const sdkError = originalError as { code?: number; data?: unknown };
-      if (sdkError.code === MCP_PAYMENT_REQUIRED_CODE && sdkError.data) {
-        return sdkError.data as Record<string, unknown>;
-      }
-    }
+/** Shape of an MCP tool call result */
+interface ToolCallResult {
+  content?: ToolResultContent[];
+  isError?: boolean;
+  structuredContent?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/**
+ * Check if a tool call result is an x402 payment-required response.
+ * Returns the PaymentRequired data if found, undefined otherwise.
+ *
+ * Per the x402 MCP transport spec, payment required is signaled as a tool result with:
+ * - isError: true
+ * - structuredContent containing { x402Version, accepts: [...] } (preferred)
+ * - OR content[0].text as JSON-encoded PaymentRequired (fallback)
+ */
+export function extractPaymentRequiredFromResult(
+  result: unknown
+): Record<string, unknown> | undefined {
+  if (!result || typeof result !== 'object') return undefined;
+
+  const toolResult = result as ToolCallResult;
+  if (!toolResult.isError) return undefined;
+
+  // Path 1: structuredContent (preferred)
+  if (toolResult.structuredContent && isPaymentRequired(toolResult.structuredContent)) {
+    return toolResult.structuredContent;
   }
 
-  // Also check if the error itself has code/data (direct SDK error)
-  const directError = error as { code?: number; data?: unknown };
-  if (directError.code === MCP_PAYMENT_REQUIRED_CODE && directError.data) {
-    return directError.data as Record<string, unknown>;
+  // Path 2: content[0].text as JSON (fallback)
+  const content = toolResult.content;
+  if (!Array.isArray(content) || content.length === 0) return undefined;
+
+  const first = content[0] as ToolResultContent | undefined;
+  if (!first || first.type !== 'text' || typeof first.text !== 'string') return undefined;
+
+  try {
+    const parsed: unknown = JSON.parse(first.text);
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      isPaymentRequired(parsed as Record<string, unknown>)
+    ) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Not JSON
   }
 
   return undefined;
+}
+
+/** Check if an object looks like a PaymentRequired (has x402Version + accepts array) */
+function isPaymentRequired(obj: Record<string, unknown>): boolean {
+  return 'x402Version' in obj && 'accepts' in obj && Array.isArray(obj.accepts);
 }
 
 /**
