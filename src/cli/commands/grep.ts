@@ -9,13 +9,7 @@ import { isProcessAlive } from '../../lib/utils.js';
 import { consolidateSessions } from '../../lib/sessions.js';
 import { withSessionClient } from '../../lib/session-client.js';
 import { withMcpClient } from '../helpers.js';
-import {
-  formatJson,
-  formatToolParamsInline,
-  formatToolAnnotations,
-  grayBacktick,
-  inBackticks,
-} from '../output.js';
+import { formatJson, formatToolLine, inBackticks } from '../output.js';
 import type { IMcpClient } from '../../lib/types.js';
 import { getBridgeStatus, formatBridgeStatus } from './sessions.js';
 
@@ -278,23 +272,6 @@ function truncateResult(
     result: { tools, resources, prompts, instructions },
     truncated: total - limit,
   };
-}
-
-/**
- * Format a single tool as a compact bullet line (same style as tools-list)
- */
-function formatToolLine(tool: Tool): string {
-  const bullet = chalk.dim('*');
-  const params = formatToolParamsInline(tool.inputSchema as Record<string, unknown>);
-  const parts: string[] = [];
-  const annotationsStr = formatToolAnnotations(tool.annotations);
-  if (annotationsStr) parts.push(annotationsStr);
-  const toolAny = tool as Record<string, unknown>;
-  const execution = toolAny.execution as Record<string, unknown> | undefined;
-  const taskSupport = execution?.taskSupport as string | undefined;
-  if (taskSupport) parts.push(`task:${taskSupport}`);
-  const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
-  return `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)}${params}${grayBacktick()}${suffix}`;
 }
 
 /**
