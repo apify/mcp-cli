@@ -357,13 +357,59 @@ Still, sessions can fail due to network disconnects, bridge process crash, or se
 
 **Session states:**
 
-| State                 | Meaning                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------- |
-| 🟢 **`live`**         | Bridge process running and server responding                                                      |
-| 🟡 **`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds                 |
-| 🟡 **`crashed`**      | Bridge process crashed or was killed; auto-restarts on next use                                   |
-| 🔴 **`unauthorized`** | Server rejected authentication (401/403) or token refresh failed; requires `login` then `restart` |
-| 🔴 **`expired`**      | Server rejected session ID (404); requires `restart`                                              |
+| State                  | Meaning                                                                                            |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| 🟢 **`live`**          | Bridge process running and server responding                                                       |
+| 🟡 **`connecting`**    | Initial bridge startup in progress (`mcpc connect`)                                                |
+| 🟡 **`reconnecting`**  | Bridge crashed or lost auth; auto-reconnecting in the background                                   |
+| 🟡 **`disconnected`**  | Bridge process running but server unreachable; auto-recovers when server responds                  |
+| 🟡 **`crashed`**       | Bridge process crashed or was killed; auto-reconnects in the background                            |
+| 🔴 **`unauthorized`**  | Server rejected authentication (401/403) or token refresh failed; auto-reconnects or needs `login` |
+| 🔴 **`expired`**       | Server rejected session ID (404); requires `restart`                                               |
+
+**State transitions:**
+
+```
+                mcpc connect
+                     │
+                     ▼
+              ┌──────────────┐
+              │  connecting  │
+              └──────┬───────┘
+                     │ bridge ready
+                     ▼
+              ┌──────────────┐  server unresponsive  ┌──────────────┐
+         ┌───▶│     live     │◀─────────────────────▶│ disconnected │
+         │    └──┬───────┬───┘  server responds      └──────────────┘
+         │       │       │
+         │       │       │ server rejects         server rejects
+         │       │       │ session ID (404)       auth (401/403)
+         │       │       │                             │
+         │       │       ▼                             ▼
+         │       │  ┌─────────┐               ┌──────────────┐
+         │       │  │ expired │               │ unauthorized │
+         │       │  └────┬────┘               └──────┬───────┘
+         │       │       │                           │
+         │       │       │ mcpc restart              │ auto-reconnect
+         │       │       ▼                           │ (tokens refreshed
+         │       │  ┌──────────────┐                 │  by other session)
+         │       │  │ reconnecting │◀────────────────┘
+         │       │  └──────┬───────┘
+         │       │         │ success
+         │       │         │
+         │       ▼         │
+         │  ┌─────────┐   │
+         │  │ crashed  │   │
+         │  └────┬─────┘   │
+         │       │         │
+         │       │ auto-reconnect
+         │       ▼         │
+         │  ┌──────────────┘
+         │  │ reconnecting │
+         │  └──────┬───────┘
+         │         │ success
+         └─────────┘
+```
 
 Here's how `mcpc` handles various bridge process and server connection states:
 
@@ -373,14 +419,17 @@ Here's how `mcpc` handles various bridge process and server connection states:
     The bridge will keep trying to reconnect in the background and will return to 🟢 **`live`** once the server responds again.
   - If **server rejects authentication** (HTTP 401 or 403) or token refresh fails,
     the session is marked 🔴 **`unauthorized`**.
-    You need to re-authenticate with `mcpc login <server>` and then `mcpc @my-session restart`.
+    `mcpc` will auto-reconnect in the background if another session sharing the same OAuth profile has refreshed the tokens.
+    Otherwise, re-authenticate with `mcpc login <server>` and then `mcpc @my-session restart`.
   - If **server rejects the session ID** (HTTP 404), indicating the MCP session is no longer valid,
     the session is marked 🔴 **`expired`**.
     You need to restart the session with `mcpc @my-session restart` to establish a new connection.
-- If the **bridge process crashes**, `mcpc` will mark the session as 🟡 **`crashed`** on first use.
-  Next time you run `mcpc @my-session ...`, it will attempt to restart the bridge process.
-  - If bridge **restart succeeds**, everything starts again (see above).
-  - If bridge **restart fails**, `mcpc @my-session ...` returns error, and session remains marked 🟡 **`crashed`**.
+- If the **bridge process crashes**, `mcpc` will mark the session as 🟡 **`crashed`**
+  and auto-reconnect the bridge in the background. You can also trigger reconnection manually
+  by running any `mcpc @my-session ...` command.
+  - If reconnection **succeeds** and the server resumes the MCP session, the session returns to 🟢 **`live`**.
+  - If the server issues a **new session ID** instead of resuming, the session is marked 🔴 **`expired`**.
+  - If reconnection **fails**, the session remains 🟡 **`crashed`** and retries after a 10-second cooldown.
 
 Note that `mcpc` never automatically removes sessions from the list.
 Instead, it keeps them flagged as 🟡 **`crashed`**, 🔴 **`unauthorized`**, or 🔴 **`expired`**,
