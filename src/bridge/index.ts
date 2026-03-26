@@ -631,21 +631,17 @@ class BridgeProcess {
     const serverDetails = await this.client.getServerDetails();
     const newMcpSessionId = this.client.getMcpSessionId();
 
-    // Detect session ID mismatch: we tried to resume but server issued a new session.
-    // This means the server forgot our session — treat it as expired rather than
-    // silently continuing with a new session identity.
-    if (
-      this.options.mcpSessionId &&
-      newMcpSessionId &&
-      newMcpSessionId !== this.options.mcpSessionId
-    ) {
+    // Detect session ID mismatch: we tried to resume but server did not return the
+    // same session ID. This covers: server issued a different ID, or server did not
+    // return any ID at all (e.g. session state lost). Either way the old session is gone.
+    if (this.options.mcpSessionId && newMcpSessionId !== this.options.mcpSessionId) {
       logger.warn(
-        `Server issued new MCP session ID instead of resuming ` +
-          `(old: ${this.options.mcpSessionId}, new: ${newMcpSessionId}). Marking as expired.`
+        `Server did not resume MCP session ` +
+          `(expected ${this.options.mcpSessionId}, got ${newMcpSessionId ?? 'none'}). Marking as expired.`
       );
       throw new Error(
         `Session expired: server did not resume MCP session ` +
-          `(expected ${this.options.mcpSessionId}, got ${newMcpSessionId})`
+          `(expected ${this.options.mcpSessionId}, got ${newMcpSessionId ?? 'none'})`
       );
     }
 
@@ -724,6 +720,16 @@ class BridgeProcess {
    */
   private startKeepalive(): void {
     logger.debug(`Starting keepalive ping every ${KEEPALIVE_INTERVAL_MS / 1000}s`);
+
+    // Send first ping soon after startup to detect stale sessions early
+    // (e.g. session expired on server between auto-reconnect and first interval tick)
+    const earlyPing = setTimeout(() => {
+      this.sendKeepalivePing().catch(async (error) => {
+        logger.error('Initial keepalive ping failed:', error);
+        await this.handlePossibleExpiration(error as Error);
+      });
+    }, 5_000);
+    earlyPing.unref();
 
     this.keepaliveInterval = setInterval(() => {
       this.sendKeepalivePing().catch(async (error) => {
