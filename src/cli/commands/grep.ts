@@ -11,8 +11,7 @@ import { withSessionClient } from '../../lib/session-client.js';
 import { withMcpClient } from '../helpers.js';
 import {
   formatJson,
-  formatToolParamsInline,
-  formatToolAnnotations,
+  formatToolLine,
   grayBacktick,
   inBackticks,
 } from '../output.js';
@@ -280,22 +279,6 @@ function truncateResult(
   };
 }
 
-/**
- * Format a single tool as a compact bullet line (same style as tools-list)
- */
-function formatToolLine(tool: Tool): string {
-  const bullet = chalk.dim('*');
-  const params = formatToolParamsInline(tool.inputSchema as Record<string, unknown>);
-  const parts: string[] = [];
-  const annotationsStr = formatToolAnnotations(tool.annotations);
-  if (annotationsStr) parts.push(annotationsStr);
-  const toolAny = tool as Record<string, unknown>;
-  const execution = toolAny.execution as Record<string, unknown> | undefined;
-  const taskSupport = execution?.taskSupport as string | undefined;
-  if (taskSupport) parts.push(`task:${taskSupport}`);
-  const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
-  return `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)}${params}${grayBacktick()}${suffix}`;
-}
 
 /**
  * Format a single resource as a compact bullet line
