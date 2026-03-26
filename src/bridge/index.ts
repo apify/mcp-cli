@@ -630,8 +630,28 @@ class BridgeProcess {
     // Update session with protocol version, MCP session ID, and lastSeenAt
     const serverDetails = await this.client.getServerDetails();
     const newMcpSessionId = this.client.getMcpSessionId();
+
+    // Detect session ID mismatch: we tried to resume but server issued a new session.
+    // This means the server forgot our session — treat it as expired rather than
+    // silently continuing with a new session identity.
+    if (
+      this.options.mcpSessionId &&
+      newMcpSessionId &&
+      newMcpSessionId !== this.options.mcpSessionId
+    ) {
+      logger.warn(
+        `Server issued new MCP session ID instead of resuming ` +
+          `(old: ${this.options.mcpSessionId}, new: ${newMcpSessionId}). Marking as expired.`
+      );
+      throw new Error(
+        `Session expired: server did not resume MCP session ` +
+          `(expected ${this.options.mcpSessionId}, got ${newMcpSessionId})`
+      );
+    }
+
     const sessionUpdate: Parameters<typeof updateSession>[1] = {
       lastSeenAt: new Date().toISOString(),
+      status: 'active',
     };
     if (serverDetails.protocolVersion) {
       sessionUpdate.protocolVersion = serverDetails.protocolVersion;

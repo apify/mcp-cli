@@ -604,20 +604,19 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
 export function reconnectCrashedSessions(sessionNames: string[]): void {
   for (const name of sessionNames) {
     logger.debug(`Reconnecting crashed bridge for session: ${name}`);
-    restartBridge(name)
-      .then(async () => {
-        // Bridge reconnected — clear 'reconnecting' status
-        await updateSession(name, { status: 'active' });
-        logger.debug(`Reconnection succeeded for ${name}, status set to active`);
-      })
-      .catch(async (err) => {
-        logger.debug(`Reconnection failed for ${name}: ${(err as Error).message}`);
-        // Revert to 'crashed' so the next consolidation can retry
-        try {
+    // Fire-and-forget: the bridge process itself will set the final status
+    // ('active' on success, 'expired' if server forgot session, 'unauthorized' on auth error)
+    restartBridge(name).catch(async (err) => {
+      logger.debug(`Reconnection failed for ${name}: ${(err as Error).message}`);
+      // Revert to 'crashed' only if the bridge hasn't already set a terminal status
+      try {
+        const session = await getSession(name);
+        if (session?.status === 'reconnecting') {
           await updateSession(name, { status: 'crashed' });
-        } catch {
-          // Ignore - session may have been deleted
         }
-      });
+      } catch {
+        // Ignore - session may have been deleted
+      }
+    });
   }
 }
