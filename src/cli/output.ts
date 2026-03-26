@@ -460,6 +460,24 @@ export function formatToolParamsInline(schema: Record<string, unknown>): string 
  * Format tools summary list (shared by compact and full modes)
  * Format: * `tool_name(params)` [annotations]
  */
+/**
+ * Format a single tool as a compact bullet line: * `tool_name (params)` [annotations]
+ */
+export function formatToolLine(tool: Tool): string {
+  const bullet = chalk.dim('*');
+  const params = formatToolParamsInline(tool.inputSchema as Record<string, unknown>);
+  const parts: string[] = [];
+  const annotationsStr = formatToolAnnotations(tool.annotations);
+  if (annotationsStr) parts.push(annotationsStr);
+  // Show task execution mode
+  const toolAny = tool as Record<string, unknown>;
+  const execution = toolAny.execution as Record<string, unknown> | undefined;
+  const taskSupport = execution?.taskSupport as string | undefined;
+  if (taskSupport) parts.push(`task:${taskSupport}`);
+  const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
+  return `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)} ${params}${grayBacktick()}${suffix}`;
+}
+
 function formatToolsSummary(tools: Tool[]): string[] {
   const lines: string[] = [];
 
@@ -467,21 +485,8 @@ function formatToolsSummary(tools: Tool[]): string[] {
   lines.push(chalk.bold(`Tools (${tools.length}):`));
 
   // Summary list of tools
-  const bullet = chalk.dim('*');
   for (const tool of tools) {
-    const params = formatToolParamsInline(tool.inputSchema as Record<string, unknown>);
-    const parts: string[] = [];
-    const annotationsStr = formatToolAnnotations(tool.annotations);
-    if (annotationsStr) parts.push(annotationsStr);
-    // Show task execution mode
-    const toolAny = tool as Record<string, unknown>;
-    const execution = toolAny.execution as Record<string, unknown> | undefined;
-    const taskSupport = execution?.taskSupport as string | undefined;
-    if (taskSupport) parts.push(`task:${taskSupport}`);
-    const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
-    lines.push(
-      `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)} ${params}${grayBacktick()}${suffix}`
-    );
+    lines.push(formatToolLine(tool));
   }
 
   return lines;

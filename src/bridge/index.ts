@@ -392,11 +392,19 @@ class BridgeProcess {
           'Bridge startup failed, will stay alive briefly for CLI to receive error:',
           error
         );
-        this.mcpClientReadyRejecter(error as Error);
+        // Classify the error so it propagates with the correct error type via IPC
+        // Raw SDK errors (plain Error) would get default code 2 (ServerError) in sendError(),
+        // losing the auth/session-expired distinction. Wrap as AuthError so the CLI
+        // can detect it via `instanceof AuthError` after deserialization.
+        const errorMsg = (error as Error).message || '';
+        let classifiedError: Error = error as Error;
+        if (isAuthenticationError(errorMsg) && !(error instanceof AuthError)) {
+          classifiedError = new AuthError(errorMsg);
+        }
+        this.mcpClientReadyRejecter(classifiedError);
 
         // If the error was due to session ID rejection or auth failure, mark session status
         // User must explicitly use 'mcpc @session restart' or 'mcpc login' to recover
-        const errorMsg = (error as Error).message || '';
         if (isSessionExpiredError(errorMsg)) {
           logger.warn('Session rejected by server (expired session ID), marking as expired');
           try {
