@@ -9,12 +9,7 @@ import { isProcessAlive } from '../../lib/utils.js';
 import { consolidateSessions } from '../../lib/sessions.js';
 import { withSessionClient } from '../../lib/session-client.js';
 import { withMcpClient } from '../helpers.js';
-import {
-  formatJson,
-  formatToolLine,
-  grayBacktick,
-  inBackticks,
-} from '../output.js';
+import { formatJson, formatToolLine, grayBacktick, inBackticks } from '../output.js';
 import type { IMcpClient } from '../../lib/types.js';
 import { getBridgeStatus, formatBridgeStatus } from './sessions.js';
 
@@ -278,7 +273,6 @@ function truncateResult(
     truncated: total - limit,
   };
 }
-
 
 /**
  * Format a single resource as a compact bullet line
