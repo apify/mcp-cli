@@ -371,9 +371,11 @@ export async function consolidateSessions(
         }
       }
 
-      // Identify crashed sessions eligible for automatic restart
+      // Identify crashed or unauthorized sessions eligible for automatic reconnection.
+      // Unauthorized sessions are included because another session sharing the same OAuth
+      // profile may have refreshed the tokens — the bridge reads from keychain on startup.
       for (const [name, session] of Object.entries(storage.sessions)) {
-        if (session?.status === 'crashed' && !session.pid) {
+        if ((session?.status === 'crashed' || session?.status === 'unauthorized') && !session.pid) {
           // Skip if a connection was already attempted within the cooldown window
           const lastAttempt = session.lastConnectionAttemptAt
             ? new Date(session.lastConnectionAttemptAt).getTime()
