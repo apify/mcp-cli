@@ -357,56 +357,15 @@ Still, sessions can fail due to network disconnects, bridge process crash, or se
 
 **Session states:**
 
-| State                  | Meaning                                                                                            |
-| ---------------------- | -------------------------------------------------------------------------------------------------- |
-| 🟢 **`live`**          | Bridge process running and server responding                                                       |
-| 🟡 **`connecting`**    | Initial bridge startup in progress (`mcpc connect`)                                                |
-| 🟡 **`reconnecting`**  | Bridge crashed or lost auth; auto-reconnecting in the background                                   |
-| 🟡 **`disconnected`**  | Bridge process running but server unreachable; auto-recovers when server responds                  |
-| 🟡 **`crashed`**       | Bridge process crashed or was killed; auto-reconnects in the background                            |
-| 🔴 **`unauthorized`**  | Server rejected authentication (401/403) or token refresh failed; auto-reconnects or needs `login` |
-| 🔴 **`expired`**       | Server rejected session ID (404); requires `restart`                                               |
-
-**State transitions:**
-
-```
-                mcpc connect
-                     │
-                     ▼
-              ┌──────────────┐
-              │  connecting  │
-              └──────┬───────┘
-                     │ bridge ready
-                     ▼
-              ┌──────────────┐  server unresponsive  ┌──────────────┐
-         ┌───▶│     live     │◀─────────────────────▶│ disconnected │
-         │    └──┬───────┬───┘  server responds      └──────────────┘
-         │       │       │
-         │       │       │ server rejects          server rejects
-         │       │       │ session ID (404)         auth (401/403)
-         │       │       │                               │
-         │       │       ▼                               ▼
-         │       │  ┌─────────┐                  ┌──────────────┐
-         │       │  │ expired │                  │ unauthorized │
-         │       │  └────┬────┘                  └──────┬───────┘
-         │       │       │ mcpc restart                 │ auto-reconnect
-         │       │       │                              │ (tokens refreshed
-         │       │       │  ┌───────────────────────────┘  by other session)
-         │       │       │  │
-         │       │       ▼  ▼
-         │       │  ┌──────────────┐
-         │       │  │ reconnecting │◀──── auto-reconnect
-         │       │  └──────┬───────┘
-         │       │     success │
-         │       │         │   ╲  failure
-         │       │         │    ╲
-         │       ▼         │     ▼
-         │  ┌─────────┐   │
-         │  │ crashed  ├───┘
-         │  └──────────┘
-         │         │ success
-         └─────────┘
-```
+| State                 | Meaning                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| 🟢**`live`**          | Bridge process running and server responding                                                       |
+| 🟡**`connecting`**   | Initial bridge startup in progress (`mcpc connect`)                                                |
+| 🟡**`reconnecting`** | Bridge crashed or lost auth; auto-reconnecting in the background                                   |
+| 🟡**`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds                  |
+| 🟡**`crashed`**      | Bridge process crashed or was killed; auto-reconnects in the background                            |
+| 🔴**`unauthorized`** | Server rejected authentication (401/403) or token refresh failed; auto-reconnects or needs `login` |
+| 🔴**`expired`**      | Server rejected session ID (404); requires `restart`                                               |
 
 Here's how `mcpc` handles various bridge process and server connection states:
 
