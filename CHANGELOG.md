@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- QR code display for wallet address in `x402 init`, `x402 import`, and `x402 info` commands, allowing users to scan and fund the wallet directly from the terminal
+
 ### Changed
 
 - Release process migrated from local `scripts/publish.sh` to GitHub Actions; `npm run release` now triggers the CI workflow instead of running locally
