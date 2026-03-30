@@ -1,6 +1,6 @@
 {
   "name": "@apify/mcpc",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Universal command-line client for the Model Context Protocol (MCP).",
   "type": "module",
   "keywords": [
@@ -62,6 +62,7 @@
     "commander": "^14.0.2",
     "ora": "^9.0.0",
     "proper-lockfile": "^4.1.2",
+    "qrcode-terminal": "^0.12.0",
     "undici": "^7.22.0",
     "uuid": "^13.0.0",
     "viem": "^2.46.3"
@@ -70,6 +71,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^25.0.3",
     "@types/proper-lockfile": "^4.1.4",
+    "@types/qrcode-terminal": "^0.12.2",
     "@types/uuid": "^11.0.0",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",

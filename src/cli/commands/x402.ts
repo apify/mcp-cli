@@ -4,6 +4,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import qrcode from 'qrcode-terminal';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import type { Hex } from 'viem';
 import { formatSuccess, formatError, formatInfo, formatJson } from '../output.js';
@@ -17,6 +18,32 @@ import { signPayment, parsePaymentRequired } from '../../lib/x402/signer.js';
 // ---------------------------------------------------------------------------
 
 const USDC_DECIMALS = 6;
+
+/**
+ * Generate a QR code string for the given text using small (half-block) mode.
+ */
+function generateQrCode(text: string): Promise<string> {
+  return new Promise((resolve) => {
+    qrcode.generate(text, { small: true }, (code) => {
+      resolve(code);
+    });
+  });
+}
+
+/**
+ * Print a QR code for an Ethereum address so the user can scan it to fund the wallet.
+ */
+async function printAddressQrCode(address: string): Promise<void> {
+  const qr = await generateQrCode(address);
+  console.log('');
+  console.log(chalk.bold('  Scan to fund this wallet:'));
+  console.log(
+    qr
+      .split('\n')
+      .map((line) => `  ${line}`)
+      .join('\n')
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Command: init
@@ -45,6 +72,7 @@ async function initWallet(options: { outputMode: OutputMode }): Promise<void> {
     console.log(formatSuccess('Wallet created'));
     console.log(formatInfo(`Address: ${chalk.cyan(account.address)}`));
     console.log(formatInfo('Fund this address with USDC on Base to use x402 payments.'));
+    await printAddressQrCode(account.address);
   }
 }
 
@@ -86,6 +114,8 @@ async function importWallet(options: {
   } else {
     console.log(formatSuccess('Wallet imported'));
     console.log(formatInfo(`Address: ${chalk.cyan(account.address)}`));
+    console.log(formatInfo('Fund this address with USDC on Base to use x402 payments.'));
+    await printAddressQrCode(account.address);
   }
 }
 
@@ -110,6 +140,7 @@ async function walletInfo(options: { outputMode: OutputMode }): Promise<void> {
 
   console.log(`  ${chalk.bold('Address')}   ${chalk.cyan(wallet.address)}`);
   console.log(`  ${chalk.bold('Created')}   ${wallet.createdAt}`);
+  await printAddressQrCode(wallet.address);
 }
 
 // ---------------------------------------------------------------------------

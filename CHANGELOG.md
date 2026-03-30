@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-30
+
+### Added
+
+- QR code display for wallet address in `x402 init`, `x402 import`, and `x402 info` commands, allowing users to scan and fund the wallet directly from the terminal
+
 ### Changed
 
 - Auto-reconnect crashed and unauthorized bridge processes in the background when enumerating sessions (`mcpc` or `mcpc grep`), with a 10-second cooldown between reconnection attempts. Unauthorized sessions benefit from OAuth tokens refreshed by other sessions sharing the same profile.
@@ -178,7 +184,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive shell mode
 - JSON output mode for scripting
 
-[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/apify/mcpc/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/apify/mcpc/compare/v0.1.10...v0.2.0
 [0.1.10]: https://github.com/apify/mcpc/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/apify/mcpc/compare/v0.1.8...v0.1.9
