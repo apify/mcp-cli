@@ -1211,7 +1211,7 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 | Tool                                                                    | Lang   | Stars | Contrib / Commits | Active | Tools | Resources | Prompts | Tasks | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | x402 | LLM |
 | ----------------------------------------------------------------------- | ------ | ----: | -----------------: | ------ | ----- | --------- | ------- | ----- | --------- | -------- | ----- | ----- | ---- | ----------- | ---- | --- |
-| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~420 |           7 / ~510 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | ✅       | ✅    | ✅    | ✅   | —           | ✅   | —   |
+| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~420 |           7 / ~510 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | ✅   | —   |
 | [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~3.5k |          24 / ~570 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | —   |
 | [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k |          22 / ~790 | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | ✅  |
 | [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python | ~1.8k |           5 / ~76  | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —    | —   |
