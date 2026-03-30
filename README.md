@@ -1202,24 +1202,24 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 ### MCP CLI clients
 
-<!-- Stars and activity as of March 2026. -->
+<!-- Stars, contributors, commits, and activity as of March 2026. -->
 
-| Tool                                                                    | Lang   | Stars | Active | Tools | Resources | Prompts | Tasks | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
-| ----------------------------------------------------------------------- | ------ | ----: | ------ | ----- | --------- | ------- | ----- | --------- | -------- | ----- | ----- | ---- | ----------- | --- |
-| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~400 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
-| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~3.2k | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
-| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | ✅  |
-| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python | ~1.7k | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —   |
-| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k | ⚠️     | ✅    | ✅        | ✅      | —     | ✅        | —        | —     | ✅    | ✅   | —           | —   |
-| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     | ~1.0k | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
-| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | —     | ✅    | —    | —           | ✅  |
-| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~640 | ✅     | ✅    | —         | —       | —     | —         | —        | ✅    | ✅    | ✅   | ✅          | —   |
-| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~430 | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | ✅    | —     | ✅   | —           | —   |
-| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~53 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —   |
-| [evantahler/mcpx](https://github.com/evantahler/mcpx)                   | TS     |   ~26 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | —        | ✅    | ✅    | ✅   | ✅          | —   |
-| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~15 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
+| Tool                                                                    | Lang   | Stars | Contrib / Commits | Active | Tools | Resources | Prompts | Tasks | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | x402 | LLM |
+| ----------------------------------------------------------------------- | ------ | ----: | -----------------: | ------ | ----- | --------- | ------- | ----- | --------- | -------- | ----- | ----- | ---- | ----------- | ---- | --- |
+| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~420 |           7 / ~510 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | ✅       | ✅    | ✅    | ✅   | —           | ✅   | —   |
+| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~3.5k |          24 / ~570 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | —   |
+| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k |          22 / ~790 | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | ✅  |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python | ~1.8k |           5 / ~76  | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k |          15 / ~170 | ⚠️     | ✅    | ✅        | ✅      | —     | ✅        | —        | —     | ✅    | ✅   | —           | —    | —   |
+| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     | ~1.1k |           2 / ~30  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —    | —   |
+| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 |          6 / ~110  | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | —     | ✅    | —    | —           | —    | ✅  |
+| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~640 |           1 / ~60  | ✅     | ✅    | —         | —       | —     | —         | —        | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~430 |           4 / ~63  | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | ✅    | —     | ✅   | —           | —    | —   |
+| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~54 |           1 / ~13  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —    | —   |
+| [evantahler/mcpx](https://github.com/evantahler/mcpx)                   | TS     |   ~28 |           1 / ~64  | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | —        | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~15 |          ~2 / ~46  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —    | —   |
 
-**Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **Tasks** = [async tasks](https://modelcontextprotocol.io/specification/latest/server/utilities/tasks), **LLM** = requires/uses an LLM.
+**Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **Contrib / Commits** = contributors / total commits, **Tasks** = [async tasks](https://modelcontextprotocol.io/specification/latest/server/utilities/tasks), **x402** = [x402 payment protocol](https://www.x402.org/) support, **LLM** = requires/uses an LLM.
 
 **Notes:**
 
