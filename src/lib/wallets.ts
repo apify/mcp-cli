@@ -64,15 +64,10 @@ async function saveStorageInternal(storage: WalletsStorage): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function getWallet(): Promise<WalletData | undefined> {
-  // Try OS keychain first for secure storage
   if (await isKeychainAvailable()) {
-    const keychainWallet = await readKeychainX402Wallet<WalletData>();
-    if (keychainWallet) {
-      return keychainWallet;
-    }
+    return readKeychainX402Wallet<WalletData>();
   }
 
-  // Fallback to wallets.json (also used for backward compatibility)
   return withFileLock(
     getWalletsFilePath(),
     async () => {
@@ -84,58 +79,41 @@ export async function getWallet(): Promise<WalletData | undefined> {
 }
 
 export async function saveWallet(wallet: WalletData): Promise<void> {
-  const useKeychain = await isKeychainAvailable();
-
-  if (useKeychain) {
+  if (await isKeychainAvailable()) {
     await storeKeychainX402Wallet(wallet);
+    return;
   }
 
-  // Update or clean up the fallback JSON file
   const filePath = getWalletsFilePath();
-  if (!useKeychain || (await fileExists(filePath))) {
-    await withFileLock(
-      filePath,
-      async () => {
-        const storage = await loadStorageInternal();
-
-        if (!useKeychain) {
-          // Store in JSON if keychain is unavailable
-          storage.wallet = wallet;
-        } else if (storage.wallet) {
-          // If using keychain, remove the wallet from JSON to avoid split-brain
-          delete storage.wallet;
-        }
-
-        await saveStorageInternal(storage);
-      },
-      WALLETS_DEFAULT_CONTENT
-    );
-  }
+  await withFileLock(
+    filePath,
+    async () => {
+      const storage = await loadStorageInternal();
+      storage.wallet = wallet;
+      await saveStorageInternal(storage);
+    },
+    WALLETS_DEFAULT_CONTENT
+  );
 }
 
 export async function removeWallet(): Promise<boolean> {
-  let keychainRemoved = false;
   if (await isKeychainAvailable()) {
-    keychainRemoved = await removeKeychainX402Wallet();
+    return removeKeychainX402Wallet();
   }
 
   const filePath = getWalletsFilePath();
-  let jsonRemoved = false;
+  if (!(await fileExists(filePath))) return false;
 
-  if (await fileExists(filePath)) {
-    jsonRemoved = await withFileLock(
-      filePath,
-      async () => {
-        const storage = await loadStorageInternal();
-        if (!storage.wallet) return false;
+  return withFileLock(
+    filePath,
+    async () => {
+      const storage = await loadStorageInternal();
+      if (!storage.wallet) return false;
 
-        delete storage.wallet;
-        await saveStorageInternal(storage);
-        return true;
-      },
-      WALLETS_DEFAULT_CONTENT
-    );
-  }
-
-  return keychainRemoved || jsonRemoved;
+      delete storage.wallet;
+      await saveStorageInternal(storage);
+      return true;
+    },
+    WALLETS_DEFAULT_CONTENT
+  );
 }
