@@ -58,6 +58,11 @@ async function initWallet(options: { outputMode: OutputMode }): Promise<void> {
     );
   }
 
+  if (options.outputMode !== 'json') {
+    console.log(formatWarning('This feature is experimental, use at your own risk.'));
+    console.log('');
+  }
+
   const privateKey = generatePrivateKey();
   const account = privateKeyToAccount(privateKey);
 
@@ -95,6 +100,11 @@ async function importWallet(options: {
     throw new ClientError(
       `Wallet already exists (address: ${existing.address}). Use "mcpc x402 remove" first.`
     );
+  }
+
+  if (options.outputMode !== 'json') {
+    console.log(formatWarning('This feature is experimental, use at your own risk.'));
+    console.log('');
   }
 
   let key = options.privateKey.trim();
