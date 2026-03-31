@@ -8,7 +8,7 @@ import qrcode from 'qrcode-terminal';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { createPublicClient, http, formatEther, formatUnits, erc20Abi, type Hex } from 'viem';
 import { base } from 'viem/chains';
-import { formatSuccess, formatError, formatInfo, formatJson } from '../output.js';
+import { formatSuccess, formatError, formatInfo, formatWarning, formatJson } from '../output.js';
 import { getWallet, saveWallet, removeWallet } from '../../lib/wallets.js';
 import { ClientError } from '../../lib/errors.js';
 import type { OutputMode } from '../../lib/types.js';
@@ -58,6 +58,11 @@ async function initWallet(options: { outputMode: OutputMode }): Promise<void> {
     );
   }
 
+  if (options.outputMode !== 'json') {
+    console.log(formatWarning('This feature is experimental, use at your own risk.'));
+    console.log('');
+  }
+
   const privateKey = generatePrivateKey();
   const account = privateKeyToAccount(privateKey);
 
@@ -90,6 +95,11 @@ async function importWallet(options: {
     throw new ClientError(
       `Wallet already exists (address: ${existing.address}). Use "mcpc x402 remove" first.`
     );
+  }
+
+  if (options.outputMode !== 'json') {
+    console.log(formatWarning('This feature is experimental, use at your own risk.'));
+    console.log('');
   }
 
   let key = options.privateKey.trim();
