@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Experimental disclaimer warning when creating an x402 wallet via `mcpc x402 init`
+
 ## [0.2.3] - 2026-03-31
 
 ## [0.2.2] - 2026-03-31
