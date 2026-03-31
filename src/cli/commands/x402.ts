@@ -58,11 +58,6 @@ async function initWallet(options: { outputMode: OutputMode }): Promise<void> {
     );
   }
 
-  if (options.outputMode !== 'json') {
-    console.log(formatWarning('This feature is experimental, use at your own risk.'));
-    console.log('');
-  }
-
   const privateKey = generatePrivateKey();
   const account = privateKeyToAccount(privateKey);
 
@@ -75,6 +70,12 @@ async function initWallet(options: { outputMode: OutputMode }): Promise<void> {
   if (options.outputMode === 'json') {
     console.log(formatJson({ address: account.address }));
   } else {
+    console.log(
+      formatWarning(
+        'x402 support is experimental. Use at your own risk — funds sent to this wallet may be lost.'
+      )
+    );
+    console.log('');
     console.log(formatSuccess('Wallet created'));
     console.log(formatInfo(`Address: ${chalk.cyan(account.address)}`));
     console.log(formatInfo('Fund this address with USDC on Base to use x402 payments.'));
@@ -95,11 +96,6 @@ async function importWallet(options: {
     throw new ClientError(
       `Wallet already exists (address: ${existing.address}). Use "mcpc x402 remove" first.`
     );
-  }
-
-  if (options.outputMode !== 'json') {
-    console.log(formatWarning('This feature is experimental, use at your own risk.'));
-    console.log('');
   }
 
   let key = options.privateKey.trim();
@@ -123,6 +119,12 @@ async function importWallet(options: {
   if (options.outputMode === 'json') {
     console.log(formatJson({ address: account.address }));
   } else {
+    console.log(
+      formatWarning(
+        'x402 support is experimental. Use at your own risk — funds sent to this wallet may be lost.'
+      )
+    );
+    console.log('');
     console.log(formatSuccess('Wallet imported'));
     console.log(formatInfo(`Address: ${chalk.cyan(account.address)}`));
     console.log(formatInfo('Fund this address with USDC on Base to use x402 payments.'));
