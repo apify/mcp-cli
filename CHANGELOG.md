@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - "ESC to detach" hint now shows immediately in the spinner when using `--task`, instead of waiting for the server to return a task ID
 
+### Fixed
+
+- Session incorrectly marked as `unauthorized` when access token expires but refresh token is still valid; bridge now attempts token refresh before giving up
+
 ## [0.2.3] - 2026-03-31
 
 ## [0.2.2] - 2026-03-31
