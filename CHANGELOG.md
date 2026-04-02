@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Experimental feature warning for `x402 init` and `x402 import` commands
 
+### Fixed
+
+- "ESC to detach" hint now shows immediately in the spinner when using `--task`, instead of waiting for the server to return a task ID
+
 ## [0.2.3] - 2026-03-31
 
 ## [0.2.2] - 2026-03-31
