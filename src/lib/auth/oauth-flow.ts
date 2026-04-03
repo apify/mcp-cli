@@ -437,7 +437,8 @@ export async function performOAuthFlow(
   serverUrl: string,
   profileName: string,
   scope?: string,
-  clientCredentials?: { clientId?: string; clientSecret?: string; clientMetadataUrl?: string }
+  clientCredentials?: { clientId?: string; clientSecret?: string; clientMetadataUrl?: string },
+  callbackPort?: number
 ): Promise<OAuthFlowResult> {
   logger.debug(`Starting OAuth flow for ${serverUrl} (profile: ${profileName})`);
 
@@ -455,7 +456,7 @@ export async function performOAuthFlow(
   }
 
   // Find available port for callback server
-  const port = await findAvailablePort(8000);
+  const port = callbackPort || await findAvailablePort(8000);
   const redirectUrl = `http://localhost:${port}/callback`;
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);

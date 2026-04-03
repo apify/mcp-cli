@@ -21,6 +21,7 @@ export async function login(
     clientId?: string;
     clientSecret?: string;
     clientMetadataUrl?: string;
+    callbackPort?: number;
   }
 ): Promise<void> {
   try {
@@ -64,7 +65,8 @@ export async function login(
       normalizedUrl,
       profileName,
       options.scope,
-      clientCredentials
+      clientCredentials,
+      options.callbackPort
     );
 
     if (options.outputMode === 'human') {

@@ -599,6 +599,11 @@ ${chalk.bold('OAuth client registration approaches:')}
 ${jsonHelp('Interactive prompts are written to stderr, stdout contains a clean JSON object', '`{ profile, serverUrl, scopes }`')}
 `
     )
+    .option(
+      '--callback-port <port>',
+      'OAuth callback port (default: auto-select from 8000)',
+      parseInt
+    )
     .action(async (server, opts, command) => {
       if (!server) {
         throw new ClientError(
@@ -611,6 +616,7 @@ ${jsonHelp('Interactive prompts are written to stderr, stdout contains a clean J
         clientId: opts.clientId,
         clientSecret: opts.clientSecret,
         clientMetadataUrl: opts.clientMetadataUrl,
+        callbackPort: opts.callbackPort,
         ...getOptionsFromCommand(command),
       });
     });
