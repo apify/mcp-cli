@@ -460,6 +460,11 @@ exclusive. Providing both will result in a clear error. Use one or the other.
    - If authentication fails (expired/invalid) → Fail with an error
 2. **Profile doesn't exist**: Fail with an error
 
+**When `--x402` is specified (without `--profile`):**
+
+- OAuth profile auto-detection is skipped, since x402 serves as the payment/auth mechanism
+- If you also pass `--profile`, the specified profile is still used alongside x402
+
 **When `--no-profile` is specified:**
 
 - Skip all OAuth profile detection and connect anonymously
@@ -499,6 +504,9 @@ mcpc connect mcp.apify.com @apify-personal
 
 # Explicit bearer token - skips profile auto-detection:
 mcpc connect mcp.apify.com @apify --header "Authorization: Bearer ${APIFY_TOKEN}"
+
+# x402 payment - skips default profile auto-detection:
+mcpc connect mcp.apify.com @apify --x402
 
 # Anonymous - skips default profile even if it exists:
 mcpc connect mcp.apify.com @apify-anon --no-profile

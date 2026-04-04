@@ -202,9 +202,37 @@ const sessionHeadersAccount = (sessionName: string): string => `session:${sessio
 const proxyBearerTokenAccount = (sessionName: string): string =>
   `session:${sessionName}:proxy-bearer-token`;
 
+const x402WalletAccount = (): string => `x402-wallet`;
+
 // =============================================================================
 // Public API
 // =============================================================================
+
+export async function isKeychainAvailable(): Promise<boolean> {
+  await ensureProbed();
+  return keychainAvailable === true;
+}
+
+export async function setKeychainOnly(account: string, value: string): Promise<void> {
+  await ensureProbed();
+  if (keychainAvailable !== true) throw new Error('Keychain is not available');
+  const EntryClass = await getEntry();
+  new EntryClass(SERVICE_NAME, account).setPassword(value);
+}
+
+export async function getKeychainOnly(account: string): Promise<string | null> {
+  await ensureProbed();
+  if (keychainAvailable !== true) throw new Error('Keychain is not available');
+  const EntryClass = await getEntry();
+  return new EntryClass(SERVICE_NAME, account).getPassword() ?? null;
+}
+
+export async function deleteKeychainOnly(account: string): Promise<boolean> {
+  await ensureProbed();
+  if (keychainAvailable !== true) throw new Error('Keychain is not available');
+  const EntryClass = await getEntry();
+  return new EntryClass(SERVICE_NAME, account).deletePassword();
+}
 
 /** Store OAuth client registration info for an auth profile. */
 export async function storeKeychainOAuthClientInfo(
@@ -315,4 +343,35 @@ export async function readKeychainProxyBearerToken(
 export async function removeKeychainProxyBearerToken(sessionName: string): Promise<boolean> {
   logger.debug(`Deleting proxy bearer token for session ${sessionName}`);
   return keychainDelete(proxyBearerTokenAccount(sessionName));
+}
+
+/** Store the x402 wallet data. */
+export async function storeKeychainX402Wallet<T>(wallet: T): Promise<void> {
+  logger.debug(`Storing x402 wallet in OS keychain`);
+  await setKeychainOnly(x402WalletAccount(), JSON.stringify(wallet));
+}
+
+/** Read the x402 wallet data. */
+export async function readKeychainX402Wallet<T>(): Promise<T | undefined> {
+  logger.debug(`Retrieving x402 wallet from OS keychain`);
+  try {
+    const raw = await getKeychainOnly(x402WalletAccount());
+    if (!raw) return undefined;
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    if ((error as Error).message === 'Keychain is not available') return undefined;
+    logger.error(`Failed to parse x402 wallet: ${(error as Error).message}`);
+    return undefined;
+  }
+}
+
+/** Delete the x402 wallet data. */
+export async function removeKeychainX402Wallet(): Promise<boolean> {
+  logger.debug(`Deleting x402 wallet from OS keychain`);
+  try {
+    return await deleteKeychainOnly(x402WalletAccount());
+  } catch (error) {
+    if ((error as Error).message === 'Keychain is not available') return false;
+    throw error;
+  }
 }

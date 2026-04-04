@@ -6,8 +6,9 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import qrcode from 'qrcode-terminal';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import type { Hex } from 'viem';
-import { formatSuccess, formatError, formatInfo, formatJson } from '../output.js';
+import { createPublicClient, http, formatEther, formatUnits, erc20Abi, type Hex } from 'viem';
+import { base } from 'viem/chains';
+import { formatSuccess, formatError, formatInfo, formatWarning, formatJson } from '../output.js';
 import { getWallet, saveWallet, removeWallet } from '../../lib/wallets.js';
 import { ClientError } from '../../lib/errors.js';
 import type { OutputMode } from '../../lib/types.js';
@@ -69,6 +70,12 @@ async function initWallet(options: { outputMode: OutputMode }): Promise<void> {
   if (options.outputMode === 'json') {
     console.log(formatJson({ address: account.address }));
   } else {
+    console.log(
+      formatWarning(
+        'x402 support is experimental. Use at your own risk — funds sent to this wallet may be lost.'
+      )
+    );
+    console.log('');
     console.log(formatSuccess('Wallet created'));
     console.log(formatInfo(`Address: ${chalk.cyan(account.address)}`));
     console.log(formatInfo('Fund this address with USDC on Base to use x402 payments.'));
@@ -112,6 +119,12 @@ async function importWallet(options: {
   if (options.outputMode === 'json') {
     console.log(formatJson({ address: account.address }));
   } else {
+    console.log(
+      formatWarning(
+        'x402 support is experimental. Use at your own risk — funds sent to this wallet may be lost.'
+      )
+    );
+    console.log('');
     console.log(formatSuccess('Wallet imported'));
     console.log(formatInfo(`Address: ${chalk.cyan(account.address)}`));
     console.log(formatInfo('Fund this address with USDC on Base to use x402 payments.'));
@@ -123,23 +136,70 @@ async function importWallet(options: {
 // Command: info
 // ---------------------------------------------------------------------------
 
+const USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+
 async function walletInfo(options: { outputMode: OutputMode }): Promise<void> {
   const wallet = await getWallet();
 
+  if (!wallet) {
+    if (options.outputMode === 'json') {
+      console.log(formatJson(null));
+    } else {
+      console.log(formatInfo('No wallet configured. Create one with: mcpc x402 init'));
+    }
+    return;
+  }
+
+  const publicClient = createPublicClient({
+    chain: base,
+    transport: http('https://mainnet.base.org'),
+  });
+
+  let ethBalance = '0';
+  let usdcBalance = '0';
+  let balanceError = false;
+
+  try {
+    const [eth, usdc] = await Promise.all([
+      publicClient.getBalance({ address: wallet.address as Hex }),
+      publicClient.readContract({
+        address: USDC_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [wallet.address as Hex],
+      }),
+    ]);
+
+    ethBalance = formatEther(eth);
+    usdcBalance = formatUnits(usdc, USDC_DECIMALS);
+  } catch (err) {
+    balanceError = true;
+  }
+
   if (options.outputMode === 'json') {
     console.log(
-      formatJson(wallet ? { address: wallet.address, createdAt: wallet.createdAt } : null)
+      formatJson({
+        address: wallet.address,
+        createdAt: wallet.createdAt,
+        balances: balanceError
+          ? null
+          : {
+              eth: ethBalance,
+              usdc: usdcBalance,
+            },
+      })
     );
     return;
   }
 
-  if (!wallet) {
-    console.log(formatInfo('No wallet configured. Create one with: mcpc x402 init'));
-    return;
+  console.log(`  ${chalk.bold('Address')}        ${chalk.cyan(wallet.address)}`);
+  console.log(`  ${chalk.bold('Created')}        ${wallet.createdAt}`);
+  if (!balanceError) {
+    console.log(`  ${chalk.bold('ETH Balance')}    ${ethBalance}`);
+    console.log(`  ${chalk.bold('USDC Balance')}   ${usdcBalance}`);
+  } else {
+    console.log(`  ${chalk.bold('Balances')}       ${chalk.red('Failed to fetch')}`);
   }
-
-  console.log(`  ${chalk.bold('Address')}   ${chalk.cyan(wallet.address)}`);
-  console.log(`  ${chalk.bold('Created')}   ${wallet.createdAt}`);
   await printAddressQrCode(wallet.address);
 }
 

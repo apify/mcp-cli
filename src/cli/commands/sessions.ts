@@ -183,6 +183,7 @@ export async function connectSession(
   // Skip OAuth profile resolution when:
   // - --no-profile is specified (explicit anonymous connection)
   // - --header "Authorization: ..." is provided (explicit bearer token)
+  // - --x402 is specified (x402 payment auth instead of OAuth)
   let profileName: string | undefined;
   if (serverConfig.url) {
     if (options.noProfile) {
@@ -191,6 +192,10 @@ export async function connectSession(
       logger.debug(
         'Skipping OAuth profile auto-detection: explicit Authorization header provided via --header'
       );
+    } else if (options.x402 && !options.profile) {
+      // When using --x402 without explicit --profile, don't try to auto-discover default profile
+      // since x402 itself serves as the authentication mechanism
+      logger.debug('Skipping OAuth profile auto-detection: --x402 specified');
     } else {
       profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
         sessionName: name,
@@ -678,7 +683,7 @@ export async function restartSession(
     // `mcpc login <server>` to create a default profile, and restarts the session.
     const hasExplicitAuthHeader = headers?.Authorization !== undefined;
     let profileName = session.profileName;
-    if (!profileName && serverConfig.url && !hasExplicitAuthHeader) {
+    if (!profileName && serverConfig.url && !hasExplicitAuthHeader && !session.x402) {
       profileName = await resolveAuthProfile(serverConfig.url, serverConfig.url, undefined, {
         sessionName: name,
       });
