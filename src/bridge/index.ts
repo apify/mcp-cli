@@ -777,7 +777,9 @@ class BridgeProcess {
       // If we have a token manager, try to refresh before giving up
       if (this.tokenManager) {
         try {
-          logger.info('Authentication error detected, attempting token refresh before giving up...');
+          logger.info(
+            'Authentication error detected, attempting token refresh before giving up...'
+          );
           await this.tokenManager.refreshAccessToken();
           logger.info('Token refresh succeeded — session will recover on next request');
           return;
