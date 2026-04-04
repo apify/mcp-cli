@@ -263,20 +263,26 @@ export async function callTool(
       let lastProgressMessage: string | undefined;
       let capturedTaskId: string | undefined;
 
+      // Set up ESC key listener for detaching (TTY + human mode only, not in interactive shell)
+      const escListener = setupEscListener(
+        options.outputMode === 'human' && !process.stdin.isRaw,
+        () => !!capturedTaskId
+      );
+
+      const escHintText = escListener.promise ? ` ${chalk.dim('(ESC to detach)')}` : '';
+
       const updateSpinnerText = (): void => {
         if (!spinner) return;
         const elapsed = formatElapsed(Date.now() - startTime);
         const progressSuffix = lastProgressMessage ? ` ${chalk.dim(lastProgressMessage)}` : '';
         const statusSuffix =
           !lastProgressMessage && lastStatusMessage ? ` ${chalk.dim(lastStatusMessage)}` : '';
-        const escHint =
-          capturedTaskId && escListener.promise ? ` ${chalk.dim('(ESC to detach)')}` : '';
-        spinner.text = `Running tool ${chalk.bold(name)}... (${elapsed})${progressSuffix}${statusSuffix}${escHint}`;
+        spinner.text = `Running tool ${chalk.bold(name)}... (${elapsed})${progressSuffix}${statusSuffix}${escHintText}`;
       };
 
       if (options.outputMode === 'human') {
         spinner = ora({
-          text: `Running tool ${chalk.bold(name)}... (0:00)`,
+          text: `Running tool ${chalk.bold(name)}... (0:00)${escHintText}`,
           color: 'cyan',
         }).start();
         timerInterval = setInterval(updateSpinnerText, 1000);
@@ -296,12 +302,6 @@ export async function callTool(
           updateSpinnerText();
         }
       };
-
-      // Set up ESC key listener for detaching (TTY + human mode only, not in interactive shell)
-      const escListener = setupEscListener(
-        options.outputMode === 'human' && !process.stdin.isRaw,
-        () => !!capturedTaskId
-      );
 
       try {
         const taskPromise = client.callToolWithTask(name, parsedArgs, onUpdate);
