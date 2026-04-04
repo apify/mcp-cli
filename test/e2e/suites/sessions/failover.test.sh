@@ -34,13 +34,24 @@ test_pass
 
 # Test: kill bridge process
 test_case "kill bridge process"
-kill "$bridge_pid" 2>/dev/null || true
+_kill_tree "$bridge_pid"
 sleep 1
 
 # Verify it's no longer running
-if kill -0 "$bridge_pid" 2>/dev/null; then
-  test_fail "bridge should not be running"
-  exit 1
+if is_windows; then
+  if tasklist //FI "PID eq $bridge_pid" //NH 2>/dev/null | grep -q "$bridge_pid"; then
+    test_fail "bridge should not be running"
+    exit 1
+  fi
+  # On Windows, force-kill doesn't allow graceful shutdown (no HTTP DELETE),
+  # so the server still has the session active. Expire it via control API
+  # to simulate the session being invalidated.
+  curl -s -X POST "$TEST_SERVER_URL/control/expire-session" >/dev/null
+else
+  if kill -0 "$bridge_pid" 2>/dev/null; then
+    test_fail "bridge should not be running"
+    exit 1
+  fi
 fi
 test_pass
 
@@ -72,6 +83,10 @@ test_pass
 
 # Test: explicit restart recovers from expired session
 test_case "explicit restart recovers from expired session"
+# Reset server state so the restarted bridge can connect
+if is_windows; then
+  curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
+fi
 run_mcpc "$SESSION" restart
 assert_success
 test_pass

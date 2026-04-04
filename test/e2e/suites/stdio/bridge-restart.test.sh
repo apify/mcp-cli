@@ -36,20 +36,34 @@ test_pass
 
 # Test: verify bridge process is running
 test_case "verify bridge process is running"
-if ! kill -0 "$original_pid" 2>/dev/null; then
-  test_fail "bridge process should be running"
-  exit 1
+if is_windows; then
+  if ! tasklist //FI "PID eq $original_pid" //NH 2>/dev/null | grep -q "$original_pid"; then
+    test_fail "bridge process should be running"
+    exit 1
+  fi
+else
+  if ! kill -0 "$original_pid" 2>/dev/null; then
+    test_fail "bridge process should be running"
+    exit 1
+  fi
 fi
 test_pass
 
 # Test: kill the bridge process
 test_case "kill bridge process"
-kill "$original_pid"
+_kill_tree "$original_pid"
 # Wait for process to actually die
 sleep 1
-if kill -0 "$original_pid" 2>/dev/null; then
-  test_fail "bridge process should have been killed"
-  exit 1
+if is_windows; then
+  if tasklist //FI "PID eq $original_pid" //NH 2>/dev/null | grep -q "$original_pid"; then
+    test_fail "bridge process should have been killed"
+    exit 1
+  fi
+else
+  if kill -0 "$original_pid" 2>/dev/null; then
+    test_fail "bridge process should have been killed"
+    exit 1
+  fi
 fi
 test_pass
 
@@ -78,7 +92,7 @@ test_pass
 # Test: create a test file and read it via restarted session
 test_case "file operations work after restart"
 echo "Content after restart test" > "$TEST_TMP/restart-test.txt"
-run_xmcpc "$SESSION" tools-call read_file "path:=$TEST_TMP/restart-test.txt"
+run_xmcpc "$SESSION" tools-call read_file "path:=$NATIVE_TEST_TMP/restart-test.txt"
 assert_success
 assert_contains "$STDOUT" "Content after restart test"
 test_pass
@@ -87,7 +101,7 @@ test_pass
 test_case "bridge restarts multiple times"
 run_mcpc --json
 second_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
-kill "$second_pid"
+_kill_tree "$second_pid"
 sleep 1
 
 # Use session again - should restart
