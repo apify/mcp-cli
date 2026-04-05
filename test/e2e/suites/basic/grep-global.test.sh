@@ -170,7 +170,7 @@ test_pass
 test_case "global grep --json includes instructions in results"
 run_mcpc --json grep "sample tools, resources, and prompts"
 assert_success
-assert_json "$STDOUT" '[.sessions[] | select(.instructions == true)] | length > 0'
+assert_json "$STDOUT" '[.sessions[] | select(.instructions | type == "string")] | length > 0'
 test_pass
 
 # =============================================================================

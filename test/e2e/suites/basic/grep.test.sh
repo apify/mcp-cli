@@ -109,13 +109,13 @@ test_case "grep --json --instructions returns instructions field"
 run_mcpc --json "$SESSION" grep "sample tools" --instructions
 assert_success
 assert_json_valid "$STDOUT"
-assert_json "$STDOUT" '.sessions[0].instructions == true'
+assert_json "$STDOUT" '.sessions[0].instructions | type == "string"'
 test_pass
 
 test_case "grep --json default includes instructions field"
 run_mcpc --json "$SESSION" grep "sample tools"
 assert_success
-assert_json "$STDOUT" '.sessions[0].instructions == true'
+assert_json "$STDOUT" '.sessions[0].instructions | type == "string"'
 test_pass
 
 test_case "grep --json instructions false when no match"
