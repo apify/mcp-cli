@@ -39,6 +39,8 @@
 $ mcpc @github tools-call get_file_contents arg:="yes" # NOW
 $ mcpc @github/get_file_contents arg:="yes"  # NEW
 
+Reduce CLI errors:
+Syntax errors: mcpc call linear_list_issues instead of mcpc @linear tools-call list_issues. Resolved after mcpc --help.
 
 
 ## Code mode

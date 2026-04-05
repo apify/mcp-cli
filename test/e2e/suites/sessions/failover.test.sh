@@ -55,11 +55,15 @@ else
 fi
 test_pass
 
-# Test: session shows as crashed
-test_case "session shows as crashed after bridge kill"
+# Test: session shows as crashed or reconnecting
+test_case "session shows as crashed or reconnecting after bridge kill"
 run_mcpc --json
 session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .status")
-assert_eq "$session_status" "crashed" "session should show as crashed"
+# Session may show as "crashed" (bridge dead) or "reconnecting" (auto-reconnect in progress)
+if [[ "$session_status" != "crashed" && "$session_status" != "reconnecting" ]]; then
+  test_fail "session should show as crashed or reconnecting, got: $session_status"
+  exit 1
+fi
 test_pass
 
 # Test: using crashed session attempts restart but server rejects old session ID
