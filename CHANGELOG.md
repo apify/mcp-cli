@@ -10,11 +10,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `connect` command now auto-generates session name when `@session` is omitted (e.g., `mcpc connect mcp.apify.com` creates `@apify`). If a session for the same server already exists with matching auth settings, it is reused instead of creating a duplicate.
+- Experimental feature warning for `x402 init` and `x402 import` commands
+- Windows E2E tests via manual-dispatch GitHub Actions workflow (`e2e-windows.yml`) — cross-platform test framework with MSYS path conversion, cached `tasklist` process detection, graceful bridge shutdown via IPC, and Windows named pipe support
 
 ### Fixed
 
-- Fixed auth loss when reconnecting an unauthorized session via `mcpc connect` — the `unauthorized` status was not cleared, causing all subsequent operations to fail with "Authentication required by server" even after successful reconnection
-- HTTP proxy support (`HTTP_PROXY`/`HTTPS_PROXY` env vars) now works for MCP server connections, OAuth token refresh, and x402 payment signing — previously the MCP SDK transport and OAuth calls bypassed the global proxy dispatcher
+- "ESC to detach" hint now shows immediately in the spinner when using `--task`, instead of waiting for the server to return a task ID
+
+## [0.2.3] - 2026-03-31
+
+## [0.2.2] - 2026-03-31
+
+## [0.2.1] - 2026-03-30
+
+### Added
+
+- Secure x402 wallet storage using OS keychain integration with fallback to `wallets.json` for compatibility
+- QR code display for wallet address in `x402 init`, `x402 import`, and `x402 info` commands, allowing users to scan and fund the wallet directly from the terminal
+
+### Changed
+
+- Auto-reconnect crashed and unauthorized bridge processes in the background when enumerating sessions (`mcpc` or `mcpc grep`), with a 10-second cooldown between reconnection attempts. Unauthorized sessions benefit from OAuth tokens refreshed by other sessions sharing the same profile.
+
+### Fixed
+
+- Fixed expired sessions falsely showing as `live` after auto-reconnect — the bridge now detects when the server did not resume the original MCP session (including when no session ID is returned) and marks the session as `expired`
+- Bridge sends first keepalive ping 5 seconds after startup (instead of waiting the full 30-second interval) to detect stale sessions earlier
+
+## [0.2.0] - 2026-03-24
+
+### Added
+
+- New `mcpc grep <pattern>` command to search tools, resources, prompts, and instructions across all active sessions, with regex, type filters, and single-session search support
+- New `tasks-list`, `tasks-get`, `tasks-cancel` commands for managing async tasks on the server
+- `--task` flag for `tools-call` to opt-in to task execution with progress spinner; `--detach` to start a task and return the task ID immediately; press ESC during `--task` to detach on the fly
+- `--insecure` global option to skip TLS certificate verification
+- `--client-id` and `--client-secret` options for `mcpc login`, for servers that don't support dynamic client registration
+- `--no-profile` option for `connect` to skip OAuth profile auto-detection
+- `mcpc login` now falls back to accepting a pasted callback URL when the browser cannot be opened (e.g. headless servers, containers)
+- `tools-list` now shows inline parameter signatures (e.g. `read_file(path: string, +4 optional)`) for quick scanning without `--full`
+- `mcpc @session` now shows available tools list from bridge cache (no extra server call)
 
 ### Changed
 
@@ -31,47 +66,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Direct one-shot URL access (e.g. `mcpc mcp.apify.com tools-list`) is removed; create a session first with `mcpc connect`.
 
-- Renamed `--async` flag to `--task` in `tools-call` for consistency with MCP specification; `--detach` now implies `--task`
-- Revised session states: auth failures (401/403) now show as `unauthorized` (separate from `expired` which is for session ID expiry), with actionable login guidance; new `disconnected` state surfaces when bridge is alive but server has been unreachable for >2 minutes
+- Revised session states: `unauthorized` (401/403), `disconnected` (bridge alive but server unreachable >2min), and `expired` (session ID rejected), each with actionable guidance
 - When `--profile` is not specified, only the `default` profile is used; non-default profiles require an explicit `--profile` flag
-- `@napi-rs/keyring` native addon is now loaded lazily: `mcpc` starts and works normally even when `libsecret` (Linux) or the addon itself is missing; a one-time warning is emitted and credentials fall back to `~/.mcpc/credentials.json` (mode 0600)
-- `x402 sign` now takes the PAYMENT-REQUIRED header as a positional argument instead of `-r` flag (e.g. `mcpc x402 sign <base64>`)
-- `tools-list` and `tools-get` now show `[task:optional]`, `[task:required]`, or `[task:forbidden]` instead of `[async]`
-- Tools cache now fetches all pages on startup and on `tools/list_changed` notifications; `tools-get` uses cached list first and only re-fetches if the tool is not found
-- `--header` / `-H` option is now specific to the `connect` command instead of being shown as a global option
-
-### Added
-
-- New `tasks-list`, `tasks-get`, `tasks-cancel` commands for managing async tasks on the server
-- `--task` flag for `tools-call` to opt-in to task execution with a progress spinner showing elapsed time, server status messages, and progress notifications in human mode
-- `--detach` flag for `tools-call` to start a task and return the task ID immediately without waiting for completion (implies `--task`)
-- Press ESC during `--task` execution to detach on the fly — the task continues in the background and the task ID is printed
-- `--insecure` global option to skip TLS certificate verification, for MCP servers with self-signed certificates
-- `--client-id` and `--client-secret` options for `mcpc login` command, for servers that don't support dynamic client registration
-- `--no-profile` option for `connect` command to skip OAuth profile auto-detection and connect anonymously
-- `mcpc close @session`, `mcpc restart @session`, and `mcpc shell @session` command-first syntax as alternatives to `mcpc @session close/restart/shell`
-- `mcpc login` now falls back to accepting a pasted callback URL when the browser cannot be opened (e.g. headless servers, containers)
-- `tools-list` now shows inline parameter signatures (e.g. `read_file(path: string, +4 optional)`) for quick scanning without `--full`
-- `mcpc @session` now shows available tools list from bridge cache (no extra server call)
-- Task capability and `execution.taskSupport` displayed in `tools-get` and server info
-- x402 payments are now also sent via the MCP `_meta["x402/payment"]` field on `tools/call` requests, in addition to the existing HTTP header
+- `@napi-rs/keyring` native addon is now loaded lazily; falls back to `~/.mcpc/credentials.json` when unavailable
+- `--header` / `-H` option is now specific to the `connect` command instead of being a global option
+- Tools cache now fetches all pages on startup and on `tools/list_changed` notifications
 
 ### Fixed
 
-- Explicit `--header "Authorization: Bearer ..."` is no longer silently ignored when a default OAuth profile exists for the same server; explicit CLI headers now take precedence over auto-detected profiles
-- Combining `--profile` with `--header "Authorization: ..."` now returns a clear error instead of silently stripping the header
-- Session restart now auto-detects the `default` OAuth profile created after the session was established, fixing the `login` then `restart` flow for unauthorized sessions
-- Sessions requiring authentication now correctly show as `expired` instead of `live` when the server rejects unauthenticated connections
-- Auth errors wrapped in `NetworkError` by bridge IPC are now detected on first health check, avoiding unnecessary bridge restart
+- HTTP proxy support (`HTTP_PROXY`/`HTTPS_PROXY`) now works for MCP server connections, OAuth token refresh, and x402 payment signing
+- Explicit `--header "Authorization: ..."` now takes precedence over auto-detected OAuth profiles
+- Fixed auth loss when reconnecting an unauthorized session via `mcpc connect`
+- Session restart now auto-detects the `default` OAuth profile created after the session was established
 - `--timeout` flag now correctly propagates to MCP requests via session bridge
 - `--task` and `--detach` tool calls now correctly send task creation parameters to the server
-- Bridge now forwards `logging/message` notifications from the MCP server to connected clients, so `logging-set-level` actually takes effect in interactive shell sessions
+- Bridge now forwards `logging/message` notifications to connected clients
 - IPC buffer between CLI and bridge process is now capped at 10 MB, preventing unbounded memory growth
-- `parseServerArg()` now handles Windows drive-letter config paths and other ambiguous cases
-- Misplaced subcommand-specific flags (e.g. `--full`, `--proxy`) now produce clear "Unknown option" errors instead of confusing rejections
-- `logging-set-level` JSON output no longer includes a redundant `success` field
-- `logTarget` no longer prints a misleading prefix when a session doesn't exist
-- File lock retries now use randomized exponential backoff to reduce contention
+- Fixed `mcpc help <command>` showing truncated usage line
 
 ## [0.1.10] - 2026-03-01
 
@@ -188,7 +199,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive shell mode
 - JSON output mode for scripting
 
-[Unreleased]: https://github.com/apify/mcpc/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/apify/mcpc/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/apify/mcpc/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/apify/mcpc/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/apify/mcpc/compare/v0.1.10...v0.2.0
 [0.1.10]: https://github.com/apify/mcpc/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/apify/mcpc/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/apify/mcpc/compare/v0.1.7...v0.1.8

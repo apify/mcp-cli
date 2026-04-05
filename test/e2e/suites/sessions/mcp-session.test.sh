@@ -64,8 +64,14 @@ bridge_pid=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .pid")
 assert_not_empty "$bridge_pid" "should have bridge PID"
 
 # Kill the bridge
-kill "$bridge_pid" 2>/dev/null || true
+_kill_tree "$bridge_pid"
 sleep 1
+
+# On Windows, force-kill doesn't allow graceful shutdown (no HTTP DELETE),
+# so the server still has the session active. Expire it via control API.
+if is_windows; then
+  curl -s -X POST "$TEST_SERVER_URL/control/expire-session" >/dev/null
+fi
 
 # Use session again - server should reject the old session ID
 # and bridge should mark session as expired (NOT auto-reconnect)
@@ -87,6 +93,10 @@ test_pass
 
 # Test: explicit restart creates new session
 test_case "explicit restart recovers from expired session"
+# Reset server state so the restarted bridge can connect
+if is_windows; then
+  curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
+fi
 run_mcpc "$SESSION" restart
 assert_success
 

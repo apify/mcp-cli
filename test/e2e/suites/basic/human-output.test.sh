@@ -25,14 +25,14 @@ test_pass
 test_case "tools-list contains header with count"
 run_mcpc "$SESSION" tools-list
 assert_success
-assert_contains "$STDOUT" "Available tools"
+assert_contains "$STDOUT" "Tools ("
 test_pass
 
 test_case "tools-list contains tool names in backticks"
 run_mcpc "$SESSION" tools-list
 assert_success
-assert_contains "$STDOUT" "\`echo("
-assert_contains "$STDOUT" "\`add("
+assert_contains "$STDOUT" "\`echo ("
+assert_contains "$STDOUT" "\`add ("
 test_pass
 
 test_case "tools-list uses * bullet character"
@@ -86,7 +86,7 @@ test_pass
 test_case "resources-list contains header with count"
 run_mcpc "$SESSION" resources-list
 assert_success
-assert_contains "$STDOUT" "Available resources"
+assert_contains "$STDOUT" "Resources ("
 test_pass
 
 test_case "resources-list contains resource URIs"
@@ -114,7 +114,7 @@ test_pass
 test_case "resources-templates-list contains header"
 run_mcpc "$SESSION" resources-templates-list
 assert_success
-assert_contains "$STDOUT" "Available resource templates"
+assert_contains "$STDOUT" "Resource templates ("
 test_pass
 
 test_case "resources-templates-list contains URI templates"
@@ -130,7 +130,7 @@ test_pass
 test_case "prompts-list contains header with count"
 run_mcpc "$SESSION" prompts-list
 assert_success
-assert_contains "$STDOUT" "Available prompts"
+assert_contains "$STDOUT" "Prompts ("
 test_pass
 
 test_case "prompts-list contains prompt names"

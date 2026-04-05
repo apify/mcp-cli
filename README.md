@@ -13,7 +13,7 @@ After all, UNIX-compatible shell script is THE most universal coding language.
 
 - 🌎 **Compatible** - Works with any MCP server over Streamable HTTP or stdio.
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
-- 🔧 **Strong MCP support** - Instructions, tools, resources, prompts, dynamic discovery.
+- 🔧 **Strong MCP support** - Instructions, tools, resources, prompts, async tasks, dynamic discovery.
 - 🔌 **Code mode** - JSON output enables integration with CLI tools like `jq` and scripting.
 - 🤖 **AI sandboxing** - MCP proxy server to securely access authenticated sessions from AI-generated code.
 - 🔒 **Secure** - Full OAuth 2.1 support, OS keychain for credentials storage.
@@ -106,51 +106,6 @@ mcpc @fs tools-list
 <!-- AUTO-GENERATED: mcpc --help -->
 
 ```
-Usage: mcpc [options] [<@session>] [<command>]
-
-Universal command-line client for the Model Context Protocol (MCP).
-
-Options:
-  -j, --json                   Output in JSON format for scripting
-  --verbose                    Enable debug logging
-  --profile <name>             OAuth profile for the server ("default" if not provided)
-  --schema <file>              Validate tool/prompt schema against expected schema
-  --schema-mode <mode>         Schema validation mode: strict, compatible (default), ignore
-  --timeout <seconds>          Request timeout in seconds (default: 300)
-  --insecure                   Skip TLS certificate verification (for self-signed certs)
-  -v, --version                Output the version number
-  -h, --help                   Display help
-
-Commands:
-  connect <server> <@session>  Connect to an MCP server and start a new named @session
-  close <@session>             Close a session
-  restart <@session>           Restart a session (losing all state)
-  shell <@session>             Open interactive shell for a session
-  login <server>               Interactively login to a server using OAuth and save profile
-  logout <server>              Delete an authentication profile for a server
-  clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
-  x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
-  help [command] [subcommand]  Show help for a specific command
-
-MCP session commands (after connecting):
-  <@session>                   Show MCP server info and capabilities
-  <@session> tools-list        List MCP tools
-  <@session> tools-get <name>
-  <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
-  <@session> prompts-list
-  <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
-  <@session> resources-list
-  <@session> resources-read <uri>
-  <@session> resources-subscribe <uri>
-  <@session> resources-unsubscribe <uri>
-  <@session> resources-templates-list
-  <@session> tasks-list
-  <@session> tasks-get <taskId>
-  <@session> tasks-cancel <taskId>
-  <@session> logging-set-level <level>
-  <@session> ping
-
-Run "mcpc" without arguments to show active sessions and OAuth profiles.
 ```
 
 ### General actions
@@ -265,6 +220,45 @@ mcpc @apify shell
 Shell commands: `help`, `exit`/`quit`/Ctrl+D, Ctrl+C to cancel.
 Arrow keys navigate history (saved to `~/.mcpc/history`).
 
+### Grep (search across sessions)
+
+`mcpc grep` searches tools, resources, and prompts across all active sessions or within a single session:
+
+```bash
+# Search tools and server instructions in all active sessions
+mcpc grep "search"
+
+# Search within a single session
+mcpc @apify grep "actor"
+
+# Search resources and prompts instead of the default tools and instructions
+mcpc grep "config" --resources --prompts
+
+# Regex search
+mcpc grep "search|find" -E
+
+# Case-sensitive search (default is case-insensitive)
+mcpc grep "Search" --case-sensitive
+
+# Limit results
+mcpc grep "e" -m 5
+
+# JSON output for scripting
+mcpc grep "actor" --json
+```
+
+By default, `grep` searches only tools. Use `--resources` or `--prompts` to search those types
+(combine with `--tools` to include tools too). Sessions that are crashed or unavailable are shown
+with their status rather than silently skipped.
+
+The `grep` command is useful for **dynamic tool discovery**, 
+also called [Tool search tool](https://www.anthropic.com/engineering/advanced-tool-use) by Anthropic
+or [Dynamic context discovery](https://cursor.com/blog/dynamic-context-discovery) by Cursor.
+Rather than loading all tools into AI agent's context, the agent can use `grep` to discover the right tool
+for the job, and only load the relevant tools into the context when needed to reduce token usage and improve accuracy.
+
+<!-- TODO: explain this more, show diagram -->
+
 ### JSON mode
 
 By default, `mcpc` prints output in Markdown-ish text format with colors, making it easy to read by both humans and AIs.
@@ -316,13 +310,15 @@ Still, sessions can fail due to network disconnects, bridge process crash, or se
 
 **Session states:**
 
-| State                 | Meaning                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------- |
-| 🟢 **`live`**         | Bridge process running and server responding                                                      |
-| 🟡 **`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds                 |
-| 🟡 **`crashed`**      | Bridge process crashed or was killed; auto-restarts on next use                                   |
-| 🔴 **`unauthorized`** | Server rejected authentication (401/403) or token refresh failed; requires `login` then `restart` |
-| 🔴 **`expired`**      | Server rejected session ID (404); requires `restart`                                              |
+| State                 | Meaning                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| 🟢**`live`**          | Bridge process running and server responding                                                       |
+| 🟡**`connecting`**   | Initial bridge startup in progress (`mcpc connect`)                                                |
+| 🟡**`reconnecting`** | Bridge crashed or lost auth; auto-reconnecting in the background                                   |
+| 🟡**`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds                  |
+| 🟡**`crashed`**      | Bridge process crashed or was killed; auto-reconnects in the background                            |
+| 🔴**`unauthorized`** | Server rejected authentication (401/403) or token refresh failed; auto-reconnects or needs `login` |
+| 🔴**`expired`**      | Server rejected session ID (404); requires `restart`                                               |
 
 Here's how `mcpc` handles various bridge process and server connection states:
 
@@ -332,14 +328,17 @@ Here's how `mcpc` handles various bridge process and server connection states:
     The bridge will keep trying to reconnect in the background and will return to 🟢 **`live`** once the server responds again.
   - If **server rejects authentication** (HTTP 401 or 403) or token refresh fails,
     the session is marked 🔴 **`unauthorized`**.
-    You need to re-authenticate with `mcpc login <server>` and then `mcpc @my-session restart`.
+    `mcpc` will auto-reconnect in the background if another session sharing the same OAuth profile has refreshed the tokens.
+    Otherwise, re-authenticate with `mcpc login <server>` and then `mcpc @my-session restart`.
   - If **server rejects the session ID** (HTTP 404), indicating the MCP session is no longer valid,
     the session is marked 🔴 **`expired`**.
     You need to restart the session with `mcpc @my-session restart` to establish a new connection.
-- If the **bridge process crashes**, `mcpc` will mark the session as 🟡 **`crashed`** on first use.
-  Next time you run `mcpc @my-session ...`, it will attempt to restart the bridge process.
-  - If bridge **restart succeeds**, everything starts again (see above).
-  - If bridge **restart fails**, `mcpc @my-session ...` returns error, and session remains marked 🟡 **`crashed`**.
+- If the **bridge process crashes**, `mcpc` will mark the session as 🟡 **`crashed`**
+  and auto-reconnect the bridge in the background. You can also trigger reconnection manually
+  by running any `mcpc @my-session ...` command.
+  - If reconnection **succeeds** and the server resumes the MCP session, the session returns to 🟢 **`live`**.
+  - If the server issues a **new session ID** instead of resuming, the session is marked 🔴 **`expired`**.
+  - If reconnection **fails**, the session remains 🟡 **`crashed`** and retries after a 10-second cooldown.
 
 Note that `mcpc` never automatically removes sessions from the list.
 Instead, it keeps them flagged as 🟡 **`crashed`**, 🔴 **`unauthorized`**, or 🔴 **`expired`**,
@@ -461,6 +460,11 @@ exclusive. Providing both will result in a clear error. Use one or the other.
    - If authentication fails (expired/invalid) → Fail with an error
 2. **Profile doesn't exist**: Fail with an error
 
+**When `--x402` is specified (without `--profile`):**
+
+- OAuth profile auto-detection is skipped, since x402 serves as the payment/auth mechanism
+- If you also pass `--profile`, the specified profile is still used alongside x402
+
 **When `--no-profile` is specified:**
 
 - Skip all OAuth profile detection and connect anonymously
@@ -500,6 +504,9 @@ mcpc connect mcp.apify.com @apify-personal
 
 # Explicit bearer token - skips profile auto-detection:
 mcpc connect mcp.apify.com @apify --header "Authorization: Bearer ${APIFY_TOKEN}"
+
+# x402 payment - skips default profile auto-detection:
+mcpc connect mcp.apify.com @apify --x402
 
 # Anonymous - skips default profile even if it exists:
 mcpc connect mcp.apify.com @apify-anon --no-profile
@@ -805,7 +812,7 @@ The bridge process manages the full MCP session lifecycle:
 | 🔔 [**Notifications**](#list-change-notifications) | ✅ Supported                      |
 | 📄 [**Pagination**](#pagination)                   | ✅ Supported                      |
 | 🏓 [**Ping**](#ping)                               | ✅ Supported                      |
-| ⏳ **Async tasks**                                 | 🚧 Planned                        |
+| ⏳ [**Async tasks**](#async-tasks)                  | ✅ Supported                      |
 | 📁 **Roots**                                       | 🚧 Planned                        |
 | ❓ **Elicitation**                                 | 🚧 Planned                        |
 | 🔤 **Completion**                                  | 🚧 Planned                        |
@@ -956,6 +963,35 @@ Send a ping to check if a server connection is alive:
 mcpc @apify ping
 mcpc @apify ping --json
 ```
+
+#### Async tasks
+
+MCP servers can execute tools as [async tasks](https://modelcontextprotocol.io/specification/latest/server/utilities/tasks)
+that run in the background and report progress. `mcpc` supports the full task lifecycle:
+
+```bash
+# Call a tool as a task (waits for completion, shows progress spinner)
+mcpc @apify tools-call long-running-job input:="data" --task
+
+# Start a task and return immediately with the task ID
+mcpc @apify tools-call long-running-job input:="data" --detach
+
+# List active tasks
+mcpc @apify tasks-list
+
+# Check task status
+mcpc @apify tasks-get <taskId>
+
+# Cancel a running task
+mcpc @apify tasks-cancel <taskId>
+```
+
+With `--task`, the CLI shows a progress spinner with elapsed time, server status messages,
+and progress notifications. Press **ESC** during execution to detach and get the task ID
+for later retrieval. With `--detach`, the task starts and returns the task ID immediately.
+
+`tools-list` and `tools-get` show task support annotations per tool:
+`[task:optional]`, `[task:required]`, or `[task:forbidden]`.
 
 ## Configuration
 
@@ -1179,23 +1215,24 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 ### MCP CLI clients
 
-<!-- Stars and activity as of March 2026. -->
+<!-- Stars, contributors, commits, and activity as of March 2026. -->
 
-| Tool                                                                    | Lang   | Stars | Active | Tools | Resources | Prompts | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
-| ----------------------------------------------------------------------- | ------ | ----: | ------ | ----- | --------- | ------- | --------- | -------- | ----- | ----- | ---- | ----------- | --- |
-| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~350 | ✅     | ✅    | ✅        | ✅      | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
-| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~2.6k | ✅     | ✅    | —         | —       | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
-| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k | ✅     | ✅    | ✅        | ✅      | ✅        | ✅       | ✅    | ✅    | ✅   | —           | ✅  |
-| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k | ⚠️     | ✅    | ✅        | ✅      | ✅        | —        | —     | ✅    | ✅   | —           | —   |
-| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     |  ~950 | ✅     | ✅    | —         | —       | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
-| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 | ⚠️     | ✅    | ✅        | ✅      | —         | —        | —     | ✅    | —    | —           | ✅  |
-| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~590 | ✅     | ✅    | —         | —       | —         | —        | ✅    | ✅    | ✅   | ✅          | —   |
-| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~420 | ⚠️     | ✅    | ✅        | ✅      | —         | —        | ✅    | —     | ✅   | —           | —   |
-| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python |  ~170 | ✅     | ✅    | ✅        | ✅      | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —   |
-| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~46 | ✅     | ✅    | —         | —       | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —   |
-| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~13 | ✅     | ✅    | —         | —       | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
+| Tool                                                                    | Lang   | Stars | Contrib / Commits | Active | Tools | Resources | Prompts | Tasks | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | x402 | LLM |
+| ----------------------------------------------------------------------- | ------ | ----: | -----------------: | ------ | ----- | --------- | ------- | ----- | --------- | -------- | ----- | ----- | ---- | ----------- | ---- | --- |
+| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~420 |           7 / ~510 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | ✅   | —   |
+| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~3.5k |          24 / ~570 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | —   |
+| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k |          22 / ~790 | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | ✅  |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python | ~1.8k |           5 / ~76  | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k |          15 / ~170 | ⚠️     | ✅    | ✅        | ✅      | —     | ✅        | —        | —     | ✅    | ✅   | —           | —    | —   |
+| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     | ~1.1k |           2 / ~30  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —    | —   |
+| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 |          6 / ~110  | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | —     | ✅    | —    | —           | —    | ✅  |
+| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~640 |           1 / ~60  | ✅     | ✅    | —         | —       | —     | —         | —        | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~430 |           4 / ~63  | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | ✅    | —     | ✅   | —           | —    | —   |
+| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~54 |           1 / ~13  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —    | —   |
+| [evantahler/mcpx](https://github.com/evantahler/mcpx)                   | TS     |   ~28 |           1 / ~64  | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | —        | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~15 |          ~2 / ~46  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —    | —   |
 
-**Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **LLM** = requires/uses an LLM.
+**Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **Contrib / Commits** = contributors / total commits, **Tasks** = [async tasks](https://modelcontextprotocol.io/specification/latest/server/utilities/tasks), **x402** = [x402 payment protocol](https://www.x402.org/) support, **LLM** = requires/uses an LLM.
 
 **Notes:**
 

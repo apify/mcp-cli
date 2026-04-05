@@ -9,6 +9,12 @@ import type { WalletData, WalletsStorage } from './types.js';
 import { getWalletsFilePath, fileExists, ensureDir, getMcpcHome } from './utils.js';
 import { withFileLock } from './file-lock.js';
 import { ClientError } from './errors.js';
+import {
+  isKeychainAvailable,
+  readKeychainX402Wallet,
+  storeKeychainX402Wallet,
+  removeKeychainX402Wallet,
+} from './auth/keychain.js';
 
 const WALLETS_DEFAULT_CONTENT = JSON.stringify({ version: 1 }, null, 2);
 
@@ -58,6 +64,10 @@ async function saveStorageInternal(storage: WalletsStorage): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function getWallet(): Promise<WalletData | undefined> {
+  if (await isKeychainAvailable()) {
+    return readKeychainX402Wallet<WalletData>();
+  }
+
   return withFileLock(
     getWalletsFilePath(),
     async () => {
@@ -69,6 +79,11 @@ export async function getWallet(): Promise<WalletData | undefined> {
 }
 
 export async function saveWallet(wallet: WalletData): Promise<void> {
+  if (await isKeychainAvailable()) {
+    await storeKeychainX402Wallet(wallet);
+    return;
+  }
+
   const filePath = getWalletsFilePath();
   await withFileLock(
     filePath,
@@ -82,12 +97,19 @@ export async function saveWallet(wallet: WalletData): Promise<void> {
 }
 
 export async function removeWallet(): Promise<boolean> {
+  if (await isKeychainAvailable()) {
+    return removeKeychainX402Wallet();
+  }
+
   const filePath = getWalletsFilePath();
+  if (!(await fileExists(filePath))) return false;
+
   return withFileLock(
     filePath,
     async () => {
       const storage = await loadStorageInternal();
       if (!storage.wallet) return false;
+
       delete storage.wallet;
       await saveStorageInternal(storage);
       return true;

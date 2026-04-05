@@ -178,8 +178,10 @@ mcpc/
 
 **Session States:**
 - 🟢 **live** - Bridge process running and server responding (lastSeenAt within 2 minutes)
+- 🟡 **connecting** - Initial bridge connection in progress (first `connect`)
+- 🟡 **reconnecting** - Bridge crashed and is being automatically reconnected
 - 🟡 **disconnected** - Bridge process running but server unreachable (lastSeenAt stale >2min); auto-recovers when server responds
-- 🟡 **crashed** - Bridge process crashed or killed; auto-restarts on next use
+- 🟡 **crashed** - Bridge process crashed or killed; auto-reconnects in the background
 - 🔴 **unauthorized** - Server rejected authentication (401/403) or token refresh failed; requires `login` then `restart`
 - 🔴 **expired** - Server rejected session ID (404); requires `restart`
 
@@ -529,7 +531,9 @@ Example: `mcpc @apify logging-set-level debug`
 
 After making any code changes, always run `npm run lint` and fix **all** errors before committing. Do not skip or ignore lint failures. The lint command checks both ESLint rules and Prettier formatting. To auto-fix issues, run `npm run lint:fix`. If auto-fix doesn't resolve everything, manually fix the remaining errors. Never commit code that fails `npm run lint`. **As the very last step of every task**, run `npm run lint` once more and fix any remaining issues before considering the work done.
 
-After lint passes, run `npm test` (unit tests) and fix any failures before committing. If a test fails due to your changes, update the test or fix the code so all tests pass. Never commit code that fails unit tests.
+After lint passes, run `npm run build` and fix any TypeScript compilation errors before committing. The CI runs `tsc` with strict settings (including `noUnusedLocals`) that may catch errors not reported by ESLint alone, such as unused imports or type errors. Never commit code that fails `npm run build`.
+
+After build passes, run `npm run test:unit` and fix any failures before committing. If a test fails due to your changes, update the test or fix the code so all tests pass. Never commit code that fails unit tests.
 
 For any non-trivial change (new feature, bug fix, behaviour change, or notable refactor), add an entry to the `[Unreleased]` section of `CHANGELOG.md` before finishing. Use the appropriate category (`Added`, `Changed`, `Fixed`, `Removed`). Skip purely internal changes such as test-only edits, code style fixes, or minor cosmetic/styling tweaks (e.g. changing colors, adjusting whitespace, renaming labels).
 
@@ -645,12 +649,19 @@ All MCP operations go through named sessions. Sessions are persistent bridge pro
 
 ## Releasing
 
-The release process is automated via `npm run release` (runs `scripts/publish.sh`). Before releasing:
+The release process is automated via GitHub Actions (`release.yml`). The local `npm run release` command is a thin wrapper that validates preconditions and triggers the workflow.
+
+Before releasing:
 
 1. **Update CHANGELOG.md** with all changes since the last release
-2. Run `npm run release` (or `npm run release minor` / `npm run release major`)
+2. Ensure your branch is clean, up-to-date with `origin/main`, and all CI checks pass
+3. Run `npm run release` (or `npm run release:minor` / `npm run release:major`)
 
-The script will: run tests, bump version, create git tag, push, publish to npm, and create GitHub release.
+The script validates preconditions locally, then triggers the `release.yml` GitHub Actions workflow which handles: lint, build, test, version bump, changelog update, README update, git commit/tag/push, npm publish (with provenance), and GitHub release creation.
+
+For pre-releases: `npm run release:pre` (or `npm run release:pre -- minor`)
+
+Monitor the release progress at the GitHub Actions URL that opens automatically.
 
 ### Changelog maintenance
 

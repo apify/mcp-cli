@@ -24,6 +24,10 @@ permissions:
   contents: write
   id-token: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Publish ${{ inputs.type }}
@@ -65,6 +69,10 @@ jobs:
 
       - name: Unit tests
         run: npm run test:unit
+
+      - name: Update README
+        if: inputs.type == 'release'
+        run: npm run build:readme
 
       # ── Pre-release ────────────────────────────────────────────────
       - name: Bump pre-release version
@@ -148,15 +156,15 @@ jobs:
 
       - name: Create GitHub pre-release
         if: inputs.type == 'pre-release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.prerelease.outputs.version }}
+          name: v${{ steps.prerelease.outputs.version }}
+          prerelease: true
+          generate_release_notes: true
+          target_commitish: ${{ github.sha }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${{ steps.prerelease.outputs.version }}"
-          gh release create "v${VERSION}" \
-            --title "v${VERSION}" \
-            --prerelease \
-            --generate-notes \
-            --target "${{ github.sha }}"
+          GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
       # ── Release ────────────────────────────────────────────────────
       - name: Bump release version
@@ -203,7 +211,7 @@ jobs:
           NEW_VERSION="${{ steps.release.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json CHANGELOG.md
+          git add package.json package-lock.json CHANGELOG.md README.md
           git commit -m "v${NEW_VERSION}"
           git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
           git push origin main
@@ -217,11 +225,10 @@ jobs:
 
       - name: Create GitHub release
         if: inputs.type == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.release.outputs.version }}
+          name: v${{ steps.release.outputs.version }}
+          generate_release_notes: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${{ steps.release.outputs.version }}"
-          gh release create "v${VERSION}" \
-            --title "v${VERSION}" \
-            --generate-notes \
-            --target "v${VERSION}"
+          GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}

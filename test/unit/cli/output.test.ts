@@ -263,7 +263,7 @@ describe('formatToolParamsInline', () => {
       },
       required: ['required1'],
     };
-    expect(formatToolParamsInline(schema)).toBe('(required1: num, optional1?: str)');
+    expect(formatToolParamsInline(schema)).toBe('(required1:num, optional1?:str)');
   });
 
   it('should truncate to 3 params with ellipsis', () => {
@@ -277,7 +277,7 @@ describe('formatToolParamsInline', () => {
       },
       required: ['a', 'b', 'c', 'd'],
     };
-    expect(formatToolParamsInline(schema)).toBe('(a: str, b: str, c: str, \u2026)');
+    expect(formatToolParamsInline(schema)).toBe('(a:str, b:str, c:str, \u2026)');
   });
 });
 
@@ -466,13 +466,13 @@ describe('formatTools', () => {
   describe('compact format (default)', () => {
     it('should show header with tool count', () => {
       const output = formatTools(sampleTools);
-      expect(output).toContain('Available tools (2):');
+      expect(output).toContain('Tools (2):');
     });
 
     it('should show tool names in backticks', () => {
       const output = formatTools(sampleTools);
-      expect(output).toContain('`search_web(');
-      expect(output).toContain('`run_actor(');
+      expect(output).toContain('`search_web (');
+      expect(output).toContain('`run_actor (');
     });
 
     it('should use * bullet character', () => {
@@ -483,9 +483,9 @@ describe('formatTools', () => {
     it('should show inline parameters with short types after tool name', () => {
       const output = formatTools(sampleTools);
       // search_web: 1 required + 2 optional = 3 total, all shown
-      expect(output).toContain('`search_web(query: str, maxResults?: num, language?: str)`');
+      expect(output).toContain('`search_web (query:str, maxResults?:num, language?:str)`');
       // run_actor: 1 required + 4 optional = 5 total, show first 3 + ellipsis
-      expect(output).toContain('`run_actor(actorId: str, input?: obj, memory?: num, \u2026)`');
+      expect(output).toContain('`run_actor (actorId:str, input?:obj, memory?:num, \u2026)`');
     });
 
     it('should show annotations after parameters', () => {
@@ -550,7 +550,7 @@ describe('formatTools', () => {
       ];
 
       const output = formatTools(tools);
-      expect(output).toContain('`no_params_tool()`');
+      expect(output).toContain('`no_params_tool ()`');
     });
 
     it('should handle tools with no description', () => {
@@ -565,12 +565,12 @@ describe('formatTools', () => {
       ];
 
       const output = formatTools(tools);
-      expect(output).toContain('`undocumented(arg?: str)`');
+      expect(output).toContain('`undocumented (arg?:str)`');
     });
 
     it('should handle empty tools array', () => {
       const output = formatTools([]);
-      expect(output).toContain('Available tools (0):');
+      expect(output).toContain('Tools (0):');
     });
 
     it('should show task mode for tools with task support', () => {
@@ -601,10 +601,10 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain('`optional_tool()` [task:optional]');
-      expect(output).toContain('`required_tool()` [task:required]');
-      expect(output).toContain('`forbidden_tool()` [task:forbidden]');
-      expect(output).not.toContain('`sync_tool()` [');
+      expect(output).toContain('`optional_tool ()` [task:optional]');
+      expect(output).toContain('`required_tool ()` [task:required]');
+      expect(output).toContain('`forbidden_tool ()` [task:forbidden]');
+      expect(output).not.toContain('`sync_tool ()` [');
     });
 
     it('should show all params when 3 or fewer total', () => {
@@ -624,7 +624,7 @@ describe('formatTools', () => {
       ] as Tool[];
 
       const output = formatTools(tools);
-      expect(output).toContain('`simple_tool(a: str, b?: num, c?: bool)`');
+      expect(output).toContain('`simple_tool (a:str, b?:num, c?:bool)`');
     });
 
     it('should show at most 3 params with ellipsis for the rest', () => {
@@ -647,7 +647,7 @@ describe('formatTools', () => {
 
       const output = formatTools(tools);
       // Required params first, then optional; max 3 shown + ellipsis
-      expect(output).toContain('`many_required(a: str, b: str, c: str, \u2026)`');
+      expect(output).toContain('`many_required (a:str, b:str, c:str, \u2026)`');
     });
 
     it('should combine annotations and task indicator', () => {
@@ -1008,7 +1008,7 @@ describe('formatResources', () => {
     const output = formatResources(resources);
 
     // Should have header with count
-    expect(output).toContain('Available resources (2):');
+    expect(output).toContain('Resources (2):');
 
     // Should have summary list
     expect(output).toContain('* `file:///home/user/data.json`');
@@ -1024,7 +1024,7 @@ describe('formatResources', () => {
   it('should show empty list message for no resources', () => {
     const resources: Resource[] = [];
     const output = formatResources(resources);
-    expect(output).toContain('Available resources (0):');
+    expect(output).toContain('Resources (0):');
   });
 });
 
@@ -1092,7 +1092,7 @@ describe('formatResourceTemplates', () => {
     const output = formatResourceTemplates(templates);
 
     // Should have header with count
-    expect(output).toContain('Available resource templates (2):');
+    expect(output).toContain('Resource templates (2):');
 
     // Should have summary list
     expect(output).toContain('* `file:///{path}`');
@@ -1152,7 +1152,7 @@ describe('formatPrompts', () => {
     const output = formatPrompts(prompts);
 
     // Should have header with count
-    expect(output).toContain('Available prompts (2):');
+    expect(output).toContain('Prompts (2):');
 
     // Should have summary list
     expect(output).toContain('* `greeting`');

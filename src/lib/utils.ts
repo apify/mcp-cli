@@ -4,6 +4,7 @@
  */
 
 import { createHash } from 'crypto';
+import { execFileSync } from 'child_process';
 import { homedir } from 'os';
 import { join, resolve, isAbsolute } from 'path';
 import { mkdir, access, constants } from 'fs/promises';
@@ -380,14 +381,59 @@ export function truncate(str: string, maxLength: number): string {
 }
 
 /**
- * Check if a process with the given PID is running
+ * Check if a process with the given PID is running.
+ *
+ * On Unix, `process.kill(pid, 0)` reliably checks process existence.
+ * On Windows, `process.kill(pid, 0)` can return false positives because
+ * the underlying `OpenProcess()` succeeds for zombie processes whose
+ * handles haven't been fully released. We use `tasklist` instead, with
+ * a short-lived cache so one call covers all PID checks within 2 seconds.
  */
 export function isProcessAlive(pid: number): boolean {
+  if (process.platform === 'win32') {
+    return isProcessAliveTasklist(pid);
+  }
   try {
-    // Sending signal 0 checks if process exists without killing it
     process.kill(pid, 0);
     return true;
   } catch {
+    return false;
+  }
+}
+
+/**
+ * Windows process alive check using cached tasklist output.
+ *
+ * A single `tasklist` call fetches all PIDs and caches them for 2 seconds.
+ * Subsequent checks within the TTL window are instant Set lookups.
+ * This reduces hundreds of 1-2s process spawns to a handful.
+ */
+let _tasklistCache: Set<number> | null = null;
+let _tasklistCacheTime = 0;
+const TASKLIST_CACHE_TTL = 2000; // 2 seconds
+
+function isProcessAliveTasklist(pid: number): boolean {
+  const now = Date.now();
+  if (_tasklistCache && now - _tasklistCacheTime < TASKLIST_CACHE_TTL) {
+    return _tasklistCache.has(pid);
+  }
+  try {
+    // Fetch ALL PIDs in one call (CSV format for reliable parsing)
+    const output = execFileSync('tasklist', ['/FO', 'CSV', '/NH'], {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 10000,
+    });
+    _tasklistCache = new Set<number>();
+    for (const line of output.split('\n')) {
+      // CSV format: "Image Name","PID","Session Name","Session#","Mem Usage"
+      const match = /"(\d+)"/.exec(line);
+      if (match) _tasklistCache.add(Number(match[1]));
+    }
+    _tasklistCacheTime = now;
+    return _tasklistCache.has(pid);
+  } catch {
+    _tasklistCache = null;
     return false;
   }
 }
