@@ -11,7 +11,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { initProxy } from '../lib/proxy.js';
-import { Command } from 'commander';
+import { Command, Help } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatHumanError, ClientError } from '../lib/index.js';
 import chalk from 'chalk';
@@ -311,11 +311,30 @@ function createTopLevelProgram(): Command {
   });
 
   // Strip [options] from the commands list (options are shown per-command via `mcpc help <cmd>`)
+  // Show Commands before Options in top-level help for better discoverability
   program.configureHelp({
     subcommandTerm: (cmd) =>
       `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
     styleTitle: (str) => chalk.bold(str),
     styleSubcommandText: (str) => chalk.cyan(str),
+    formatHelp: (cmd, helper) => {
+      const output = Help.prototype.formatHelp.call(helper, cmd, helper);
+      // Swap Options and Commands sections (separated by blank lines)
+      const sections = output.split('\n\n');
+      const optIdx = sections.findIndex((s: string) => s.includes('Options:'));
+      const cmdIdx = sections.findIndex((s: string) => s.includes('Commands:'));
+      if (optIdx >= 0 && cmdIdx >= 0 && optIdx < cmdIdx) {
+        const tmp = sections[optIdx] as string;
+        sections[optIdx] = sections[cmdIdx] as string;
+        sections[cmdIdx] = tmp;
+      }
+      return (
+        sections
+          .map((s: string) => s.trimEnd())
+          .filter((s: string) => s !== '')
+          .join('\n\n') + '\n'
+      );
+    },
   });
 
   // Use raw Markdown URL for pipes (AI agents), GitHub UI for TTY (humans)
@@ -328,7 +347,7 @@ function createTopLevelProgram(): Command {
     .description(
       `${rainbow('Universal')} command-line client for the Model Context Protocol (MCP).`
     )
-    .usage('[options] [<@session>] [<command>]')
+    .usage('[<@session>] [<command>] [options]')
     .option('-j, --json', 'Output in JSON format for scripting')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
@@ -344,7 +363,7 @@ function createTopLevelProgram(): Command {
     `
 ${chalk.bold('MCP session commands (after connecting):')}
   <@session>                   Show MCP server info, capabilities, and tools
-  <@session> ${chalk.cyan('grep')} <pattern>    Search tools, resources, or prompts
+  <@session> ${chalk.cyan('grep')} <pattern>    Search tools and instructions
   <@session> ${chalk.cyan('tools-list')}        List all server tools
   <@session> ${chalk.cyan('tools-get')} <name>  Get tool details and schema
   <@session> ${chalk.cyan('tools-call')} <name> [arg:=val ... | <json> | <stdin]
@@ -520,7 +539,7 @@ ${chalk.bold('Session name:')}
   program
     .command('logout [server]')
     .usage('<server>')
-    .description('Delete an authentication profile for a server')
+    .description('Delete an OAuth profile for a server')
     .option('--profile <name>', 'Profile name (default: "default")')
     .action(async (server, opts, command) => {
       if (!server) {
