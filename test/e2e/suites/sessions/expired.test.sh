@@ -8,7 +8,12 @@ test_init "sessions/expired" --isolated
 
 # Create a fake session record in sessions.json
 mkdir -p "$MCPC_HOME_DIR"
-cat > "$MCPC_HOME_DIR/sessions.json" << 'EOF'
+_fake_socket="/tmp/nonexistent.sock"
+if is_windows; then
+  # JSON requires double-backslashes for literal backslashes
+  _fake_socket="\\\\\\\\.\\\\pipe\\\\mcpc-nonexistent-test"
+fi
+cat > "$MCPC_HOME_DIR/sessions.json" << EOF
 {
   "sessions": {
     "@fake-session": {
@@ -16,7 +21,7 @@ cat > "$MCPC_HOME_DIR/sessions.json" << 'EOF'
       "target": "https://fake-server.example.com",
       "transport": "http",
       "pid": 99999,
-      "socketPath": "/tmp/nonexistent.sock",
+      "socketPath": "$_fake_socket",
       "createdAt": "2025-01-01T00:00:00Z",
       "updatedAt": "2025-01-01T00:00:00Z"
     }

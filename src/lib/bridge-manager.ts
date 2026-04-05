@@ -252,8 +252,16 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
 /**
  * Stop a bridge process (does NOT delete session or headers)
  * Use closeSession() for full session cleanup
+ *
+ * @param graceful - If true, attempt graceful shutdown via IPC so the bridge
+ *   can send HTTP DELETE to the server. Only needed for closeSession().
+ *   On Unix, SIGTERM always allows graceful shutdown. On Windows, SIGTERM
+ *   is equivalent to SIGKILL, so graceful mode sends an IPC message first.
  */
-export async function stopBridge(sessionName: string): Promise<void> {
+export async function stopBridge(
+  sessionName: string,
+  options?: { graceful?: boolean }
+): Promise<void> {
   logger.debug(`Stopping bridge for: ${sessionName}`);
 
   const session = await getSession(sessionName);
@@ -265,19 +273,36 @@ export async function stopBridge(sessionName: string): Promise<void> {
   // Kill the bridge process if it's still running
   if (session.pid && isProcessAlive(session.pid)) {
     try {
-      logger.debug(`Killing bridge process: ${session.pid}`);
-      process.kill(session.pid, 'SIGTERM');
+      if (process.platform === 'win32') {
+        // On Windows, SIGTERM calls TerminateProcess (immediate kill, no cleanup).
+        // For graceful shutdown (closeSession), send IPC message first so bridge
+        // can send HTTP DELETE. For restart, just kill immediately.
+        if (options?.graceful) {
+          const socketPath = getSocketPath(sessionName);
+          const shutdownOk = await sendBridgeShutdown(socketPath);
+          if (shutdownOk) {
+            await waitForProcessExit(session.pid, 2000);
+          }
+        }
+      } else {
+        logger.debug(`Sending SIGTERM to bridge process: ${session.pid}`);
+        process.kill(session.pid, 'SIGTERM');
 
-      // Wait for graceful shutdown (gives time for HTTP DELETE to be sent)
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Wait for graceful shutdown (gives time for HTTP DELETE to be sent)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
 
       // Force kill if still alive
       if (isProcessAlive(session.pid)) {
-        logger.debug('Bridge did not exit gracefully, sending SIGKILL');
-        process.kill(session.pid, 'SIGKILL');
+        logger.debug('Bridge did not exit gracefully, force killing');
+        try {
+          process.kill(session.pid, 'SIGKILL');
+        } catch {
+          // Ignore - process may have exited between check and kill
+        }
       }
     } catch (error) {
-      logger.warn('Error killing bridge process:', error);
+      logger.warn('Error stopping bridge process:', error);
     }
 
     logger.debug(`Bridge stopped for ${sessionName}`);
@@ -286,6 +311,43 @@ export async function stopBridge(sessionName: string): Promise<void> {
   // Note: Session record and headers are NOT deleted here.
   // They are preserved for failover scenarios (bridge restart).
   // Full cleanup happens in closeSession().
+}
+
+/**
+ * Send a shutdown command to the bridge via IPC socket.
+ * Returns true if the message was sent successfully, false otherwise.
+ */
+async function sendBridgeShutdown(socketPath: string): Promise<boolean> {
+  try {
+    const client = new BridgeClient(socketPath);
+    // Use a short timeout — if the bridge doesn't respond quickly,
+    // we'll fall back to force kill anyway.
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('shutdown timeout')), 2000)
+    );
+    await Promise.race([client.connect(), timeout]);
+    client.send({ type: 'shutdown' });
+    await client.close();
+    logger.debug('Sent shutdown IPC message to bridge');
+    return true;
+  } catch (error) {
+    logger.debug('Failed to send shutdown IPC message:', error);
+    return false;
+  }
+}
+
+/**
+ * Wait for a process to exit, with a timeout.
+ */
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<void> {
+  const start = Date.now();
+  const interval = 500;
+  while (Date.now() - start < timeoutMs) {
+    if (!isProcessAlive(pid)) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
 }
 
 /**

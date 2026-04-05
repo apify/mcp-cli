@@ -44,21 +44,21 @@ test_pass
 
 # Test: read file via MCP (read-only tool, safe for run_xmcpc)
 test_case "read file via MCP"
-run_xmcpc "$SESSION" tools-call read_file "path:=$TEST_TMP/test.txt"
+run_xmcpc "$SESSION" tools-call read_file "path:=$NATIVE_TEST_TMP/test.txt"
 assert_success
 assert_contains "$STDOUT" "Hello from E2E test"
 test_pass
 
 # Test: list directory via MCP (output includes temp files with random names, use run_mcpc)
 test_case "list directory via MCP"
-run_mcpc "$SESSION" tools-call list_directory "path:=$TEST_TMP"
+run_mcpc "$SESSION" tools-call list_directory "path:=$NATIVE_TEST_TMP"
 assert_success
 assert_contains "$STDOUT" "test.txt"
 test_pass
 
 # Test: write file via MCP
 test_case "write file via MCP"
-run_mcpc "$SESSION" tools-call write_file "path:=$TEST_TMP/written.txt" "content:=Written via MCP"
+run_mcpc "$SESSION" tools-call write_file "path:=$NATIVE_TEST_TMP/written.txt" "content:=Written via MCP"
 assert_success
 test_pass
 

@@ -536,8 +536,9 @@ export async function closeSession(
       throw new ClientError(`Session not found: ${name}`);
     }
 
-    // Stop the bridge process
-    await stopBridge(name);
+    // Stop the bridge process (graceful: send IPC shutdown on Windows so
+    // the bridge can send HTTP DELETE to the server before exiting)
+    await stopBridge(name, { graceful: true });
 
     // Delete session record from storage
     await deleteSession(name);
