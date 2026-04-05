@@ -437,10 +437,8 @@ ${chalk.bold('Session name:')}
       // Auto-generate session name if not provided
       if (!sessionName) {
         sessionName = await sessions.resolveSessionName(parsed, {
-          outputMode: globalOpts.outputMode,
-          profile: opts.profile as string | undefined,
+          ...globalOpts,
           headers,
-          noProfile: opts.noProfile as boolean | undefined,
         });
       }
 
