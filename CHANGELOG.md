@@ -9,8 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Unit test to verify README help section stays in sync with `mcpc --help` output
 - Experimental feature warning for `x402 init` and `x402 import` commands
 - Windows E2E tests via manual-dispatch GitHub Actions workflow (`e2e-windows.yml`) — cross-platform test framework with MSYS path conversion, cached `tasklist` process detection, graceful bridge shutdown via IPC, and Windows named pipe support
+
+### Changed
+
+- Reordered `mcpc --help` to show Commands before Options for better discoverability
 
 ### Fixed
 
