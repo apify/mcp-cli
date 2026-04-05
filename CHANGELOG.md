@@ -7,15 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Experimental feature warning for `x402 init` and `x402 import` commands
+- Windows E2E tests via manual-dispatch GitHub Actions workflow (`e2e-windows.yml`) — cross-platform test framework with MSYS path conversion, cached `tasklist` process detection, graceful bridge shutdown via IPC, and Windows named pipe support
+
+### Fixed
+
+- Session incorrectly marked as `unauthorized` when access token expires but refresh token is still valid; bridge now attempts token refresh before giving up
+- "ESC to detach" hint now shows immediately in the spinner when using `--task`, instead of waiting for the server to return a task ID
+
+## [0.2.3] - 2026-03-31
+
+## [0.2.2] - 2026-03-31
+
 ## [0.2.1] - 2026-03-30
 
 ### Added
 
+- Secure x402 wallet storage using OS keychain integration with fallback to `wallets.json` for compatibility
 - QR code display for wallet address in `x402 init`, `x402 import`, and `x402 info` commands, allowing users to scan and fund the wallet directly from the terminal
 
 ### Changed
 
-- Release process migrated from local `scripts/publish.sh` to GitHub Actions; `npm run release` now triggers the CI workflow instead of running locally
+- Auto-reconnect crashed and unauthorized bridge processes in the background when enumerating sessions (`mcpc` or `mcpc grep`), with a 10-second cooldown between reconnection attempts. Unauthorized sessions benefit from OAuth tokens refreshed by other sessions sharing the same profile.
+
+### Fixed
+
+- Fixed expired sessions falsely showing as `live` after auto-reconnect — the bridge now detects when the server did not resume the original MCP session (including when no session ID is returned) and marks the session as `expired`
+- Bridge sends first keepalive ping 5 seconds after startup (instead of waiting the full 30-second interval) to detect stale sessions earlier
 
 ## [0.2.0] - 2026-03-24
 
@@ -179,7 +199,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive shell mode
 - JSON output mode for scripting
 
-[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/apify/mcpc/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/apify/mcpc/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/apify/mcpc/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/apify/mcpc/compare/v0.1.10...v0.2.0
 [0.1.10]: https://github.com/apify/mcpc/compare/v0.1.9...v0.1.10

@@ -40,6 +40,13 @@ BLUE='\033[0;34m'
 DIM='\033[0;2m'
 NC='\033[0m'
 
+# Cross-platform helpers
+_UNAME_S="$(uname -s)"
+_is_windows() {
+  [[ "$_UNAME_S" == MINGW* || "$_UNAME_S" == MSYS* ]]
+}
+_TMPDIR="${TMPDIR:-${TEMP:-/tmp}}"
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -221,13 +228,15 @@ if [[ "$ISOLATED_ALL" == "true" ]]; then
   export E2E_ISOLATED_ALL=1
 fi
 
-# Shared home directory uses /tmp to keep socket paths short
+# Shared home directory uses temp dir to keep socket paths short
 # (Unix socket paths are limited to ~104 bytes)
-E2E_SHARED_HOME="/tmp/mcpc-e2e-$E2E_RUN_ID"
+E2E_SHARED_HOME="$_TMPDIR/mcpc-e2e-$E2E_RUN_ID"
 mkdir -p "$E2E_SHARED_HOME"
 export E2E_SHARED_HOME
-# Create a symlink in run directory for easy access
-ln -sf "$E2E_SHARED_HOME" "$RUN_DIR/_shared_home"
+# Create a symlink in run directory for easy access (skip on Windows where symlinks need privileges)
+if ! _is_windows; then
+  ln -sf "$E2E_SHARED_HOME" "$RUN_DIR/_shared_home"
+fi
 
 # Set up coverage collection if enabled
 if [[ "$COVERAGE" == "true" ]]; then
@@ -267,7 +276,6 @@ run_test() {
   fi
 }
 
-export -f run_test test_name
 export SCRIPT_DIR SUITES_DIR E2E_RUN_ID E2E_RUNS_DIR E2E_SHARED_HOME E2E_ISOLATED_ALL E2E_RUNTIME PROJECT_ROOT NODE_V8_COVERAGE
 
 # Run tests
@@ -291,8 +299,43 @@ if [[ "$VERBOSE" == "true" ]]; then
       echo -e "${RED}✗${NC} $name"
     fi
   done
+elif _is_windows; then
+  # On Windows, export -f is unreliable in Git Bash, so use background jobs.
+  # Each test gets a 5-minute timeout to prevent indefinite hangs.
+  _PER_TEST_TIMEOUT=300
+  _running=0
+  for test in "${TESTS[@]}"; do
+    test_id=$(test_name "$test")
+    test_dir="$E2E_RUNS_DIR/$E2E_RUN_ID/$test_id"
+    mkdir -p "$test_dir"
+    (
+      # Run test with a timeout: start test in background, kill if it exceeds limit
+      bash "$test" > "$test_dir/output.log" 2>&1 &
+      _test_pid=$!
+      (
+        sleep "$_PER_TEST_TIMEOUT"
+        echo "TIMEOUT: test '$test_id' exceeded ${_PER_TEST_TIMEOUT}s limit" >> "$test_dir/output.log"
+        kill -9 "$_test_pid" 2>/dev/null || true
+      ) &
+      _watchdog_pid=$!
+      if wait "$_test_pid" 2>/dev/null; then
+        echo "0" > "$test_dir/result"
+      else
+        echo "${?:-1}" > "$test_dir/result"
+      fi
+      kill "$_watchdog_pid" 2>/dev/null || true
+      wait "$_watchdog_pid" 2>/dev/null || true
+    ) &
+    ((_running++)) || true
+    if [[ $_running -ge $PARALLEL ]]; then
+      wait -n 2>/dev/null || wait
+      ((_running--)) || true
+    fi
+  done
+  wait
 else
-  # Parallel execution
+  # Parallel execution via xargs (Unix)
+  export -f run_test test_name
   printf '%s\n' "${TESTS[@]}" | xargs -P "$PARALLEL" -I {} bash -c 'run_test "$@"' _ {}
 fi
 
@@ -422,8 +465,12 @@ cleanup_bridges() {
 
   # Also kill any bridge processes that might have the home dir in their args
   # (in case sessions.json is already deleted or corrupted)
-  pkill -f "mcpc-bridge.*$home_dir" 2>/dev/null || true
-  pkill -f "mcpc/dist/bridge.*$home_dir" 2>/dev/null || true
+  if _is_windows; then
+    taskkill //F //IM node.exe 2>/dev/null || true
+  else
+    pkill -f "mcpc-bridge.*$home_dir" 2>/dev/null || true
+    pkill -f "mcpc/dist/bridge.*$home_dir" 2>/dev/null || true
+  fi
 
   # Give processes a moment to terminate
   sleep 0.5
@@ -431,8 +478,11 @@ cleanup_bridges() {
 
 # Kill any remaining test server processes
 cleanup_test_servers() {
-  # Kill any tsx/node processes running the test server
-  pkill -f "test/e2e/server/index.ts" 2>/dev/null || true
+  if _is_windows; then
+    :
+  else
+    pkill -f "test/e2e/server/index.ts" 2>/dev/null || true
+  fi
   sleep 0.2
 }
 

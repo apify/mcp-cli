@@ -30,7 +30,12 @@ import {
   consolidateSessions,
   getSession,
 } from '../../lib/sessions.js';
-import { startBridge, StartBridgeOptions, stopBridge } from '../../lib/bridge-manager.js';
+import {
+  startBridge,
+  StartBridgeOptions,
+  stopBridge,
+  reconnectCrashedSessions,
+} from '../../lib/bridge-manager.js';
 import {
   storeKeychainSessionHeaders,
   storeKeychainProxyBearerToken,
@@ -178,6 +183,7 @@ export async function connectSession(
   // Skip OAuth profile resolution when:
   // - --no-profile is specified (explicit anonymous connection)
   // - --header "Authorization: ..." is provided (explicit bearer token)
+  // - --x402 is specified (x402 payment auth instead of OAuth)
   let profileName: string | undefined;
   if (serverConfig.url) {
     if (options.noProfile) {
@@ -186,6 +192,10 @@ export async function connectSession(
       logger.debug(
         'Skipping OAuth profile auto-detection: explicit Authorization header provided via --header'
       );
+    } else if (options.x402 && !options.profile) {
+      // When using --x402 without explicit --profile, don't try to auto-discover default profile
+      // since x402 itself serves as the authentication mechanism
+      logger.debug('Skipping OAuth profile auto-detection: --x402 specified');
     } else {
       profileName = await resolveAuthProfile(serverConfig.url, target, options.profile, {
         sessionName: name,
@@ -249,6 +259,8 @@ export async function connectSession(
     await saveSession(name, {
       server: sessionTransportConfig,
       createdAt: new Date().toISOString(),
+      status: 'connecting',
+      lastConnectionAttemptAt: new Date().toISOString(),
       ...sessionUpdate,
     });
     logger.debug(`Initial session record created for: ${name}`);
@@ -279,8 +291,8 @@ export async function connectSession(
 
     const { pid } = await startBridge(bridgeOptions);
 
-    // Update session with bridge info (socket path is computed from session name)
-    await updateSession(name, { pid });
+    // Update session with bridge info and mark as active (clears 'connecting' status)
+    await updateSession(name, { pid, status: 'active' });
     logger.debug(`Session ${name} updated with bridge PID: ${pid}`);
   } catch (error) {
     // Clean up on bridge start failure
@@ -328,7 +340,14 @@ export async function connectSession(
 
 // DISCONNECTED_THRESHOLD_MS imported from ../../lib/types.js
 
-export type DisplayStatus = 'live' | 'disconnected' | 'crashed' | 'unauthorized' | 'expired';
+export type DisplayStatus =
+  | 'live'
+  | 'connecting'
+  | 'reconnecting'
+  | 'disconnected'
+  | 'crashed'
+  | 'unauthorized'
+  | 'expired';
 
 /**
  * Determine bridge status for a session
@@ -343,6 +362,10 @@ export function getBridgeStatus(session: {
   }
   if (session.status === 'expired') {
     return 'expired';
+  }
+  // Transient states: connecting (initial) or reconnecting (after crash)
+  if (session.status === 'connecting' || session.status === 'reconnecting') {
+    return session.status;
   }
   if (!session.pid || !isProcessAlive(session.pid)) {
     return 'crashed';
@@ -364,6 +387,10 @@ export function formatBridgeStatus(status: DisplayStatus): { dot: string; text: 
   switch (status) {
     case 'live':
       return { dot: chalk.green('●'), text: chalk.green('live') };
+    case 'connecting':
+      return { dot: chalk.yellow('●'), text: chalk.yellow('connecting') };
+    case 'reconnecting':
+      return { dot: chalk.yellow('●'), text: chalk.yellow('reconnecting') };
     case 'disconnected':
       return { dot: chalk.yellow('●'), text: chalk.yellow('disconnected') };
     case 'crashed':
@@ -408,6 +435,9 @@ export async function listSessionsAndAuthProfiles(options: {
   // Consolidate sessions first (cleans up crashed bridges, removes expired sessions)
   const consolidateResult = await consolidateSessions(false);
   const sessions = Object.values(consolidateResult.sessions);
+
+  // Auto-restart crashed bridges in the background (fire-and-forget)
+  reconnectCrashedSessions(consolidateResult.sessionsToRestart);
 
   // Load auth profiles from disk
   const profiles = await listAuthProfiles();
@@ -455,8 +485,7 @@ export async function listSessionsAndAuthProfiles(options: {
 
         // Show recovery hints for non-live sessions
         if (status === 'unauthorized') {
-          const target = getServerHost(session.server.url || session.server.command || '');
-          console.log(chalk.dim(`    ↳ run: mcpc login ${target} && mcpc ${session.name} restart`));
+          console.log(chalk.dim(`    ↳ run: mcpc ${session.name} restart`));
         } else if (status === 'crashed') {
           console.log(chalk.dim(`    ↳ run: mcpc ${session.name}`));
         } else if (status === 'expired') {
@@ -506,8 +535,9 @@ export async function closeSession(
       throw new ClientError(`Session not found: ${name}`);
     }
 
-    // Stop the bridge process
-    await stopBridge(name);
+    // Stop the bridge process (graceful: send IPC shutdown on Windows so
+    // the bridge can send HTTP DELETE to the server before exiting)
+    await stopBridge(name, { graceful: true });
 
     // Delete session record from storage
     await deleteSession(name);
@@ -653,7 +683,7 @@ export async function restartSession(
     // `mcpc login <server>` to create a default profile, and restarts the session.
     const hasExplicitAuthHeader = headers?.Authorization !== undefined;
     let profileName = session.profileName;
-    if (!profileName && serverConfig.url && !hasExplicitAuthHeader) {
+    if (!profileName && serverConfig.url && !hasExplicitAuthHeader && !session.x402) {
       profileName = await resolveAuthProfile(serverConfig.url, serverConfig.url, undefined, {
         sessionName: name,
       });

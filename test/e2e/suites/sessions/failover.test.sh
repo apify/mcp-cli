@@ -34,21 +34,36 @@ test_pass
 
 # Test: kill bridge process
 test_case "kill bridge process"
-kill "$bridge_pid" 2>/dev/null || true
+_kill_tree "$bridge_pid"
 sleep 1
 
 # Verify it's no longer running
-if kill -0 "$bridge_pid" 2>/dev/null; then
-  test_fail "bridge should not be running"
-  exit 1
+if is_windows; then
+  if tasklist //FI "PID eq $bridge_pid" //NH 2>/dev/null | grep -q "$bridge_pid"; then
+    test_fail "bridge should not be running"
+    exit 1
+  fi
+  # On Windows, force-kill doesn't allow graceful shutdown (no HTTP DELETE),
+  # so the server still has the session active. Expire it via control API
+  # to simulate the session being invalidated.
+  curl -s -X POST "$TEST_SERVER_URL/control/expire-session" >/dev/null
+else
+  if kill -0 "$bridge_pid" 2>/dev/null; then
+    test_fail "bridge should not be running"
+    exit 1
+  fi
 fi
 test_pass
 
-# Test: session shows as crashed
-test_case "session shows as crashed after bridge kill"
+# Test: session shows as crashed or reconnecting
+test_case "session shows as crashed or reconnecting after bridge kill"
 run_mcpc --json
 session_status=$(json_get ".sessions[] | select(.name == \"$SESSION\") | .status")
-assert_eq "$session_status" "crashed" "session should show as crashed"
+# Session may show as "crashed" (bridge dead) or "reconnecting" (auto-reconnect in progress)
+if [[ "$session_status" != "crashed" && "$session_status" != "reconnecting" ]]; then
+  test_fail "session should show as crashed or reconnecting, got: $session_status"
+  exit 1
+fi
 test_pass
 
 # Test: using crashed session attempts restart but server rejects old session ID
@@ -72,6 +87,10 @@ test_pass
 
 # Test: explicit restart recovers from expired session
 test_case "explicit restart recovers from expired session"
+# Reset server state so the restarted bridge can connect
+if is_windows; then
+  curl -s -X POST "$TEST_SERVER_URL/control/reset" >/dev/null
+fi
 run_mcpc "$SESSION" restart
 assert_success
 test_pass

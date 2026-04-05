@@ -8,6 +8,10 @@
 - the README should show explain each command, show the full options from "mcpc help command" - perhaps this could be on start of the readme,
   with links to the more detailed sections below. In general the README deserves one iteration.
 
+- grep - print some snippet of server instructions
+
+- tools-call help should provide some info what the json output looks like, in human mode provide introduce the results (@apify/tool-xx succeeded 
+  and returned:
 
 
 ## Bugs !
@@ -35,6 +39,8 @@
 $ mcpc @github tools-call get_file_contents arg:="yes" # NOW
 $ mcpc @github/get_file_contents arg:="yes"  # NEW
 
+Reduce CLI errors:
+Syntax errors: mcpc call linear_list_issues instead of mcpc @linear tools-call list_issues. Resolved after mcpc --help.
 
 
 ## Code mode

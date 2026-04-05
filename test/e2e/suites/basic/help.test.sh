@@ -40,7 +40,8 @@ test_pass
 # Test: version matches package.json
 test_case "version matches package.json"
 run_mcpc --version
-pkg_version=$(node -p "require('$PROJECT_ROOT/package.json').version")
+_pkg_root="$(to_native_path "$PROJECT_ROOT")"
+pkg_version=$(node -p "require('$_pkg_root/package.json').version")
 assert_eq "$STDOUT" "$pkg_version" "version should match package.json"
 test_pass
 

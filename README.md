@@ -310,13 +310,15 @@ Still, sessions can fail due to network disconnects, bridge process crash, or se
 
 **Session states:**
 
-| State                 | Meaning                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------- |
-| 🟢 **`live`**         | Bridge process running and server responding                                                      |
-| 🟡 **`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds                 |
-| 🟡 **`crashed`**      | Bridge process crashed or was killed; auto-restarts on next use                                   |
-| 🔴 **`unauthorized`** | Server rejected authentication (401/403) or token refresh failed; requires `login` then `restart` |
-| 🔴 **`expired`**      | Server rejected session ID (404); requires `restart`                                              |
+| State                 | Meaning                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| 🟢**`live`**          | Bridge process running and server responding                                                       |
+| 🟡**`connecting`**   | Initial bridge startup in progress (`mcpc connect`)                                                |
+| 🟡**`reconnecting`** | Bridge crashed or lost auth; auto-reconnecting in the background                                   |
+| 🟡**`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds                  |
+| 🟡**`crashed`**      | Bridge process crashed or was killed; auto-reconnects in the background                            |
+| 🔴**`unauthorized`** | Server rejected authentication (401/403) or token refresh failed; auto-reconnects or needs `login` |
+| 🔴**`expired`**      | Server rejected session ID (404); requires `restart`                                               |
 
 Here's how `mcpc` handles various bridge process and server connection states:
 
@@ -326,14 +328,17 @@ Here's how `mcpc` handles various bridge process and server connection states:
     The bridge will keep trying to reconnect in the background and will return to 🟢 **`live`** once the server responds again.
   - If **server rejects authentication** (HTTP 401 or 403) or token refresh fails,
     the session is marked 🔴 **`unauthorized`**.
-    You need to re-authenticate with `mcpc login <server>` and then `mcpc @my-session restart`.
+    `mcpc` will auto-reconnect in the background if another session sharing the same OAuth profile has refreshed the tokens.
+    Otherwise, re-authenticate with `mcpc login <server>` and then `mcpc @my-session restart`.
   - If **server rejects the session ID** (HTTP 404), indicating the MCP session is no longer valid,
     the session is marked 🔴 **`expired`**.
     You need to restart the session with `mcpc @my-session restart` to establish a new connection.
-- If the **bridge process crashes**, `mcpc` will mark the session as 🟡 **`crashed`** on first use.
-  Next time you run `mcpc @my-session ...`, it will attempt to restart the bridge process.
-  - If bridge **restart succeeds**, everything starts again (see above).
-  - If bridge **restart fails**, `mcpc @my-session ...` returns error, and session remains marked 🟡 **`crashed`**.
+- If the **bridge process crashes**, `mcpc` will mark the session as 🟡 **`crashed`**
+  and auto-reconnect the bridge in the background. You can also trigger reconnection manually
+  by running any `mcpc @my-session ...` command.
+  - If reconnection **succeeds** and the server resumes the MCP session, the session returns to 🟢 **`live`**.
+  - If the server issues a **new session ID** instead of resuming, the session is marked 🔴 **`expired`**.
+  - If reconnection **fails**, the session remains 🟡 **`crashed`** and retries after a 10-second cooldown.
 
 Note that `mcpc` never automatically removes sessions from the list.
 Instead, it keeps them flagged as 🟡 **`crashed`**, 🔴 **`unauthorized`**, or 🔴 **`expired`**,
@@ -455,6 +460,11 @@ exclusive. Providing both will result in a clear error. Use one or the other.
    - If authentication fails (expired/invalid) → Fail with an error
 2. **Profile doesn't exist**: Fail with an error
 
+**When `--x402` is specified (without `--profile`):**
+
+- OAuth profile auto-detection is skipped, since x402 serves as the payment/auth mechanism
+- If you also pass `--profile`, the specified profile is still used alongside x402
+
 **When `--no-profile` is specified:**
 
 - Skip all OAuth profile detection and connect anonymously
@@ -494,6 +504,9 @@ mcpc connect mcp.apify.com @apify-personal
 
 # Explicit bearer token - skips profile auto-detection:
 mcpc connect mcp.apify.com @apify --header "Authorization: Bearer ${APIFY_TOKEN}"
+
+# x402 payment - skips default profile auto-detection:
+mcpc connect mcp.apify.com @apify --x402
 
 # Anonymous - skips default profile even if it exists:
 mcpc connect mcp.apify.com @apify-anon --no-profile
@@ -1202,24 +1215,24 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 
 ### MCP CLI clients
 
-<!-- Stars and activity as of March 2026. -->
+<!-- Stars, contributors, commits, and activity as of March 2026. -->
 
-| Tool                                                                    | Lang   | Stars | Active | Tools | Resources | Prompts | Tasks | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | LLM |
-| ----------------------------------------------------------------------- | ------ | ----: | ------ | ----- | --------- | ------- | ----- | --------- | -------- | ----- | ----- | ---- | ----------- | --- |
-| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~400 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
-| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~3.2k | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —   |
-| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | ✅  |
-| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python | ~1.7k | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —   |
-| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k | ⚠️     | ✅    | ✅        | ✅      | —     | ✅        | —        | —     | ✅    | ✅   | —           | —   |
-| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     | ~1.0k | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
-| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | —     | ✅    | —    | —           | ✅  |
-| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~640 | ✅     | ✅    | —         | —       | —     | —         | —        | ✅    | ✅    | ✅   | ✅          | —   |
-| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~430 | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | ✅    | —     | ✅   | —           | —   |
-| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~53 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —   |
-| [evantahler/mcpx](https://github.com/evantahler/mcpx)                   | TS     |   ~26 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | —        | ✅    | ✅    | ✅   | ✅          | —   |
-| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~15 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —   |
+| Tool                                                                    | Lang   | Stars | Contrib / Commits | Active | Tools | Resources | Prompts | Tasks | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | x402 | LLM |
+| ----------------------------------------------------------------------- | ------ | ----: | -----------------: | ------ | ----- | --------- | ------- | ----- | --------- | -------- | ----- | ----- | ---- | ----------- | ---- | --- |
+| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~420 |           7 / ~510 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | ✅   | —   |
+| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~3.5k |          24 / ~570 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | —   |
+| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k |          22 / ~790 | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | ✅  |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python | ~1.8k |           5 / ~76  | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k |          15 / ~170 | ⚠️     | ✅    | ✅        | ✅      | —     | ✅        | —        | —     | ✅    | ✅   | —           | —    | —   |
+| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     | ~1.1k |           2 / ~30  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —    | —   |
+| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 |          6 / ~110  | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | —     | ✅    | —    | —           | —    | ✅  |
+| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~640 |           1 / ~60  | ✅     | ✅    | —         | —       | —     | —         | —        | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~430 |           4 / ~63  | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | ✅    | —     | ✅   | —           | —    | —   |
+| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~54 |           1 / ~13  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —    | —   |
+| [evantahler/mcpx](https://github.com/evantahler/mcpx)                   | TS     |   ~28 |           1 / ~64  | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | —        | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~15 |          ~2 / ~46  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —    | —   |
 
-**Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **Tasks** = [async tasks](https://modelcontextprotocol.io/specification/latest/server/utilities/tasks), **LLM** = requires/uses an LLM.
+**Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **Contrib / Commits** = contributors / total commits, **Tasks** = [async tasks](https://modelcontextprotocol.io/specification/latest/server/utilities/tasks), **x402** = [x402 payment protocol](https://www.x402.org/) support, **LLM** = requires/uses an LLM.
 
 **Notes:**
 

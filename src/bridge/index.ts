@@ -642,8 +642,24 @@ class BridgeProcess {
     // Update session with protocol version, MCP session ID, and lastSeenAt
     const serverDetails = await this.client.getServerDetails();
     const newMcpSessionId = this.client.getMcpSessionId();
+
+    // Detect session ID mismatch: we tried to resume but server did not return the
+    // same session ID. This covers: server issued a different ID, or server did not
+    // return any ID at all (e.g. session state lost). Either way the old session is gone.
+    if (this.options.mcpSessionId && newMcpSessionId !== this.options.mcpSessionId) {
+      logger.warn(
+        `Server did not resume MCP session ` +
+          `(expected ${this.options.mcpSessionId}, got ${newMcpSessionId ?? 'none'}). Marking as expired.`
+      );
+      throw new Error(
+        `Session expired: server did not resume MCP session ` +
+          `(expected ${this.options.mcpSessionId}, got ${newMcpSessionId ?? 'none'})`
+      );
+    }
+
     const sessionUpdate: Parameters<typeof updateSession>[1] = {
       lastSeenAt: new Date().toISOString(),
+      status: 'active',
     };
     if (serverDetails.protocolVersion) {
       sessionUpdate.protocolVersion = serverDetails.protocolVersion;
@@ -717,6 +733,16 @@ class BridgeProcess {
   private startKeepalive(): void {
     logger.debug(`Starting keepalive ping every ${KEEPALIVE_INTERVAL_MS / 1000}s`);
 
+    // Send first ping soon after startup to detect stale sessions early
+    // (e.g. session expired on server between auto-reconnect and first interval tick)
+    const earlyPing = setTimeout(() => {
+      this.sendKeepalivePing().catch(async (error) => {
+        logger.error('Initial keepalive ping failed:', error);
+        await this.handlePossibleExpiration(error as Error);
+      });
+    }, 5_000);
+    earlyPing.unref();
+
     this.keepaliveInterval = setInterval(() => {
       this.sendKeepalivePing().catch(async (error) => {
         logger.error('Keepalive ping failed:', error);
@@ -763,6 +789,10 @@ class BridgeProcess {
    * Check if an error indicates session expiration or auth failure and handle accordingly.
    * Session expiry is checked first since it's more specific (404/session-not-found),
    * while auth errors are broader (401/403/unauthorized) and could overlap.
+   *
+   * For auth errors, if a token manager is available, we attempt to refresh the token
+   * before giving up. This handles transient auth failures (e.g., expired access token
+   * that can be refreshed) without unnecessarily killing the session.
    */
   private async handlePossibleExpiration(error: Error): Promise<void> {
     let status: 'expired' | 'unauthorized' | null = null;
@@ -770,6 +800,19 @@ class BridgeProcess {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
       status = 'expired';
     } else if (isAuthenticationError(error.message)) {
+      // If we have a token manager, try to refresh before giving up
+      if (this.tokenManager) {
+        try {
+          logger.info(
+            'Authentication error detected, attempting token refresh before giving up...'
+          );
+          await this.tokenManager.refreshAccessToken();
+          logger.info('Token refresh succeeded — session will recover on next request');
+          return;
+        } catch (refreshError) {
+          logger.warn('Token refresh also failed, marking session as unauthorized:', refreshError);
+        }
+      }
       logger.warn('Authentication rejected, marking session as unauthorized and shutting down');
       status = 'unauthorized';
     }

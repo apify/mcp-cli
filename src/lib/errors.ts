@@ -102,15 +102,21 @@ export function createServerAuthError(
   target: string,
   options?: { sessionName?: string; originalError?: Error }
 ): AuthError {
-  const sessionHint = options?.sessionName
-    ? `Then restart the session:\n  mcpc ${options.sessionName} restart`
-    : `Then run your command again.`;
+  let hint: string;
+  if (options?.sessionName) {
+    hint =
+      `Try restarting the session first (refreshes the token):\n` +
+      `  mcpc ${options.sessionName} restart\n\n` +
+      `If the error persists, re-authenticate:\n` +
+      `  mcpc login ${target}\n` +
+      `  mcpc ${options.sessionName} restart`;
+  } else {
+    hint =
+      `To authenticate, run:\n` + `  mcpc login ${target}\n\n` + `Then run your command again.`;
+  }
 
   return new AuthError(
-    `Authentication required by server.\n\n` +
-      `To authenticate, run:\n` +
-      `  mcpc login ${target}\n\n` +
-      sessionHint,
+    `Authentication required by server.\n\n` + hint,
     options?.originalError ? { originalError: options.originalError } : undefined
   );
 }
