@@ -419,9 +419,9 @@ ${chalk.bold('Session name:')}
       if (!sessionName) {
         sessionName = await sessions.resolveSessionName(parsed, {
           outputMode: globalOpts.outputMode,
-          profile: opts.profile,
+          profile: opts.profile as string | undefined,
           headers,
-          noProfile: opts.noProfile,
+          noProfile: opts.noProfile as boolean | undefined,
         });
       }
 

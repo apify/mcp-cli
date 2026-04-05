@@ -275,7 +275,7 @@ export function generateSessionName(
 
     // Take the first label (before the first dot)
     const labels = hostname.split('.');
-    name = labels.length >= 2 ? labels[0]! : hostname;
+    name = labels.length >= 2 ? (labels[0] ?? hostname) : hostname;
   }
 
   // Append non-standard port
