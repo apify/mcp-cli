@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Session incorrectly marked as `unauthorized` when access token expires but refresh token is still valid; bridge now attempts token refresh before giving up
 - "ESC to detach" hint now shows immediately in the spinner when using `--task`, instead of waiting for the server to return a task ID
 
 ## [0.2.3] - 2026-03-31
@@ -21,7 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.2] - 2026-03-31
 
 ## [0.2.1] - 2026-03-30
+
 ### Added
+
 - Secure x402 wallet storage using OS keychain integration with fallback to `wallets.json` for compatibility
 - QR code display for wallet address in `x402 init`, `x402 import`, and `x402 info` commands, allowing users to scan and fund the wallet directly from the terminal
 

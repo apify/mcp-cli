@@ -789,6 +789,10 @@ class BridgeProcess {
    * Check if an error indicates session expiration or auth failure and handle accordingly.
    * Session expiry is checked first since it's more specific (404/session-not-found),
    * while auth errors are broader (401/403/unauthorized) and could overlap.
+   *
+   * For auth errors, if a token manager is available, we attempt to refresh the token
+   * before giving up. This handles transient auth failures (e.g., expired access token
+   * that can be refreshed) without unnecessarily killing the session.
    */
   private async handlePossibleExpiration(error: Error): Promise<void> {
     let status: 'expired' | 'unauthorized' | null = null;
@@ -796,6 +800,19 @@ class BridgeProcess {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
       status = 'expired';
     } else if (isAuthenticationError(error.message)) {
+      // If we have a token manager, try to refresh before giving up
+      if (this.tokenManager) {
+        try {
+          logger.info(
+            'Authentication error detected, attempting token refresh before giving up...'
+          );
+          await this.tokenManager.refreshAccessToken();
+          logger.info('Token refresh succeeded — session will recover on next request');
+          return;
+        } catch (refreshError) {
+          logger.warn('Token refresh also failed, marking session as unauthorized:', refreshError);
+        }
+      }
       logger.warn('Authentication rejected, marking session as unauthorized and shutting down');
       status = 'unauthorized';
     }
