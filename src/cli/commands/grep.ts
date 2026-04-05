@@ -28,7 +28,8 @@ interface GrepResult {
   tools: Tool[];
   resources: Resource[];
   prompts: Prompt[];
-  instructions: boolean;
+  /** false when no match, snippet string when matched */
+  instructions: string | false;
 }
 
 interface SessionGrepResult {
@@ -36,7 +37,7 @@ interface SessionGrepResult {
   tools: Tool[];
   resources: Resource[];
   prompts: Prompt[];
-  instructions: boolean;
+  instructions: string | false;
 }
 
 interface SessionGrepError {
@@ -126,11 +127,102 @@ function buildInstructionsSearchText(instructions: string, sessionName: string):
 }
 
 /**
+ * Extract a short snippet from instructions text around the first match.
+ * The snippet is at most ~70 chars longer than the matched text, with ellipsis
+ * added when the snippet doesn't reach the start/end of the instructions.
+ * Whitespace (including newlines) is normalized to single spaces.
+ */
+export function extractInstructionsSnippet(
+  instructions: string,
+  pattern: string,
+  options: { regex?: boolean | undefined; caseSensitive?: boolean | undefined }
+): string | false {
+  // Normalize whitespace for display
+  const normalized = instructions.replace(/\s+/g, ' ').trim();
+
+  let matchStart: number;
+  let matchEnd: number;
+
+  if (options.regex) {
+    let re: RegExp;
+    try {
+      re = new RegExp(pattern, options.caseSensitive ? '' : 'i');
+    } catch {
+      return false;
+    }
+    const match = re.exec(normalized);
+    if (!match) return false;
+    matchStart = match.index;
+    matchEnd = matchStart + match[0].length;
+  } else {
+    const haystack = options.caseSensitive ? normalized : normalized.toLowerCase();
+    const needle = options.caseSensitive ? pattern : pattern.toLowerCase();
+    matchStart = haystack.indexOf(needle);
+    if (matchStart === -1) return false;
+    matchEnd = matchStart + needle.length;
+  }
+
+  const contextSize = 35;
+  let snippetStart = Math.max(0, matchStart - contextSize);
+  let snippetEnd = Math.min(normalized.length, matchEnd + contextSize);
+
+  // Snap to word boundaries if possible (don't cut mid-word)
+  if (snippetStart > 0) {
+    const spacePos = normalized.indexOf(' ', snippetStart);
+    if (spacePos !== -1 && spacePos < matchStart) {
+      snippetStart = spacePos + 1;
+    }
+  }
+  if (snippetEnd < normalized.length) {
+    const spacePos = normalized.lastIndexOf(' ', snippetEnd);
+    if (spacePos !== -1 && spacePos > matchEnd) {
+      snippetEnd = spacePos;
+    }
+  }
+
+  let snippet = normalized.slice(snippetStart, snippetEnd);
+  if (snippetStart > 0) snippet = '\u2026' + snippet;
+  if (snippetEnd < normalized.length) snippet = snippet + '\u2026';
+
+  return snippet;
+}
+
+/**
+ * Highlight the first match of a pattern in a text string using chalk.bold.underline.
+ */
+function highlightMatch(
+  text: string,
+  pattern: string,
+  options: { regex?: boolean | undefined; caseSensitive?: boolean | undefined }
+): string {
+  if (options.regex) {
+    let re: RegExp;
+    try {
+      re = new RegExp(pattern, options.caseSensitive ? '' : 'i');
+    } catch {
+      return text;
+    }
+    return text.replace(re, (m) => chalk.bold.underline(m));
+  }
+
+  const haystack = options.caseSensitive ? text : text.toLowerCase();
+  const needle = options.caseSensitive ? pattern : pattern.toLowerCase();
+  const idx = haystack.indexOf(needle);
+  if (idx === -1) return text;
+
+  const before = text.slice(0, idx);
+  const matched = text.slice(idx, idx + needle.length);
+  const after = text.slice(idx + needle.length);
+  return before + chalk.bold.underline(matched) + after;
+}
+
+/**
  * Search a single MCP client for matching items.
  * Respects server capabilities — only fetches types the server supports.
  */
 async function searchClient(
   client: IMcpClient,
+  pattern: string,
   matcher: (text: string) => boolean,
   options: GrepOptions,
   sessionName: string = ''
@@ -169,10 +261,15 @@ async function searchClient(
     matcher(buildPromptSearchText(p, sessionName))
   );
 
-  // Match instructions
+  // Match instructions — produce a snippet if matched
   const instructionsText = searchInstructions ? serverDetails.instructions : undefined;
-  const matchedInstructions =
-    !!instructionsText && matcher(buildInstructionsSearchText(instructionsText, sessionName));
+  let matchedInstructions: string | false = false;
+  if (instructionsText && matcher(buildInstructionsSearchText(instructionsText, sessionName))) {
+    const snippet = extractInstructionsSnippet(instructionsText, pattern, options);
+    // Fallback: if snippet extraction fails (e.g. match was on session name prefix), show truncated text
+    matchedInstructions =
+      snippet || instructionsText.replace(/\s+/g, ' ').trim().slice(0, 80) + '…';
+  }
 
   return {
     tools: matchedTools,
@@ -260,7 +357,7 @@ function truncateResult(
   let remaining = limit;
 
   // Instructions always come first (it's just 1 item)
-  const instructions = result.instructions && remaining > 0 ? true : false;
+  const instructions = result.instructions && remaining > 0 ? result.instructions : false;
   if (instructions) remaining--;
 
   const tools = result.tools.slice(0, remaining);
@@ -312,10 +409,19 @@ function formatResultSection(
 /**
  * Format human output for a single session's grep results
  */
-function formatGrepResultHuman(result: GrepResult, indent: string = ''): string[] {
+function formatGrepResultHuman(
+  result: GrepResult,
+  indent: string = '',
+  pattern?: string,
+  options?: { regex?: boolean | undefined; caseSensitive?: boolean | undefined }
+): string[] {
   const lines: string[] = [];
   if (result.instructions) {
-    lines.push(`${indent}${chalk.bold('Instructions')}`);
+    const snippet =
+      pattern && options
+        ? highlightMatch(result.instructions, pattern, options)
+        : result.instructions;
+    lines.push(`${indent}${chalk.bold('Instructions:')}  ${chalk.dim(snippet)}`);
   }
   lines.push(
     ...formatResultSection('Tools', result.tools, formatToolLine as (item: never) => string, indent)
@@ -355,7 +461,7 @@ export async function grepSession(
   const sessionRef = session.startsWith('@') ? session : `@${session}`;
 
   return await withMcpClient(session, options, async (client) => {
-    const fullResult = await searchClient(client, matcher, options, sessionRef);
+    const fullResult = await searchClient(client, pattern, matcher, options, sessionRef);
     const total = countMatches(fullResult);
 
     const { result, truncated } =
@@ -386,7 +492,7 @@ export async function grepSession(
       if (total === 0) {
         console.log('No matches found.');
       } else {
-        const lines = formatGrepResultHuman(result);
+        const lines = formatGrepResultHuman(result, '', pattern, options);
         lines.push('');
         const suffix = truncated > 0 ? ` (showing ${countMatches(result)})` : '';
         lines.push(chalk.dim(`${total} ${total === 1 ? 'match' : 'matches'}${suffix}.`));
@@ -467,7 +573,7 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
     queryableSessions.map(async (session): Promise<SessionGrepResult> => {
       const sessionName = toSessionRef(session.name);
       const result = await withSessionClient(sessionName, async (client) => {
-        return searchClient(client, matcher, options, sessionName);
+        return searchClient(client, pattern, matcher, options, sessionName);
       });
       return {
         name: sessionName,
@@ -573,7 +679,7 @@ export async function grepAllSessions(pattern: string, options: GrepOptions): Pr
 
     for (const r of displayResultsWithMatches) {
       lines.push(chalk.cyan(r.name));
-      lines.push(...formatGrepResultHuman(r, '  '));
+      lines.push(...formatGrepResultHuman(r, '  ', pattern, options));
       lines.push('');
     }
 

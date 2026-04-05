@@ -135,7 +135,7 @@ Options:
 
 MCP session commands (after connecting):
   <@session>                   Show MCP server info, capabilities, and tools
-  <@session> grep <pattern>    Search tools, resources, or prompts
+  <@session> grep <pattern>    Search tools and instructions
   <@session> tools-list        List all server tools
   <@session> tools-get <name>  Get tool details and schema
   <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
