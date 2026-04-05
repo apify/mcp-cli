@@ -56,6 +56,80 @@ _BLUE='\033[0;34m'
 _DIM='\033[0;2m'
 _NC='\033[0m'
 
+# ============================================================================
+# Cross-platform helpers
+# ============================================================================
+
+# Detect platform once
+_UNAME_S="$(uname -s)"
+
+# Check if running on Windows (Git Bash / MSYS2 / MINGW)
+is_windows() {
+  [[ "$_UNAME_S" == MINGW* || "$_UNAME_S" == MSYS* ]]
+}
+
+# Cross-platform temp directory
+_TMPDIR="${TMPDIR:-${TEMP:-/tmp}}"
+
+# Convert an MSYS/Git Bash path to a native Windows path (mixed mode: C:/...)
+# On non-Windows, returns the path unchanged.
+# Usage: native_path=$(to_native_path "/d/a/repo/config.json")
+to_native_path() {
+  if is_windows && command -v cygpath &>/dev/null; then
+    cygpath -m "$1"
+  else
+    echo "$1"
+  fi
+}
+
+# Kill a process and all its children
+# Usage: _kill_tree <pid>
+_kill_tree() {
+  local pid="$1"
+  if is_windows; then
+    # On Windows/Git Bash, $! returns MSYS PIDs; bash's built-in kill
+    # understands those, but Windows taskkill does not.  Use kill -9
+    # to force-terminate, then try taskkill as a best-effort fallback
+    # for any Windows-native child processes.
+    kill -9 "$pid" 2>/dev/null || true
+    taskkill //F //T //PID "$pid" >/dev/null 2>&1 || true
+  else
+    pkill -P "$pid" 2>/dev/null || true
+    kill "$pid" 2>/dev/null || true
+  fi
+}
+
+# Wait for a background process to exit after it has been killed.
+# On Windows, wait can block forever if the process ignores signals, so
+# we skip the wait entirely and rely on kill -9 having done its job.
+# Usage: _wait_killed <pid>
+_wait_killed() {
+  local pid="$1"
+  if is_windows; then
+    # Give the process a brief moment to die, but don't block
+    sleep 0.3
+  else
+    wait "$pid" 2>/dev/null || true
+  fi
+}
+
+# Find a Python interpreter
+_find_python() {
+  if command -v python3 &>/dev/null; then
+    echo "python3"
+  elif command -v python &>/dev/null; then
+    echo "python"
+  else
+    echo "python3"  # will fail with clear error
+  fi
+}
+
+# Compute a short MD5 hash (first 8 chars)
+# Usage: _md5_short "string"
+_md5_short() {
+  echo "$1" | md5sum 2>/dev/null | cut -c1-8 || echo "$1" | md5 -q -s 2>/dev/null | cut -c1-8
+}
+
 # Test state
 _TEST_NAME=""
 _TEST_RUN_DIR=""
@@ -105,13 +179,13 @@ test_init() {
 
   # Generate short unique ID for this test (used in session names)
   # This keeps Unix socket paths under the 104 char limit
-  _TEST_SHORT_ID="$(echo "$E2E_RUN_ID-$_TEST_NAME" | md5sum 2>/dev/null | cut -c1-8 || md5 -q -s "$E2E_RUN_ID-$_TEST_NAME" | cut -c1-8)"
+  _TEST_SHORT_ID="$(_md5_short "$E2E_RUN_ID-$_TEST_NAME")"
 
   # Set up mcpc home directory
   # Use /tmp to keep socket paths short (Unix sockets limited to ~104 bytes)
   if [[ $_TEST_ISOLATED -eq 1 ]]; then
     # Isolated: each test gets its own home directory
-    export MCPC_HOME_DIR="/tmp/mcpc-e2e-$_TEST_SHORT_ID"
+    export MCPC_HOME_DIR="$_TMPDIR/mcpc-e2e-$_TEST_SHORT_ID"
     _TEST_ISOLATED_HOME="$MCPC_HOME_DIR"  # Track for cleanup
   else
     # Shared: all tests in this run share the same home directory
@@ -122,6 +196,11 @@ test_init() {
   # Create temp directory for test artifacts
   export TEST_TMP="$_TEST_RUN_DIR/tmp"
   mkdir -p "$TEST_TMP"
+
+  # Native-path version of TEST_TMP for passing through CLI arguments
+  # (MSYS2 won't auto-convert paths embedded in composite args like path:=/d/a/...)
+  export NATIVE_TEST_TMP
+  NATIVE_TEST_TMP="$(to_native_path "$TEST_TMP")"
 
   # Set up cleanup trap
   trap '_test_cleanup' EXIT
@@ -148,9 +227,8 @@ _test_cleanup() {
 
   # Stop proxy server if started
   if [[ -n "${_PROXY_SERVER_PID:-}" ]]; then
-    pkill -P "$_PROXY_SERVER_PID" 2>/dev/null || true
-    kill "$_PROXY_SERVER_PID" 2>/dev/null || true
-    wait "$_PROXY_SERVER_PID" 2>/dev/null || true
+    _kill_tree "$_PROXY_SERVER_PID"
+    _wait_killed "$_PROXY_SERVER_PID"
     _PROXY_SERVER_PID=""
   fi
 
@@ -561,7 +639,7 @@ _HTTPS_WRAPPER_PID=""
 start_test_server() {
   # Find a free port if not specified
   if [[ "$TEST_SERVER_PORT" == "0" ]]; then
-    TEST_SERVER_PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("",0)); print(s.getsockname()[1]); s.close()')
+    TEST_SERVER_PORT=$($(_find_python) -c 'import socket; s=socket.socket(); s.bind(("",0)); print(s.getsockname()[1]); s.close()')
   fi
 
   # Build environment
@@ -599,7 +677,7 @@ start_test_server() {
 
 # Create a dummy auth profile for a host (internal helper)
 # This is needed because mcpc requires auth profiles for all HTTP servers
-# Uses atomic symlink creation for cross-platform locking
+# Uses atomic mkdir for cross-platform locking
 # Usage: _create_test_auth_profile <host> [scheme]
 #   scheme defaults to "http" if not specified
 _create_test_auth_profile() {
@@ -611,21 +689,21 @@ _create_test_auth_profile() {
   # Ensure mcpc home dir exists
   mkdir -p "$MCPC_HOME_DIR"
 
-  # Acquire lock using atomic symlink (works on macOS and Linux)
+  # Acquire lock using atomic mkdir (works on macOS, Linux, and Windows)
   local max_wait=50
   local waited=0
-  while ! ln -s $$ "$lock_file" 2>/dev/null; do
+  while ! mkdir "$lock_file" 2>/dev/null; do
     sleep 0.1
     ((waited++)) || true
     if [[ $waited -ge $max_wait ]]; then
       # Stale lock - remove and retry
-      rm -f "$lock_file"
+      rm -rf "$lock_file"
       waited=0
     fi
   done
 
   # Ensure lock is released on function exit
-  trap "rm -f '$lock_file'" RETURN
+  trap "rm -rf '$lock_file'" RETURN
 
   # Create or update profiles.json with a dummy profile for this host
   if [[ -f "$profiles_file" && -s "$profiles_file" ]]; then
@@ -753,17 +831,13 @@ start_https_test_server() {
 # Stop test server
 stop_test_server() {
   if [[ -n "$_HTTPS_WRAPPER_PID" ]]; then
-    pkill -P "$_HTTPS_WRAPPER_PID" 2>/dev/null || true
-    kill "$_HTTPS_WRAPPER_PID" 2>/dev/null || true
-    wait "$_HTTPS_WRAPPER_PID" 2>/dev/null || true
+    _kill_tree "$_HTTPS_WRAPPER_PID"
+    _wait_killed "$_HTTPS_WRAPPER_PID"
     _HTTPS_WRAPPER_PID=""
   fi
   if [[ -n "$_TEST_SERVER_PID" ]]; then
-    # Kill all child processes first (tsx spawns node as child)
-    pkill -P "$_TEST_SERVER_PID" 2>/dev/null || true
-    # Then kill the parent process
-    kill "$_TEST_SERVER_PID" 2>/dev/null || true
-    wait "$_TEST_SERVER_PID" 2>/dev/null || true
+    _kill_tree "$_TEST_SERVER_PID"
+    _wait_killed "$_TEST_SERVER_PID"
     _TEST_SERVER_PID=""
   fi
 }
@@ -814,10 +888,22 @@ create_stdio_config() {
   local name="$1"
   local command="$2"
   shift 2
-  local args=("$@")
+
+  # Convert path-like args (starting with /, ~, .) to native paths on Windows
+  local native_args=()
+  for arg in "$@"; do
+    case "$arg" in
+      /*|~*|.*)
+        native_args+=("$(to_native_path "$arg")")
+        ;;
+      *)
+        native_args+=("$arg")
+        ;;
+    esac
+  done
 
   local config_file="$TEST_TMP/config-$name.json"
-  local args_json=$(printf '%s\n' "${args[@]}" | jq -R . | jq -s .)
+  local args_json=$(printf '%s\n' "${native_args[@]}" | jq -R . | jq -s .)
 
   cat > "$config_file" <<EOF
 {
@@ -830,7 +916,7 @@ create_stdio_config() {
 }
 EOF
 
-  echo "$config_file"
+  to_native_path "$config_file"
 }
 
 # Create config for filesystem server
@@ -849,13 +935,13 @@ create_fs_config() {
 wait_for() {
   local cmd="$1"
   local timeout="${2:-10}"
-  local interval=0.2
-  local elapsed=0
+  local max_iterations=$(( timeout * 5 ))  # 0.2s intervals
+  local waited=0
 
   while ! eval "$cmd" 2>/dev/null; do
-    sleep $interval
-    elapsed=$(echo "$elapsed + $interval" | bc)
-    if (( $(echo "$elapsed >= $timeout" | bc -l) )); then
+    sleep 0.2
+    ((waited++)) || true
+    if [[ $waited -ge $max_iterations ]]; then
       return 1
     fi
   done

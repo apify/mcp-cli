@@ -18,7 +18,7 @@ export TEST_SERVER_HOST="localhost"
 export TEST_SERVER_PORT="$TEST_SERVER_PORT"
 
 # Create config with env var in URL
-CONFIG_FILE="$TEST_TMP/env-url-config.json"
+CONFIG_FILE="$(to_native_path "$TEST_TMP/env-url-config.json")"
 cat > "$CONFIG_FILE" <<'EOF'
 {
   "mcpServers": {
@@ -53,7 +53,7 @@ test_case "env var substitution in headers"
 export MY_API_TOKEN="secret-token-12345"
 
 # Create config with env var in header
-CONFIG_FILE="$TEST_TMP/env-header-config.json"
+CONFIG_FILE="$(to_native_path "$TEST_TMP/env-header-config.json")"
 cat > "$CONFIG_FILE" <<EOF
 {
   "mcpServers": {
@@ -93,7 +93,7 @@ test_case "missing env var defaults to empty string"
 unset NONEXISTENT_VAR
 
 # Create config with missing env var
-CONFIG_FILE="$TEST_TMP/env-missing-config.json"
+CONFIG_FILE="$(to_native_path "$TEST_TMP/env-missing-config.json")"
 cat > "$CONFIG_FILE" <<EOF
 {
   "mcpServers": {
@@ -127,7 +127,7 @@ export MY_HOST="localhost"
 export MY_PORT="$TEST_SERVER_PORT"
 
 # Create config with multiple env vars in URL
-CONFIG_FILE="$TEST_TMP/env-multi-config.json"
+CONFIG_FILE="$(to_native_path "$TEST_TMP/env-multi-config.json")"
 cat > "$CONFIG_FILE" <<EOF
 {
   "mcpServers": {
