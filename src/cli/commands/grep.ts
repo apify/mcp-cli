@@ -128,7 +128,7 @@ function buildInstructionsSearchText(instructions: string, sessionName: string):
 
 /**
  * Extract a short snippet from instructions text around the first match.
- * The snippet is at most ~50 chars longer than the matched text, with ellipsis
+ * The snippet is at most ~70 chars longer than the matched text, with ellipsis
  * added when the snippet doesn't reach the start/end of the instructions.
  * Whitespace (including newlines) is normalized to single spaces.
  */
@@ -162,7 +162,7 @@ export function extractInstructionsSnippet(
     matchEnd = matchStart + needle.length;
   }
 
-  const contextSize = 25;
+  const contextSize = 35;
   let snippetStart = Math.max(0, matchStart - contextSize);
   let snippetEnd = Math.min(normalized.length, matchEnd + contextSize);
 
