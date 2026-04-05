@@ -243,6 +243,8 @@ export interface ConsolidateSessionsResult {
   expiredSessions: number;
   /** Updated sessions map (for use by caller) */
   sessions: Record<string, SessionData>;
+  /** Session names eligible for automatic background restart */
+  sessionsToRestart: string[];
 }
 
 /**
@@ -258,6 +260,7 @@ export async function consolidateSessions(
     crashedBridges: 0,
     expiredSessions: 0,
     sessions: {},
+    sessionsToRestart: [],
   };
 
   const filePath = getSessionsFilePath();
@@ -320,11 +323,12 @@ export async function consolidateSessions(
           logger.debug(`Clearing crashed bridge PID for session: ${name} (PID: ${session.pid})`);
           delete session.pid;
           hasChanges = true;
-          // Don't overwrite 'expired' or 'unauthorized' status - those are server-side states, not bridge state
+          // Don't overwrite terminal/transient statuses
           if (
             session.status !== 'crashed' &&
             session.status !== 'expired' &&
-            session.status !== 'unauthorized'
+            session.status !== 'unauthorized' &&
+            session.status !== 'reconnecting'
           ) {
             session.status = 'crashed';
             result.crashedBridges++;
@@ -333,12 +337,65 @@ export async function consolidateSessions(
           !session.pid &&
           session.status !== 'crashed' &&
           session.status !== 'expired' &&
-          session.status !== 'unauthorized'
+          session.status !== 'unauthorized' &&
+          session.status !== 'connecting' &&
+          session.status !== 'reconnecting'
         ) {
-          // No pid but not marked crashed yet (and not expired/unauthorized)
+          // No pid but not marked crashed yet (and not in a transient/terminal state)
           session.status = 'crashed';
           result.crashedBridges++;
           hasChanges = true;
+        }
+      }
+
+      // Cooldown: socket connect timeout (5s) + 5s buffer = 10s
+      const AUTO_RESTART_COOLDOWN_MS = 10_000;
+      const now = Date.now();
+
+      // Expire stale 'connecting'/'reconnecting' states — if the connection attempt
+      // started more than the cooldown period ago and no PID exists, assume it failed
+      for (const [name, session] of Object.entries(storage.sessions)) {
+        if (
+          (session?.status === 'connecting' || session?.status === 'reconnecting') &&
+          !session.pid
+        ) {
+          const attemptAt = session.lastConnectionAttemptAt
+            ? new Date(session.lastConnectionAttemptAt).getTime()
+            : 0;
+          if (attemptAt > 0 && now - attemptAt > AUTO_RESTART_COOLDOWN_MS) {
+            logger.debug(`Stale ${session.status} state for ${name}, marking as crashed`);
+            session.status = 'crashed';
+            result.crashedBridges++;
+            hasChanges = true;
+          }
+        }
+      }
+
+      // Identify crashed or unauthorized sessions eligible for automatic reconnection.
+      // Unauthorized sessions are included because another session sharing the same OAuth
+      // profile may have refreshed the tokens — the bridge reads from keychain on startup.
+      for (const [name, session] of Object.entries(storage.sessions)) {
+        if ((session?.status === 'crashed' || session?.status === 'unauthorized') && !session.pid) {
+          // Skip if a connection was already attempted within the cooldown window
+          const lastAttempt = session.lastConnectionAttemptAt
+            ? new Date(session.lastConnectionAttemptAt).getTime()
+            : 0;
+          if (now - lastAttempt <= AUTO_RESTART_COOLDOWN_MS) {
+            continue;
+          }
+          // Skip if bridge was recently alive — it may have just crashed and needs
+          // time for cleanup before we restart (also avoids conflicts with parallel
+          // sessions sharing the same home directory)
+          const lastSeen = session.lastSeenAt ? new Date(session.lastSeenAt).getTime() : 0;
+          if (lastSeen > 0 && now - lastSeen <= AUTO_RESTART_COOLDOWN_MS) {
+            logger.debug(`Skipping auto-restart for ${name}: bridge was recently alive`);
+            continue;
+          }
+          session.lastConnectionAttemptAt = new Date(now).toISOString();
+          session.status = 'reconnecting';
+          hasChanges = true;
+          result.sessionsToRestart.push(name);
+          logger.debug(`Marking session ${name} for auto-restart`);
         }
       }
 

@@ -630,11 +630,13 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   }
 
   // Bridge not healthy - restart it
+  await updateSession(sessionName, { status: 'reconnecting' });
   await restartBridge(sessionName);
 
   // Try getServerDetails on restarted bridge (blocks until MCP connected)
   const result = await checkBridgeHealth(socketPath);
   if (result.healthy) {
+    await updateSession(sessionName, { status: 'active' });
     logger.debug(`Bridge for ${sessionName} passed health check`);
     return socketPath;
   }
@@ -649,4 +651,34 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     `Bridge for ${sessionName} failed after restart: ${errorMsg}. ` +
       `For details, check logs at ${logPath}`
   );
+}
+
+/**
+ * Reconnect crashed bridge sessions in the background.
+ * Fire-and-forget: does not wait for reconnections to complete.
+ * Called after consolidateSessions() identifies crashed sessions eligible for reconnection.
+ *
+ * Unlike explicit "restart" (which creates a fresh MCP session), this preserves
+ * the existing MCP session ID for resumption when possible.
+ *
+ * @param sessionNames - Names of sessions to reconnect (from consolidateSessions result)
+ */
+export function reconnectCrashedSessions(sessionNames: string[]): void {
+  for (const name of sessionNames) {
+    logger.debug(`Reconnecting crashed bridge for session: ${name}`);
+    // Fire-and-forget: the bridge process itself will set the final status
+    // ('active' on success, 'expired' if server forgot session, 'unauthorized' on auth error)
+    restartBridge(name).catch(async (err) => {
+      logger.debug(`Reconnection failed for ${name}: ${(err as Error).message}`);
+      // Revert to 'crashed' only if the bridge hasn't already set a terminal status
+      try {
+        const session = await getSession(name);
+        if (session?.status === 'reconnecting') {
+          await updateSession(name, { status: 'crashed' });
+        }
+      } catch {
+        // Ignore - session may have been deleted
+      }
+    });
+  }
 }

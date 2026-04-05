@@ -27,7 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Release process migrated from local `scripts/publish.sh` to GitHub Actions; `npm run release` now triggers the CI workflow instead of running locally
+- Auto-reconnect crashed and unauthorized bridge processes in the background when enumerating sessions (`mcpc` or `mcpc grep`), with a 10-second cooldown between reconnection attempts. Unauthorized sessions benefit from OAuth tokens refreshed by other sessions sharing the same profile.
+
+### Fixed
+
+- Fixed expired sessions falsely showing as `live` after auto-reconnect — the bridge now detects when the server did not resume the original MCP session (including when no session ID is returned) and marks the session as `expired`
+- Bridge sends first keepalive ping 5 seconds after startup (instead of waiting the full 30-second interval) to detect stale sessions earlier
 
 ## [0.2.0] - 2026-03-24
 
