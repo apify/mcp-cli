@@ -66,7 +66,8 @@ echo "  Done"
 echo "Updating table of contents..."
 doctoc "$README" --github --notitle --maxlevel 2
 # Remove mcpc: entries from TOC (internal anchors that shouldn't be in TOC)
-sed -i '/^- \[mcpc:/d' "$README"
+# Use temp file for cross-platform compatibility (macOS sed -i requires different syntax)
+sed '/^- \[mcpc:/d' "$README" > "$README.tmp" && mv "$README.tmp" "$README"
 echo "  Done"
 
 # Step 3: Check for broken internal links
