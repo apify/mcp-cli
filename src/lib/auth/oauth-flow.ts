@@ -18,6 +18,20 @@ import type { AuthProfile } from '../types.js';
 
 const logger = createLogger('oauth-flow');
 
+/**
+ * Escape HTML special characters to prevent XSS in OAuth callback responses.
+ * The callback server renders error messages from query parameters (error_description)
+ * directly into HTML, so they must be escaped.
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // Special key codes
 const ESCAPE_KEY = '\x1b';
 const CTRL_C = '\x03';
@@ -144,6 +158,17 @@ function startCallbackServer(port: number): {
   const sockets = new Set<Socket>();
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+    // Validate Host header to prevent DNS rebinding attacks.
+    // Only allow requests explicitly targeting localhost or 127.0.0.1.
+    const host = req.headers.host || '';
+    const hostWithoutPort = host.split(':')[0] || '';
+    if (hostWithoutPort !== 'localhost' && hostWithoutPort !== '127.0.0.1') {
+      logger.warn(`Rejected OAuth callback request with unexpected Host header: ${host}`);
+      res.writeHead(403);
+      res.end('Forbidden');
+      return;
+    }
+
     const url = new URL(req.url || '/', `http://localhost:${port}`);
 
     if (url.pathname === '/callback') {
@@ -160,7 +185,7 @@ function startCallbackServer(port: number): {
             <head><title>Authentication failed</title></head>
             <body>
               <h1>Authentication failed</h1>
-              <p>Error: ${message}</p>
+              <p>Error: ${escapeHtml(message)}</p>
               <p>You can close this window.</p>
             </body>
           </html>
@@ -253,23 +278,29 @@ async function findAvailablePort(startPort: number = 8000): Promise<number> {
  * Returns true if the browser was opened successfully, false otherwise
  */
 async function tryOpenBrowser(url: string): Promise<boolean> {
-  const { exec } = await import('child_process');
+  const { execFile } = await import('child_process');
   const { promisify } = await import('util');
-  const execAsync = promisify(exec);
+  const execFileAsync = promisify(execFile);
 
   const platform = process.platform;
   let command: string;
+  let args: string[];
 
   if (platform === 'darwin') {
-    command = `open "${url}"`;
+    command = 'open';
+    args = [url];
   } else if (platform === 'win32') {
-    command = `start "${url}"`;
+    // On Windows, use cmd.exe /c start to open URLs.
+    // The empty "" is the window title argument required by 'start' when the target contains special characters.
+    command = 'cmd.exe';
+    args = ['/c', 'start', '""', url];
   } else {
-    command = `xdg-open "${url}"`;
+    command = 'xdg-open';
+    args = [url];
   }
 
   try {
-    await execAsync(command);
+    await execFileAsync(command, args);
     logger.debug('Browser opened successfully');
     return true;
   } catch (error) {

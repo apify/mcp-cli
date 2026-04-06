@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Reordered `mcpc --help` to show Commands before Options for better discoverability
 
+### Security
+
+- Fixed XSS vulnerability in OAuth callback server: error messages from query parameters are now HTML-escaped before rendering
+- Replaced `exec()` with `execFile()` in browser opening to prevent potential shell injection via crafted OAuth authorization URLs
+- Added Host header validation to OAuth callback server to mitigate DNS rebinding attacks
+- Set restrictive directory permissions (`0o700`) on `~/.mcpc/` and subdirectories to prevent local privilege escalation on shared systems
+
 ### Fixed
 
 - Session incorrectly marked as `unauthorized` when access token expires but refresh token is still valid; bridge now attempts token refresh before giving up
