@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Reordered `mcpc --help` to show Commands before Options for better discoverability
+- Increased `grep` instructions snippet context from 35 to 40 characters and wrapped snippets in backtick guards for clearer AI agent consumption
 
 ### Security
 
