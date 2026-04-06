@@ -4,7 +4,13 @@
 
 import ora from 'ora';
 import chalk from 'chalk';
-import { formatOutput, formatToolDetail, formatSuccess, formatWarning } from '../output.js';
+import {
+  formatOutput,
+  formatToolDetail,
+  formatToolCallExample,
+  formatSuccess,
+  formatWarning,
+} from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import type { CommandOptions, TaskUpdate } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
@@ -85,6 +91,10 @@ export async function getTool(
 
     if (options.outputMode === 'human') {
       console.log(formatToolDetail(tool));
+      const example = formatToolCallExample(tool, target);
+      if (example) {
+        console.log('\n' + example + '\n');
+      }
     } else {
       console.log(formatOutput(tool, 'json'));
     }
