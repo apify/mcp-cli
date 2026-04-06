@@ -228,6 +228,8 @@ export interface AuthCredentials {
   // OAuth credentials (for refresh flow)
   clientId?: string;
   refreshToken?: string;
+  // OAuth access token (used as static Bearer token when no refresh token available)
+  accessToken?: string;
   // HTTP headers (from --header flags, stored in keychain)
   headers?: Record<string, string>;
 }

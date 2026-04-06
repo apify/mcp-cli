@@ -141,6 +141,7 @@ class BridgeProcess {
     logger.info(`Received auth credentials for profile: ${credentials.profileName}`);
     logger.debug(`  serverUrl: ${credentials.serverUrl}`);
     logger.debug(`  refreshToken: ${credentials.refreshToken ? 'present' : 'MISSING'}`);
+    logger.debug(`  accessToken: ${credentials.accessToken ? 'present' : 'MISSING'}`);
     logger.debug(`  clientId: ${credentials.clientId ? 'present' : 'MISSING'}`);
     logger.debug(`  headers: ${credentials.headers ? Object.keys(credentials.headers).length : 0}`);
 
@@ -221,11 +222,22 @@ class BridgeProcess {
       logger.debug('OAuthProvider created for SDK transport (runtime mode)');
     } else if (credentials.refreshToken && !credentials.clientId) {
       logger.warn('Refresh token provided but client ID is missing - token refresh will not work');
+    } else if (credentials.accessToken && !credentials.refreshToken) {
+      // No refresh token available — use the access token as a static Bearer header.
+      // This covers OAuth servers that don't issue refresh tokens.
+      this.headers = {
+        ...this.headers,
+        Authorization: `Bearer ${credentials.accessToken}`,
+      };
+      logger.debug('Using OAuth access token as static Bearer header (no refresh token available)');
     }
 
     // Store headers if provided (used when no OAuth refresh token available)
     if (credentials.headers) {
-      this.headers = credentials.headers;
+      this.headers = {
+        ...this.headers,
+        ...credentials.headers,
+      };
       logger.debug(`Stored headers "${Object.keys(this.headers).join(', ')}" in memory`);
     }
 
