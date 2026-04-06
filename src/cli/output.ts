@@ -616,7 +616,7 @@ export function formatToolCallExample(tool: Tool, sessionName?: string): string 
   if (!properties || Object.keys(properties).length === 0) {
     // Tool takes no arguments — still show the simple call
     const session = sessionName || '<@session>';
-    return `${chalk.bold('Example:')}\n  mcpc ${session} tools-call ${tool.name}`;
+    return `${chalk.bold('Call example:')}\n  mcpc ${session} tools-call ${tool.name}`;
   }
 
   const requiredNames = (schema?.required as string[]) || [];
@@ -638,7 +638,7 @@ export function formatToolCallExample(tool: Tool, sessionName?: string): string 
     return `${name}:=${val}`;
   });
 
-  return `${chalk.bold('Example:')}\n  mcpc ${session} tools-call ${tool.name} ${argParts.join(' ')}`;
+  return `${chalk.bold('Call example:')}\n  mcpc ${session} tools-call ${tool.name} ${argParts.join(' ')}`;
 }
 
 /**
