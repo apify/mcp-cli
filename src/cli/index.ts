@@ -348,7 +348,7 @@ function createTopLevelProgram(): Command {
       `${rainbow('Universal')} command-line client for the Model Context Protocol (MCP).`
     )
     .usage('[<@session>] [<command>] [options]')
-    .option('-j, --json', 'Output in JSON format for scripting')
+    .option('-j, --json', 'Output in JSON format for scripting and code mode')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
