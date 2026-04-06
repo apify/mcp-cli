@@ -58,8 +58,8 @@ async function loadHistory(): Promise<string[]> {
 async function saveHistory(history: string[]): Promise<void> {
   const historyPath = join(getMcpcHome(), HISTORY_FILE);
 
-  // Ensure directory exists
-  await mkdir(getMcpcHome(), { recursive: true });
+  // Ensure directory exists with owner-only permissions
+  await mkdir(getMcpcHome(), { recursive: true, mode: 0o700 });
 
   // Keep only last HISTORY_MAX_COMMANDS commands
   const toSave = history.slice(-HISTORY_MAX_COMMANDS);

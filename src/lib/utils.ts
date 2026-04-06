@@ -101,11 +101,13 @@ export function getWalletsFilePath(): string {
 }
 
 /**
- * Ensure a directory exists, creating it if necessary
+ * Ensure a directory exists, creating it if necessary.
+ * Uses mode 0o700 (owner-only) by default to protect sensitive data
+ * like session files, credentials, and Unix sockets.
  */
-export async function ensureDir(dirPath: string): Promise<void> {
+export async function ensureDir(dirPath: string, mode: number = 0o700): Promise<void> {
   try {
-    await mkdir(dirPath, { recursive: true });
+    await mkdir(dirPath, { recursive: true, mode });
   } catch (error) {
     // Ignore error if directory already exists
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
