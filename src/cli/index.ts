@@ -402,6 +402,8 @@ Full docs: ${docsUrl}`
 ${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
+
+${chalk.bold('JSON output (--json):')}\n  MCP InitializeResult: { protocolVersion, capabilities, serverInfo, instructions?, tools? }
 `
     )
     .action(async (server, sessionName, opts, command) => {
@@ -460,6 +462,10 @@ ${chalk.bold('Server formats:')}
     .command('close [@session]')
     .usage('<@session>')
     .description('Close a session')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  { sessionName, closed: true }\n`
+    )
     .action(async (sessionName, _opts, command) => {
       if (!sessionName) {
         throw new ClientError('Missing required argument: @session\n\nExample: mcpc close @myapp');
@@ -508,6 +514,10 @@ ${chalk.bold('Server formats:')}
       '--client-secret <secret>',
       'OAuth client secret (for servers without dynamic client registration)'
     )
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  { profile, serverUrl, scopes }\n`
+    )
     .action(async (server, opts, command) => {
       if (!server) {
         throw new ClientError(
@@ -529,6 +539,10 @@ ${chalk.bold('Server formats:')}
     .usage('<server>')
     .description('Delete an OAuth profile for a server')
     .option('--profile <name>', 'Profile name (default: "default")')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  { profile, serverUrl, deleted: true, affectedSessions }\n`
+    )
     .action(async (server, opts, command) => {
       if (!server) {
         throw new ClientError(
@@ -555,6 +569,9 @@ ${chalk.bold('Resources:')}
   all         Remove all of the above
 
 Without arguments, performs safe cleanup of stale data only.
+
+${chalk.bold('JSON output (--json):')}
+  { crashedBridges, expiredSessions, orphanedBridgeLogs, sessions, profiles, logs }
 `
     )
     .action(async (resources: string[], _opts, command) => {
@@ -606,6 +623,9 @@ ${chalk.bold('Examples:')}
   mcpc @apify grep "actor"                  Search within a single session
   mcpc grep "file" --json                   JSON output for scripting
   mcpc grep "actor" -m 5                    Show at most 5 results
+
+${chalk.bold('JSON output (--json):')}
+  [{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instructions?: string[] }]
 `
     )
     .action(async (pattern, opts, command) => {
@@ -703,6 +723,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('help')
     .description('Show server instructions and available capabilities')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  MCP InitializeResult: { protocolVersion, capabilities, serverInfo, instructions?, tools? }\n`
+    )
     .action(async (_options, command) => {
       await sessions.showHelp(session, getOptionsFromCommand(command));
     });
@@ -736,6 +760,10 @@ function registerSessionCommands(program: Command, session: string): void {
     .command('tools')
     .description('List available tools (shorthand for tools-list)')
     .option('--full', 'Show full tool details including complete input schema')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP Tool objects: [{ name, description?, inputSchema, annotations? }, ...]\n`
+    )
     .action(async (_options, command) => {
       await tools.listTools(session, getOptionsFromCommand(command));
     });
@@ -744,6 +772,10 @@ function registerSessionCommands(program: Command, session: string): void {
     .command('tools-list')
     .description('List available tools')
     .option('--full', 'Show full tool details including complete input schema')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP Tool objects: [{ name, description?, inputSchema, annotations? }, ...]\n`
+    )
     .action(async (_options, command) => {
       await tools.listTools(session, getOptionsFromCommand(command));
     });
@@ -751,6 +783,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tools-get <name>')
     .description('Get information about a specific tool')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  MCP Tool object: { name, description?, inputSchema, annotations? }\n`
+    )
     .action(async (name, _options, command) => {
       await tools.getTool(session, name, getOptionsFromCommand(command));
     });
@@ -760,6 +796,10 @@ function registerSessionCommands(program: Command, session: string): void {
     .description('Call a tool with arguments (key:=value pairs or JSON)')
     .option('--task', 'Use task execution (experimental)')
     .option('--detach', 'Start task and return immediately with task ID (implies --task)')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  MCP CallToolResult: { content: [{ type, text?, ... }], isError?, structuredContent? }\n`
+    )
     .action(async (name, args, options, command) => {
       await tools.callTool(session, name, {
         args,
@@ -773,6 +813,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tasks-list')
     .description('List active tasks')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  { tasks: [{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }, ...] }\n`
+    )
     .action(async (_options, command) => {
       await tasks.listTasks(session, getOptionsFromCommand(command));
     });
@@ -780,6 +824,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tasks-get <taskId>')
     .description('Get status of a specific task')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  MCP Task object: { taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }\n`
+    )
     .action(async (taskId, _options, command) => {
       await tasks.getTask(session, taskId, getOptionsFromCommand(command));
     });
@@ -787,6 +835,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tasks-cancel <taskId>')
     .description('Cancel a running task')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  MCP Task object: { taskId, status, statusMessage? }\n`
+    )
     .action(async (taskId, _options, command) => {
       await tasks.cancelTask(session, taskId, getOptionsFromCommand(command));
     });
@@ -795,6 +847,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('resources')
     .description('List available resources (shorthand for resources-list)')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP Resource objects: [{ uri, name?, description?, mimeType? }, ...]\n`
+    )
     .action(async (_options, command) => {
       await resources.listResources(session, getOptionsFromCommand(command));
     });
@@ -802,6 +858,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('resources-list')
     .description('List available resources')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP Resource objects: [{ uri, name?, description?, mimeType? }, ...]\n`
+    )
     .action(async (_options, command) => {
       await resources.listResources(session, getOptionsFromCommand(command));
     });
@@ -811,6 +871,10 @@ function registerSessionCommands(program: Command, session: string): void {
     .description('Get a resource by URI')
     .option('-o, --output <file>', 'Write resource to file')
     .option('--max-size <bytes>', 'Maximum resource size in bytes')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  MCP ReadResourceResult: { contents: [{ uri, mimeType?, text? | blob? }] }\n`
+    )
     .action(async (uri, options, command) => {
       await resources.getResource(session, uri, {
         output: options.output,
@@ -822,6 +886,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('resources-subscribe <uri>')
     .description('Subscribe to resource updates')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  { subscribed: true, uri: string }\n`
+    )
     .action(async (uri, _options, command) => {
       await resources.subscribeResource(session, uri, getOptionsFromCommand(command));
     });
@@ -829,6 +897,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('resources-unsubscribe <uri>')
     .description('Unsubscribe from resource updates')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  { unsubscribed: true, uri: string }\n`
+    )
     .action(async (uri, _options, command) => {
       await resources.unsubscribeResource(session, uri, getOptionsFromCommand(command));
     });
@@ -836,6 +908,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('resources-templates-list')
     .description('List available resource templates')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP ResourceTemplate objects: [{ uriTemplate, name?, description?, mimeType? }, ...]\n`
+    )
     .action(async (_options, command) => {
       await resources.listResourceTemplates(session, getOptionsFromCommand(command));
     });
@@ -844,6 +920,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('prompts')
     .description('List available prompts (shorthand for prompts-list)')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP Prompt objects: [{ name, description?, arguments?: [{ name, description?, required? }] }, ...]\n`
+    )
     .action(async (_options, command) => {
       await prompts.listPrompts(session, getOptionsFromCommand(command));
     });
@@ -851,6 +931,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('prompts-list')
     .description('List available prompts')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP Prompt objects: [{ name, description?, arguments?: [{ name, description?, required? }] }, ...]\n`
+    )
     .action(async (_options, command) => {
       await prompts.listPrompts(session, getOptionsFromCommand(command));
     });
@@ -858,6 +942,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('prompts-get <name> [args...]')
     .description('Get a prompt by name with arguments (key:=value pairs or JSON)')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  MCP GetPromptResult: { description?, messages: [{ role, content: { type, text?, ... } }] }\n`
+    )
     .action(async (name, args, _options, command) => {
       await prompts.getPrompt(session, name, {
         args,
@@ -871,6 +959,7 @@ function registerSessionCommands(program: Command, session: string): void {
     .description(
       'Set server logging level (debug, info, notice, warning, error, critical, alert, emergency)'
     )
+    .addHelpText('after', `\n${chalk.bold('JSON output (--json):')}\n  { level: string }\n`)
     .action(async (level, _options, command) => {
       await logging.setLogLevel(session, level, getOptionsFromCommand(command));
     });
@@ -879,6 +968,10 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('ping')
     .description('Ping the MCP server to check if it is alive')
+    .addHelpText(
+      'after',
+      `\n${chalk.bold('JSON output (--json):')}\n  { success: true, durationMs: number }\n`
+    )
     .action(async (_options, command) => {
       await utilities.ping(session, getOptionsFromCommand(command));
     });
