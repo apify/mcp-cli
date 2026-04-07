@@ -380,7 +380,7 @@ export async function callTool(
     if (result.isError && options.outputMode === 'human') {
       console.log(
         formatInfo(
-          `Run ${chalk.bold(`mcpc ${target} tools-call ${name} --help`)} to see the tool schema and usage`
+          `Run ${chalk.bold(`mcpc ${target} tools-get ${name}`)} to see the tool schema and usage`
         )
       );
     }
