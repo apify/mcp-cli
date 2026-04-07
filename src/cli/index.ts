@@ -68,6 +68,7 @@ interface HandlerOptions {
   schema?: string;
   schemaMode?: 'strict' | 'compatible' | 'ignore';
   full?: boolean;
+  maxChars?: number;
 }
 
 /**
