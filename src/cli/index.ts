@@ -37,6 +37,7 @@ import {
   parseServerArg,
   hasSubcommand,
   optionTakesValue,
+  suggestCommand,
   KNOWN_COMMANDS,
   KNOWN_SESSION_COMMANDS,
 } from './parser.js';
@@ -285,10 +286,19 @@ async function main(): Promise<void> {
       console.error(`Run "mcpc --help" for usage information.\n`);
     }
   } else {
+    // Try to suggest the closest matching command
+    const suggestion = suggestCommand(firstNonOption, allCommands);
     if (outputMode === 'json') {
       console.error(formatJsonError(new Error(`Unknown command: ${firstNonOption}`), 1));
     } else {
       console.error(`Error: Unknown command: ${firstNonOption}`);
+      if (suggestion) {
+        if (KNOWN_SESSION_COMMANDS.includes(suggestion)) {
+          console.error(`\nDid you mean: mcpc <@session> ${suggestion}`);
+        } else {
+          console.error(`\nDid you mean: mcpc ${suggestion}`);
+        }
+      }
       console.error(`Run "mcpc --help" for usage information.\n`);
     }
   }

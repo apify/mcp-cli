@@ -19,6 +19,7 @@ import { ping } from './commands/utilities.js';
 import { createSessionClient } from '../lib/session-client.js';
 import type { SessionClient } from '../lib/session-client.js';
 import { parseShellCommand } from './shell-parser.js';
+import { suggestCommand, KNOWN_SESSION_COMMANDS } from './parser.js';
 
 const HISTORY_MAX_COMMANDS = 1000;
 const HISTORY_FILE = 'shell-history';
@@ -336,9 +337,16 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
         break;
       }
 
-      default:
+      default: {
         console.log(chalk.red(`Unknown command: ${command}`));
-        console.log(chalk.dim('Type "help" for available commands'));
+        const suggestion = suggestCommand(command, KNOWN_SESSION_COMMANDS);
+        if (suggestion) {
+          console.log(chalk.dim(`Did you mean: ${suggestion}`));
+        } else {
+          console.log(chalk.dim('Type "help" for available commands'));
+        }
+        break;
+      }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
