@@ -416,7 +416,6 @@ Full docs: ${docsUrl}`
 ${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
-
 ${jsonHelp('`InitializeResult`', '`{ protocolVersion, capabilities, serverInfo, instructions?, tools? }`')}`
     )
     .action(async (server, sessionName, opts, command) => {
@@ -573,7 +572,6 @@ ${chalk.bold('Resources:')}
   all         Remove all of the above
 
 Without arguments, performs safe cleanup of stale data only.
-
 ${jsonHelp('`{ crashedBridges, expiredSessions, orphanedBridgeLogs, sessions, profiles, logs }`')}`
     )
     .action(async (resources: string[], _opts, command) => {
@@ -625,7 +623,6 @@ ${chalk.bold('Examples:')}
   mcpc @apify grep "actor"                  Search within a single session
   mcpc grep "file" --json                   JSON output for scripting
   mcpc grep "actor" -m 5                    Show at most 5 results
-
 ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instructions?: string[] }]`')}`
     )
     .action(async (pattern, opts, command) => {
@@ -817,7 +814,6 @@ ${chalk.bold('Arguments:')}
 
   Values are auto-parsed: strings, numbers, booleans, JSON objects/arrays.
   To force a string, wrap in quotes: id:='"123"'
-
 ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`')}`
     )
     .action(async (name, args, options, command) => {
@@ -1021,7 +1017,6 @@ ${chalk.bold('Examples:')}
   mcpc ${session} grep "search"                  Search tools and instructions
   mcpc ${session} grep "search" --resources      Search resources only
   mcpc ${session} grep "search|find" -E          Regex search
-
 ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instructions?: string[] }`')}`
     )
     .action(async (pattern, opts, command) => {
