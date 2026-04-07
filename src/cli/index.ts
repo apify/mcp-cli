@@ -189,6 +189,14 @@ async function main(): Promise<void> {
       await closeFileLogger();
       return;
     } else {
+      // Check if the user is asking for help on a session subcommand (e.g. mcpc resources-list --help)
+      const helpTarget = args.find(
+        (a) => a !== '--help' && a !== '-h' && !a.startsWith('-') && !a.startsWith('@')
+      );
+      if (helpTarget && KNOWN_SESSION_COMMANDS.includes(helpTarget)) {
+        showSessionCommandHelp(helpTarget);
+        return;
+      }
       const program = createTopLevelProgram();
       await program.parseAsync(process.argv);
       return;
@@ -706,22 +714,7 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
       }
 
       // Check session subcommands
-      const dummyProgram = createSessionProgram();
-      registerSessionCommands(dummyProgram, '<@session>');
-      for (const cmd of dummyProgram.commands) {
-        cmd.option('--json', 'Output in JSON format');
-        cmd.helpOption('-h, --help', 'Display help');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const helpOpt = (cmd as any)._getHelpOption?.();
-        if (helpOpt) helpOpt.hidden = true;
-      }
-      const sessionCmd = dummyProgram.commands.find(
-        (c) => c.name() === cmdName || c.aliases().includes(cmdName)
-      );
-      if (sessionCmd) {
-        sessionCmd.outputHelp();
-        return;
-      }
+      if (showSessionCommandHelp(cmdName)) return;
 
       console.error(`Unknown command: ${cmdName}`);
       console.error(`Run "mcpc --help" for usage information.`);
@@ -740,6 +733,30 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
   });
 
   return program;
+}
+
+/**
+ * Show help for a session subcommand by name.
+ * Returns true if the command was found and help was displayed.
+ */
+function showSessionCommandHelp(cmdName: string): boolean {
+  const dummyProgram = createSessionProgram();
+  registerSessionCommands(dummyProgram, '<@session>');
+  for (const cmd of dummyProgram.commands) {
+    cmd.option('--json', 'Output in JSON format');
+    cmd.helpOption('-h, --help', 'Display help');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const helpOpt = (cmd as any)._getHelpOption?.();
+    if (helpOpt) helpOpt.hidden = true;
+  }
+  const sessionCmd = dummyProgram.commands.find(
+    (c) => c.name() === cmdName || c.aliases().includes(cmdName)
+  );
+  if (sessionCmd) {
+    sessionCmd.outputHelp();
+    return true;
+  }
+  return false;
 }
 
 /**
