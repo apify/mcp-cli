@@ -124,11 +124,15 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
 
 /**
  * Format a JSON output help line with backtick-style Markdown formatting.
+ * Optional schemaUrl adds a "Schema:" link for AI agents.
  */
-function jsonHelp(description: string, shape?: string): string {
+function jsonHelp(description: string, shape?: string, schemaUrl?: string): string {
   const line = shape ? `  ${description}: ${shape}` : `  ${description}`;
-  return `\n${chalk.bold('JSON output (--json):')}\n${line}\n`;
+  const link = schemaUrl ? `\n  Schema: ${schemaUrl}` : '';
+  return `\n${chalk.bold('JSON output (--json):')}\n${line}${link}\n`;
 }
+
+const SCHEMA_BASE = 'https://modelcontextprotocol.io/specification/2025-11-25/schema';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -416,7 +420,7 @@ Full docs: ${docsUrl}`
 ${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
-${jsonHelp('`InitializeResult`', '`{ protocolVersion, capabilities, serverInfo, instructions?, tools? }`')}`
+${jsonHelp('`InitializeResult`', '`{ protocolVersion, capabilities, serverInfo, instructions?, tools? }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
       if (!server) {
@@ -766,7 +770,8 @@ function registerSessionCommands(program: Command, session: string): void {
       'after',
       jsonHelp(
         'Array of `Tool` objects',
-        '`[{ name, description?, inputSchema, annotations? }, ...]`'
+        '`[{ name, description?, inputSchema, annotations? }, ...]`',
+        `${SCHEMA_BASE}#tool`
       )
     )
     .action(async (_options, command) => {
@@ -781,7 +786,8 @@ function registerSessionCommands(program: Command, session: string): void {
       'after',
       jsonHelp(
         'Array of `Tool` objects',
-        '`[{ name, description?, inputSchema, annotations? }, ...]`'
+        '`[{ name, description?, inputSchema, annotations? }, ...]`',
+        `${SCHEMA_BASE}#tool`
       )
     )
     .action(async (_options, command) => {
@@ -793,7 +799,11 @@ function registerSessionCommands(program: Command, session: string): void {
     .description('Get full details and schema for a specific MCP server tool.')
     .addHelpText(
       'after',
-      jsonHelp('`Tool` object', '`{ name, description?, inputSchema, annotations? }`')
+      jsonHelp(
+        '`Tool` object',
+        '`{ name, description?, inputSchema, annotations? }`',
+        `${SCHEMA_BASE}#tool`
+      )
     )
     .action(async (name, _options, command) => {
       await tools.getTool(session, name, getOptionsFromCommand(command));
@@ -814,7 +824,7 @@ ${chalk.bold('Arguments:')}
 
   Values are auto-parsed: strings, numbers, booleans, JSON objects/arrays.
   To force a string, wrap in quotes: id:='"123"'
-${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`')}`
+${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`', `${SCHEMA_BASE}#calltoolresult`)}`
     )
     .action(async (name, args, options, command) => {
       await tools.callTool(session, name, {
@@ -865,7 +875,11 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
     .description('List available MCP server resources (shorthand for resources-list).')
     .addHelpText(
       'after',
-      jsonHelp('Array of `Resource` objects', '`[{ uri, name?, description?, mimeType? }, ...]`')
+      jsonHelp(
+        'Array of `Resource` objects',
+        '`[{ uri, name?, description?, mimeType? }, ...]`',
+        `${SCHEMA_BASE}#resource`
+      )
     )
     .action(async (_options, command) => {
       await resources.listResources(session, getOptionsFromCommand(command));
@@ -876,7 +890,11 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
     .description('List available MCP server resources.')
     .addHelpText(
       'after',
-      jsonHelp('Array of `Resource` objects', '`[{ uri, name?, description?, mimeType? }, ...]`')
+      jsonHelp(
+        'Array of `Resource` objects',
+        '`[{ uri, name?, description?, mimeType? }, ...]`',
+        `${SCHEMA_BASE}#resource`
+      )
     )
     .action(async (_options, command) => {
       await resources.listResources(session, getOptionsFromCommand(command));
@@ -889,7 +907,11 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
     .option('--max-size <bytes>', 'Maximum resource size in bytes')
     .addHelpText(
       'after',
-      jsonHelp('`ReadResourceResult`', '`{ contents: [{ uri, mimeType?, text? | blob? }] }`')
+      jsonHelp(
+        '`ReadResourceResult`',
+        '`{ contents: [{ uri, mimeType?, text? | blob? }] }`',
+        `${SCHEMA_BASE}#readresourceresult`
+      )
     )
     .action(async (uri, options, command) => {
       await resources.getResource(session, uri, {
@@ -922,7 +944,8 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
       'after',
       jsonHelp(
         'Array of `ResourceTemplate` objects',
-        '`[{ uriTemplate, name?, description?, mimeType? }, ...]`'
+        '`[{ uriTemplate, name?, description?, mimeType? }, ...]`',
+        `${SCHEMA_BASE}#resourcetemplate`
       )
     )
     .action(async (_options, command) => {
@@ -937,7 +960,8 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
       'after',
       jsonHelp(
         'Array of `Prompt` objects',
-        '`[{ name, description?, arguments?: [{ name, required? }] }, ...]`'
+        '`[{ name, description?, arguments?: [{ name, required? }] }, ...]`',
+        `${SCHEMA_BASE}#prompt`
       )
     )
     .action(async (_options, command) => {
@@ -951,7 +975,8 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
       'after',
       jsonHelp(
         'Array of `Prompt` objects',
-        '`[{ name, description?, arguments?: [{ name, required? }] }, ...]`'
+        '`[{ name, description?, arguments?: [{ name, required? }] }, ...]`',
+        `${SCHEMA_BASE}#prompt`
       )
     )
     .action(async (_options, command) => {
@@ -965,7 +990,8 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
       'after',
       jsonHelp(
         '`GetPromptResult`',
-        '`{ description?, messages: [{ role, content: { type, text?, ... } }] }`'
+        '`{ description?, messages: [{ role, content: { type, text?, ... } }] }`',
+        `${SCHEMA_BASE}#getpromptresult`
       )
     )
     .action(async (name, args, _options, command) => {
