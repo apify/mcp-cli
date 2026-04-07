@@ -193,6 +193,27 @@ describe('extractInstructionsSnippet', () => {
     expect(result!.length).toBeGreaterThanOrEqual('END'.length + 50);
   });
 
+  it('truncates when regex matches the entire long text (e.g. .*)', () => {
+    const text =
+      'Apify is the worlds largest marketplace of tools for web scraping data extraction and web automation. These tools are called Actors. They enable you to extract structured data from many sources and do a lot more interesting things with them over time.';
+    const result = extractInstructionsSnippet(text, '.*', { regex: true });
+    expect(result).toBeTruthy();
+    // Should be capped, not the full 250+ char string
+    expect(result!.length).toBeLessThanOrEqual(75);
+    // Should start from the beginning (no leading ellipsis)
+    expect(result!.startsWith('\u2026')).toBe(false);
+    // Should have trailing ellipsis since text was truncated
+    expect(result!.endsWith('\u2026')).toBe(true);
+    // Should start with the beginning of the text
+    expect(result).toContain('Apify');
+  });
+
+  it('returns full text when regex matches all of a short text', () => {
+    const text = 'Short instructions here.';
+    const result = extractInstructionsSnippet(text, '.*', { regex: true });
+    expect(result).toBe('Short instructions here.');
+  });
+
   it('handles case-insensitive regex', () => {
     const text = 'The Quick Brown Fox jumps over the lazy dog';
     const result = extractInstructionsSnippet(text, 'quick.*fox', {

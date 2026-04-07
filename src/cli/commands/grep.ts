@@ -128,11 +128,12 @@ function buildInstructionsSearchText(instructions: string, sessionName: string):
 
 /**
  * Extract a short snippet from instructions text around the first match.
- * Shows up to 70 context characters around the matched text. When the match
- * is near the start or end, unused context budget from one side is redistributed
- * to the other, so edge matches show more surrounding text. Ellipsis is added
- * when the snippet doesn't reach the start/end. Whitespace is normalized to
- * single spaces.
+ * The total snippet is capped at pattern.length + 70 characters (minimum 70).
+ * When the match is short and near the start or end, unused context budget
+ * from one side is redistributed to the other. When the match itself is very
+ * long (e.g. `.*`), the snippet is truncated from the beginning of the text.
+ * Ellipsis is added when the snippet doesn't reach the start/end.
+ * Whitespace is normalized to single spaces.
  */
 export function extractInstructionsSnippet(
   instructions: string,
@@ -164,9 +165,22 @@ export function extractInstructionsSnippet(
     matchEnd = matchStart + needle.length;
   }
 
+  const matchLen = matchEnd - matchStart;
+  const maxSnippet = Math.max(70, pattern.length + 70);
+
+  // When the match itself is longer than the budget, just show the beginning of the text
+  if (matchLen >= maxSnippet) {
+    if (normalized.length <= maxSnippet) return normalized;
+    // Snap to word boundary
+    let end = maxSnippet;
+    const spacePos = normalized.lastIndexOf(' ', end);
+    if (spacePos > maxSnippet * 0.5) end = spacePos;
+    return normalized.slice(0, end) + '\u2026';
+  }
+
   // Total context budget (chars around the match, excluding the match itself).
   // When the match is near start/end, unused budget from one side is given to the other.
-  const totalContext = 70;
+  const totalContext = maxSnippet - matchLen;
   const availBefore = matchStart;
   const availAfter = normalized.length - matchEnd;
 
