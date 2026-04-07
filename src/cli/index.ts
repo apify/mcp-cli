@@ -730,7 +730,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Help command
   program
     .command('help')
-    .description('Show server instructions and available capabilities')
+    .description('Show MCP server instructions, capabilities, and tools.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  MCP InitializeResult: { protocolVersion, capabilities, serverInfo, instructions?, tools? }\n`
@@ -742,7 +742,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Shell command
   program
     .command('shell')
-    .description('Interactive shell for the session')
+    .description('Launch interactive MCP shell for the session.')
     .action(async () => {
       await sessions.openShell(session);
     });
@@ -750,7 +750,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Close command
   program
     .command('close', { hidden: true })
-    .description('Close the session')
+    .description('Close the MCP server session.')
     .action(async (_options, command) => {
       await sessions.closeSession(session, getOptionsFromCommand(command));
     });
@@ -758,7 +758,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Restart command
   program
     .command('restart')
-    .description('Restart the session (stop and start the bridge)')
+    .description('Restart the MCP server session (losing all state).')
     .action(async (_options, command) => {
       await sessions.restartSession(session, getOptionsFromCommand(command));
     });
@@ -766,7 +766,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Tools commands
   program
     .command('tools')
-    .description('List available tools (shorthand for tools-list)')
+    .description('List all available MCP server tools (shorthand for tools-list).')
     .option('--full', 'Show full tool details including complete input schema')
     .addHelpText(
       'after',
@@ -778,7 +778,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('tools-list')
-    .description('List available tools')
+    .description('List all available MCP server tools.')
     .option('--full', 'Show full tool details including complete input schema')
     .addHelpText(
       'after',
@@ -790,7 +790,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('tools-get <name>')
-    .description('Get information about a specific tool')
+    .description('Get full details and schema for a specific MCP server tool.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  MCP Tool object: { name, description?, inputSchema, annotations? }\n`
@@ -801,7 +801,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('tools-call <name> [args...]')
-    .description('Call a tool with arguments (key:=value pairs or JSON)')
+    .description('Call an MCP server tool with arguments (key:=value pairs or JSON)')
     .option('--task', 'Use task execution (experimental)')
     .option('--detach', 'Start task and return immediately with task ID (implies --task)')
     .addHelpText(
@@ -820,7 +820,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Tasks commands
   program
     .command('tasks-list')
-    .description('List active tasks')
+    .description('List all MCP server tasks.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  { tasks: [{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }, ...] }\n`
@@ -831,7 +831,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('tasks-get <taskId>')
-    .description('Get status of a specific task')
+    .description('Get status of a specific MCP task.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  MCP Task object: { taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }\n`
@@ -842,7 +842,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('tasks-cancel <taskId>')
-    .description('Cancel a running task')
+    .description('Cancel a running MCP task.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  MCP Task object: { taskId, status, statusMessage? }\n`
@@ -854,7 +854,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Resources commands
   program
     .command('resources')
-    .description('List available resources (shorthand for resources-list)')
+    .description('List available MCP server resources (shorthand for resources-list).')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP Resource objects: [{ uri, name?, description?, mimeType? }, ...]\n`
@@ -865,7 +865,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('resources-list')
-    .description('List available resources')
+    .description('List available MCP server resources.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP Resource objects: [{ uri, name?, description?, mimeType? }, ...]\n`
@@ -876,7 +876,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('resources-read <uri>')
-    .description('Get a resource by URI')
+    .description('Get an MCP server resource by URI.')
     .option('-o, --output <file>', 'Write resource to file')
     .option('--max-size <bytes>', 'Maximum resource size in bytes')
     .addHelpText(
@@ -893,7 +893,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('resources-subscribe <uri>')
-    .description('Subscribe to resource updates')
+    .description('Subscribe to MCP server resource updates.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  { subscribed: true, uri: string }\n`
@@ -904,7 +904,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('resources-unsubscribe <uri>')
-    .description('Unsubscribe from resource updates')
+    .description('Unsubscribe from MCP server resource updates.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  { unsubscribed: true, uri: string }\n`
@@ -915,7 +915,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('resources-templates-list')
-    .description('List available resource templates')
+    .description('List available MCP server resource templates.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP ResourceTemplate objects: [{ uriTemplate, name?, description?, mimeType? }, ...]\n`
@@ -927,7 +927,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Prompts commands
   program
     .command('prompts')
-    .description('List available prompts (shorthand for prompts-list)')
+    .description('List all available MCP server prompts (shorthand for prompts-list).')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP Prompt objects: [{ name, description?, arguments?: [{ name, description?, required? }] }, ...]\n`
@@ -938,7 +938,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('prompts-list')
-    .description('List available prompts')
+    .description('List all available MCP server prompts.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  Array of MCP Prompt objects: [{ name, description?, arguments?: [{ name, description?, required? }] }, ...]\n`
@@ -949,7 +949,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('prompts-get <name> [args...]')
-    .description('Get a prompt by name with arguments (key:=value pairs or JSON)')
+    .description('Get a prompt by name with arguments (key:=value pairs or JSON).')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  MCP GetPromptResult: { description?, messages: [{ role, content: { type, text?, ... } }] }\n`
@@ -965,7 +965,7 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('logging-set-level <level>')
     .description(
-      'Set server logging level (debug, info, notice, warning, error, critical, alert, emergency)'
+      'Set MCP server server logging level (debug, info, notice, warning, error, critical, alert, emergency)'
     )
     .addHelpText('after', `\n${chalk.bold('JSON output (--json):')}\n  { level: string }\n`)
     .action(async (level, _options, command) => {
@@ -975,7 +975,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Server commands
   program
     .command('ping')
-    .description('Ping the MCP server to check if it is alive')
+    .description('Ping the MCP server to check it is alive.')
     .addHelpText(
       'after',
       `\n${chalk.bold('JSON output (--json):')}\n  { success: true, durationMs: number }\n`
@@ -987,7 +987,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Grep command: @session grep <pattern>
   program
     .command('grep <pattern>')
-    .description('Search tools and instructions')
+    .description('Search MCP server objects (by default --tools and --instructions).')
     .option('--tools', 'Search tools')
     .option('--resources', 'Search resources')
     .option('--prompts', 'Search prompts')

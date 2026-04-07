@@ -1,6 +1,9 @@
 
 # TODOs
 
+- "mcpc help tools-call" - show more info how to pass args, including stdio pipe and JSON. Maybe add short examples.
+Make "mcpc @apify grep --help" and "mcpc grep --help" more consistent with info what they print.
+The former should provide the --json example.
 
 ## NEW
 
