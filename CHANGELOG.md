@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--max-output <chars>` global option to truncate large tool/prompt/resource output
+- `tools-call <tool> --help` shows tool parameter schema (shortcut for `tools-get`)
+- "Did you mean?" suggestions for unknown commands, including reversed names (e.g., `list-tools` → `tools-list`)
+
+### Fixed
+
+- `connect` now verifies the server responds before reporting success; shows a warning with the actual error when the server is unreachable
+- HTTP 404 during initial connect no longer misclassified as "session expired"; error messages now include the actual HTTP error and server URL
+
 ## [0.2.4] - 2026-04-07
 
 ### Security
