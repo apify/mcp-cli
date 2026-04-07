@@ -1002,7 +1002,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
   // Grep command: @session grep <pattern>
   program
     .command('grep <pattern>')
-    .description('Search MCP server objects (by default --tools and --instructions).')
+    .description('Search objects in an MCP server session.')
     .option('--tools', 'Search tools')
     .option('--resources', 'Search resources')
     .option('--prompts', 'Search prompts')
