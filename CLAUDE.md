@@ -603,7 +603,7 @@ After lint passes, run `npm run build` and fix any TypeScript compilation errors
 
 After build passes, run `npm run test:unit` and fix any failures before committing. If a test fails due to your changes, update the test or fix the code so all tests pass. Never commit code that fails unit tests.
 
-For any non-trivial change (new feature, bug fix, behaviour change, or notable refactor), add an entry to the `[Unreleased]` section of `CHANGELOG.md` before finishing. Use the appropriate category (`Added`, `Changed`, `Fixed`, `Removed`). Skip purely internal changes such as test-only edits, code style fixes, or minor cosmetic/styling tweaks (e.g. changing colors, adjusting whitespace, renaming labels).
+For any non-trivial change (new feature, bug fix, behaviour change, or notable refactor), add an entry to the `[Unreleased]` section of `CHANGELOG.md` before finishing. Use the appropriate category (`Added`, `Changed`, `Fixed`, `Removed`). Skip purely internal changes such as test-only edits, code style fixes, or minor cosmetic/styling tweaks (e.g. changing colors, adjusting whitespace, renaming labels). The changelog is for **users reading release notes** — only include entries that a user would care about. Do not add entries for: new warnings or deprecation notices on existing commands, minor help text changes, test infrastructure, CI/CD changes, or internal refactors. When in doubt, leave it out.
 
 When implementing features:
 
@@ -769,7 +769,7 @@ The `CHANGELOG.md` file follows [Keep a Changelog](https://keepachangelog.com/en
 2. Ensure all significant changes are documented in `[Unreleased]`
 3. The release script will automatically move `[Unreleased]` entries to the new version section
 
-**Important:** Always keep user-facing changes documented. Internal refactoring or test changes don't need changelog entries unless they affect behavior.
+**Important:** The changelog is for **users reading release notes**. Only include entries that a user would care about. Do not add entries for: new warnings or deprecation notices on existing commands, minor help text or `--help` output changes, test infrastructure (new tests, test refactors), CI/CD workflow changes, internal refactors, or cosmetic tweaks. When in doubt, leave it out.
 
 # Misc
 
