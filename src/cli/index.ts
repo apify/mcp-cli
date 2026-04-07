@@ -689,6 +689,9 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
       registerSessionCommands(dummyProgram, '<@session>');
       for (const cmd of dummyProgram.commands) {
         cmd.helpOption('-h, --help', 'Display help');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const helpOpt = (cmd as any)._getHelpOption?.();
+        if (helpOpt) helpOpt.hidden = true;
       }
       const sessionCmd = dummyProgram.commands.find(
         (c) => c.name() === cmdName || c.aliases().includes(cmdName)
@@ -1120,9 +1123,13 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
   // Register all session subcommands
   registerSessionCommands(program, session);
 
-  // Fix help option text on all sub-commands (Commander defaults to lowercase)
+  // Hide the redundant "-h, --help" from sub-command help output —
+  // you already need --help to see it.  Keep -h/--help functional for routing.
   for (const cmd of program.commands) {
     cmd.helpOption('-h, --help', 'Display help');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const helpOpt = (cmd as any)._getHelpOption?.();
+    if (helpOpt) helpOpt.hidden = true;
   }
 
   // Parse and execute
