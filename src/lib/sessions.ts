@@ -328,7 +328,8 @@ export async function consolidateSessions(
             session.status !== 'crashed' &&
             session.status !== 'expired' &&
             session.status !== 'unauthorized' &&
-            session.status !== 'reconnecting'
+            session.status !== 'reconnecting' &&
+            session.status !== 'connecting'
           ) {
             session.status = 'crashed';
             result.crashedBridges++;
