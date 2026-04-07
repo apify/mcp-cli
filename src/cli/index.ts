@@ -153,17 +153,23 @@ async function main(): Promise<void> {
 
   // Check for help flag
   // x402 has its own Commander program with full subcommand help, so pass --help through
+  // Session commands (@name ...) also handle --help via their own Commander program
   if (args.includes('--help') || args.includes('-h')) {
-    if (args.includes('x402')) {
+    // Check if this is a session command — let it fall through to session handling
+    const hasSessionArg = args.some((a) => a.startsWith('@') && !a.startsWith('--'));
+    if (hasSessionArg) {
+      // Fall through — handleSessionCommands will parse --help via Commander
+    } else if (args.includes('x402')) {
       const x402Index = args.indexOf('x402');
       const x402Args = args.slice(x402Index + 1);
       await handleX402Command(x402Args);
       await closeFileLogger();
       return;
+    } else {
+      const program = createTopLevelProgram();
+      await program.parseAsync(process.argv);
+      return;
     }
-    const program = createTopLevelProgram();
-    await program.parseAsync(process.argv);
-    return;
   }
 
   // Validate all options are known (before any processing)
@@ -684,9 +690,11 @@ ${chalk.bold('JSON output (--json):')}
       }
 
       // Check session subcommands
-      const dummyProgram = new Command();
-      dummyProgram.name('mcpc <@session>');
-      registerSessionCommands(dummyProgram, '@dummy');
+      const dummyProgram = createSessionProgram();
+      registerSessionCommands(dummyProgram, '<@session>');
+      for (const cmd of dummyProgram.commands) {
+        cmd.helpOption('-h, --help', 'Display help');
+      }
       const sessionCmd = dummyProgram.commands.find(
         (c) => c.name() === cmdName || c.aliases().includes(cmdName)
       );
@@ -1017,6 +1025,12 @@ function createSessionProgram(): Command {
     getErrHelpWidth: () => 100,
   });
 
+  // Match the top-level help styling: bold titles, cyan subcommand text
+  program.configureHelp({
+    styleTitle: (str) => chalk.bold(str),
+    styleSubcommandText: (str) => chalk.cyan(str),
+  });
+
   program
     .name('mcpc <@session>')
     .helpOption('-h, --help', 'Display help')
@@ -1035,8 +1049,9 @@ function createSessionProgram(): Command {
  * Handle commands for a session target (@name)
  */
 async function handleSessionCommands(session: string, args: string[]): Promise<void> {
-  // Check if no subcommand provided - show server info
-  if (!hasSubcommand(args)) {
+  // Check if no subcommand provided - show server info (unless --help is requested)
+  const argsSlice = args.slice(2);
+  if (!hasSubcommand(args) && !argsSlice.includes('--help') && !argsSlice.includes('-h')) {
     const options = extractOptions(args);
     if (options.verbose) setVerbose(true);
     if (options.json) setJsonMode(true);
@@ -1053,6 +1068,11 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
 
   // Register all session subcommands
   registerSessionCommands(program, session);
+
+  // Fix help option text on all sub-commands (Commander defaults to lowercase)
+  for (const cmd of program.commands) {
+    cmd.helpOption('-h, --help', 'Display help');
+  }
 
   // Parse and execute
   try {
