@@ -686,7 +686,7 @@ export function reconnectCrashedSessions(sessionNames: string[]): void {
       // Revert to 'crashed' only if the bridge hasn't already set a terminal status
       try {
         const session = await getSession(name);
-        if (session?.status === 'reconnecting') {
+        if (session?.status === 'reconnecting' || session?.status === 'connecting') {
           await updateSession(name, { status: 'crashed' });
         }
       } catch {
