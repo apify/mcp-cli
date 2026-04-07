@@ -123,7 +123,7 @@ Commands:
   help [command] [subcommand]  Show help for a specific command
 
 Options:
-  -j, --json                   Output in JSON format for scripting
+      --json                   Output in JSON format for scripting
   --verbose                    Enable debug logging
   --profile <name>             OAuth profile for the server ("default" if not provided)
   --schema <file>              Validate tool/prompt schema against expected schema

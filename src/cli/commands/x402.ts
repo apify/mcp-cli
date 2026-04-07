@@ -331,7 +331,7 @@ export async function handleX402Command(args: string[]): Promise<void> {
 
   // Inherit global options so they parse correctly
   program
-    .option('-j, --json', 'Output in JSON format')
+    .option('--json', 'Output in JSON format')
     .option('--verbose', 'Enable debug logging')
     .helpOption('-h, --help', 'Display help')
     .helpCommand('help [command]', 'Display help for command')

@@ -366,7 +366,7 @@ function createTopLevelProgram(): Command {
       `${rainbow('Universal')} command-line client for the Model Context Protocol (MCP).`
     )
     .usage('[<@session>] [<command>] [options]')
-    .option('-j, --json', 'Output in JSON format for scripting')
+    .option('--json', 'Output in JSON format for scripting')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
@@ -688,7 +688,7 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
       const dummyProgram = createSessionProgram();
       registerSessionCommands(dummyProgram, '<@session>');
       for (const cmd of dummyProgram.commands) {
-        cmd.option('-j, --json', 'Output in JSON format');
+        cmd.option('--json', 'Output in JSON format');
         cmd.helpOption('-h, --help', 'Display help');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const helpOpt = (cmd as any)._getHelpOption?.();
@@ -1089,7 +1089,7 @@ function createSessionProgram(): Command {
   program
     .name('mcpc <@session>')
     .helpOption('-h, --help', 'Display help')
-    .option('-j, --json', 'Output in JSON format for scripting and code mode')
+    .option('--json', 'Output in JSON format for scripting and code mode')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile override')
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
@@ -1128,7 +1128,7 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
   // - Show --json so users/agents know it's available
   // - Hide the redundant -h/--help (you already need it to see this screen)
   for (const cmd of program.commands) {
-    cmd.option('-j, --json', 'Output in JSON format');
+    cmd.option('--json', 'Output in JSON format');
     cmd.helpOption('-h, --help', 'Display help');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const helpOpt = (cmd as any)._getHelpOption?.();
