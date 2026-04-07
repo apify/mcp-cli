@@ -128,9 +128,11 @@ function buildInstructionsSearchText(instructions: string, sessionName: string):
 
 /**
  * Extract a short snippet from instructions text around the first match.
- * The snippet is at most ~80 chars longer than the matched text, with ellipsis
- * added when the snippet doesn't reach the start/end of the instructions.
- * Whitespace (including newlines) is normalized to single spaces.
+ * Shows up to 70 context characters around the matched text. When the match
+ * is near the start or end, unused context budget from one side is redistributed
+ * to the other, so edge matches show more surrounding text. Ellipsis is added
+ * when the snippet doesn't reach the start/end. Whitespace is normalized to
+ * single spaces.
  */
 export function extractInstructionsSnippet(
   instructions: string,
@@ -162,9 +164,34 @@ export function extractInstructionsSnippet(
     matchEnd = matchStart + needle.length;
   }
 
-  const contextSize = 40;
-  let snippetStart = Math.max(0, matchStart - contextSize);
-  let snippetEnd = Math.min(normalized.length, matchEnd + contextSize);
+  // Total context budget (chars around the match, excluding the match itself).
+  // When the match is near start/end, unused budget from one side is given to the other.
+  const totalContext = 70;
+  const availBefore = matchStart;
+  const availAfter = normalized.length - matchEnd;
+
+  let ctxBefore: number;
+  let ctxAfter: number;
+  if (availBefore + availAfter <= totalContext) {
+    // Entire text fits within the budget
+    ctxBefore = availBefore;
+    ctxAfter = availAfter;
+  } else if (availBefore <= totalContext / 2) {
+    // Near start — give leftover to the right
+    ctxBefore = availBefore;
+    ctxAfter = Math.min(availAfter, totalContext - ctxBefore);
+  } else if (availAfter <= totalContext / 2) {
+    // Near end — give leftover to the left
+    ctxAfter = availAfter;
+    ctxBefore = Math.min(availBefore, totalContext - ctxAfter);
+  } else {
+    // Middle — split evenly
+    ctxBefore = Math.floor(totalContext / 2);
+    ctxAfter = totalContext - ctxBefore;
+  }
+
+  let snippetStart = matchStart - ctxBefore;
+  let snippetEnd = matchEnd + ctxAfter;
 
   // Snap to word boundaries if possible (don't cut mid-word)
   if (snippetStart > 0) {

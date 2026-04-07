@@ -76,17 +76,19 @@ describe('extractInstructionsSnippet', () => {
   });
 
   it('adds leading ellipsis when match is far from the start', () => {
-    const text = 'aaa bbb ccc ddd eee fff ggg hhh iii jjj kkk lll mmm nnn ooo ppp';
+    const text =
+      'aaa bbb ccc ddd eee fff ggg hhh iii jjj kkk lll mmm nnn ooo ppp qqq rrr sss ttt uuu vvv www xxx';
     const result = extractInstructionsSnippet(text, 'mmm', {});
     expect(result).toBeTruthy();
     expect(result).toContain('mmm');
     expect(result!.startsWith('\u2026')).toBe(true);
-    // total length should be roughly pattern.length + 50
-    expect(result!.length).toBeLessThanOrEqual('mmm'.length + 90);
+    // total length should be roughly pattern.length + 70 + ellipsis
+    expect(result!.length).toBeLessThanOrEqual('mmm'.length + 80);
   });
 
   it('adds trailing ellipsis when match is far from the end', () => {
-    const text = 'aaa bbb ccc ddd eee fff ggg hhh iii jjj kkk lll mmm nnn ooo ppp';
+    const text =
+      'aaa bbb ccc ddd eee fff ggg hhh iii jjj kkk lll mmm nnn ooo ppp qqq rrr sss ttt uuu vvv www xxx';
     const result = extractInstructionsSnippet(text, 'ccc', {});
     expect(result).toBeTruthy();
     expect(result).toContain('ccc');
@@ -164,8 +166,31 @@ describe('extractInstructionsSnippet', () => {
     const result = extractInstructionsSnippet(text, pattern, {});
     expect(result).toBeTruthy();
     expect(result).toContain(pattern);
-    // Snippet should be at most about pattern.length + 80 + 2 (for ellipsis chars)
-    expect(result!.length).toBeLessThanOrEqual(pattern.length + 90);
+    // Snippet should be at most about pattern.length + 70 + 2 (for ellipsis chars)
+    expect(result!.length).toBeLessThanOrEqual(pattern.length + 80);
+  });
+
+  it('redistributes context budget when match is at the start', () => {
+    // 100+ chars so snippet must be truncated
+    const text =
+      'START then some more words follow here and there and everywhere in this long text that keeps going on and on';
+    const result = extractInstructionsSnippet(text, 'START', {});
+    expect(result).toBeTruthy();
+    expect(result).toContain('START');
+    expect(result!.startsWith('\u2026')).toBe(false);
+    // Should show more context after START (up to 70 chars) since none is needed before
+    expect(result!.length).toBeGreaterThanOrEqual('START'.length + 50);
+  });
+
+  it('redistributes context budget when match is at the end', () => {
+    const text =
+      'This is a long text that keeps going on and on with many words before reaching the very END';
+    const result = extractInstructionsSnippet(text, 'END', {});
+    expect(result).toBeTruthy();
+    expect(result).toContain('END');
+    expect(result!.endsWith('\u2026')).toBe(false);
+    // Should show more context before END (up to 70 chars) since none is needed after
+    expect(result!.length).toBeGreaterThanOrEqual('END'.length + 50);
   });
 
   it('handles case-insensitive regex', () => {
