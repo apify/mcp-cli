@@ -392,10 +392,11 @@ export async function consolidateSessions(
             continue;
           }
           session.lastConnectionAttemptAt = new Date(now).toISOString();
-          session.status = 'reconnecting';
+          // Use 'connecting' if session has never successfully connected, 'reconnecting' otherwise
+          session.status = session.lastSeenAt ? 'reconnecting' : 'connecting';
           hasChanges = true;
           result.sessionsToRestart.push(name);
-          logger.debug(`Marking session ${name} for auto-restart`);
+          logger.debug(`Marking session ${name} for auto-restart (${session.status})`);
         }
       }
 

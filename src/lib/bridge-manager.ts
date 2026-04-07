@@ -640,7 +640,10 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   }
 
   // Bridge not healthy - restart it
-  await updateSession(sessionName, { status: 'reconnecting' });
+  // Use 'connecting' if the session has never successfully connected (no lastSeenAt),
+  // 'reconnecting' if it was previously active.
+  const restartStatus = session.lastSeenAt ? 'reconnecting' : 'connecting';
+  await updateSession(sessionName, { status: restartStatus });
   await restartBridge(sessionName);
 
   // Try getServerDetails on restarted bridge (blocks until MCP connected)
