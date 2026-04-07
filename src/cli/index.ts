@@ -880,7 +880,8 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
       'after',
       jsonHelp(
         '`{ tasks: Task[] }`',
-        '`{ tasks: [{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }] }`'
+        '`{ tasks: [{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }] }`',
+        `${SCHEMA_BASE}#task`
       )
     )
     .action(async (_options, command) => {
@@ -892,7 +893,11 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
     .description('Get MCP task status.')
     .addHelpText(
       'after',
-      jsonHelp('`Task` object', '`{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }`')
+      jsonHelp(
+        '`Task` object',
+        '`{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }`',
+        `${SCHEMA_BASE}#task`
+      )
     )
     .action(async (taskId, _options, command) => {
       await tasks.getTask(session, taskId, getOptionsFromCommand(command));
@@ -901,7 +906,10 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
   program
     .command('tasks-cancel <taskId>')
     .description('Cancel an MCP task.')
-    .addHelpText('after', jsonHelp('`Task` object', '`{ taskId, status, statusMessage? }`'))
+    .addHelpText(
+      'after',
+      jsonHelp('`Task` object', '`{ taskId, status, statusMessage? }`', `${SCHEMA_BASE}#task`)
+    )
     .action(async (taskId, _options, command) => {
       await tasks.cancelTask(session, taskId, getOptionsFromCommand(command));
     });
@@ -1119,6 +1127,7 @@ function createSessionProgram(): Command {
 
   program
     .name('mcpc <@session>')
+    .description('Execute MCP commands on a connected session.')
     .helpOption('-h, --help', 'Display help')
     .option('--json', 'Output in JSON format for scripting and code mode')
     .option('--verbose', 'Enable debug logging')
