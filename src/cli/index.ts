@@ -189,6 +189,14 @@ async function main(): Promise<void> {
       await closeFileLogger();
       return;
     } else {
+      // Check if the user is asking for help on a session subcommand (e.g. mcpc resources-list --help)
+      const helpTarget = args.find(
+        (a) => a !== '--help' && a !== '-h' && !a.startsWith('-') && !a.startsWith('@')
+      );
+      if (helpTarget && KNOWN_SESSION_COMMANDS.includes(helpTarget)) {
+        showSessionCommandHelp(helpTarget);
+        return;
+      }
       const program = createTopLevelProgram();
       await program.parseAsync(process.argv);
       return;
@@ -706,22 +714,7 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
       }
 
       // Check session subcommands
-      const dummyProgram = createSessionProgram();
-      registerSessionCommands(dummyProgram, '<@session>');
-      for (const cmd of dummyProgram.commands) {
-        cmd.option('--json', 'Output in JSON format');
-        cmd.helpOption('-h, --help', 'Display help');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const helpOpt = (cmd as any)._getHelpOption?.();
-        if (helpOpt) helpOpt.hidden = true;
-      }
-      const sessionCmd = dummyProgram.commands.find(
-        (c) => c.name() === cmdName || c.aliases().includes(cmdName)
-      );
-      if (sessionCmd) {
-        sessionCmd.outputHelp();
-        return;
-      }
+      if (showSessionCommandHelp(cmdName)) return;
 
       console.error(`Unknown command: ${cmdName}`);
       console.error(`Run "mcpc --help" for usage information.`);
@@ -743,6 +736,30 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
 }
 
 /**
+ * Show help for a session subcommand by name.
+ * Returns true if the command was found and help was displayed.
+ */
+function showSessionCommandHelp(cmdName: string): boolean {
+  const dummyProgram = createSessionProgram();
+  registerSessionCommands(dummyProgram, '<@session>');
+  for (const cmd of dummyProgram.commands) {
+    cmd.option('--json', 'Output in JSON format');
+    cmd.helpOption('-h, --help', 'Display help');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const helpOpt = (cmd as any)._getHelpOption?.();
+    if (helpOpt) helpOpt.hidden = true;
+  }
+  const sessionCmd = dummyProgram.commands.find(
+    (c) => c.name() === cmdName || c.aliases().includes(cmdName)
+  );
+  if (sessionCmd) {
+    sessionCmd.outputHelp();
+    return true;
+  }
+  return false;
+}
+
+/**
  * Register all session subcommands on a Commander program
  * Extracted so it can be reused for both execution and help lookup
  */
@@ -755,7 +772,8 @@ function registerSessionCommands(program: Command, session: string): void {
       'after',
       jsonHelp(
         '`InitializeResult`',
-        '`{ protocolVersion, capabilities, serverInfo, instructions?, tools? }`'
+        '`{ protocolVersion, capabilities, serverInfo, instructions?, tools? }`',
+        `${SCHEMA_BASE}#initializeresult`
       )
     )
     .action(async (_options, command) => {
@@ -880,7 +898,8 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
       'after',
       jsonHelp(
         '`{ tasks: Task[] }`',
-        '`{ tasks: [{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }] }`'
+        '`{ tasks: [{ taskId, status, ttl, createdAt, lastUpdatedAt, statusMessage?, pollInterval? }] }`',
+        `${SCHEMA_BASE}#task`
       )
     )
     .action(async (_options, command) => {
@@ -892,7 +911,11 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
     .description('Get MCP task status.')
     .addHelpText(
       'after',
-      jsonHelp('`Task` object', '`{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }`')
+      jsonHelp(
+        '`Task` object',
+        '`{ taskId, status, ttl, createdAt, lastUpdatedAt, statusMessage?, pollInterval? }`',
+        `${SCHEMA_BASE}#task`
+      )
     )
     .action(async (taskId, _options, command) => {
       await tasks.getTask(session, taskId, getOptionsFromCommand(command));
@@ -901,7 +924,14 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
   program
     .command('tasks-cancel <taskId>')
     .description('Cancel an MCP task.')
-    .addHelpText('after', jsonHelp('`Task` object', '`{ taskId, status, statusMessage? }`'))
+    .addHelpText(
+      'after',
+      jsonHelp(
+        '`Task` object',
+        '`{ taskId, status, ttl, createdAt, lastUpdatedAt, statusMessage?, pollInterval? }`',
+        `${SCHEMA_BASE}#task`
+      )
+    )
     .action(async (taskId, _options, command) => {
       await tasks.cancelTask(session, taskId, getOptionsFromCommand(command));
     });
@@ -1119,6 +1149,7 @@ function createSessionProgram(): Command {
 
   program
     .name('mcpc <@session>')
+    .description('Execute MCP commands on a connected session.')
     .helpOption('-h, --help', 'Display help')
     .option('--json', 'Output in JSON format for scripting and code mode')
     .option('--verbose', 'Enable debug logging')
