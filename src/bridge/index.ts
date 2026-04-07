@@ -141,6 +141,7 @@ class BridgeProcess {
     logger.info(`Received auth credentials for profile: ${credentials.profileName}`);
     logger.debug(`  serverUrl: ${credentials.serverUrl}`);
     logger.debug(`  refreshToken: ${credentials.refreshToken ? 'present' : 'MISSING'}`);
+    logger.debug(`  accessToken: ${credentials.accessToken ? 'present' : 'MISSING'}`);
     logger.debug(`  clientId: ${credentials.clientId ? 'present' : 'MISSING'}`);
     logger.debug(`  headers: ${credentials.headers ? Object.keys(credentials.headers).length : 0}`);
 
@@ -221,11 +222,22 @@ class BridgeProcess {
       logger.debug('OAuthProvider created for SDK transport (runtime mode)');
     } else if (credentials.refreshToken && !credentials.clientId) {
       logger.warn('Refresh token provided but client ID is missing - token refresh will not work');
+    } else if (credentials.accessToken && !credentials.refreshToken) {
+      // No refresh token available — use the access token as a static Bearer header.
+      // This covers OAuth servers that don't issue refresh tokens.
+      this.headers = {
+        ...this.headers,
+        Authorization: `Bearer ${credentials.accessToken}`,
+      };
+      logger.debug('Using OAuth access token as static Bearer header (no refresh token available)');
     }
 
     // Store headers if provided (used when no OAuth refresh token available)
     if (credentials.headers) {
-      this.headers = credentials.headers;
+      this.headers = {
+        ...this.headers,
+        ...credentials.headers,
+      };
       logger.debug(`Stored headers "${Object.keys(this.headers).join(', ')}" in memory`);
     }
 
@@ -413,7 +425,11 @@ class BridgeProcess {
 
         // If the error was due to session ID rejection or auth failure, mark session status
         // User must explicitly use 'mcpc @session restart' or 'mcpc login' to recover
-        if (isSessionExpiredError(errorMsg)) {
+        if (
+          isSessionExpiredError(errorMsg, {
+            hadActiveSession: !!this.options.mcpSessionId,
+          })
+        ) {
           logger.warn('Session rejected by server (expired session ID), marking as expired');
           try {
             await updateSession(this.options.sessionName, { status: 'expired' });
@@ -657,6 +673,16 @@ class BridgeProcess {
       );
     }
 
+    // Verify resumed session is actually functional by sending a ping.
+    // The initialize handshake may succeed even when the server has lost session state,
+    // causing the session to appear "live" until the first real request reveals it's expired.
+    // Ping before marking as active so we never show a false "live" status.
+    if (this.options.mcpSessionId) {
+      logger.info('Verifying resumed session with ping...');
+      await this.client.ping();
+      logger.info('Session verification ping succeeded');
+    }
+
     const sessionUpdate: Parameters<typeof updateSession>[1] = {
       lastSeenAt: new Date().toISOString(),
       status: 'active',
@@ -680,6 +706,11 @@ class BridgeProcess {
     // Pre-populate tools cache (used by x402 proactive signing and listAllTools IPC method)
     if (serverDetails.capabilities?.tools) {
       await this.client.listAllTools({ refreshCache: true }).catch((err) => {
+        const errMsg = (err as Error).message || '';
+        if (isSessionExpiredError(errMsg) || isAuthenticationError(errMsg)) {
+          // Re-throw session/auth errors so they trigger proper status handling
+          throw err;
+        }
         logger.warn('Failed to pre-populate tools cache:', err);
       });
     }
@@ -796,7 +827,7 @@ class BridgeProcess {
    */
   private async handlePossibleExpiration(error: Error): Promise<void> {
     let status: 'expired' | 'unauthorized' | null = null;
-    if (isSessionExpiredError(error.message)) {
+    if (isSessionExpiredError(error.message, { hadActiveSession: true })) {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
       status = 'expired';
     } else if (isAuthenticationError(error.message)) {

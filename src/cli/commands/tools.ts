@@ -4,7 +4,16 @@
 
 import ora from 'ora';
 import chalk from 'chalk';
-import { formatOutput, formatToolDetail, formatSuccess, formatWarning } from '../output.js';
+import {
+  formatOutput,
+  formatToolDetail,
+  formatToolCallExample,
+  formatSuccess,
+  formatError,
+  formatWarning,
+  formatInfo,
+  truncateOutput,
+} from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import type { CommandOptions, TaskUpdate } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
@@ -85,6 +94,10 @@ export async function getTool(
 
     if (options.outputMode === 'human') {
       console.log(formatToolDetail(tool));
+      const example = formatToolCallExample(tool, target);
+      if (example) {
+        console.log('\n' + example + '\n');
+      }
     } else {
       console.log(formatOutput(tool, 'json'));
     }
@@ -329,7 +342,11 @@ export async function callTool(
 
         const elapsed = formatElapsed(Date.now() - startTime);
         if (spinner) {
-          spinner.succeed(`Tool ${chalk.bold(name)} executed successfully (${elapsed})`);
+          if (result && (result as Record<string, unknown>).isError) {
+            spinner.fail(`Tool ${chalk.bold(name)} returned an error (${elapsed})`);
+          } else {
+            spinner.succeed(`Tool ${chalk.bold(name)} executed successfully (${elapsed})`);
+          }
         }
       } catch (error) {
         escListener.cleanup();
@@ -345,14 +362,27 @@ export async function callTool(
       // Synchronous execution (default)
       result = await client.callTool(name, parsedArgs);
       if (options.outputMode === 'human') {
-        console.log(formatSuccess(`Tool ${name} executed successfully`));
+        if (result.isError) {
+          console.log(formatError(`Tool ${name} returned an error`));
+        } else {
+          console.log(formatSuccess(`Tool ${name} executed successfully`));
+        }
       }
     }
 
-    if (options.outputMode === 'human') {
-      console.log(formatOutput(result, 'human'));
-    } else {
-      console.log(formatOutput(result, 'json'));
+    let output = formatOutput(result, options.outputMode);
+    if (options.maxChars) {
+      output = truncateOutput(output, options.maxChars);
+    }
+    console.log(output);
+
+    // Show hint for getting tool schema when the tool returned an error
+    if (result.isError && options.outputMode === 'human') {
+      console.log(
+        formatInfo(
+          `Run ${chalk.bold(`mcpc ${target} tools-get ${name}`)} to see the tool schema and usage`
+        )
+      );
     }
   });
 }

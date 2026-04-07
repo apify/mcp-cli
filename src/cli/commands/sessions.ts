@@ -18,6 +18,7 @@ import type { ServerConfig, ProxyConfig } from '../../lib/types.js';
 import {
   formatOutput,
   formatSuccess,
+  formatWarning,
   formatError,
   formatSessionLine,
   formatServerDetails,
@@ -420,21 +421,20 @@ export async function connectSession(
     throw error;
   }
 
-  // Success! Show server info like when running "mcpc <target>"
-  if (options.outputMode === 'human') {
-    console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
-  }
-
-  // Display server info via the new session (best-effort).
+  // Verify the connection works by fetching server details.
   // showServerDetails blocks until the bridge is connected (via health check),
   // so by the time it returns or throws, we have definitive bridge status.
-  // Re-throw auth errors (real failures requiring user action), but swallow others
-  // (TLS errors, timeouts, etc.) since the session was created and can be used later.
+  // Only print success after the server actually responds.
   try {
     await showServerDetails(name, {
       ...options,
       hideTarget: false, // Show session info prefix
     });
+
+    // Server responded — now we can print success
+    if (options.outputMode === 'human') {
+      console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
+    }
   } catch (detailsError) {
     if (detailsError instanceof AuthError) {
       throw detailsError;
@@ -443,6 +443,19 @@ export async function connectSession(
     // as ClientError/ServerError during bridge IPC serialization)
     if (detailsError instanceof Error && isAuthenticationError(detailsError.message)) {
       throw createServerAuthError(serverConfig.url || target, { sessionName: name });
+    }
+
+    // Non-auth failure: session was created but server didn't respond properly.
+    // Show a warning instead of silent success, so the user knows something is wrong.
+    if (options.outputMode === 'human') {
+      const errorMsg = detailsError instanceof Error ? detailsError.message : String(detailsError);
+      console.log(
+        formatWarning(
+          `Session ${name} created but server is not responding: ${errorMsg}\n` +
+            `  The session will auto-recover when the server becomes available.\n` +
+            `  Check status with: mcpc ${name}`
+        )
+      );
     }
     logger.debug(
       `showServerDetails failed for new session ${name}: ${(detailsError as Error).message}`

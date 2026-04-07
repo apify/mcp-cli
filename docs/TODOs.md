@@ -1,6 +1,9 @@
 
 # TODOs
 
+- "mcpc help tools-call" - show more info how to pass args, including stdio pipe and JSON. Maybe add short examples.
+Make "mcpc @apify grep --help" and "mcpc grep --help" more consistent with info what they print.
+The former should provide the --json example.
 
 ## NEW
 
@@ -29,6 +32,8 @@
 
 - Make "mcpc connect mcp.apify.com" work without @session, and generate session name on best effort basis (e.g. use the main hostname without TLD 
 + suffix)
+
+- and finally, "mcpc connect" should connect to all server configs found - see https://www.withone.ai/docs/cli#mcp-server-installation 
 
 - mcpc @apify tools-get fetch-actor-details => should print also "object" properties in human mode
 

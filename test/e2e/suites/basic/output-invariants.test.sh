@@ -57,13 +57,6 @@ assert_json "$STDOUT" '.sessions'
 assert_json "$STDOUT" '.profiles'
 test_pass
 
-# Test: -j is alias for --json
-test_case "-j is alias for --json"
-run_mcpc -j
-assert_success
-assert_json_valid "$STDOUT"
-test_pass
-
 # Test: --json on error returns JSON or nothing
 test_case "--json on error returns JSON or nothing"
 run_mcpc @nonexistent-session-$RANDOM tools-list --json

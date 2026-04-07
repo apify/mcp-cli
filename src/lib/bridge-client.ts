@@ -264,6 +264,7 @@ export class BridgeClient extends EventEmitter {
     serverUrl: string;
     profileName: string;
     refreshToken?: string;
+    accessToken?: string;
     headers?: Record<string, string>;
   }): void {
     this.send({

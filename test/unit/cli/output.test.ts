@@ -55,6 +55,8 @@ import {
   formatSessionLine,
   formatHuman,
   logTarget,
+  formatToolCallExample,
+  formatToolHints,
 } from '../../../src/cli/output.js';
 import type {
   Tool,
@@ -828,6 +830,147 @@ describe('formatToolDetail', () => {
   });
 });
 
+describe('formatToolCallExample', () => {
+  it('should show required params and fill optional up to 3', () => {
+    const tool: Tool = {
+      name: 'read_file',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: { type: 'string' },
+          encoding: { type: 'string', default: 'utf-8' },
+          tail: { type: 'integer', minimum: 0 },
+        },
+        required: ['path'],
+      },
+    };
+
+    const output = formatToolCallExample(tool, '@fs');
+    expect(output).not.toBeNull();
+    expect(output).toContain('tools-call read_file');
+    expect(output).toContain('@fs');
+    expect(output).toContain('path:="something"');
+    expect(output).toContain('encoding:="utf-8"');
+    expect(output).toContain('tail:=0');
+  });
+
+  it('should use default values when available', () => {
+    const tool: Tool = {
+      name: 'search',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+          limit: { type: 'number', default: 10 },
+        },
+        required: ['query'],
+      },
+    };
+
+    const output = formatToolCallExample(tool, '@test');
+    expect(output).toContain('query:="something"');
+    expect(output).toContain('limit:=10');
+  });
+
+  it('should show example for tool with no parameters', () => {
+    const tool: Tool = {
+      name: 'ping',
+      inputSchema: { type: 'object', properties: {} },
+    };
+
+    const output = formatToolCallExample(tool, '@srv');
+    expect(output).not.toBeNull();
+    expect(output).toContain('tools-call ping');
+    // Should NOT contain any key:= pairs
+    expect(output).not.toContain(':=');
+  });
+
+  it('should use enum first value as example', () => {
+    const tool: Tool = {
+      name: 'set-mode',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          mode: { type: 'string', enum: ['fast', 'slow', 'normal'] },
+        },
+        required: ['mode'],
+      },
+    };
+
+    const output = formatToolCallExample(tool, '@s');
+    expect(output).toContain('mode:="fast"');
+  });
+
+  it('should use placeholder <@session> when no session name provided', () => {
+    const tool: Tool = {
+      name: 'test',
+      inputSchema: { type: 'object', properties: { a: { type: 'string' } } },
+    };
+
+    const output = formatToolCallExample(tool);
+    expect(output).toContain('<@session>');
+  });
+
+  it('should include --task for task:required tools', () => {
+    const tool = {
+      name: 'long-run',
+      inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] },
+      execution: { taskSupport: 'required' },
+    } as unknown as Tool;
+
+    const output = formatToolCallExample(tool, '@s');
+    expect(output).toContain('--task');
+    expect(output).not.toContain('[--task]');
+  });
+
+  it('should include [--task] for task:optional tools', () => {
+    const tool = {
+      name: 'maybe-async',
+      inputSchema: { type: 'object', properties: {} },
+      execution: { taskSupport: 'optional' },
+    } as unknown as Tool;
+
+    const output = formatToolCallExample(tool, '@s');
+    expect(output).toContain('[--task]');
+  });
+});
+
+describe('formatToolHints', () => {
+  it('should combine annotations and task support', () => {
+    const tool = {
+      name: 'test',
+      inputSchema: { type: 'object', properties: {} },
+      annotations: { destructiveHint: true, openWorldHint: true },
+      execution: { taskSupport: 'required' },
+    } as unknown as Tool;
+
+    const hints = formatToolHints(tool);
+    expect(hints).toContain('destructive');
+    expect(hints).toContain('open-world');
+    expect(hints).toContain('task:required');
+  });
+
+  it('should return null when no annotations and no task support', () => {
+    const tool: Tool = {
+      name: 'plain',
+      inputSchema: { type: 'object', properties: {} },
+    };
+
+    expect(formatToolHints(tool)).toBeNull();
+  });
+
+  it('should show only task support when no annotations', () => {
+    const tool = {
+      name: 'async-only',
+      inputSchema: { type: 'object', properties: {} },
+      execution: { taskSupport: 'optional' },
+    } as unknown as Tool;
+
+    const hints = formatToolHints(tool);
+    expect(hints).toBe('task:optional');
+  });
+});
+
 describe('formatServerDetails', () => {
   it('should format server info with all features', () => {
     const details: ServerDetails = {
@@ -1570,5 +1713,40 @@ describe('logTarget', () => {
 
     // Should not log anything in json mode
     expect(consoleSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('truncateOutput', () => {
+  // Import dynamically to avoid chalk mock issues
+  let truncateOutput: (output: string, maxChars: number) => string;
+
+  beforeAll(async () => {
+    const mod = await import('../../../src/cli/output.js');
+    truncateOutput = mod.truncateOutput;
+  });
+
+  it('returns original string when within limit', () => {
+    expect(truncateOutput('short', 100)).toBe('short');
+  });
+
+  it('returns original string when exactly at limit', () => {
+    const str = 'a'.repeat(100);
+    expect(truncateOutput(str, 100)).toBe(str);
+  });
+
+  it('truncates long strings with a notice', () => {
+    const str = 'a'.repeat(2000);
+    const result = truncateOutput(str, 100);
+    expect(result.length).toBeLessThan(str.length);
+    expect(result).toContain('output truncated');
+    expect(result).toContain('--max-chars');
+    // Should show KB size for large outputs
+    expect(result).toContain('2.0KB total');
+  });
+
+  it('shows character count for small outputs', () => {
+    const str = 'a'.repeat(200);
+    const result = truncateOutput(str, 50);
+    expect(result).toContain('200 chars');
   });
 });

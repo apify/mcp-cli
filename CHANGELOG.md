@@ -10,13 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `connect` command now auto-generates session name when `@session` is omitted (e.g., `mcpc connect mcp.apify.com` creates `@apify`). If a session for the same server already exists with matching auth settings, it is reused instead of creating a duplicate.
-- Unit test to verify README help section stays in sync with `mcpc --help` output
-- Experimental feature warning for `x402 init` and `x402 import` commands
-- Windows E2E tests via manual-dispatch GitHub Actions workflow (`e2e-windows.yml`) — cross-platform test framework with MSYS path conversion, cached `tasklist` process detection, graceful bridge shutdown via IPC, and Windows named pipe support
+- `--max-chars <chars>` global option to truncate large tool/prompt/resource output
+- `tools-call <tool> --help` shows tool parameter schema (shortcut for `tools-get`)
+- "Did you mean?" suggestions for unknown commands, including reversed names (e.g., `list-tools` → `tools-list`)
+- `--json` output documentation in `--help` for all commands, describing the MCP object shape returned
+- `tools-get` now shows an example `tools-call` command with placeholder arguments based on the tool's schema
 
-### Changed
+### Fixed
 
-- Reordered `mcpc --help` to show Commands before Options for better discoverability
+- `connect` now verifies the server responds before reporting success; shows a warning with the actual error when the server is unreachable
+- HTTP 404 during initial connect no longer misclassified as "session expired"; error messages now include the actual HTTP error and server URL
+- `build:readme` script failing on macOS due to `sed -i` platform difference
+
+## [0.2.4] - 2026-04-07
 
 ### Security
 
@@ -27,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Bridge ignores stored OAuth access token when no refresh token is provided; servers that don't issue refresh tokens now work correctly by using the access token as a static Bearer header
 - Session incorrectly marked as `unauthorized` when access token expires but refresh token is still valid; bridge now attempts token refresh before giving up
 - "ESC to detach" hint now shows immediately in the spinner when using `--task`, instead of waiting for the server to return a task ID
 
@@ -212,7 +219,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive shell mode
 - JSON output mode for scripting
 
-[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/apify/mcpc/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/apify/mcpc/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/apify/mcpc/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/apify/mcpc/compare/v0.2.0...v0.2.1

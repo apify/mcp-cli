@@ -124,12 +124,13 @@ Commands:
   help [command] [subcommand]  Show help for a specific command
 
 Options:
-  -j, --json                   Output in JSON format for scripting and code mode
+  --json                       Output in JSON format for scripting
   --verbose                    Enable debug logging
   --profile <name>             OAuth profile for the server ("default" if not provided)
   --schema <file>              Validate tool/prompt schema against expected schema
   --schema-mode <mode>         Schema validation mode: strict, compatible (default), ignore
   --timeout <seconds>          Request timeout in seconds (default: 300)
+  --max-chars <n>              Truncate tool/prompt output to this many characters
   --insecure                   Skip TLS certificate verification (for self-signed certs)
   -v, --version                Output the version number
   -h, --help                   Display help

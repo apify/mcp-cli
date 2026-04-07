@@ -228,6 +228,8 @@ export interface AuthCredentials {
   // OAuth credentials (for refresh flow)
   clientId?: string;
   refreshToken?: string;
+  // OAuth access token (used as static Bearer token when no refresh token available)
+  accessToken?: string;
   // HTTP headers (from --header flags, stored in keychain)
   headers?: Record<string, string>;
 }
@@ -313,6 +315,7 @@ export interface CommandOptions {
   hideTarget?: boolean; // Suppress session info prefix (used in interactive shell)
   schema?: string; // Path to expected schema file for validation
   schemaMode?: 'strict' | 'compatible' | 'ignore'; // Schema validation mode
+  maxChars?: number; // Maximum output characters for tool/prompt results (truncate if exceeded)
 }
 
 /**

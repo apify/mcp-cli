@@ -24,6 +24,7 @@ import {
   fileExists,
   getLogsDir,
   isSessionExpiredError,
+  enrichErrorMessage,
 } from './utils.js';
 import { updateSession, getSession } from './sessions.js';
 import { createLogger } from './logger.js';
@@ -51,11 +52,12 @@ const logger = createLogger('bridge-manager');
  */
 async function classifyAndThrowSessionError(
   sessionName: string,
-  session: { server: ServerConfig },
+  session: { server: ServerConfig; mcpSessionId?: string },
   errorMessage: string,
   originalError?: Error
 ): Promise<void> {
-  if (isSessionExpiredError(errorMessage)) {
+  const hadActiveSession = !!session.mcpSessionId;
+  if (isSessionExpiredError(errorMessage, { hadActiveSession })) {
     await updateSession(sessionName, { status: 'expired' }).catch((e) =>
       logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
     );
@@ -460,10 +462,16 @@ async function sendAuthCredentialsToBridge(
     if (profile) {
       // Load tokens from keychain
       const tokens = await readKeychainOAuthTokenInfo(profile.serverUrl, profileName);
-      if (tokens?.refreshToken) {
-        credentials.refreshToken = tokens.refreshToken;
+      if (tokens) {
         credentials.serverUrl = profile.serverUrl;
-        logger.debug(`Found OAuth refresh token for profile ${profileName}`);
+        if (tokens.refreshToken) {
+          credentials.refreshToken = tokens.refreshToken;
+          logger.debug(`Found OAuth refresh token for profile ${profileName}`);
+        }
+        if (tokens.accessToken) {
+          credentials.accessToken = tokens.accessToken;
+          logger.debug(`Found OAuth access token for profile ${profileName}`);
+        }
       }
 
       // Load client info from keychain (needed for token refresh)
@@ -486,8 +494,11 @@ async function sendAuthCredentialsToBridge(
   logger.debug(
     'Sending auth credentials to bridge' +
       (credentials.refreshToken ? ' (with refresh token)' : '') +
+      (credentials.accessToken ? ' (with access token)' : '') +
       (credentials.headers ? ` (with ${Object.keys(credentials.headers).length} headers)` : '') +
-      (!credentials.refreshToken && !credentials.headers ? ' (minimal - no tokens or headers)' : '')
+      (!credentials.refreshToken && !credentials.accessToken && !credentials.headers
+        ? ' (minimal - no tokens or headers)'
+        : '')
   );
 
   // Connect to bridge and send credentials
@@ -619,10 +630,9 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
       if (result.error instanceof NetworkError) {
         logger.debug(`Bridge process alive but socket not responding for ${sessionName}`);
       } else {
-        // Other MCP errors - propagate
-        throw new ClientError(
-          `Bridge for ${sessionName} failed to connect to MCP server: ${result.error.message}`
-        );
+        // Other MCP errors - propagate with enriched message
+        const serverUrl = session.server.url;
+        throw new ClientError(enrichErrorMessage(result.error.message, serverUrl));
       }
     }
   } else {
@@ -630,7 +640,10 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   }
 
   // Bridge not healthy - restart it
-  await updateSession(sessionName, { status: 'reconnecting' });
+  // Use 'connecting' if the session has never successfully connected (no lastSeenAt),
+  // 'reconnecting' if it was previously active.
+  const restartStatus = session.lastSeenAt ? 'reconnecting' : 'connecting';
+  await updateSession(sessionName, { status: restartStatus });
   await restartBridge(sessionName);
 
   // Try getServerDetails on restarted bridge (blocks until MCP connected)
@@ -645,11 +658,11 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   const errorMsg = result.error?.message || 'unknown error';
   await classifyAndThrowSessionError(sessionName, session, errorMsg, result.error);
 
-  // Other errors - provide detailed error with log path
+  // Other errors - provide enriched error with log path
+  const serverUrl = session.server.url;
   const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
   throw new ClientError(
-    `Bridge for ${sessionName} failed after restart: ${errorMsg}. ` +
-      `For details, check logs at ${logPath}`
+    `${enrichErrorMessage(errorMsg, serverUrl)}\n` + `For details, check logs at ${logPath}`
   );
 }
 
