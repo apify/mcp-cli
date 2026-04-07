@@ -688,6 +688,7 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
       const dummyProgram = createSessionProgram();
       registerSessionCommands(dummyProgram, '<@session>');
       for (const cmd of dummyProgram.commands) {
+        cmd.option('-j, --json', 'Output in JSON format');
         cmd.helpOption('-h, --help', 'Display help');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const helpOpt = (cmd as any)._getHelpOption?.();
@@ -1123,9 +1124,11 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
   // Register all session subcommands
   registerSessionCommands(program, session);
 
-  // Hide the redundant "-h, --help" from sub-command help output —
-  // you already need --help to see it.  Keep -h/--help functional for routing.
+  // Tune sub-command help display:
+  // - Show --json so users/agents know it's available
+  // - Hide the redundant -h/--help (you already need it to see this screen)
   for (const cmd of program.commands) {
+    cmd.option('-j, --json', 'Output in JSON format');
     cmd.helpOption('-h, --help', 'Display help');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const helpOpt = (cmd as any)._getHelpOption?.();
