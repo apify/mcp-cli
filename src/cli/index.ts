@@ -755,7 +755,8 @@ function registerSessionCommands(program: Command, session: string): void {
       'after',
       jsonHelp(
         '`InitializeResult`',
-        '`{ protocolVersion, capabilities, serverInfo, instructions?, tools? }`'
+        '`{ protocolVersion, capabilities, serverInfo, instructions?, tools? }`',
+        `${SCHEMA_BASE}#initializeresult`
       )
     )
     .action(async (_options, command) => {
@@ -880,7 +881,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
       'after',
       jsonHelp(
         '`{ tasks: Task[] }`',
-        '`{ tasks: [{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }] }`',
+        '`{ tasks: [{ taskId, status, ttl, createdAt, lastUpdatedAt, statusMessage?, pollInterval? }] }`',
         `${SCHEMA_BASE}#task`
       )
     )
@@ -895,7 +896,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
       'after',
       jsonHelp(
         '`Task` object',
-        '`{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }`',
+        '`{ taskId, status, ttl, createdAt, lastUpdatedAt, statusMessage?, pollInterval? }`',
         `${SCHEMA_BASE}#task`
       )
     )
@@ -908,7 +909,11 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
     .description('Cancel an MCP task.')
     .addHelpText(
       'after',
-      jsonHelp('`Task` object', '`{ taskId, status, statusMessage? }`', `${SCHEMA_BASE}#task`)
+      jsonHelp(
+        '`Task` object',
+        '`{ taskId, status, ttl, createdAt, lastUpdatedAt, statusMessage?, pollInterval? }`',
+        `${SCHEMA_BASE}#task`
+      )
     )
     .action(async (taskId, _options, command) => {
       await tasks.cancelTask(session, taskId, getOptionsFromCommand(command));
