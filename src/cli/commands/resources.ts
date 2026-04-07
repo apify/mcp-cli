@@ -84,8 +84,8 @@ export async function getResource(
     }
 
     let output = formatOutput(result, options.outputMode);
-    if (options.maxOutput) {
-      output = truncateOutput(output, options.maxOutput);
+    if (options.maxChars) {
+      output = truncateOutput(output, options.maxChars);
     }
     console.log(output);
   });

@@ -35,7 +35,7 @@ const GLOBAL_OPTIONS_WITH_VALUES = [
   '--profile',
   '--schema',
   '--schema-mode',
-  '--max-output',
+  '--max-chars',
 ];
 
 // All options that take a value — used by optionTakesValue() to correctly skip
@@ -124,22 +124,27 @@ export const KNOWN_SESSION_COMMANDS = [
 
 /**
  * Compute Levenshtein distance between two strings.
+ * Uses two flat Int32Arrays (always initialized to 0) to avoid undefined-index issues.
  */
 function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0) as number[]);
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  let prev = new Int32Array(n + 1);
+  let curr = new Int32Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+
   for (let i = 1; i <= m; i++) {
+    curr[0] = i;
     for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1]
-          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const del = (prev[j] as number) + 1;
+      const ins = (curr[j - 1] as number) + 1;
+      const sub = (prev[j - 1] as number) + cost;
+      curr[j] = Math.min(del, ins, sub);
     }
+    [prev, curr] = [curr, prev];
   }
-  return dp[m][n];
+  return prev[n] as number;
 }
 
 /**

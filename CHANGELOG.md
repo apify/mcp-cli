@@ -9,14 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `--max-output <chars>` global option to truncate large tool/prompt/resource output
+- `--max-chars <chars>` global option to truncate large tool/prompt/resource output
 - `tools-call <tool> --help` shows tool parameter schema (shortcut for `tools-get`)
 - "Did you mean?" suggestions for unknown commands, including reversed names (e.g., `list-tools` → `tools-list`)
+- `--json` output documentation in `--help` for all commands, describing the MCP object shape returned
+- `tools-get` now shows an example `tools-call` command with placeholder arguments based on the tool's schema
 
 ### Fixed
 
 - `connect` now verifies the server responds before reporting success; shows a warning with the actual error when the server is unreachable
 - HTTP 404 during initial connect no longer misclassified as "session expired"; error messages now include the actual HTTP error and server URL
+- `build:readme` script failing on macOS due to `sed -i` platform difference
 
 ## [0.2.4] - 2026-04-07
 

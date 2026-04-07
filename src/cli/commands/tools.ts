@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import {
   formatOutput,
   formatToolDetail,
+  formatToolCallExample,
   formatSuccess,
   formatWarning,
   truncateOutput,
@@ -91,6 +92,10 @@ export async function getTool(
 
     if (options.outputMode === 'human') {
       console.log(formatToolDetail(tool));
+      const example = formatToolCallExample(tool, target);
+      if (example) {
+        console.log('\n' + example + '\n');
+      }
     } else {
       console.log(formatOutput(tool, 'json'));
     }
@@ -356,8 +361,8 @@ export async function callTool(
     }
 
     let output = formatOutput(result, options.outputMode);
-    if (options.maxOutput) {
-      output = truncateOutput(output, options.maxOutput);
+    if (options.maxChars) {
+      output = truncateOutput(output, options.maxChars);
     }
     console.log(output);
   });
