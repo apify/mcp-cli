@@ -37,6 +37,7 @@ import {
   parseServerArg,
   hasSubcommand,
   optionTakesValue,
+  suggestCommand,
   KNOWN_COMMANDS,
   KNOWN_SESSION_COMMANDS,
 } from './parser.js';
@@ -67,6 +68,7 @@ interface HandlerOptions {
   schema?: string;
   schemaMode?: 'strict' | 'compatible' | 'ignore';
   full?: boolean;
+  maxChars?: number;
 }
 
 /**
@@ -118,6 +120,15 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
     options.schemaMode = mode;
   }
   if (opts.full) options.full = opts.full;
+  if (opts.maxChars) {
+    const maxChars = parseInt(opts.maxChars as string, 10);
+    if (isNaN(maxChars) || maxChars <= 0) {
+      throw new Error(
+        `Invalid --max-chars value: "${opts.maxChars as string}". Must be a positive number (characters).`
+      );
+    }
+    options.maxChars = maxChars;
+  }
 
   return options;
 }
@@ -303,10 +314,19 @@ async function main(): Promise<void> {
       console.error(`Run "mcpc --help" for usage information.\n`);
     }
   } else {
+    // Try to suggest the closest matching command
+    const suggestion = suggestCommand(firstNonOption, allCommands);
     if (outputMode === 'json') {
       console.error(formatJsonError(new Error(`Unknown command: ${firstNonOption}`), 1));
     } else {
       console.error(`Error: Unknown command: ${firstNonOption}`);
+      if (suggestion) {
+        if (KNOWN_SESSION_COMMANDS.includes(suggestion)) {
+          console.error(`\nDid you mean: mcpc <@session> ${suggestion}`);
+        } else {
+          console.error(`\nDid you mean: mcpc ${suggestion}`);
+        }
+      }
       console.error(`Run "mcpc --help" for usage information.\n`);
     }
   }
@@ -372,6 +392,7 @@ function createTopLevelProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--max-chars <n>', 'Truncate tool/prompt output to this many characters')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .version(mcpcVersion, '-v, --version', 'Output the version number')
     .helpOption('-h, --help', 'Display help');
@@ -816,6 +837,7 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tools-call <name> [args...]')
     .description('Call an MCP server tool with arguments (key:=value pairs or JSON)')
+    .helpOption(false) // Disable built-in --help so we can intercept it for tool schema
     .option('--task', 'Use async task execution (experimental)')
     .option('--detach', 'Start task and return immediately with task ID (implies --task)')
     .addHelpText(
@@ -831,6 +853,17 @@ ${chalk.bold('Arguments:')}
 ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`', `${SCHEMA_BASE}#calltoolresult`)}`
     )
     .action(async (name, args, options, command) => {
+      // Intercept --help: with helpOption(false) Commander won't catch it.
+      // "tools-call --help" (no tool name) → name is '--help', show command help.
+      // "tools-call search --help" → show tool parameter schema (shortcut for tools-get).
+      if (name === '--help' || name === '-h') {
+        command.help();
+        return;
+      }
+      if (args.includes('--help') || args.includes('-h')) {
+        await tools.getTool(session, name, getOptionsFromCommand(command));
+        return;
+      }
       await tools.callTool(session, name, {
         args,
         task: options.task,
@@ -1095,6 +1128,7 @@ function createSessionProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--max-chars <n>', 'Truncate tool/prompt output to this many characters')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)');
 
   return program;

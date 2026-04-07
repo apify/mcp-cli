@@ -10,6 +10,7 @@ import {
   formatToolCallExample,
   formatSuccess,
   formatWarning,
+  truncateOutput,
 } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import type { CommandOptions, TaskUpdate } from '../../lib/types.js';
@@ -359,10 +360,10 @@ export async function callTool(
       }
     }
 
-    if (options.outputMode === 'human') {
-      console.log(formatOutput(result, 'human'));
-    } else {
-      console.log(formatOutput(result, 'json'));
+    let output = formatOutput(result, options.outputMode);
+    if (options.maxChars) {
+      output = truncateOutput(output, options.maxChars);
     }
+    console.log(output);
   });
 }

@@ -396,19 +396,102 @@ export function redactHeaders(headers: Record<string, string>): Record<string, s
 /**
  * Check if an error message indicates MCP session expiration.
  * Used to detect when a server has invalidated a session so it can be marked as expired.
+ *
+ * @param errorMessage - The error message to check
+ * @param options.hadActiveSession - When true, bare HTTP 404 errors are treated as session
+ *   expiration (the server likely rejected a stale MCP-Session-Id). When false, 404 is only
+ *   matched if the message explicitly mentions "session" — a bare 404 during initial connect
+ *   likely means the URL is wrong, not that a session expired.
  */
-export function isSessionExpiredError(errorMessage: string): boolean {
+export function isSessionExpiredError(
+  errorMessage: string,
+  options?: { hadActiveSession?: boolean }
+): boolean {
   const msg = errorMessage.toLowerCase();
-  return (
-    // HTTP 404 typically means session endpoint not found
-    // NOTE: Be careful not to match normal MCP errors like "tool not found"
-    (msg.includes('404') && !msg.includes('tool')) ||
-    // Explicit session-related messages
+
+  // Explicit session-related messages — always indicate expiration
+  if (
     msg.includes('session expired') ||
-    // Match "session not found" or "session id xyz not found" (with ID in between)
     /session(\s+id)?\s+\S+\s+not\s+found/.test(msg) ||
     msg.includes('session not found') ||
     msg.includes('invalid session') ||
     msg.includes('session is no longer valid')
+  ) {
+    return true;
+  }
+
+  // HTTP 404: only treat as session expiration when we had an active session ID.
+  // A bare 404 during initial connect typically means the URL is wrong.
+  // NOTE: exclude "tool not found" messages which are normal MCP errors.
+  if (msg.includes('404') && !msg.includes('tool')) {
+    // If the 404 message explicitly mentions "session", always match
+    if (msg.includes('session')) {
+      return true;
+    }
+    // Otherwise only match if we had an active MCP session (server rejected our session ID)
+    return options?.hadActiveSession === true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if an error message indicates an HTTP redirect (3xx).
+ * Redirects from an MCP endpoint suggest the URL is wrong (not an MCP server).
+ */
+export function isHttpRedirectError(errorMessage: string): boolean {
+  const msg = errorMessage.toLowerCase();
+  return (
+    msg.includes('redirect') ||
+    /30[1-8]/.test(msg) ||
+    msg.includes('moved permanently') ||
+    msg.includes('moved temporarily')
   );
+}
+
+/**
+ * Enrich a raw error message with actionable context based on the error pattern.
+ * Maps common HTTP/network errors to user-friendly messages with suggestions.
+ */
+export function enrichErrorMessage(errorMessage: string, serverUrl?: string): string {
+  const msg = errorMessage.toLowerCase();
+  const urlHint = serverUrl ? ` at ${serverUrl}` : '';
+
+  // Connection refused
+  if (msg.includes('econnrefused') || msg.includes('connection refused')) {
+    return `Cannot reach server${urlHint}. Is the server running?\n  Original error: ${errorMessage}`;
+  }
+
+  // DNS resolution failure
+  if (msg.includes('enotfound') || msg.includes('getaddrinfo')) {
+    return `Cannot resolve hostname${urlHint}. Check the server URL.\n  Original error: ${errorMessage}`;
+  }
+
+  // HTTP 404 (not session-related)
+  if (msg.includes('404')) {
+    return `Server returned 404 Not Found${urlHint}. Check the endpoint URL.\n  Original error: ${errorMessage}`;
+  }
+
+  // HTTP redirects
+  if (isHttpRedirectError(errorMessage)) {
+    return `Server returned a redirect${urlHint}. This doesn't look like an MCP endpoint.\n  Original error: ${errorMessage}`;
+  }
+
+  // Timeout
+  if (msg.includes('timeout') || msg.includes('etimedout') || msg.includes('timed out')) {
+    return `Connection timed out${urlHint}. The server may be slow or unreachable.\n  Original error: ${errorMessage}`;
+  }
+
+  // TLS/SSL errors
+  if (
+    msg.includes('ssl') ||
+    msg.includes('tls') ||
+    msg.includes('certificate') ||
+    msg.includes('cert')
+  ) {
+    return `TLS/SSL error${urlHint}. Check the server's certificate.\n  Original error: ${errorMessage}`;
+  }
+
+  // No enrichment possible
+  return errorMessage;
 }

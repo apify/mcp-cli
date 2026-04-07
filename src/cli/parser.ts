@@ -30,7 +30,13 @@ export function getJsonFromEnv(): boolean {
 }
 
 // Global options that take a value (not boolean flags)
-const GLOBAL_OPTIONS_WITH_VALUES = ['--timeout', '--profile', '--schema', '--schema-mode'];
+const GLOBAL_OPTIONS_WITH_VALUES = [
+  '--timeout',
+  '--profile',
+  '--schema',
+  '--schema-mode',
+  '--max-chars',
+];
 
 // All options that take a value — used by optionTakesValue() to correctly skip
 // the next arg when scanning for command tokens. Includes subcommand-specific
@@ -115,6 +121,66 @@ export const KNOWN_SESSION_COMMANDS = [
   'tasks-cancel',
   'grep',
 ];
+
+/**
+ * Compute Levenshtein distance between two strings.
+ * Uses two flat Int32Arrays (always initialized to 0) to avoid undefined-index issues.
+ */
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  let prev = new Int32Array(n + 1);
+  let curr = new Int32Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const del = (prev[j] as number) + 1;
+      const ins = (curr[j - 1] as number) + 1;
+      const sub = (prev[j - 1] as number) + cost;
+      curr[j] = Math.min(del, ins, sub);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n] as number;
+}
+
+/**
+ * Suggest the closest matching command for a given unknown input.
+ * Returns the closest match if within a reasonable edit distance, or undefined.
+ *
+ * Also detects reversed hyphenated commands (e.g., "list-tools" → "tools-list")
+ * which is the most common mistake pattern.
+ */
+export function suggestCommand(
+  input: string,
+  commands: string[],
+  maxDistance = 3
+): string | undefined {
+  const normalized = input.toLowerCase();
+
+  // Check for reversed hyphenated command (e.g., "list-tools" → "tools-list")
+  if (normalized.includes('-')) {
+    const parts = normalized.split('-');
+    const reversed = parts.reverse().join('-');
+    const reversedMatch = commands.find((cmd) => cmd.toLowerCase() === reversed);
+    if (reversedMatch) return reversedMatch;
+  }
+
+  // Fall back to Levenshtein distance
+  let best: string | undefined;
+  let bestDist = Infinity;
+  for (const cmd of commands) {
+    const dist = levenshtein(normalized, cmd.toLowerCase());
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = cmd;
+    }
+  }
+  return bestDist <= maxDistance ? best : undefined;
+}
 
 /**
  * Check if an option always takes a value

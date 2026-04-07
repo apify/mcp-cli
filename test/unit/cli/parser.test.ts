@@ -10,6 +10,7 @@ import {
   validateArgValues,
   optionTakesValue,
   hasSubcommand,
+  suggestCommand,
 } from '../../../src/cli/parser.js';
 import { ClientError } from '../../../src/lib/errors.js';
 
@@ -524,5 +525,60 @@ describe('validateArgValues', () => {
     expect(() =>
       validateArgValues(['connect', 'example.com', '--timeout', 'notanumber'])
     ).not.toThrow();
+  });
+});
+
+describe('suggestCommand', () => {
+  const commands = [
+    'tools-list',
+    'tools-get',
+    'tools-call',
+    'resources-list',
+    'resources-read',
+    'prompts-list',
+    'prompts-get',
+    'connect',
+    'login',
+    'help',
+  ];
+
+  it('suggests the closest match for reversed command names', () => {
+    expect(suggestCommand('list-tools', commands)).toBe('tools-list');
+    expect(suggestCommand('list-resources', commands)).toBe('resources-list');
+    expect(suggestCommand('list-prompts', commands)).toBe('prompts-list');
+  });
+
+  it('suggests the closest match for typos', () => {
+    expect(suggestCommand('tools-lst', commands)).toBe('tools-list');
+    expect(suggestCommand('conect', commands)).toBe('connect');
+    expect(suggestCommand('loign', commands)).toBe('login');
+  });
+
+  it('suggests closest match for short inputs within maxDistance', () => {
+    // "call" → "help" has distance 3, which equals maxDistance
+    expect(suggestCommand('call', commands)).toBe('help');
+    // Too distant inputs return undefined
+    expect(suggestCommand('xyz', commands)).toBeUndefined();
+  });
+
+  it('is case-insensitive', () => {
+    expect(suggestCommand('TOOLS-LIST', commands)).toBe('tools-list');
+    expect(suggestCommand('Tools-Call', commands)).toBe('tools-call');
+  });
+
+  it('returns undefined when no match is close enough', () => {
+    expect(suggestCommand('completely-unrelated', commands)).toBeUndefined();
+    expect(suggestCommand('xyzzy', commands)).toBeUndefined();
+  });
+
+  it('returns undefined for empty input', () => {
+    expect(suggestCommand('', commands)).toBeUndefined();
+  });
+
+  it('respects custom maxDistance', () => {
+    // With very low maxDistance, even close matches are rejected
+    expect(suggestCommand('tools-lst', commands, 0)).toBeUndefined();
+    // With higher maxDistance, more distant matches are accepted
+    expect(suggestCommand('tools-lst', commands, 1)).toBe('tools-list');
   });
 });

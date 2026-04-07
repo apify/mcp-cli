@@ -19,6 +19,7 @@ import { ping } from './commands/utilities.js';
 import { createSessionClient } from '../lib/session-client.js';
 import type { SessionClient } from '../lib/session-client.js';
 import { parseShellCommand } from './shell-parser.js';
+import { suggestCommand, KNOWN_SESSION_COMMANDS } from './parser.js';
 
 const HISTORY_MAX_COMMANDS = 1000;
 const HISTORY_FILE = 'shell-history';
@@ -228,10 +229,20 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
         // Extract flags from args
         const taskFlag = args.includes('--task');
         const detachFlag = args.includes('--detach');
-        const filteredArgs = args.filter((a) => a !== '--task' && a !== '--detach');
+        const helpFlag = args.includes('--help') || args.includes('-h');
+        const filteredArgs = args.filter(
+          (a) => a !== '--task' && a !== '--detach' && a !== '--help' && a !== '-h'
+        );
 
         // First arg is tool name, rest are positional arguments
         const toolName = filteredArgs[0] as string;
+
+        // --help shows tool schema (shortcut for tools-get)
+        if (helpFlag) {
+          await tools.getTool(ctx.target, toolName, options);
+          break;
+        }
+
         const toolArgs = filteredArgs.slice(1);
 
         await tools.callTool(ctx.target, toolName, {
@@ -336,9 +347,16 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
         break;
       }
 
-      default:
+      default: {
         console.log(chalk.red(`Unknown command: ${command}`));
-        console.log(chalk.dim('Type "help" for available commands'));
+        const suggestion = suggestCommand(command, KNOWN_SESSION_COMMANDS);
+        if (suggestion) {
+          console.log(chalk.dim(`Did you mean: ${suggestion}`));
+        } else {
+          console.log(chalk.dim('Type "help" for available commands'));
+        }
+        break;
+      }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

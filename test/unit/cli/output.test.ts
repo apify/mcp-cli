@@ -1715,3 +1715,38 @@ describe('logTarget', () => {
     expect(consoleSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('truncateOutput', () => {
+  // Import dynamically to avoid chalk mock issues
+  let truncateOutput: (output: string, maxChars: number) => string;
+
+  beforeAll(async () => {
+    const mod = await import('../../../src/cli/output.js');
+    truncateOutput = mod.truncateOutput;
+  });
+
+  it('returns original string when within limit', () => {
+    expect(truncateOutput('short', 100)).toBe('short');
+  });
+
+  it('returns original string when exactly at limit', () => {
+    const str = 'a'.repeat(100);
+    expect(truncateOutput(str, 100)).toBe(str);
+  });
+
+  it('truncates long strings with a notice', () => {
+    const str = 'a'.repeat(2000);
+    const result = truncateOutput(str, 100);
+    expect(result.length).toBeLessThan(str.length);
+    expect(result).toContain('output truncated');
+    expect(result).toContain('--max-chars');
+    // Should show KB size for large outputs
+    expect(result).toContain('2.0KB total');
+  });
+
+  it('shows character count for small outputs', () => {
+    const str = 'a'.repeat(200);
+    const result = truncateOutput(str, 50);
+    expect(result).toContain('200 chars');
+  });
+});

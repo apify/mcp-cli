@@ -315,6 +315,7 @@ export interface CommandOptions {
   hideTarget?: boolean; // Suppress session info prefix (used in interactive shell)
   schema?: string; // Path to expected schema file for validation
   schemaMode?: 'strict' | 'compatible' | 'ignore'; // Schema validation mode
+  maxChars?: number; // Maximum output characters for tool/prompt results (truncate if exceeded)
 }
 
 /**
