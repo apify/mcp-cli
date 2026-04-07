@@ -816,7 +816,7 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tools-call <name> [args...]')
     .description('Call an MCP server tool with arguments (key:=value pairs or JSON)')
-    .option('--task', 'Use task execution (experimental)')
+    .option('--task', 'Use async task execution (experimental)')
     .option('--detach', 'Start task and return immediately with task ID (implies --task)')
     .addHelpText(
       'after',
