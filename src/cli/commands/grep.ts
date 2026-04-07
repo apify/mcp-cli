@@ -128,7 +128,7 @@ function buildInstructionsSearchText(instructions: string, sessionName: string):
 
 /**
  * Extract a short snippet from instructions text around the first match.
- * The snippet is at most ~70 chars longer than the matched text, with ellipsis
+ * The snippet is at most ~80 chars longer than the matched text, with ellipsis
  * added when the snippet doesn't reach the start/end of the instructions.
  * Whitespace (including newlines) is normalized to single spaces.
  */
@@ -162,7 +162,7 @@ export function extractInstructionsSnippet(
     matchEnd = matchStart + needle.length;
   }
 
-  const contextSize = 35;
+  const contextSize = 40;
   let snippetStart = Math.max(0, matchStart - contextSize);
   let snippetEnd = Math.min(normalized.length, matchEnd + contextSize);
 
@@ -268,7 +268,7 @@ async function searchClient(
     const snippet = extractInstructionsSnippet(instructionsText, pattern, options);
     // Fallback: if snippet extraction fails (e.g. match was on session name prefix), show truncated text
     matchedInstructions =
-      snippet || instructionsText.replace(/\s+/g, ' ').trim().slice(0, 80) + '…';
+      snippet || instructionsText.replace(/\s+/g, ' ').trim().slice(0, 90) + '…';
   }
 
   return {
@@ -421,7 +421,7 @@ function formatGrepResultHuman(
       pattern && options
         ? highlightMatch(result.instructions, pattern, options)
         : result.instructions;
-    lines.push(`${indent}${chalk.bold('Instructions:')}  ${chalk.dim(snippet)}`);
+    lines.push(`${indent}${chalk.bold('Instructions:')}  ${chalk.dim('````' + snippet + '````')}`);
   }
   lines.push(
     ...formatResultSection('Tools', result.tools, formatToolLine as (item: never) => string, indent)

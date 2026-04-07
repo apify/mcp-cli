@@ -460,10 +460,16 @@ async function sendAuthCredentialsToBridge(
     if (profile) {
       // Load tokens from keychain
       const tokens = await readKeychainOAuthTokenInfo(profile.serverUrl, profileName);
-      if (tokens?.refreshToken) {
-        credentials.refreshToken = tokens.refreshToken;
+      if (tokens) {
         credentials.serverUrl = profile.serverUrl;
-        logger.debug(`Found OAuth refresh token for profile ${profileName}`);
+        if (tokens.refreshToken) {
+          credentials.refreshToken = tokens.refreshToken;
+          logger.debug(`Found OAuth refresh token for profile ${profileName}`);
+        }
+        if (tokens.accessToken) {
+          credentials.accessToken = tokens.accessToken;
+          logger.debug(`Found OAuth access token for profile ${profileName}`);
+        }
       }
 
       // Load client info from keychain (needed for token refresh)
@@ -486,8 +492,11 @@ async function sendAuthCredentialsToBridge(
   logger.debug(
     'Sending auth credentials to bridge' +
       (credentials.refreshToken ? ' (with refresh token)' : '') +
+      (credentials.accessToken ? ' (with access token)' : '') +
       (credentials.headers ? ` (with ${Object.keys(credentials.headers).length} headers)` : '') +
-      (!credentials.refreshToken && !credentials.headers ? ' (minimal - no tokens or headers)' : '')
+      (!credentials.refreshToken && !credentials.accessToken && !credentials.headers
+        ? ' (minimal - no tokens or headers)'
+        : '')
   );
 
   // Connect to bridge and send credentials

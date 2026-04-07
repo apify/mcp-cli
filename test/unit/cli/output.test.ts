@@ -56,6 +56,7 @@ import {
   formatHuman,
   logTarget,
   formatToolCallExample,
+  formatToolHints,
 } from '../../../src/cli/output.js';
 import type {
   Tool,
@@ -908,6 +909,65 @@ describe('formatToolCallExample', () => {
 
     const output = formatToolCallExample(tool);
     expect(output).toContain('<@session>');
+  });
+
+  it('should include --task for task:required tools', () => {
+    const tool = {
+      name: 'long-run',
+      inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] },
+      execution: { taskSupport: 'required' },
+    } as unknown as Tool;
+
+    const output = formatToolCallExample(tool, '@s');
+    expect(output).toContain('--task');
+    expect(output).not.toContain('[--task]');
+  });
+
+  it('should include [--task] for task:optional tools', () => {
+    const tool = {
+      name: 'maybe-async',
+      inputSchema: { type: 'object', properties: {} },
+      execution: { taskSupport: 'optional' },
+    } as unknown as Tool;
+
+    const output = formatToolCallExample(tool, '@s');
+    expect(output).toContain('[--task]');
+  });
+});
+
+describe('formatToolHints', () => {
+  it('should combine annotations and task support', () => {
+    const tool = {
+      name: 'test',
+      inputSchema: { type: 'object', properties: {} },
+      annotations: { destructiveHint: true, openWorldHint: true },
+      execution: { taskSupport: 'required' },
+    } as unknown as Tool;
+
+    const hints = formatToolHints(tool);
+    expect(hints).toContain('destructive');
+    expect(hints).toContain('open-world');
+    expect(hints).toContain('task:required');
+  });
+
+  it('should return null when no annotations and no task support', () => {
+    const tool: Tool = {
+      name: 'plain',
+      inputSchema: { type: 'object', properties: {} },
+    };
+
+    expect(formatToolHints(tool)).toBeNull();
+  });
+
+  it('should show only task support when no annotations', () => {
+    const tool = {
+      name: 'async-only',
+      inputSchema: { type: 'object', properties: {} },
+      execution: { taskSupport: 'optional' },
+    } as unknown as Tool;
+
+    const hints = formatToolHints(tool);
+    expect(hints).toBe('task:optional');
   });
 });
 

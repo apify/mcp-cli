@@ -82,7 +82,7 @@ describe('extractInstructionsSnippet', () => {
     expect(result).toContain('mmm');
     expect(result!.startsWith('\u2026')).toBe(true);
     // total length should be roughly pattern.length + 50
-    expect(result!.length).toBeLessThanOrEqual('mmm'.length + 80);
+    expect(result!.length).toBeLessThanOrEqual('mmm'.length + 90);
   });
 
   it('adds trailing ellipsis when match is far from the end', () => {
@@ -101,7 +101,7 @@ describe('extractInstructionsSnippet', () => {
     expect(result).toContain('lazy');
     expect(result!.startsWith('\u2026')).toBe(true);
     expect(result!.endsWith('\u2026')).toBe(true);
-    expect(result!.length).toBeLessThanOrEqual('lazy'.length + 80);
+    expect(result!.length).toBeLessThanOrEqual('lazy'.length + 90);
   });
 
   it('normalizes whitespace including newlines', () => {
@@ -164,8 +164,8 @@ describe('extractInstructionsSnippet', () => {
     const result = extractInstructionsSnippet(text, pattern, {});
     expect(result).toBeTruthy();
     expect(result).toContain(pattern);
-    // Snippet should be at most about pattern.length + 50 + 2 (for ellipsis chars)
-    expect(result!.length).toBeLessThanOrEqual(pattern.length + 80);
+    // Snippet should be at most about pattern.length + 80 + 2 (for ellipsis chars)
+    expect(result!.length).toBeLessThanOrEqual(pattern.length + 90);
   });
 
   it('handles case-insensitive regex', () => {
