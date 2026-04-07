@@ -238,6 +238,31 @@ export function formatToolAnnotations(annotations: Tool['annotations']): string 
 }
 
 /**
+ * Get the task support mode for a tool ('required', 'optional', or undefined)
+ */
+export function getToolTaskSupport(tool: Tool): string | undefined {
+  const toolAny = tool as Record<string, unknown>;
+  const execution = toolAny.execution as Record<string, unknown> | undefined;
+  return execution?.taskSupport as string | undefined;
+}
+
+/**
+ * Format tool hints: annotations + task support mode.
+ * Returns a string like "destructive, open-world, task:required" or null if empty.
+ */
+export function formatToolHints(tool: Tool): string | null {
+  const parts: string[] = [];
+
+  const annotationsStr = formatToolAnnotations(tool.annotations);
+  if (annotationsStr) parts.push(annotationsStr);
+
+  const taskSupport = getToolTaskSupport(tool);
+  if (taskSupport) parts.push(`task:${taskSupport}`);
+
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
+/**
  * Convert a JSON Schema type definition to a simplified type string
  * e.g., { type: 'string' } -> 'string'
  *       { type: 'array', items: { type: 'number' } } -> 'array<number>'
@@ -466,15 +491,8 @@ export function formatToolParamsInline(schema: Record<string, unknown>): string 
 export function formatToolLine(tool: Tool): string {
   const bullet = chalk.dim('*');
   const params = formatToolParamsInline(tool.inputSchema as Record<string, unknown>);
-  const parts: string[] = [];
-  const annotationsStr = formatToolAnnotations(tool.annotations);
-  if (annotationsStr) parts.push(annotationsStr);
-  // Show task execution mode
-  const toolAny = tool as Record<string, unknown>;
-  const execution = toolAny.execution as Record<string, unknown> | undefined;
-  const taskSupport = execution?.taskSupport as string | undefined;
-  if (taskSupport) parts.push(`task:${taskSupport}`);
-  const suffix = parts.length > 0 ? ` ${chalk.gray(`[${parts.join(', ')}]`)}` : '';
+  const hintsStr = formatToolHints(tool);
+  const suffix = hintsStr ? ` ${chalk.gray(`[${hintsStr}]`)}` : '';
   return `${bullet} ${grayBacktick()}${chalk.cyan(tool.name)} ${params}${grayBacktick()}${suffix}`;
 }
 
@@ -536,10 +554,10 @@ export function formatToolDetail(tool: Tool): string {
     lines.push(chalk.bold(`# ${title}`));
   }
 
-  // Tool header: Tool: `name` [annotations]
-  const annotationsStr = formatToolAnnotations(tool.annotations);
-  const annotationsSuffix = annotationsStr ? ` ${chalk.gray(`[${annotationsStr}]`)}` : '';
-  lines.push(`${chalk.bold('Tool:')} ${inBackticks(tool.name)}${annotationsSuffix}`);
+  // Tool header: Tool: `name` [hints]
+  const hintsStr = formatToolHints(tool);
+  const hintsSuffix = hintsStr ? ` ${chalk.gray(`[${hintsStr}]`)}` : '';
+  lines.push(`${chalk.bold('Tool:')} ${inBackticks(tool.name)}${hintsSuffix}`);
 
   // Input args
   lines.push('');
@@ -566,6 +584,87 @@ export function formatToolDetail(tool: Tool): string {
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Generate an example placeholder value for a JSON Schema property.
+ * Uses the default value if available, otherwise a reasonable placeholder.
+ */
+function exampleValue(propSchema: Record<string, unknown>): string {
+  // Use default value if available
+  if (propSchema.default !== undefined) {
+    return JSON.stringify(propSchema.default);
+  }
+
+  // Use first enum value if available
+  if (propSchema.enum && Array.isArray(propSchema.enum) && propSchema.enum.length > 0) {
+    return JSON.stringify(propSchema.enum[0]);
+  }
+
+  const schemaType = propSchema.type;
+
+  if (schemaType === 'string') return '"something"';
+  if (schemaType === 'number') return '1';
+  if (schemaType === 'integer') {
+    // Respect minimum if set
+    const min = propSchema.minimum as number | undefined;
+    return String(min ?? 1);
+  }
+  if (schemaType === 'boolean') return 'true';
+
+  // Union types like ['string', 'null']
+  if (Array.isArray(schemaType)) {
+    const nonNull = schemaType.filter((t) => t !== 'null');
+    if (nonNull.includes('string')) return '"something"';
+    if (nonNull.includes('number') || nonNull.includes('integer')) return '1';
+    if (nonNull.includes('boolean')) return 'true';
+  }
+
+  return '"something"';
+}
+
+/**
+ * Format a tools-call usage example for a tool, showing how to invoke it.
+ * Shows required params first, then fills with optional params up to 3 total.
+ */
+export function formatToolCallExample(tool: Tool, sessionName?: string): string | null {
+  const schema = tool.inputSchema as Record<string, unknown> | undefined;
+  const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined;
+  const session = sessionName || '<@session>';
+
+  // Build --task flag based on task support
+  const taskSupport = getToolTaskSupport(tool);
+  const taskFlag =
+    taskSupport === 'required' ? ' --task' : taskSupport === 'optional' ? ' [--task]' : '';
+
+  const bullet = chalk.dim('*');
+
+  if (!properties || Object.keys(properties).length === 0) {
+    // Tool takes no arguments — still show the simple call
+    const cmd = `mcpc ${session} tools-call ${tool.name}${taskFlag}`;
+    return `${chalk.bold('Call example:')}\n${bullet} ${grayBacktick()}${chalk.cyan(cmd)}${grayBacktick()}`;
+  }
+
+  const requiredNames = (schema?.required as string[]) || [];
+  const allNames = Object.keys(properties);
+  const requiredInOrder = allNames.filter((n) => requiredNames.includes(n));
+  const optionalInOrder = allNames.filter((n) => !requiredNames.includes(n));
+
+  // Pick params: all required, then fill optional up to 3 total
+  const MAX_EXAMPLE_PARAMS = 3;
+  const params: string[] = [...requiredInOrder];
+  if (params.length < MAX_EXAMPLE_PARAMS) {
+    const remaining = MAX_EXAMPLE_PARAMS - params.length;
+    params.push(...optionalInOrder.slice(0, remaining));
+  }
+
+  const argParts = params.map((name) => {
+    const val = exampleValue(properties[name] ?? {});
+    return `${name}:=${val}`;
+  });
+
+  const cmd = `mcpc ${session} tools-call ${tool.name} ${argParts.join(' ')}${taskFlag}`;
+  return `${chalk.bold('Call example:')}\n${bullet} ${grayBacktick()}${chalk.cyan(cmd)}${grayBacktick()}`;
 }
 
 /**

@@ -421,7 +421,7 @@ function formatGrepResultHuman(
       pattern && options
         ? highlightMatch(result.instructions, pattern, options)
         : result.instructions;
-    lines.push(`${indent}${chalk.bold('Instructions:')}  ${chalk.dim('````' + snippet + '````')}`);
+    lines.push(`${indent}${chalk.bold('Instructions:')} ${chalk.dim('````' + snippet + '````')}`);
   }
   lines.push(
     ...formatResultSection('Tools', result.tools, formatToolLine as (item: never) => string, indent)

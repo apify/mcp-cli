@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--json` output documentation in `--help` for all commands, describing the MCP object shape returned
+- `tools-get` now shows an example `tools-call` command with placeholder arguments based on the tool's schema
+
+### Fixed
+
+- `build:readme` script failing on macOS due to `sed -i` platform difference
+
 ## [0.2.4] - 2026-04-07
 
 ### Security
