@@ -673,6 +673,16 @@ class BridgeProcess {
       );
     }
 
+    // Verify resumed session is actually functional by sending a ping.
+    // The initialize handshake may succeed even when the server has lost session state,
+    // causing the session to appear "live" until the first real request reveals it's expired.
+    // Ping before marking as active so we never show a false "live" status.
+    if (this.options.mcpSessionId) {
+      logger.info('Verifying resumed session with ping...');
+      await this.client.ping();
+      logger.info('Session verification ping succeeded');
+    }
+
     const sessionUpdate: Parameters<typeof updateSession>[1] = {
       lastSeenAt: new Date().toISOString(),
       status: 'active',
@@ -696,6 +706,11 @@ class BridgeProcess {
     // Pre-populate tools cache (used by x402 proactive signing and listAllTools IPC method)
     if (serverDetails.capabilities?.tools) {
       await this.client.listAllTools({ refreshCache: true }).catch((err) => {
+        const errMsg = (err as Error).message || '';
+        if (isSessionExpiredError(errMsg) || isAuthenticationError(errMsg)) {
+          // Re-throw session/auth errors so they trigger proper status handling
+          throw err;
+        }
         logger.warn('Failed to pre-populate tools cache:', err);
       });
     }
