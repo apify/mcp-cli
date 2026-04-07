@@ -425,7 +425,11 @@ class BridgeProcess {
 
         // If the error was due to session ID rejection or auth failure, mark session status
         // User must explicitly use 'mcpc @session restart' or 'mcpc login' to recover
-        if (isSessionExpiredError(errorMsg)) {
+        if (
+          isSessionExpiredError(errorMsg, {
+            hadActiveSession: !!this.options.mcpSessionId,
+          })
+        ) {
           logger.warn('Session rejected by server (expired session ID), marking as expired');
           try {
             await updateSession(this.options.sessionName, { status: 'expired' });
@@ -808,7 +812,7 @@ class BridgeProcess {
    */
   private async handlePossibleExpiration(error: Error): Promise<void> {
     let status: 'expired' | 'unauthorized' | null = null;
-    if (isSessionExpiredError(error.message)) {
+    if (isSessionExpiredError(error.message, { hadActiveSession: true })) {
       logger.warn('Session appears to be expired, marking as expired and shutting down');
       status = 'expired';
     } else if (isAuthenticationError(error.message)) {

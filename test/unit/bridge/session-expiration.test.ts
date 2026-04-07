@@ -1,12 +1,16 @@
 /**
- * Unit tests for session expiration detection
+ * Unit tests for session expiration detection and error enrichment
  */
 
-import { isSessionExpiredError } from '../../../src/lib/utils.js';
+import {
+  isSessionExpiredError,
+  isHttpRedirectError,
+  enrichErrorMessage,
+} from '../../../src/lib/utils.js';
 import { isAuthenticationError } from '../../../src/lib/errors.js';
 
 describe('isSessionExpiredError', () => {
-  describe('should detect session expiration', () => {
+  describe('explicit session messages (always detected regardless of hadActiveSession)', () => {
     it('detects "session not found" message', () => {
       expect(isSessionExpiredError('session not found')).toBe(true);
       expect(isSessionExpiredError('Session not found')).toBe(true);
@@ -14,7 +18,6 @@ describe('isSessionExpiredError', () => {
     });
 
     it('detects "Session ID xyz not found" message (the bug fix case)', () => {
-      // This is the exact error format from the bug report
       expect(
         isSessionExpiredError(
           'Bad Request: Session ID 334c4cc0-ea1a-49f5-89a6-13bbe29b17d6 not found'
@@ -45,20 +48,48 @@ describe('isSessionExpiredError', () => {
       expect(isSessionExpiredError('session is no longer valid')).toBe(true);
       expect(isSessionExpiredError('Your session is no longer valid')).toBe(true);
     });
+  });
 
-    it('detects HTTP 404 errors (non-tool related)', () => {
-      expect(isSessionExpiredError('404 Not Found')).toBe(true);
-      expect(isSessionExpiredError('HTTP 404')).toBe(true);
-      expect(isSessionExpiredError('Error: 404')).toBe(true);
+  describe('HTTP 404 with hadActiveSession context', () => {
+    it('detects bare 404 when hadActiveSession is true', () => {
+      expect(isSessionExpiredError('404 Not Found', { hadActiveSession: true })).toBe(true);
+      expect(isSessionExpiredError('HTTP 404', { hadActiveSession: true })).toBe(true);
+      expect(isSessionExpiredError('Error: 404', { hadActiveSession: true })).toBe(true);
+    });
+
+    it('does NOT detect bare 404 when hadActiveSession is false', () => {
+      // A bare 404 during initial connect means wrong URL, not expired session
+      expect(isSessionExpiredError('404 Not Found', { hadActiveSession: false })).toBe(false);
+      expect(isSessionExpiredError('HTTP 404', { hadActiveSession: false })).toBe(false);
+      expect(isSessionExpiredError('Error: 404', { hadActiveSession: false })).toBe(false);
+    });
+
+    it('does NOT detect bare 404 when hadActiveSession is not specified', () => {
+      // Default behavior: bare 404 without context is not treated as session expiration
+      expect(isSessionExpiredError('404 Not Found')).toBe(false);
+      expect(isSessionExpiredError('HTTP 404')).toBe(false);
+      expect(isSessionExpiredError('Error: 404')).toBe(false);
+    });
+
+    it('detects 404 mentioning "session" regardless of hadActiveSession', () => {
+      // If the 404 message explicitly mentions "session", always treat as expiration
+      expect(isSessionExpiredError('404 session not found')).toBe(true);
+      expect(isSessionExpiredError('404 session not found', { hadActiveSession: false })).toBe(
+        true
+      );
+      expect(isSessionExpiredError('404 session not found', { hadActiveSession: true })).toBe(true);
     });
   });
 
   describe('should NOT detect as session expiration', () => {
     it('ignores "tool not found" errors (404 with tool)', () => {
-      // Tool-related 404s should NOT be treated as session expiration
-      expect(isSessionExpiredError('404 tool not found')).toBe(false);
-      expect(isSessionExpiredError('Tool xyz not found (404)')).toBe(false);
-      expect(isSessionExpiredError('Error 404: tool does not exist')).toBe(false);
+      expect(isSessionExpiredError('404 tool not found', { hadActiveSession: true })).toBe(false);
+      expect(isSessionExpiredError('Tool xyz not found (404)', { hadActiveSession: true })).toBe(
+        false
+      );
+      expect(
+        isSessionExpiredError('Error 404: tool does not exist', { hadActiveSession: true })
+      ).toBe(false);
     });
 
     it('ignores generic errors', () => {
@@ -82,7 +113,6 @@ describe('isSessionExpiredError', () => {
 
   describe('edge cases', () => {
     it('handles messages with leading/trailing whitespace', () => {
-      // Leading/trailing whitespace doesn't affect matching
       expect(isSessionExpiredError('  session not found  ')).toBe(true);
       expect(isSessionExpiredError('  session expired  ')).toBe(true);
     });
@@ -101,6 +131,71 @@ describe('isSessionExpiredError', () => {
       expect(isSessionExpiredError('SESSION IS NO LONGER VALID')).toBe(true);
       expect(isSessionExpiredError('SESSION ID ABC NOT FOUND')).toBe(true);
     });
+  });
+});
+
+describe('isHttpRedirectError', () => {
+  it('detects redirect-related messages', () => {
+    expect(isHttpRedirectError('redirect')).toBe(true);
+    expect(isHttpRedirectError('301 Moved Permanently')).toBe(true);
+    expect(isHttpRedirectError('302 Found')).toBe(true);
+    expect(isHttpRedirectError('HTTP 307 Temporary Redirect')).toBe(true);
+    expect(isHttpRedirectError('moved permanently')).toBe(true);
+    expect(isHttpRedirectError('moved temporarily')).toBe(true);
+  });
+
+  it('does not match non-redirect messages', () => {
+    expect(isHttpRedirectError('404 Not Found')).toBe(false);
+    expect(isHttpRedirectError('Connection refused')).toBe(false);
+    expect(isHttpRedirectError('200 OK')).toBe(false);
+  });
+});
+
+describe('enrichErrorMessage', () => {
+  it('enriches connection refused errors', () => {
+    const result = enrichErrorMessage('ECONNREFUSED', 'https://mcp.example.com');
+    expect(result).toContain('Cannot reach server');
+    expect(result).toContain('https://mcp.example.com');
+    expect(result).toContain('Is the server running?');
+  });
+
+  it('enriches DNS resolution errors', () => {
+    const result = enrichErrorMessage('getaddrinfo ENOTFOUND bad.host', 'https://bad.host');
+    expect(result).toContain('Cannot resolve hostname');
+    expect(result).toContain('https://bad.host');
+  });
+
+  it('enriches 404 errors with URL', () => {
+    const result = enrichErrorMessage('404 Not Found', 'https://mcp.example.com/wrong');
+    expect(result).toContain('404 Not Found');
+    expect(result).toContain('https://mcp.example.com/wrong');
+    expect(result).toContain('Check the endpoint URL');
+  });
+
+  it('enriches redirect errors', () => {
+    const result = enrichErrorMessage('301 Moved Permanently', 'https://example.com');
+    expect(result).toContain("doesn't look like an MCP endpoint");
+  });
+
+  it('enriches timeout errors', () => {
+    const result = enrichErrorMessage('ETIMEDOUT');
+    expect(result).toContain('timed out');
+  });
+
+  it('enriches TLS/SSL errors', () => {
+    const result = enrichErrorMessage('self-signed certificate in certificate chain');
+    expect(result).toContain('TLS/SSL error');
+  });
+
+  it('returns original message when no pattern matches', () => {
+    const msg = 'some unknown error';
+    expect(enrichErrorMessage(msg)).toBe(msg);
+  });
+
+  it('works without serverUrl', () => {
+    const result = enrichErrorMessage('ECONNREFUSED');
+    expect(result).toContain('Cannot reach server');
+    expect(result).not.toContain('undefined');
   });
 });
 
