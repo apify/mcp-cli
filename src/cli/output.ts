@@ -963,6 +963,18 @@ export function formatInfo(message: string): string {
 }
 
 /**
+ * Truncate formatted output string to maxChars, appending a notice about truncation.
+ * Returns the original string if within limit.
+ */
+export function truncateOutput(output: string, maxChars: number): string {
+  if (output.length <= maxChars) return output;
+  const truncated = output.substring(0, maxChars);
+  const totalSize =
+    output.length >= 1024 ? `${(output.length / 1024).toFixed(1)}KB` : `${output.length} chars`;
+  return `${truncated}\n\n... output truncated (${totalSize} total, showing first ${maxChars} chars). Use --max-output to adjust.`;
+}
+
+/**
  * Truncate string with ellipsis if significantly longer than maxLen
  * Allows +3 chars slack to avoid weird cutoffs
  */

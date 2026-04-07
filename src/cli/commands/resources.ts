@@ -2,7 +2,7 @@
  * Resources command handlers
  */
 
-import { formatOutput, formatSuccess } from '../output.js';
+import { formatOutput, formatSuccess, truncateOutput } from '../output.js';
 import { withMcpClient } from '../helpers.js';
 import type { CommandOptions } from '../../lib/types.js';
 
@@ -83,7 +83,11 @@ export async function getResource(
       return;
     }
 
-    console.log(formatOutput(result, options.outputMode));
+    let output = formatOutput(result, options.outputMode);
+    if (options.maxOutput) {
+      output = truncateOutput(output, options.maxOutput);
+    }
+    console.log(output);
   });
 }
 

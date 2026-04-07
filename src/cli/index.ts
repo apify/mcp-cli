@@ -119,6 +119,15 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
     options.schemaMode = mode;
   }
   if (opts.full) options.full = opts.full;
+  if (opts.maxOutput) {
+    const maxOutput = parseInt(opts.maxOutput as string, 10);
+    if (isNaN(maxOutput) || maxOutput <= 0) {
+      throw new Error(
+        `Invalid --max-output value: "${opts.maxOutput as string}". Must be a positive number (characters).`
+      );
+    }
+    options.maxOutput = maxOutput;
+  }
 
   return options;
 }
@@ -364,6 +373,7 @@ function createTopLevelProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--max-output <chars>', 'Truncate tool/prompt output to this many characters')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .version(mcpcVersion, '-v, --version', 'Output the version number')
     .helpOption('-h, --help', 'Display help');
@@ -943,6 +953,7 @@ function createSessionProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--max-output <chars>', 'Truncate tool/prompt output to this many characters')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)');
 
   return program;

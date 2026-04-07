@@ -4,7 +4,13 @@
 
 import ora from 'ora';
 import chalk from 'chalk';
-import { formatOutput, formatToolDetail, formatSuccess, formatWarning } from '../output.js';
+import {
+  formatOutput,
+  formatToolDetail,
+  formatSuccess,
+  formatWarning,
+  truncateOutput,
+} from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import type { CommandOptions, TaskUpdate } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
@@ -349,10 +355,10 @@ export async function callTool(
       }
     }
 
-    if (options.outputMode === 'human') {
-      console.log(formatOutput(result, 'human'));
-    } else {
-      console.log(formatOutput(result, 'json'));
+    let output = formatOutput(result, options.outputMode);
+    if (options.maxOutput) {
+      output = truncateOutput(output, options.maxOutput);
     }
+    console.log(output);
   });
 }

@@ -30,7 +30,13 @@ export function getJsonFromEnv(): boolean {
 }
 
 // Global options that take a value (not boolean flags)
-const GLOBAL_OPTIONS_WITH_VALUES = ['--timeout', '--profile', '--schema', '--schema-mode'];
+const GLOBAL_OPTIONS_WITH_VALUES = [
+  '--timeout',
+  '--profile',
+  '--schema',
+  '--schema-mode',
+  '--max-output',
+];
 
 // All options that take a value — used by optionTakesValue() to correctly skip
 // the next arg when scanning for command tokens. Includes subcommand-specific
