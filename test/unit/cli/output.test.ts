@@ -5,31 +5,36 @@
 import { extractSingleTextContent } from '../../../src/cli/tool-result.js';
 
 // Mock chalk to return plain strings (required because Jest can't handle chalk's ESM imports)
+// Create a chainable identity function: each call returns the string, each property returns another chainable fn
+function chainable(
+  fn: (s: string) => string = (s: string) => s
+): ((s: string) => string) & Record<string, (s: string) => string> {
+  const proxy = new Proxy(fn, {
+    get(_target, _prop) {
+      return chainable(fn);
+    },
+  });
+  return proxy as ((s: string) => string) & Record<string, (s: string) => string>;
+}
+const mockChalk: Record<string, unknown> = {};
+for (const name of [
+  'cyan',
+  'yellow',
+  'red',
+  'dim',
+  'gray',
+  'bold',
+  'green',
+  'greenBright',
+  'blue',
+  'magenta',
+  'white',
+]) {
+  mockChalk[name] = chainable();
+}
 jest.mock('chalk', () => ({
-  default: {
-    cyan: (s: string) => s,
-    yellow: (s: string) => s,
-    red: (s: string) => s,
-    dim: (s: string) => s,
-    gray: (s: string) => s,
-    bold: (s: string) => s,
-    green: (s: string) => s,
-    greenBright: (s: string) => s,
-    blue: (s: string) => s,
-    magenta: (s: string) => s,
-    white: (s: string) => s,
-  },
-  cyan: (s: string) => s,
-  yellow: (s: string) => s,
-  red: (s: string) => s,
-  dim: (s: string) => s,
-  gray: (s: string) => s,
-  bold: (s: string) => s,
-  green: (s: string) => s,
-  greenBright: (s: string) => s,
-  blue: (s: string) => s,
-  magenta: (s: string) => s,
-  white: (s: string) => s,
+  default: { ...mockChalk },
+  ...mockChalk,
 }));
 
 // Mock sessions module before importing output

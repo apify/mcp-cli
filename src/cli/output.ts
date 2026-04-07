@@ -446,7 +446,8 @@ export function formatToolParamsInline(schema: Record<string, unknown>): string 
 
   const paramStrings: string[] = shown.map(({ name, required }) => {
     const typeStr = shortType(properties[name] ?? {});
-    return required ? `${name}:${typeStr}` : `${name}?:${typeStr}`;
+    const dimType = chalk.dim.white(`:${typeStr}`);
+    return required ? `${name}${dimType}` : `${name}${chalk.dim.white('?')}${dimType}`;
   });
 
   if (hidden > 0) {
