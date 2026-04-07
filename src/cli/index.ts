@@ -778,9 +778,15 @@ function registerSessionCommands(program: Command, session: string): void {
   program
     .command('tools-call <name> [args...]')
     .description('Call a tool with arguments (key:=value pairs or JSON)')
+    .helpOption(false) // Disable built-in --help so we can intercept it for tool schema
     .option('--task', 'Use task execution (experimental)')
     .option('--detach', 'Start task and return immediately with task ID (implies --task)')
     .action(async (name, args, options, command) => {
+      // Intercept --help to show tool parameter schema (shortcut for tools-get)
+      if (args.includes('--help') || args.includes('-h')) {
+        await tools.getTool(session, name, getOptionsFromCommand(command));
+        return;
+      }
       await tools.callTool(session, name, {
         args,
         task: options.task,

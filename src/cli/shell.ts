@@ -229,10 +229,20 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
         // Extract flags from args
         const taskFlag = args.includes('--task');
         const detachFlag = args.includes('--detach');
-        const filteredArgs = args.filter((a) => a !== '--task' && a !== '--detach');
+        const helpFlag = args.includes('--help') || args.includes('-h');
+        const filteredArgs = args.filter(
+          (a) => a !== '--task' && a !== '--detach' && a !== '--help' && a !== '-h'
+        );
 
         // First arg is tool name, rest are positional arguments
         const toolName = filteredArgs[0] as string;
+
+        // --help shows tool schema (shortcut for tools-get)
+        if (helpFlag) {
+          await tools.getTool(ctx.target, toolName, options);
+          break;
+        }
+
         const toolArgs = filteredArgs.slice(1);
 
         await tools.callTool(ctx.target, toolName, {
