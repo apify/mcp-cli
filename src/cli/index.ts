@@ -750,7 +750,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Help command
   program
     .command('help')
-    .description('Show MCP server instructions, capabilities, and tools.')
+    .description('Show MCP server info, capabilities, and tools.')
     .addHelpText(
       'after',
       jsonHelp(
@@ -765,7 +765,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Shell command
   program
     .command('shell')
-    .description('Launch interactive MCP shell for the session.')
+    .description('Launch interactive MCP shell.')
     .action(async () => {
       await sessions.openShell(session);
     });
@@ -773,7 +773,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Close command
   program
     .command('close', { hidden: true })
-    .description('Close the MCP server session.')
+    .description('Close MCP session.')
     .action(async (_options, command) => {
       await sessions.closeSession(session, getOptionsFromCommand(command));
     });
@@ -781,7 +781,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Restart command
   program
     .command('restart')
-    .description('Restart the MCP server session (losing all state).')
+    .description('Restart MCP session (losing all state).')
     .action(async (_options, command) => {
       await sessions.restartSession(session, getOptionsFromCommand(command));
     });
@@ -789,7 +789,7 @@ function registerSessionCommands(program: Command, session: string): void {
   // Tools commands
   program
     .command('tools')
-    .description('List all available MCP server tools (shorthand for tools-list).')
+    .description('List MCP tools (shorthand for tools-list).')
     .option('--full', 'Show full tool details including complete input schema')
     .addHelpText(
       'after',
@@ -805,7 +805,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('tools-list')
-    .description('List all available MCP server tools.')
+    .description('List all MCP tools.')
     .option('--full', 'Show full tool details including complete input schema')
     .addHelpText(
       'after',
@@ -821,7 +821,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('tools-get <name>')
-    .description('Get full details and schema for a specific MCP server tool.')
+    .description('Get details and schema for an MCP tool.')
     .addHelpText(
       'after',
       jsonHelp(
@@ -836,7 +836,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   program
     .command('tools-call <name> [args...]')
-    .description('Call an MCP server tool with arguments (key:=value pairs or JSON)')
+    .description('Call an MCP tool with arguments.')
     .helpOption(false) // Disable built-in --help so we can intercept it for tool schema
     .option('--task', 'Use async task execution (experimental)')
     .option('--detach', 'Start task and return immediately with task ID (implies --task)')
@@ -875,7 +875,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
   // Tasks commands
   program
     .command('tasks-list')
-    .description('List all MCP server tasks.')
+    .description('List all MCP tasks.')
     .addHelpText(
       'after',
       jsonHelp(
@@ -889,7 +889,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
 
   program
     .command('tasks-get <taskId>')
-    .description('Get status of a specific MCP task.')
+    .description('Get MCP task status.')
     .addHelpText(
       'after',
       jsonHelp('`Task` object', '`{ taskId, status, statusMessage?, createdAt?, lastUpdatedAt? }`')
@@ -900,7 +900,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
 
   program
     .command('tasks-cancel <taskId>')
-    .description('Cancel a running MCP task.')
+    .description('Cancel an MCP task.')
     .addHelpText('after', jsonHelp('`Task` object', '`{ taskId, status, statusMessage? }`'))
     .action(async (taskId, _options, command) => {
       await tasks.cancelTask(session, taskId, getOptionsFromCommand(command));
@@ -909,7 +909,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
   // Resources commands
   program
     .command('resources')
-    .description('List available MCP server resources (shorthand for resources-list).')
+    .description('List MCP resources (shorthand for resources-list).')
     .addHelpText(
       'after',
       jsonHelp(
@@ -924,7 +924,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
 
   program
     .command('resources-list')
-    .description('List available MCP server resources.')
+    .description('List all MCP resources.')
     .addHelpText(
       'after',
       jsonHelp(
@@ -939,7 +939,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
 
   program
     .command('resources-read <uri>')
-    .description('Get an MCP server resource by URI.')
+    .description('Read an MCP resource by URI.')
     .option('-o, --output <file>', 'Write resource to file')
     .option('--max-size <bytes>', 'Maximum resource size in bytes')
     .addHelpText(
@@ -960,7 +960,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
 
   program
     .command('resources-subscribe <uri>')
-    .description('Subscribe to MCP server resource updates.')
+    .description('Subscribe to MCP resource updates.')
     .addHelpText('after', jsonHelp('`{ subscribed: true, uri: string }`'))
     .action(async (uri, _options, command) => {
       await resources.subscribeResource(session, uri, getOptionsFromCommand(command));
@@ -968,7 +968,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
 
   program
     .command('resources-unsubscribe <uri>')
-    .description('Unsubscribe from MCP server resource updates.')
+    .description('Unsubscribe from MCP resource updates.')
     .addHelpText('after', jsonHelp('`{ unsubscribed: true, uri: string }`'))
     .action(async (uri, _options, command) => {
       await resources.unsubscribeResource(session, uri, getOptionsFromCommand(command));
@@ -976,7 +976,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
 
   program
     .command('resources-templates-list')
-    .description('List available MCP server resource templates.')
+    .description('List MCP resource templates.')
     .addHelpText(
       'after',
       jsonHelp(
@@ -992,7 +992,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
   // Prompts commands
   program
     .command('prompts')
-    .description('List all available MCP server prompts (shorthand for prompts-list).')
+    .description('List MCP prompts (shorthand for prompts-list).')
     .addHelpText(
       'after',
       jsonHelp(
@@ -1007,7 +1007,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
 
   program
     .command('prompts-list')
-    .description('List all available MCP server prompts.')
+    .description('List all MCP prompts.')
     .addHelpText(
       'after',
       jsonHelp(
@@ -1022,7 +1022,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
 
   program
     .command('prompts-get <name> [args...]')
-    .description('Get a prompt by name with arguments (key:=value pairs or JSON).')
+    .description('Get an MCP prompt with arguments.')
     .addHelpText(
       'after',
       jsonHelp(
@@ -1041,9 +1041,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
   // Logging commands
   program
     .command('logging-set-level <level>')
-    .description(
-      'Set MCP server server logging level (debug, info, notice, warning, error, critical, alert, emergency)'
-    )
+    .description('Set MCP server logging level.')
     .addHelpText('after', jsonHelp('`{ level: string }`'))
     .action(async (level, _options, command) => {
       await logging.setLogLevel(session, level, getOptionsFromCommand(command));
@@ -1052,7 +1050,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
   // Server commands
   program
     .command('ping')
-    .description('Ping the MCP server to check it is alive.')
+    .description('Ping the MCP server.')
     .addHelpText('after', jsonHelp('`{ success: true, durationMs: number }`'))
     .action(async (_options, command) => {
       await utilities.ping(session, getOptionsFromCommand(command));
@@ -1062,7 +1060,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
   program
     .command('grep <pattern>')
     .usage('<pattern> [options]')
-    .description('Search objects in an MCP server session.')
+    .description('Search MCP session objects.')
     .option('--tools', 'Search tools')
     .option('--resources', 'Search resources')
     .option('--prompts', 'Search prompts')
