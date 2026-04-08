@@ -449,7 +449,7 @@ Full docs: ${docsUrl}`
 ${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
-${jsonHelp('`InitializeResult`', '`{ protocolVersion, capabilities, serverInfo, instructions?, tools? }`', `${SCHEMA_BASE}#initializeresult`)}`
+${jsonHelp('`InitializeResult` extended with `tools` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, tools?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
       if (!server) {
