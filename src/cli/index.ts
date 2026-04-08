@@ -458,7 +458,7 @@ ${chalk.bold('Session name:')}
   already exists (same server URL, OAuth profile, and HTTP header names), it
   is reused (restarted if not live). Header values are not compared — they
   are stored securely in OS keychain.
-${jsonHelp('`InitializeResult` extended with `tools` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, tools?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
+${jsonHelp('`InitializeResult` extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
       if (!server) {

@@ -747,7 +747,7 @@ export async function showServerDetails(
             capabilities,
             serverInfo,
             instructions,
-            ...(tools.length > 0 && { tools }),
+            ...(tools.length > 0 && { toolNames: tools.map((t) => t.name) }),
           },
           'json'
         )
