@@ -804,7 +804,7 @@ function registerSessionCommands(program: Command, session: string): void {
 
   // Close command
   program
-    .command('close', { hidden: true })
+    .command('close')
     .description('Close MCP session.')
     .action(async (_options, command) => {
       await sessions.closeSession(session, getOptionsFromCommand(command));
@@ -1158,6 +1158,8 @@ function createSessionProgram(): Command {
 
   // Match the top-level help styling: bold titles, cyan subcommand text
   program.configureHelp({
+    subcommandTerm: (cmd) =>
+      `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
     styleTitle: (str) => chalk.bold(str),
     styleSubcommandText: (str) => chalk.cyan(str),
   });
