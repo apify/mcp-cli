@@ -111,7 +111,8 @@ Usage: mcpc [<@session>] [<command>] [options]
 Universal command-line client for the Model Context Protocol (MCP).
 
 Commands:
-  connect <server> <@session>  Connect to an MCP server and start a new named @session
+  connect <server> [@session]  Connect to an MCP server and start a named @session (name
+                               auto-generated if omitted)
   close <@session>             Close a session
   restart <@session>           Restart a session (losing all state)
   shell <@session>             Open interactive shell for a session
@@ -299,7 +300,7 @@ By default, `grep` searches only tools. Use `--resources` or `--prompts` to sear
 (combine with `--tools` to include tools too). Sessions that are crashed or unavailable are shown
 with their status rather than silently skipped.
 
-The `grep` command is useful for **dynamic tool discovery**, 
+The `grep` command is useful for **dynamic tool discovery**,
 also called [Tool search tool](https://www.anthropic.com/engineering/advanced-tool-use) by Anthropic
 or [Dynamic context discovery](https://cursor.com/blog/dynamic-context-discovery) by Cursor.
 Rather than loading all tools into AI agent's context, the agent can use `grep` to discover the right tool
@@ -358,9 +359,9 @@ Still, sessions can fail due to network disconnects, bridge process crash, or se
 
 **Session states:**
 
-| State                 | Meaning                                                                                            |
-| --------------------- | -------------------------------------------------------------------------------------------------- |
-| 🟢**`live`**          | Bridge process running and server responding                                                       |
+| State                | Meaning                                                                                            |
+| -------------------- | -------------------------------------------------------------------------------------------------- |
+| 🟢**`live`**         | Bridge process running and server responding                                                       |
 | 🟡**`connecting`**   | Initial bridge startup in progress (`mcpc connect`)                                                |
 | 🟡**`reconnecting`** | Bridge crashed or lost auth; auto-reconnecting in the background                                   |
 | 🟡**`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds                  |
@@ -786,10 +787,10 @@ mcpc x402 sign <base64-payment-required> --amount 1.00 --expiry 3600 --json
 
 **Options:**
 
-| Option              | Description                                                      |
-| ------------------- | ---------------------------------------------------------------- |
-| `--amount <usd>`    | Override the payment amount in USD (e.g. `0.50` for $0.50)       |
-| `--expiry <seconds>`| Override the payment expiry in seconds from now (e.g. `3600`)    |
+| Option               | Description                                                   |
+| -------------------- | ------------------------------------------------------------- |
+| `--amount <usd>`     | Override the payment amount in USD (e.g. `0.50` for $0.50)    |
+| `--expiry <seconds>` | Override the payment expiry in seconds from now (e.g. `3600`) |
 
 The command outputs the signed `PAYMENT-SIGNATURE` header value and an MCP config snippet
 that can be used directly with other MCP clients.
@@ -860,7 +861,7 @@ The bridge process manages the full MCP session lifecycle:
 | 🔔 [**Notifications**](#list-change-notifications) | ✅ Supported                      |
 | 📄 [**Pagination**](#pagination)                   | ✅ Supported                      |
 | 🏓 [**Ping**](#ping)                               | ✅ Supported                      |
-| ⏳ [**Async tasks**](#async-tasks)                  | ✅ Supported                      |
+| ⏳ [**Async tasks**](#async-tasks)                 | ✅ Supported                      |
 | 📁 **Roots**                                       | 🚧 Planned                        |
 | ❓ **Elicitation**                                 | 🚧 Planned                        |
 | 🔤 **Completion**                                  | 🚧 Planned                        |
@@ -1266,19 +1267,19 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for development setup, architecture overvi
 <!-- Stars, contributors, commits, and activity as of March 2026. -->
 
 | Tool                                                                    | Lang   | Stars | Contrib / Commits | Active | Tools | Resources | Prompts | Tasks | Code mode | Sessions | OAuth | Stdio | HTTP | Tool search | x402 | LLM |
-| ----------------------------------------------------------------------- | ------ | ----: | -----------------: | ------ | ----- | --------- | ------- | ----- | --------- | -------- | ----- | ----- | ---- | ----------- | ---- | --- |
-| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~420 |           7 / ~510 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | ✅   | —   |
-| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~3.5k |          24 / ~570 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | —   |
-| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k |          22 / ~790 | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | ✅  |
-| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python | ~1.8k |           5 / ~76  | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —    | —   |
-| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k |          15 / ~170 | ⚠️     | ✅    | ✅        | ✅      | —     | ✅        | —        | —     | ✅    | ✅   | —           | —    | —   |
-| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     | ~1.1k |           2 / ~30  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —    | —   |
-| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 |          6 / ~110  | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | —     | ✅    | —    | —           | —    | ✅  |
-| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~640 |           1 / ~60  | ✅     | ✅    | —         | —       | —     | —         | —        | ✅    | ✅    | ✅   | ✅          | —    | —   |
-| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~430 |           4 / ~63  | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | ✅    | —     | ✅   | —           | —    | —   |
-| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~54 |           1 / ~13  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —    | —   |
-| [evantahler/mcpx](https://github.com/evantahler/mcpx)                   | TS     |   ~28 |           1 / ~64  | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | —        | ✅    | ✅    | ✅   | ✅          | —    | —   |
-| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~15 |          ~2 / ~46  | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —    | —   |
+| ----------------------------------------------------------------------- | ------ | ----: | ----------------: | ------ | ----- | --------- | ------- | ----- | --------- | -------- | ----- | ----- | ---- | ----------- | ---- | --- |
+| **[apify/mcpc](https://github.com/apify/mcpc)**                         | TS     |  ~420 |          7 / ~510 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | ✅   | —   |
+| [steipete/mcporter](https://github.com/steipete/mcporter)               | TS     | ~3.5k |         24 / ~570 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | —   |
+| [IBM/mcp-cli](https://github.com/IBM/mcp-cli)                           | Python | ~1.9k |         22 / ~790 | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | —           | —    | ✅  |
+| [knowsuchagency/mcp2cli](https://github.com/knowsuchagency/mcp2cli)     | Python | ~1.8k |           5 / ~76 | ✅     | ✅    | ✅        | ✅      | —     | ✅        | ✅       | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [f/mcptools](https://github.com/f/mcptools)                             | Go     | ~1.5k |         15 / ~170 | ⚠️     | ✅    | ✅        | ✅      | —     | ✅        | —        | —     | ✅    | ✅   | —           | —    | —   |
+| [philschmid/mcp-cli](https://github.com/philschmid/mcp-cli)             | TS     | ~1.1k |           2 / ~30 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —    | —   |
+| [adhikasp/mcp-client-cli](https://github.com/adhikasp/mcp-client-cli)   | Python |  ~670 |          6 / ~110 | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | —     | ✅    | —    | —           | —    | ✅  |
+| [thellimist/clihub](https://github.com/thellimist/clihub)               | Go     |  ~640 |           1 / ~60 | ✅     | ✅    | —         | —       | —     | —         | —        | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [wong2/mcp-cli](https://github.com/wong2/mcp-cli)                       | JS     |  ~430 |           4 / ~63 | ⚠️     | ✅    | ✅        | ✅      | —     | —         | —        | ✅    | —     | ✅   | —           | —    | —   |
+| [mcpshim/mcpshim](https://github.com/mcpshim/mcpshim)                   | Go     |   ~54 |           1 / ~13 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | ✅    | —     | ✅   | ✅          | —    | —   |
+| [evantahler/mcpx](https://github.com/evantahler/mcpx)                   | TS     |   ~28 |           1 / ~64 | ✅     | ✅    | ✅        | ✅      | ✅    | ✅        | —        | ✅    | ✅    | ✅   | ✅          | —    | —   |
+| [EstebanForge/mcp-cli-ent](https://github.com/EstebanForge/mcp-cli-ent) | Go     |   ~15 |          ~2 / ~46 | ✅     | ✅    | —         | —       | —     | ✅        | ✅       | —     | ✅    | ✅   | ✅          | —    | —   |
 
 **Legend:** ✅ = supported, ⚠️ = stale (no commits in 3+ months), **Contrib / Commits** = contributors / total commits, **Tasks** = [async tasks](https://modelcontextprotocol.io/specification/latest/server/utilities/tasks), **x402** = [x402 payment protocol](https://www.x402.org/) support, **LLM** = requires/uses an LLM.
 

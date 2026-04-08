@@ -217,6 +217,79 @@ export function isValidSessionName(name: string): boolean {
   return /^@[a-zA-Z0-9_-]{1,64}$/.test(name);
 }
 
+/** Common hostname prefixes to strip when generating session names */
+const COMMON_HOST_PREFIXES = ['mcp.', 'api.', 'www.'];
+
+/**
+ * Sanitize a string into a valid session name part (without @ prefix).
+ * Replaces invalid characters with hyphens, collapses consecutive hyphens,
+ * and trims leading/trailing hyphens. Truncates to 64 characters.
+ */
+function sanitizeSessionName(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '-') // replace invalid chars with hyphens
+    .replace(/-{2,}/g, '-') // collapse consecutive hyphens
+    .replace(/^-+|-+$/g, '') // trim leading/trailing hyphens
+    .slice(0, 64);
+}
+
+/**
+ * Generate a session name from a parsed server argument.
+ *
+ * For URL targets: extracts the "brand" part of the hostname.
+ *   - Strips common prefixes (mcp., api., www.)
+ *   - Takes the first remaining label (before the first dot)
+ *   - Appends non-standard port as -<port>
+ *   Examples: mcp.apify.com → apify, mcp.example.co.uk → example, localhost:3000 → localhost-3000
+ *
+ * For config entries: uses the entry name directly (sanitized).
+ *   Example: ~/.vscode/mcp.json:filesystem → filesystem
+ *
+ * @returns Session name with @ prefix (e.g., @apify)
+ */
+export function generateSessionName(
+  parsed: { type: 'url'; url: string } | { type: 'config'; file: string; entry: string }
+): string {
+  if (parsed.type === 'config') {
+    const name = sanitizeSessionName(parsed.entry);
+    return `@${name || 'session'}`;
+  }
+
+  // URL case: parse and extract hostname
+  const url = new URL(normalizeServerUrl(parsed.url));
+  let hostname = url.hostname.toLowerCase();
+
+  // For IP addresses, use the full address (dots will be sanitized to hyphens)
+  const isIpAddress = /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
+  let name: string;
+
+  if (isIpAddress) {
+    name = hostname;
+  } else {
+    // Strip common prefixes
+    for (const prefix of COMMON_HOST_PREFIXES) {
+      if (hostname.startsWith(prefix) && hostname.length > prefix.length) {
+        hostname = hostname.slice(prefix.length);
+        break; // only strip one prefix
+      }
+    }
+
+    // Take the first label (before the first dot)
+    const labels = hostname.split('.');
+    name = labels.length >= 2 ? (labels[0] ?? hostname) : hostname;
+  }
+
+  // Append non-standard port
+  const port = url.port;
+  if (port) {
+    name += `-${port}`;
+  }
+
+  const sanitized = sanitizeSessionName(name);
+  return `@${sanitized || 'session'}`;
+}
+
 /**
  * Validate if a string is a valid profile name.
  * Profile names must be alphanumeric with hyphens/underscores, 1-64 chars (no @ prefix)

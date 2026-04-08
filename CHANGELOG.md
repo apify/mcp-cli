@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `connect` command now auto-generates session name when `@session` is omitted (e.g., `mcpc connect mcp.apify.com` creates `@apify`). If a session for the same server already exists with matching auth settings, it is reused instead of creating a duplicate.
 - `--max-chars <chars>` global option to truncate large tool/prompt/resource output
 - `tools-call <tool> --help` shows tool parameter schema (shortcut for `tools-get`)
 - "Did you mean?" suggestions for unknown commands, including reversed names (e.g., `list-tools` → `tools-list`)

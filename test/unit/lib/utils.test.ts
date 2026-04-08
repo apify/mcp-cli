@@ -15,6 +15,7 @@ import {
   normalizeServerUrl,
   getServerHost,
   isValidSessionName,
+  generateSessionName,
   isValidProfileName,
   validateProfileName,
   isValidResourceUri,
@@ -285,6 +286,115 @@ describe('isValidSessionName', () => {
     expect(isValidSessionName(' @test')).toBe(false); // space
     expect(isValidSessionName('@')).toBe(false); // @ alone
     expect(isValidSessionName('@' + 'a'.repeat(65))).toBe(false); // too long
+  });
+});
+
+describe('generateSessionName', () => {
+  describe('URL targets', () => {
+    it('should extract brand from mcp.*.com hostnames', () => {
+      expect(generateSessionName({ type: 'url', url: 'mcp.apify.com' })).toBe('@apify');
+      expect(generateSessionName({ type: 'url', url: 'mcp.example.com' })).toBe('@example');
+    });
+
+    it('should extract brand from api.*.com hostnames', () => {
+      expect(generateSessionName({ type: 'url', url: 'api.example.com' })).toBe('@example');
+    });
+
+    it('should extract brand from www.*.com hostnames', () => {
+      expect(generateSessionName({ type: 'url', url: 'www.example.com' })).toBe('@example');
+    });
+
+    it('should handle multi-part TLDs (co.uk, etc.)', () => {
+      expect(generateSessionName({ type: 'url', url: 'mcp.example.co.uk' })).toBe('@example');
+    });
+
+    it('should handle deep subdomains by stripping only one prefix', () => {
+      expect(generateSessionName({ type: 'url', url: 'api.deep-research.anthropic.com' })).toBe(
+        '@deep-research'
+      );
+    });
+
+    it('should use the hostname directly when no common prefix', () => {
+      expect(generateSessionName({ type: 'url', url: 'simple.com' })).toBe('@simple');
+    });
+
+    it('should handle single-label hostnames', () => {
+      expect(generateSessionName({ type: 'url', url: 'localhost' })).toBe('@localhost');
+    });
+
+    it('should append non-standard port', () => {
+      expect(generateSessionName({ type: 'url', url: 'localhost:3000' })).toBe('@localhost-3000');
+      expect(generateSessionName({ type: 'url', url: '127.0.0.1:8080' })).toBe('@127-0-0-1-8080');
+    });
+
+    it('should not append standard ports', () => {
+      expect(generateSessionName({ type: 'url', url: 'https://example.com:443' })).toBe('@example');
+      expect(generateSessionName({ type: 'url', url: 'http://localhost:80' })).toBe('@localhost');
+    });
+
+    it('should handle IP addresses by replacing dots with hyphens', () => {
+      expect(generateSessionName({ type: 'url', url: '127.0.0.1' })).toBe('@127-0-0-1');
+      expect(generateSessionName({ type: 'url', url: '192.168.1.100' })).toBe('@192-168-1-100');
+    });
+
+    it('should handle full URLs with scheme', () => {
+      expect(generateSessionName({ type: 'url', url: 'https://mcp.apify.com' })).toBe('@apify');
+      expect(generateSessionName({ type: 'url', url: 'http://localhost:3000' })).toBe(
+        '@localhost-3000'
+      );
+    });
+
+    it('should lowercase the result', () => {
+      expect(generateSessionName({ type: 'url', url: 'MCP.APIFY.COM' })).toBe('@apify');
+    });
+
+    it('should produce valid session names', () => {
+      const urls = [
+        'mcp.apify.com',
+        'mcp.example.co.uk',
+        'localhost:3000',
+        '127.0.0.1:8080',
+        'api.deep-research.anthropic.com',
+        'simple.com',
+      ];
+      for (const url of urls) {
+        const name = generateSessionName({ type: 'url', url });
+        expect(isValidSessionName(name)).toBe(true);
+      }
+    });
+  });
+
+  describe('config entry targets', () => {
+    it('should use the entry name directly', () => {
+      expect(
+        generateSessionName({ type: 'config', file: '~/.vscode/mcp.json', entry: 'filesystem' })
+      ).toBe('@filesystem');
+    });
+
+    it('should sanitize special characters', () => {
+      expect(
+        generateSessionName({ type: 'config', file: '~/.vscode/mcp.json', entry: 'my server' })
+      ).toBe('@my-server');
+      expect(
+        generateSessionName({
+          type: 'config',
+          file: '~/.vscode/mcp.json',
+          entry: 'my.server.name',
+        })
+      ).toBe('@my-server-name');
+    });
+
+    it('should produce valid session names', () => {
+      const entries = ['filesystem', 'my-server', 'puppeteer', 'test_server'];
+      for (const entry of entries) {
+        const name = generateSessionName({
+          type: 'config',
+          file: '~/.vscode/mcp.json',
+          entry,
+        });
+        expect(isValidSessionName(name)).toBe(true);
+      }
+    });
   });
 });
 

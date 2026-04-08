@@ -6,6 +6,8 @@ import { createServer } from 'net';
 import {
   OutputMode,
   isValidSessionName,
+  generateSessionName,
+  normalizeServerUrl,
   validateProfileName,
   isProcessAlive,
   getServerHost,
@@ -30,6 +32,7 @@ import {
   updateSession,
   consolidateSessions,
   getSession,
+  loadSessions,
 } from '../../lib/sessions.js';
 import {
   startBridge,
@@ -78,6 +81,115 @@ async function checkPortAvailable(host: string, port: number): Promise<boolean> 
 
     server.listen(port, host);
   });
+}
+
+/**
+ * Find an existing session that matches the given server target and authentication settings.
+ * Used when auto-generating session names to reuse existing sessions instead of creating duplicates.
+ *
+ * @returns The matching session name (with @ prefix), or undefined if no match found
+ */
+async function findMatchingSession(
+  parsed: { type: 'url'; url: string } | { type: 'config'; file: string; entry: string },
+  options: { profile?: string; headers?: string[]; noProfile?: boolean }
+): Promise<string | undefined> {
+  const storage = await loadSessions();
+  const sessions = Object.values(storage.sessions);
+
+  if (sessions.length === 0) return undefined;
+
+  // Determine the effective profile name for comparison
+  const effectiveProfile = options.noProfile ? undefined : (options.profile ?? 'default');
+
+  for (const session of sessions) {
+    if (!session.server) continue;
+
+    // Match server target
+    if (parsed.type === 'url') {
+      if (!session.server.url) continue;
+      // Compare normalized URLs
+      try {
+        const existingUrl = normalizeServerUrl(session.server.url);
+        const newUrl = normalizeServerUrl(parsed.url);
+        if (existingUrl !== newUrl) continue;
+      } catch {
+        continue;
+      }
+    } else {
+      // Config entry: match by command (stdio transport)
+      // Config entries produce stdio configs with command/args, so we can't easily
+      // compare them. Instead, just compare generated session names for config targets.
+      // This is handled by the caller (resolveSessionName) via name-based dedup.
+      continue;
+    }
+
+    // Match profile
+    const sessionProfile = session.profileName ?? 'default';
+    if (effectiveProfile !== sessionProfile) continue;
+
+    // Match header keys (values are redacted, so we only compare key sets)
+    const existingHeaderKeys = Object.keys(session.server.headers || {}).sort();
+    const newHeaderKeys = (options.headers || [])
+      .map((h) => h.split(':')[0]?.trim() || '')
+      .filter(Boolean)
+      .sort();
+    if (existingHeaderKeys.join(',') !== newHeaderKeys.join(',')) continue;
+
+    // Found a match
+    return session.name;
+  }
+
+  return undefined;
+}
+
+/**
+ * Resolve the session name when @session is omitted from `mcpc connect`.
+ * Finds an existing matching session or generates a new unique name.
+ *
+ * @returns Session name with @ prefix
+ */
+export async function resolveSessionName(
+  parsed: { type: 'url'; url: string } | { type: 'config'; file: string; entry: string },
+  options: {
+    outputMode: OutputMode;
+    profile?: string;
+    headers?: string[];
+    noProfile?: boolean;
+  }
+): Promise<string> {
+  // First, check if an existing session matches this server + auth settings
+  const existingName = await findMatchingSession(parsed, options);
+  if (existingName) {
+    return existingName;
+  }
+
+  // Generate a new session name
+  const candidateName = generateSessionName(parsed);
+
+  // Check if the candidate name is already taken by a different server
+  const storage = await loadSessions();
+  if (!(candidateName in storage.sessions)) {
+    if (options.outputMode === 'human') {
+      console.log(chalk.cyan(`Using session name: ${candidateName}`));
+    }
+    return candidateName;
+  }
+
+  // Name is taken - try suffixed variants
+  for (let i = 2; i <= 99; i++) {
+    const suffixed = `${candidateName}-${i}`;
+    if (isValidSessionName(suffixed) && !(suffixed in storage.sessions)) {
+      if (options.outputMode === 'human') {
+        console.log(chalk.cyan(`Using session name: ${suffixed}`));
+      }
+      return suffixed;
+    }
+  }
+
+  throw new ClientError(
+    `Cannot auto-generate session name: too many sessions for this server.\n` +
+      `Specify a name explicitly: mcpc connect ${parsed.type === 'url' ? parsed.url : `${parsed.file}:${parsed.entry}`} @my-session`
+  );
 }
 
 /**
