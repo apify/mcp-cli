@@ -454,9 +454,11 @@ ${chalk.bold('Server formats:')}
 
 ${chalk.bold('Session name:')}
   If @session is omitted, a name is auto-generated from the server hostname
-  (e.g. mcp.apify.com → @apify) or config entry name. If a session for the
-  same server already exists, it is reused (restarted if not live).
-${jsonHelp('`InitializeResult`', '`{ protocolVersion, capabilities, serverInfo, instructions?, tools? }`', `${SCHEMA_BASE}#initializeresult`)}`
+  (e.g. mcp.apify.com → @apify) or config entry name. If a matching session
+  already exists (same server URL, OAuth profile, and HTTP header names), it
+  is reused (restarted if not live). Header values are not compared — they
+  are stored securely in OS keychain.
+${jsonHelp('`InitializeResult` extended with `tools` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, tools?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
       if (!server) {
