@@ -138,7 +138,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
  * Optional schemaUrl adds a "Schema:" link for AI agents.
  */
 function jsonHelp(description: string, shape?: string, schemaUrl?: string): string {
-  const line = shape ? `  ${description}:\n${shape}` : `  ${description}`;
+  const line = shape ? `  ${description}:\n  ${shape}` : `  ${description}`;
   const link = schemaUrl ? `\n  Schema: ${schemaUrl}` : '';
   return `\n${chalk.bold('JSON output (--json):')}\n${line}${link}\n`;
 }
