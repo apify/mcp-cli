@@ -11,7 +11,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { initProxy } from '../lib/proxy.js';
-import { Command, Help } from 'commander';
+import { Command, CommanderError, Help } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatHumanError, ClientError } from '../lib/index.js';
 import chalk from 'chalk';
@@ -1150,7 +1150,8 @@ function createSessionProgram(): Command {
   const program = new Command();
 
   program.configureOutput({
-    outputError: (str, write) => write(str),
+    // Suppress Commander's default error output; we handle errors in the catch block
+    outputError: () => {},
     getOutHelpWidth: () => 100,
     getErrHelpWidth: () => 100,
   });
@@ -1198,6 +1199,9 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
 
   const program = createSessionProgram();
 
+  // Override exit so Commander throws instead of calling process.exit()
+  program.exitOverride();
+
   // Register all session subcommands
   registerSessionCommands(program, session);
 
@@ -1218,6 +1222,31 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
   } catch (error) {
     const opts = program.opts();
     const outputMode: OutputMode = opts.json ? 'json' : 'human';
+
+    // Commander unknown command error — provide "Did you mean?" suggestion
+    if (error instanceof CommanderError && error.code === 'commander.unknownCommand') {
+      const unknownCmd = args.find(
+        (a, i) => i >= 2 && !a.startsWith('-') && !KNOWN_SESSION_COMMANDS.includes(a)
+      );
+      if (unknownCmd) {
+        const suggestion = suggestCommand(unknownCmd, KNOWN_SESSION_COMMANDS);
+        if (outputMode === 'json') {
+          console.error(formatJsonError(new Error(`Unknown command: ${unknownCmd}`), 1));
+        } else {
+          console.error(`Error: Unknown command: ${unknownCmd}`);
+          if (suggestion) {
+            console.error(`\nDid you mean: mcpc ${session} ${suggestion}`);
+          }
+          console.error(`Run "mcpc ${session} --help" for available commands.\n`);
+        }
+        process.exit(1);
+      }
+    }
+
+    // Commander help/version display — exit cleanly
+    if (error instanceof CommanderError && error.code === 'commander.helpDisplayed') {
+      process.exit(0);
+    }
 
     if (isMcpError(error)) {
       if (outputMode === 'json') {
