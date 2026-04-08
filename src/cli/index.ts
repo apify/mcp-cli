@@ -778,20 +778,12 @@ function showSessionCommandHelp(cmdName: string): boolean {
  * Extracted so it can be reused for both execution and help lookup
  */
 function registerSessionCommands(program: Command, session: string): void {
-  // Help command
+  // Help command — show same output as --help
   program
     .command('help')
-    .description('Show MCP server info, capabilities, and tools.')
-    .addHelpText(
-      'after',
-      jsonHelp(
-        '`InitializeResult`',
-        '`{ protocolVersion, capabilities, serverInfo, instructions?, tools? }`',
-        `${SCHEMA_BASE}#initializeresult`
-      )
-    )
-    .action(async (_options, command) => {
-      await sessions.showHelp(session, getOptionsFromCommand(command));
+    .description('Show available commands and options.')
+    .action((_options, command) => {
+      command.parent.outputHelp();
     });
 
   // Shell command
@@ -1175,7 +1167,11 @@ function createSessionProgram(): Command {
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--max-chars <n>', 'Truncate tool/prompt output to this many characters')
-    .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)');
+    .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
+    .addHelpText(
+      'before',
+      `When no command is given, shows server info, capabilities, and tools.\n`
+    );
 
   return program;
 }

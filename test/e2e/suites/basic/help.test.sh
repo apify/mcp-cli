@@ -62,4 +62,43 @@ json_version=$(echo "$STDOUT" | jq -r '.version')
 assert_eq "$json_version" "$text_version" "JSON version should match text version"
 test_pass
 
+# =============================================================================
+# Session help
+# =============================================================================
+
+# Test: mcpc @session --help lists available commands
+test_case "@session --help lists available commands"
+run_mcpc @test-session --help
+assert_success
+assert_contains "$STDOUT" "Commands:"
+assert_contains "$STDOUT" "tools-list"
+assert_contains "$STDOUT" "close"
+test_pass
+
+# Test: mcpc @session --help mentions no-command behavior
+test_case "@session --help mentions no-command behavior"
+run_mcpc @test-session --help
+assert_success
+assert_contains "$STDOUT" "server info"
+test_pass
+
+# Test: mcpc @session --help does not show [options] on simple commands
+test_case "@session --help does not show [options] on simple commands"
+run_mcpc @test-session --help
+assert_success
+# "ping" has no options, should appear without [options]
+assert_not_contains "$STDOUT" "ping [options]"
+# "close" has no options, should appear without [options]
+assert_not_contains "$STDOUT" "close [options]"
+test_pass
+
+# Test: mcpc @session help shows same output as --help
+test_case "@session help matches @session --help"
+run_mcpc @test-session --help
+HELP_OUTPUT="$STDOUT"
+run_mcpc @test-session help
+assert_success
+assert_eq "$STDOUT" "$HELP_OUTPUT" "help and --help output should match"
+test_pass
+
 test_done
