@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--json` output documentation in `--help` for all commands, describing the MCP object shape returned
 - `tools-get` now shows an example `tools-call` command with placeholder arguments based on the tool's schema
 
+### Changed
+
+- JSON output for session info (`mcpc @session --json` and `mcpc connect --json`) now returns `toolNames` (array of tool name strings) instead of full `tools` objects, keeping it concise and consistent with the human-readable output
+
 ### Fixed
 
 - `connect` now verifies the server responds before reporting success; shows a warning with the actual error when the server is unreachable
