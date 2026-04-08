@@ -69,6 +69,29 @@ assert_json_eq "$STDERR" ".code" "1"
 assert_contains "$STDERR" "Unknown command"
 test_pass
 
+# Test: top-level typo command suggests correct form (Levenshtein)
+test_case "top-level typo suggests connect"
+run_mcpc conect
+assert_failure
+assert_contains "$STDERR" "Unknown command: conect"
+assert_contains "$STDERR" "Did you mean: mcpc connect"
+test_pass
+
+# Test: session subcommand used without @session
+test_case "session subcommand without @session suggests adding session"
+run_mcpc tools-list
+assert_failure
+assert_contains "$STDERR" "Missing session target for command: tools-list"
+assert_contains "$STDERR" "Did you mean: mcpc <@session> tools-list"
+test_pass
+
+# Test: top-level typo that matches a session subcommand
+test_case "top-level typo suggests session subcommand"
+run_mcpc tools-lst
+assert_failure
+assert_contains "$STDERR" "Did you mean: mcpc <@session> tools-list"
+test_pass
+
 # Test: connect command missing required arguments (Commander.js handles this)
 test_case "connect command missing required arguments"
 run_mcpc connect
