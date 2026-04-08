@@ -2,6 +2,7 @@ name: E2E Windows
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   e2e-windows-node:
