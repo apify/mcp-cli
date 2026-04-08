@@ -23,6 +23,52 @@ run_mcpc @test invalid-command-$RANDOM
 assert_failure
 test_pass
 
+# Test: reversed hyphenated command suggests correct form
+test_case "reversed command suggests tools-list"
+run_mcpc @test list-tools
+assert_failure
+assert_contains "$STDERR" "Unknown command: list-tools"
+assert_contains "$STDERR" "Did you mean: mcpc @test tools-list"
+test_pass
+
+# Test: reversed resource command
+test_case "reversed command suggests resources-list"
+run_mcpc @test list-resources
+assert_failure
+assert_contains "$STDERR" "Did you mean: mcpc @test resources-list"
+test_pass
+
+# Test: reversed prompts command
+test_case "reversed command suggests prompts-get"
+run_mcpc @test get-prompts
+assert_failure
+assert_contains "$STDERR" "Did you mean: mcpc @test prompts-get"
+test_pass
+
+# Test: typo command gets Levenshtein suggestion
+test_case "typo command suggests tools-list"
+run_mcpc @test tools-lst
+assert_failure
+assert_contains "$STDERR" "Did you mean: mcpc @test tools-list"
+test_pass
+
+# Test: completely unknown command shows help text but no suggestion
+test_case "unknown command shows help pointer"
+run_mcpc @test xyzzy-$RANDOM
+assert_failure
+assert_contains "$STDERR" "Unknown command"
+assert_contains "$STDERR" "mcpc @test --help"
+test_pass
+
+# Test: unknown command in JSON mode returns JSON error
+test_case "unknown command in JSON mode returns JSON"
+run_mcpc @test --json list-tools
+assert_failure
+assert_json_valid "$STDERR" "stderr is valid JSON"
+assert_json_eq "$STDERR" ".code" "1"
+assert_contains "$STDERR" "Unknown command"
+test_pass
+
 # Test: connect command missing required arguments (Commander.js handles this)
 test_case "connect command missing required arguments"
 run_mcpc connect
