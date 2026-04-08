@@ -778,9 +778,9 @@ function showSessionCommandHelp(cmdName: string): boolean {
  * Extracted so it can be reused for both execution and help lookup
  */
 function registerSessionCommands(program: Command, session: string): void {
-  // Help command — show same output as --help
+  // Help command — show same output as --help (hidden: already shown via --help)
   program
-    .command('help')
+    .command('help', { hidden: true })
     .description('Show available commands and options.')
     .action((_options, command) => {
       command.parent.outputHelp();
@@ -808,6 +808,47 @@ function registerSessionCommands(program: Command, session: string): void {
     .description('Restart MCP session (losing all state).')
     .action(async (_options, command) => {
       await sessions.restartSession(session, getOptionsFromCommand(command));
+    });
+
+  // Grep command: @session grep <pattern>
+  program
+    .command('grep <pattern>')
+    .usage('<pattern> [options]')
+    .description('Search MCP session objects.')
+    .option('--tools', 'Search tools')
+    .option('--resources', 'Search resources')
+    .option('--prompts', 'Search prompts')
+    .option('--instructions', 'Search server instructions')
+    .option('-E, --regex', 'Treat pattern as a regular expression')
+    .option('-s, --case-sensitive', 'Case-sensitive matching')
+    .option('-m, --max-results <n>', 'Limit the number of results')
+    .addHelpText(
+      'after',
+      `
+${chalk.bold('Type filters:')}
+  By default, tools and instructions are searched. Use --resources or --prompts
+  to search those instead. Combine flags to search multiple types.
+
+${chalk.bold('Examples:')}
+  mcpc ${session} grep "search"                  Search tools and instructions
+  mcpc ${session} grep "search" --resources      Search resources only
+  mcpc ${session} grep "search|find" -E          Regex search
+${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instructions?: string[] }`')}`
+    )
+    .action(async (pattern, opts, command) => {
+      const globalOpts = getOptionsFromCommand(command);
+      const maxResults = opts.maxResults ? parseInt(opts.maxResults as string, 10) : undefined;
+      const exitCode = await grepCmd.grepSession(session, pattern, {
+        tools: opts.tools as boolean | undefined,
+        resources: opts.resources as boolean | undefined,
+        prompts: opts.prompts as boolean | undefined,
+        instructions: opts.instructions as boolean | undefined,
+        regex: opts.regex as boolean | undefined,
+        caseSensitive: opts.caseSensitive as boolean | undefined,
+        maxResults,
+        ...globalOpts,
+      });
+      process.exit(exitCode);
     });
 
   // Tools commands
@@ -1091,47 +1132,6 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
     .action(async (_options, command) => {
       await utilities.ping(session, getOptionsFromCommand(command));
     });
-
-  // Grep command: @session grep <pattern>
-  program
-    .command('grep <pattern>')
-    .usage('<pattern> [options]')
-    .description('Search MCP session objects.')
-    .option('--tools', 'Search tools')
-    .option('--resources', 'Search resources')
-    .option('--prompts', 'Search prompts')
-    .option('--instructions', 'Search server instructions')
-    .option('-E, --regex', 'Treat pattern as a regular expression')
-    .option('-s, --case-sensitive', 'Case-sensitive matching')
-    .option('-m, --max-results <n>', 'Limit the number of results')
-    .addHelpText(
-      'after',
-      `
-${chalk.bold('Type filters:')}
-  By default, tools and instructions are searched. Use --resources or --prompts
-  to search those instead. Combine flags to search multiple types.
-
-${chalk.bold('Examples:')}
-  mcpc ${session} grep "search"                  Search tools and instructions
-  mcpc ${session} grep "search" --resources      Search resources only
-  mcpc ${session} grep "search|find" -E          Regex search
-${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instructions?: string[] }`')}`
-    )
-    .action(async (pattern, opts, command) => {
-      const globalOpts = getOptionsFromCommand(command);
-      const maxResults = opts.maxResults ? parseInt(opts.maxResults as string, 10) : undefined;
-      const exitCode = await grepCmd.grepSession(session, pattern, {
-        tools: opts.tools as boolean | undefined,
-        resources: opts.resources as boolean | undefined,
-        prompts: opts.prompts as boolean | undefined,
-        instructions: opts.instructions as boolean | undefined,
-        regex: opts.regex as boolean | undefined,
-        caseSensitive: opts.caseSensitive as boolean | undefined,
-        maxResults,
-        ...globalOpts,
-      });
-      process.exit(exitCode);
-    });
 }
 
 /**
@@ -1169,8 +1169,8 @@ function createSessionProgram(): Command {
     .option('--max-chars <n>', 'Truncate tool/prompt output to this many characters')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .addHelpText(
-      'before',
-      `When no command is given, shows server info, capabilities, and tools.\n`
+      'after',
+      `\nWhen no command is given, shows server info, capabilities, and tools.`
     );
 
   return program;

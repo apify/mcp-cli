@@ -73,6 +73,7 @@ assert_success
 assert_contains "$STDOUT" "Commands:"
 assert_contains "$STDOUT" "tools-list"
 assert_contains "$STDOUT" "close"
+assert_contains "$STDOUT" "grep"
 test_pass
 
 # Test: mcpc @session --help mentions no-command behavior
@@ -90,6 +91,27 @@ assert_success
 assert_not_contains "$STDOUT" "ping [options]"
 # "close" has no options, should appear without [options]
 assert_not_contains "$STDOUT" "close [options]"
+test_pass
+
+# Test: mcpc @session --help does not list "help" as a command (redundant)
+test_case "@session --help does not list help command"
+run_mcpc @test-session --help
+assert_success
+# "help" should not appear as a listed command (it's hidden)
+assert_not_contains "$STDOUT" "  help "
+test_pass
+
+# Test: mcpc @session --help shows grep after restart
+test_case "@session --help shows grep after restart"
+run_mcpc @test-session --help
+assert_success
+# grep should appear before tools (i.e. near the top with session management commands)
+grep_line=$(echo "$STDOUT" | grep -n "grep" | head -1 | cut -d: -f1)
+tools_line=$(echo "$STDOUT" | grep -n "tools-list" | head -1 | cut -d: -f1)
+if [[ "$grep_line" -gt "$tools_line" ]]; then
+  test_fail "grep (line $grep_line) should appear before tools-list (line $tools_line)"
+  exit 1
+fi
 test_pass
 
 # Test: mcpc @session help shows same output as --help
