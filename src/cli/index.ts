@@ -1170,7 +1170,7 @@ function createSessionProgram(): Command {
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .addHelpText(
       'after',
-      `\nWhen no command is given, shows server info, capabilities, and tools.`
+      `\nWhen no command is given, shows server info, capabilities, and tools.\n`
     );
 
   return program;
