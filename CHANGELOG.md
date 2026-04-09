@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - JSON output for session info (`mcpc @session --json` and `mcpc connect --json`) now returns `toolNames` (array of tool name strings) instead of full `tools` objects, keeping it concise and consistent with the human-readable output
+- `--schema` and `--schema-mode` options moved from global scope to `tools-call` only (removed from `tools-get` and `prompts-get`)
 
 ### Fixed
 
