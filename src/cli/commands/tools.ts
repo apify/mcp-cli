@@ -12,7 +12,6 @@ import {
   formatError,
   formatWarning,
   formatInfo,
-  truncateOutput,
 } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import type { CommandOptions, TaskUpdate } from '../../lib/types.js';
@@ -40,6 +39,7 @@ export async function listTools(
     console.log(
       formatOutput(result.tools, options.outputMode, {
         ...(options.full && { full: true }),
+        ...(options.maxChars && { maxChars: options.maxChars }),
         sessionName: target,
       })
     );
@@ -370,11 +370,11 @@ export async function callTool(
       }
     }
 
-    let output = formatOutput(result, options.outputMode);
-    if (options.maxChars && options.outputMode === 'human') {
-      output = truncateOutput(output, options.maxChars);
-    }
-    console.log(output);
+    console.log(
+      formatOutput(result, options.outputMode, {
+        ...(options.maxChars && { maxChars: options.maxChars }),
+      })
+    );
 
     // Show hint for getting tool schema when the tool returned an error
     if (result.isError && options.outputMode === 'human') {

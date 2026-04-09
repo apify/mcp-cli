@@ -2,7 +2,7 @@
  * Resources command handlers
  */
 
-import { formatOutput, formatSuccess, truncateOutput } from '../output.js';
+import { formatOutput, formatSuccess } from '../output.js';
 import { withMcpClient } from '../helpers.js';
 import type { CommandOptions } from '../../lib/types.js';
 
@@ -22,7 +22,11 @@ export async function listResources(target: string, options: CommandOptions): Pr
       cursor = result.nextCursor;
     } while (cursor);
 
-    console.log(formatOutput(allResources, options.outputMode));
+    console.log(
+      formatOutput(allResources, options.outputMode, {
+        ...(options.maxChars && { maxChars: options.maxChars }),
+      })
+    );
   });
 }
 
@@ -45,7 +49,11 @@ export async function listResourceTemplates(
       cursor = result.nextCursor;
     } while (cursor);
 
-    console.log(formatOutput(allTemplates, options.outputMode));
+    console.log(
+      formatOutput(allTemplates, options.outputMode, {
+        ...(options.maxChars && { maxChars: options.maxChars }),
+      })
+    );
   });
 }
 
@@ -83,11 +91,11 @@ export async function getResource(
       return;
     }
 
-    let output = formatOutput(result, options.outputMode);
-    if (options.maxChars && options.outputMode === 'human') {
-      output = truncateOutput(output, options.maxChars);
-    }
-    console.log(output);
+    console.log(
+      formatOutput(result, options.outputMode, {
+        ...(options.maxChars && { maxChars: options.maxChars }),
+      })
+    );
   });
 }
 

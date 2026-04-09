@@ -400,6 +400,7 @@ function createTopLevelProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--max-chars <n>', 'Truncate output to n characters (ignored in --json mode)')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .version(mcpcVersion, '-v, --version', 'Output the version number')
     .helpOption('-h, --help', 'Display help');
@@ -914,7 +915,6 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
     .helpOption(false) // Disable built-in --help so we can intercept it for tool schema
     .option('--task', 'Use async task execution (experimental)')
     .option('--detach', 'Start task and return immediately with task ID (implies --task)')
-    .option('--max-chars <n>', 'Truncate output to n characters (human mode only)')
     .addHelpText(
       'after',
       `
@@ -1029,7 +1029,6 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
     .description('Read an MCP resource by URI.')
     .option('-o, --output <file>', 'Write resource to file')
     .option('--max-size <bytes>', 'Maximum resource size in bytes')
-    .option('--max-chars <n>', 'Truncate output to n characters (human mode only)')
     .addHelpText(
       'after',
       jsonHelp(
@@ -1111,7 +1110,6 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
   program
     .command('prompts-get <name> [args...]')
     .description('Get an MCP prompt with arguments.')
-    .option('--max-chars <n>', 'Truncate output to n characters (human mode only)')
     .addHelpText(
       'after',
       jsonHelp(
@@ -1178,6 +1176,7 @@ function createSessionProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
+    .option('--max-chars <n>', 'Truncate output to n characters (ignored in --json mode)')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .addHelpText(
       'after',

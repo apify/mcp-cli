@@ -77,6 +77,8 @@ export interface FormatOptions {
   full?: boolean;
   /** Session name for contextual hints (e.g. @apify) */
   sessionName?: string;
+  /** Truncate human-mode output to this many characters */
+  maxChars?: number;
 }
 
 /**
@@ -91,10 +93,13 @@ export function formatOutput(
   if (mode === 'json') {
     return formatJson(data);
   }
-  const output = formatHuman(data, options);
+  let output = formatHuman(data, options);
   // Ensure trailing newline for visual separation in shell (unless ends with code block)
   if (!output.endsWith('````') && !output.endsWith('\n')) {
-    return output + '\n';
+    output += '\n';
+  }
+  if (options?.maxChars) {
+    output = truncateOutput(output, options.maxChars);
   }
   return output;
 }
