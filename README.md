@@ -111,8 +111,7 @@ Usage: mcpc [<@session>] [<command>] [options]
 Universal command-line client for the Model Context Protocol (MCP).
 
 Commands:
-  connect <server> [@session]  Connect to an MCP server and start a named @session (name
-                               auto-generated if omitted)
+  connect <server> [@session]  Connect to an MCP server and start a named @session
   close <@session>             Close a session
   restart <@session>           Restart a session (losing all state)
   shell <@session>             Open interactive shell for a session
