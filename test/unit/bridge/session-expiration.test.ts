@@ -257,5 +257,13 @@ describe('isAuthenticationError', () => {
       expect(isAuthenticationError('')).toBe(false);
       expect(isAuthenticationError('   ')).toBe(false);
     });
+
+    it('ignores error codes that contain 401/403 as substrings', () => {
+      // MCP JSON-RPC error codes like -32603 should not match
+      expect(isAuthenticationError('MCP error -32603: Unknown tool')).toBe(false);
+      // Port numbers or IDs containing 401/403 should not match
+      expect(isAuthenticationError('connection to port 14013 failed')).toBe(false);
+      expect(isAuthenticationError('request id 84017 timed out')).toBe(false);
+    });
   });
 });

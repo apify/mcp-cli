@@ -21,7 +21,13 @@ import {
   cleanupOrphanedLogFiles,
   isSessionExpiredError,
 } from '../lib/index.js';
-import { ClientError, NetworkError, AuthError, isAuthenticationError } from '../lib/index.js';
+import {
+  ClientError,
+  ServerError,
+  NetworkError,
+  AuthError,
+  isAuthenticationError,
+} from '../lib/index.js';
 import { getSession, loadSessions, updateSession } from '../lib/sessions.js';
 import type { AuthCredentials, X402WalletCredentials } from '../lib/types.js';
 import { OAuthTokenManager } from '../lib/auth/oauth-token-manager.js';
@@ -821,11 +827,26 @@ class BridgeProcess {
    * Session expiry is checked first since it's more specific (404/session-not-found),
    * while auth errors are broader (401/403/unauthorized) and could overlap.
    *
+   * Skips application-level MCP errors (JSON-RPC errors from server handlers like
+   * "tool not found") since these should never cause session status changes. Only
+   * transport-level errors (HTTP 401/403/404) should trigger auth/expiry detection.
+   *
    * For auth errors, if a token manager is available, we attempt to refresh the token
    * before giving up. This handles transient auth failures (e.g., expired access token
    * that can be refreshed) without unnecessarily killing the session.
    */
   private async handlePossibleExpiration(error: Error): Promise<void> {
+    // ServerError wraps errors from mcp-client.ts methods. Check the original error
+    // to distinguish application-level JSON-RPC errors (tool not found, etc.) from
+    // transport-level errors (HTTP 401/403/404). The SDK's McpError class (name: 'McpError')
+    // indicates a JSON-RPC error response — these are application-level and should be skipped.
+    if (error instanceof ServerError) {
+      const originalError = (error.details as { originalError?: Error } | undefined)?.originalError;
+      if (originalError && originalError.name === 'McpError') {
+        return;
+      }
+    }
+
     let status: 'expired' | 'unauthorized' | null = null;
     if (isSessionExpiredError(error.message, { hadActiveSession: true })) {
       logger.warn('Session appears to be expired, marking as expired and shutting down');

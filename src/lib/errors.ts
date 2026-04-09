@@ -83,10 +83,12 @@ export class AuthError extends McpError {
 }
 
 /**
- * Check if an error message indicates an authentication error from the server
+ * Check if an error message indicates an authentication error from the server.
+ * Uses word boundaries for numeric codes (401, 403) to avoid false positives
+ * from error codes or other numbers that happen to contain these digits.
  */
 export function isAuthenticationError(errorMessage: string): boolean {
-  return /invalid_token|unauthorized|missing.*token|access.*token|authentication|re-authenticate|401|403/i.test(
+  return /invalid_token|unauthorized|missing.*token|access.*token|authentication|re-authenticate|\b401\b|\b403\b/i.test(
     errorMessage
   );
 }
