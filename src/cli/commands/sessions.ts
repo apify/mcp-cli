@@ -851,32 +851,10 @@ export async function restartSession(
     }
 
     // Show server details (like when creating a session)
-    // Best-effort: the restart itself succeeded (bridge started, session updated).
-    // A transient failure displaying details should not fail the restart command.
-    try {
-      await showServerDetails(name, {
-        ...options,
-        hideTarget: false,
-      });
-    } catch (detailsError) {
-      logger.debug('Failed to show server details after restart:', detailsError);
-      // ensureBridgeReady may have changed status during internal retries; reset it
-      // since the restart itself succeeded (bridge was started and is running).
-      await updateSession(name, { status: 'active' }).catch(() => {});
-      if (options.outputMode === 'human') {
-        console.error(formatWarning('Session restarted but could not display server details yet.'));
-      } else {
-        console.log(
-          formatOutput(
-            {
-              _mcpc: { sessionName: name },
-              restarted: true,
-            },
-            'json'
-          )
-        );
-      }
-    }
+    await showServerDetails(name, {
+      ...options,
+      hideTarget: false,
+    });
   } catch (error) {
     if (options.outputMode === 'human') {
       console.error(formatError((error as Error).message));
