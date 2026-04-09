@@ -187,13 +187,6 @@ assert_failure
 assert_contains "$STDERR" "Invalid header format"
 test_pass
 
-# Test: invalid --schema-mode value
-test_case "invalid --schema-mode fails"
-run_mcpc @nonexistent tools-list --schema-mode invalid
-assert_failure
-assert_contains "$STDERR" "Invalid --schema-mode"
-test_pass
-
 # Test: non-numeric --timeout value
 test_case "non-numeric --timeout fails"
 run_mcpc @nonexistent tools-list --timeout notanumber
@@ -204,13 +197,6 @@ test_pass
 # Test: non-existent config file via connect command
 test_case "non-existent config file fails"
 run_mcpc connect "/nonexistent/config-$RANDOM.json:fs" "@test-session-$RANDOM"
-assert_failure
-assert_contains "$STDERR" "not found"
-test_pass
-
-# Test: non-existent --schema file
-test_case "non-existent --schema file fails"
-run_mcpc @nonexistent tools-list --schema /nonexistent/schema-$RANDOM.json
 assert_failure
 assert_contains "$STDERR" "not found"
 test_pass

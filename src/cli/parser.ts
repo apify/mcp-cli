@@ -2,8 +2,7 @@
  * Command-line argument parsing utilities
  * Pure functions with no external dependencies for easy testing
  */
-import { existsSync } from 'fs';
-import { ClientError, resolvePath } from '../lib/index.js';
+import { ClientError } from '../lib/index.js';
 
 /**
  * Check if an environment variable is set to a truthy value
@@ -30,19 +29,15 @@ export function getJsonFromEnv(): boolean {
 }
 
 // Global options that take a value (not boolean flags)
-const GLOBAL_OPTIONS_WITH_VALUES = [
-  '--timeout',
-  '--profile',
-  '--schema',
-  '--schema-mode',
-  '--max-chars',
-];
+const GLOBAL_OPTIONS_WITH_VALUES = ['--timeout', '--profile', '--max-chars'];
 
 // All options that take a value — used by optionTakesValue() to correctly skip
 // the next arg when scanning for command tokens. Includes subcommand-specific
 // options so misplaced flags still get their values skipped during scanning.
 const OPTIONS_WITH_VALUES = [
   ...GLOBAL_OPTIONS_WITH_VALUES,
+  '--schema',
+  '--schema-mode',
   '-H',
   '--header',
   '--proxy',
@@ -73,9 +68,6 @@ const KNOWN_OPTIONS = [
   '--verbose',
   '--insecure',
 ];
-
-// Valid --schema-mode values
-const VALID_SCHEMA_MODES = ['strict', 'compatible', 'ignore'];
 
 /**
  * All known top-level commands
@@ -261,15 +253,6 @@ export function validateArgValues(args: string[]): void {
       break;
     }
 
-    // Validate --schema-mode value
-    if (arg === '--schema-mode' && nextArg) {
-      if (!VALID_SCHEMA_MODES.includes(nextArg)) {
-        throw new ClientError(
-          `Invalid --schema-mode value: "${nextArg}". Valid modes are: ${VALID_SCHEMA_MODES.join(', ')}`
-        );
-      }
-    }
-
     // Validate --timeout is a number
     if (arg === '--timeout' && nextArg) {
       const timeout = parseInt(nextArg, 10);
@@ -277,14 +260,6 @@ export function validateArgValues(args: string[]): void {
         throw new ClientError(
           `Invalid --timeout value: "${nextArg}". Must be a positive number (seconds).`
         );
-      }
-    }
-
-    // Validate --schema file exists
-    if (arg === '--schema' && nextArg) {
-      const schemaPath = resolvePath(nextArg);
-      if (!existsSync(schemaPath)) {
-        throw new ClientError(`Schema file not found: ${nextArg}`);
       }
     }
 

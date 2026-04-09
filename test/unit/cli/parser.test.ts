@@ -329,11 +329,11 @@ describe('optionTakesValue', () => {
     expect(optionTakesValue('--header')).toBe(true);
     expect(optionTakesValue('--timeout')).toBe(true);
     expect(optionTakesValue('--profile')).toBe(true);
-    expect(optionTakesValue('--schema')).toBe(true);
-    expect(optionTakesValue('--schema-mode')).toBe(true);
   });
 
   it('should return true for subcommand-specific options that take values', () => {
+    expect(optionTakesValue('--schema')).toBe(true);
+    expect(optionTakesValue('--schema-mode')).toBe(true);
     expect(optionTakesValue('--proxy')).toBe(true);
     expect(optionTakesValue('--proxy-bearer-token')).toBe(true);
     expect(optionTakesValue('--scope')).toBe(true);
@@ -491,31 +491,10 @@ describe('validateOptions', () => {
 
   it('should handle --option=value syntax', () => {
     expect(() => validateOptions(['--timeout=30'])).not.toThrow();
-    expect(() => validateOptions(['--schema-mode=strict'])).not.toThrow();
   });
 });
 
 describe('validateArgValues', () => {
-  it('should not throw for valid --schema-mode values', () => {
-    expect(() => validateArgValues(['--schema-mode', 'strict'])).not.toThrow();
-    expect(() => validateArgValues(['--schema-mode', 'compatible'])).not.toThrow();
-    expect(() => validateArgValues(['--schema-mode', 'ignore'])).not.toThrow();
-  });
-
-  it('should throw for invalid --schema-mode value before command token', () => {
-    expect(() => validateArgValues(['--schema-mode', 'bad'])).toThrow(ClientError);
-    expect(() => validateArgValues(['--schema-mode', 'bad'])).toThrow(
-      'Invalid --schema-mode value'
-    );
-  });
-
-  it('should not validate --schema-mode value after command token', () => {
-    // Even an invalid value is not checked once we are past a command token
-    expect(() =>
-      validateArgValues(['connect', 'example.com', '--schema-mode', 'bad'])
-    ).not.toThrow();
-  });
-
   it('should throw for invalid --timeout value before command token', () => {
     expect(() => validateArgValues(['--timeout', 'notanumber'])).toThrow(ClientError);
     expect(() => validateArgValues(['--timeout', 'notanumber'])).toThrow('Invalid --timeout value');

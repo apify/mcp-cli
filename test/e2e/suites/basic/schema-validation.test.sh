@@ -29,14 +29,6 @@ assert_success
 echo "$STDOUT" > "$TEST_TMP/echo-schema.json"
 test_pass
 
-# Save the greeting prompt schema (from prompts-list)
-test_case "setup: save greeting prompt schema"
-run_mcpc --json "$SESSION" prompts-list
-assert_success
-# Extract the greeting prompt from the array
-echo "$STDOUT" | jq '.[] | select(.name == "greeting")' > "$TEST_TMP/greeting-schema.json"
-test_pass
-
 # =============================================================================
 # Test: tools-call with --schema (compatible mode, default)
 # =============================================================================
@@ -50,15 +42,6 @@ test_case "tools-call with valid schema (JSON mode)"
 run_mcpc --json "$SESSION" tools-call echo message:=test --schema "$TEST_TMP/echo-schema.json"
 assert_success
 assert_json_valid "$STDOUT"
-test_pass
-
-# =============================================================================
-# Test: tools-get with --schema validation
-# =============================================================================
-
-test_case "tools-get with valid schema passes"
-run_mcpc "$SESSION" tools-get echo --schema "$TEST_TMP/echo-schema.json"
-assert_success
 test_pass
 
 # =============================================================================
@@ -81,23 +64,6 @@ test_case "tools-call with --schema-mode=ignore passes"
 run_mcpc "$SESSION" tools-call echo message:=test \
   --schema "$TEST_TMP/echo-schema.json" --schema-mode ignore
 assert_success
-test_pass
-
-# =============================================================================
-# Test: prompts-get with --schema validation
-# =============================================================================
-
-test_case "prompts-get with valid schema passes"
-run_mcpc "$SESSION" prompts-get greeting name:=Test \
-  --schema "$TEST_TMP/greeting-schema.json"
-assert_success
-test_pass
-
-test_case "prompts-get with valid schema (JSON mode)"
-run_mcpc --json "$SESSION" prompts-get greeting name:=Test \
-  --schema "$TEST_TMP/greeting-schema.json"
-assert_success
-assert_json_valid "$STDOUT"
 test_pass
 
 # =============================================================================
@@ -153,12 +119,10 @@ cat > "$TEST_TMP/extra-required-schema.json" << 'EOF'
 EOF
 test_pass
 
-test_case "tools-call fails when server removes required field"
-# The actual server doesn't have "extra" as required, so validation should fail
-# in compatible mode when extra is in expected but not in actual.
-# Note: We use tools-get instead of tools-call because tools-call with args
-# only validates the passed args (by design). tools-get validates the full schema.
-run_mcpc "$SESSION" tools-get echo \
+test_case "tools-call fails when passing arg removed from server schema"
+# The actual server doesn't have "extra" in its schema, so validation should fail
+# in compatible mode when the passed arg doesn't exist in the actual schema.
+run_mcpc "$SESSION" tools-call echo message:=test extra:=foo \
   --schema "$TEST_TMP/extra-required-schema.json"
 assert_failure
 assert_contains "$STDERR" "extra"

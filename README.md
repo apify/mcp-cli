@@ -127,8 +127,6 @@ Options:
   --json                       Output in JSON format for scripting
   --verbose                    Enable debug logging
   --profile <name>             OAuth profile for the server ("default" if not provided)
-  --schema <file>              Validate tool/prompt schema against expected schema
-  --schema-mode <mode>         Schema validation mode: strict, compatible (default), ignore
   --timeout <seconds>          Request timeout in seconds (default: 300)
   --max-chars <n>              Truncate tool/prompt output to this many characters
   --insecure                   Skip TLS certificate verification (for self-signed certs)
@@ -679,7 +677,7 @@ For a complete example script, see [`docs/examples/company-lookup.sh`](./docs/ex
 
 ### Schema validation
 
-Validate tool/prompt schemas using the `--schema` option to detect breaking changes early:
+The `tools-call` command supports `--schema` to validate a tool's schema against an expected snapshot before calling it. This helps detect breaking changes early in scripts and CI:
 
 ```bash
 # Save expected schema

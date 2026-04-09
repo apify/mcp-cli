@@ -397,8 +397,6 @@ function createTopLevelProgram(): Command {
     .option('--json', 'Output in JSON format for scripting')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
-    .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
-    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--max-chars <n>', 'Truncate tool/prompt output to this many characters')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
@@ -872,6 +870,8 @@ function registerSessionCommands(program: Command, session: string): void {
     .helpOption(false) // Disable built-in --help so we can intercept it for tool schema
     .option('--task', 'Use async task execution (experimental)')
     .option('--detach', 'Start task and return immediately with task ID (implies --task)')
+    .option('--schema <file>', 'Validate tool schema against expected schema before calling')
+    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .addHelpText(
       'after',
       `
@@ -882,6 +882,10 @@ ${chalk.bold('Arguments:')}
 
   Values are auto-parsed: strings, numbers, booleans, JSON objects/arrays.
   To force a string, wrap in quotes: id:='"123"'
+
+${chalk.bold('Schema validation:')}
+  --schema <file>       Validate tool schema before calling (save with tools-get --json)
+  --schema-mode <mode>  strict | compatible (default) | ignore
 ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`', `${SCHEMA_BASE}#calltoolresult`)}`
     )
     .action(async (name, args, options, command) => {
@@ -1169,8 +1173,6 @@ function createSessionProgram(): Command {
     .option('--json', 'Output in JSON format for scripting and code mode')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile override')
-    .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
-    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--max-chars <n>', 'Truncate tool/prompt output to this many characters')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)');

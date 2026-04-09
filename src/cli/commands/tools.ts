@@ -54,12 +54,6 @@ export async function getTool(
   name: string,
   options: CommandOptions
 ): Promise<void> {
-  // Load expected schema if provided
-  let expectedSchema: ToolSchema | undefined;
-  if (options.schema) {
-    expectedSchema = (await loadSchemaFromFile(options.schema)) as ToolSchema;
-  }
-
   await withMcpClient(target, options, async (client, _context) => {
     // Use cached tools first, then re-fetch from server if tool not found
     let result = await client.listAllTools();
@@ -73,23 +67,6 @@ export async function getTool(
 
     if (!tool) {
       throw new ClientError(`Tool not found: ${name}`);
-    }
-
-    // Validate schema if provided
-    if (expectedSchema) {
-      const schemaMode: SchemaMode = options.schemaMode || 'compatible';
-      const validation = validateToolSchema(tool as ToolSchema, expectedSchema, schemaMode);
-
-      if (!validation.valid) {
-        throw new ClientError(formatValidationError(validation, `tool "${name}"`));
-      }
-
-      // Show warnings in human mode
-      if (validation.warnings.length > 0 && options.outputMode === 'human') {
-        for (const warning of validation.warnings) {
-          console.log(formatWarning(`Schema warning: ${warning}`));
-        }
-      }
     }
 
     if (options.outputMode === 'human') {
