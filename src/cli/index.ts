@@ -723,6 +723,7 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
         (c) => c.name() === cmdName || c.aliases().includes(cmdName)
       );
       if (topLevelCmd) {
+        tuneCommandHelp(topLevelCmd);
         topLevelCmd.outputHelp();
         return;
       }
@@ -750,6 +751,19 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
 }
 
 /**
+ * Tune a command's help display: add --json option and hide --help.
+ */
+function tuneCommandHelp(cmd: Command): void {
+  if (!cmd.options.some((o) => o.long === '--json')) {
+    cmd.option('--json', 'Output in JSON format');
+  }
+  cmd.helpOption('-h, --help', 'Display help');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const helpOpt = (cmd as any)._getHelpOption?.();
+  if (helpOpt) helpOpt.hidden = true;
+}
+
+/**
  * Show help for a session subcommand by name.
  * Returns true if the command was found and help was displayed.
  */
@@ -757,11 +771,7 @@ function showSessionCommandHelp(cmdName: string): boolean {
   const dummyProgram = createSessionProgram();
   registerSessionCommands(dummyProgram, '<@session>');
   for (const cmd of dummyProgram.commands) {
-    cmd.option('--json', 'Output in JSON format');
-    cmd.helpOption('-h, --help', 'Display help');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const helpOpt = (cmd as any)._getHelpOption?.();
-    if (helpOpt) helpOpt.hidden = true;
+    tuneCommandHelp(cmd);
   }
   const sessionCmd = dummyProgram.commands.find(
     (c) => c.name() === cmdName || c.aliases().includes(cmdName)
@@ -1207,11 +1217,7 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
   // - Show --json so users/agents know it's available
   // - Hide the redundant -h/--help (you already need it to see this screen)
   for (const cmd of program.commands) {
-    cmd.option('--json', 'Output in JSON format');
-    cmd.helpOption('-h, --help', 'Display help');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const helpOpt = (cmd as any)._getHelpOption?.();
-    if (helpOpt) helpOpt.hidden = true;
+    tuneCommandHelp(cmd);
   }
 
   // Parse and execute
