@@ -1112,11 +1112,15 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
     .description('Get an MCP prompt with arguments.')
     .addHelpText(
       'after',
-      jsonHelp(
-        '`GetPromptResult`',
-        '`{ description?, messages: [{ role, content: { type, text?, ... } }] }`',
-        `${SCHEMA_BASE}#getpromptresult`
-      )
+      `
+${chalk.bold('Arguments:')}
+  key:=value pairs    mcpc ${session} prompts-get summarize style:=brief lang:=en
+  Inline JSON         mcpc ${session} prompts-get summarize '{"style":"brief"}'
+  Stdin pipe          echo '{"style":"brief"}' | mcpc ${session} prompts-get summarize
+
+  Values are auto-parsed: strings, numbers, booleans, JSON objects/arrays.
+  To force a string, wrap in quotes: id:='"123"'
+${jsonHelp('`GetPromptResult`', '`{ description?, messages: [{ role, content: { type, text?, ... } }] }`', `${SCHEMA_BASE}#getpromptresult`)}`
     )
     .action(async (name, args, _options, command) => {
       await prompts.getPrompt(session, name, {
