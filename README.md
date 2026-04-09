@@ -130,7 +130,6 @@ Options:
   --schema <file>              Validate tool/prompt schema against expected schema
   --schema-mode <mode>         Schema validation mode: strict, compatible (default), ignore
   --timeout <seconds>          Request timeout in seconds (default: 300)
-  --max-chars <n>              Truncate tool/prompt output to this many characters
   --insecure                   Skip TLS certificate verification (for self-signed certs)
   -v, --version                Output the version number
   -h, --help                   Display help

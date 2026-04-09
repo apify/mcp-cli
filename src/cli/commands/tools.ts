@@ -371,7 +371,7 @@ export async function callTool(
     }
 
     let output = formatOutput(result, options.outputMode);
-    if (options.maxChars) {
+    if (options.maxChars && options.outputMode === 'human') {
       output = truncateOutput(output, options.maxChars);
     }
     console.log(output);
