@@ -877,10 +877,6 @@ export async function restartSession(
 /**
  * Show help for a server (alias for getInstructions)
  */
-export async function showHelp(target: string, options: { outputMode: OutputMode }): Promise<void> {
-  await showServerDetails(target, options);
-}
-
 /**
  * Open an interactive shell for a target
  */
