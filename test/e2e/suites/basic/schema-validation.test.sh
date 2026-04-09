@@ -45,6 +45,15 @@ assert_json_valid "$STDOUT"
 test_pass
 
 # =============================================================================
+# Test: tools-get with --schema validation
+# =============================================================================
+
+test_case "tools-get with valid schema passes"
+run_mcpc "$SESSION" tools-get echo --schema "$TEST_TMP/echo-schema.json"
+assert_success
+test_pass
+
+# =============================================================================
 # Test: --schema-mode options
 # =============================================================================
 
@@ -119,10 +128,10 @@ cat > "$TEST_TMP/extra-required-schema.json" << 'EOF'
 EOF
 test_pass
 
-test_case "tools-call fails when passing arg removed from server schema"
-# The actual server doesn't have "extra" in its schema, so validation should fail
-# in compatible mode when the passed arg doesn't exist in the actual schema.
-run_mcpc "$SESSION" tools-call echo message:=test extra:=foo \
+test_case "tools-get fails when server removes required field"
+# The actual server doesn't have "extra" as required, so validation should fail
+# in compatible mode when extra is in expected but not in actual.
+run_mcpc "$SESSION" tools-get echo \
   --schema "$TEST_TMP/extra-required-schema.json"
 assert_failure
 assert_contains "$STDERR" "extra"

@@ -893,6 +893,8 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
   program
     .command('tools-get <name>')
     .description('Get details and schema for an MCP tool.')
+    .option('--schema <file>', 'Validate tool schema against expected schema')
+    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .addHelpText(
       'after',
       jsonHelp(
