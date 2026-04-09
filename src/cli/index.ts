@@ -434,9 +434,7 @@ Full docs: ${docsUrl}`
   program
     .command('connect [server] [@session]')
     .usage('<server> [@session]')
-    .description(
-      'Connect to an MCP server and start a named @session (name auto-generated if omitted)'
-    )
+    .description('Connect to an MCP server and start a named @session') // keep this short
     .option('-H, --header <header>', 'HTTP header (can be repeated)')
     .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
     .option('--no-profile', 'Skip OAuth profile (connect anonymously)')
