@@ -125,8 +125,10 @@ class BridgeProcess {
 
   constructor(options: BridgeOptions) {
     this.options = options;
-    // Compute socket path from session name (platform-aware: Unix socket or Windows named pipe)
-    this.socketPath = getSocketPath(options.sessionName);
+    // Each bridge instance gets a unique socket path based on its PID, so that
+    // overlapping bridges (e.g. background reconnect racing with explicit restart)
+    // never delete each other's sockets during cleanup.
+    this.socketPath = getSocketPath(options.sessionName, process.pid);
 
     // Create promise that resolves when MCP client connects
     this.mcpClientReady = new Promise<void>((resolve, reject) => {
@@ -1506,13 +1508,6 @@ class BridgeProcess {
     this.connections.clear();
 
     // Close socket server
-    // NOTE: We intentionally do NOT delete the socket file here.
-    // When multiple bridges for the same session overlap (e.g. background
-    // reconnect from a parallel CLI process racing with an explicit restart),
-    // the exiting bridge would delete the NEW bridge's socket, causing ENOENT.
-    // Stale sockets are cleaned up by startBridge() and createSocketServer()
-    // before each new bridge starts, and by consolidateSessions() for
-    // expired/unauthorized sessions.
     if (this.server) {
       const server = this.server;
       await new Promise<void>((resolve) => {
@@ -1521,6 +1516,19 @@ class BridgeProcess {
           resolve();
         });
       });
+
+      // Remove socket file (Unix only - Windows named pipes don't leave files)
+      // Safe because each bridge has a unique PID-based socket path.
+      if (process.platform !== 'win32') {
+        try {
+          if (await fileExists(this.socketPath)) {
+            await unlink(this.socketPath);
+            logger.debug('Socket file removed');
+          }
+        } catch (error) {
+          logger.warn('Failed to remove socket file:', error);
+        }
+      }
     }
 
     // Close MCP client
