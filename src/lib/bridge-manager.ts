@@ -13,7 +13,6 @@
  */
 
 import { spawn, type ChildProcess } from 'child_process';
-import { unlink } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { ServerConfig, AuthCredentials, ProxyConfig, X402WalletCredentials } from './types.js';
@@ -21,7 +20,6 @@ import {
   getSocketPath,
   waitForFile,
   isProcessAlive,
-  fileExists,
   getLogsDir,
   isSessionExpiredError,
   enrichErrorMessage,
@@ -137,17 +135,6 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
 
-  // Get socket path (computed from session name, platform-aware)
-  const socketPath = getSocketPath(sessionName);
-
-  // Remove existing socket file if it exists (Unix only, Windows named pipes don't leave files)
-  // We MUST do it here, so waitForFile() below doesn't pick the old file!
-  // Plus, if it fails, the user will see the error
-  if (process.platform !== 'win32' && (await fileExists(socketPath))) {
-    logger.debug(`Removing existing socket: ${socketPath}`);
-    await unlink(socketPath);
-  }
-
   // Create a sanitized transport config without any headers
   // Headers will be sent to the bridge via IPC instead
   const sanitizedTarget: ServerConfig = { ...serverConfig };
@@ -215,6 +202,11 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
 
   const pid = bridgeProcess.pid;
 
+  // Each bridge gets a unique socket path based on its PID, so overlapping
+  // bridges (e.g. background reconnect racing with explicit restart) never
+  // conflict. The bridge process computes the same path via process.pid.
+  const socketPath = getSocketPath(sessionName, pid);
+
   // Wait for socket file to be created (with timeout)
   try {
     await waitForFile(socketPath, { timeoutMs: 5000 });
@@ -280,7 +272,7 @@ export async function stopBridge(
         // For graceful shutdown (closeSession), send IPC message first so bridge
         // can send HTTP DELETE. For restart, just kill immediately.
         if (options?.graceful) {
-          const socketPath = getSocketPath(sessionName);
+          const socketPath = getSocketPath(sessionName, session.pid);
           const shutdownOk = await sendBridgeShutdown(socketPath);
           if (shutdownOk) {
             await waitForProcessExit(session.pid, 2000);
@@ -610,13 +602,13 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     );
   }
 
-  // Socket path is computed from session name (platform-aware)
-  const socketPath = getSocketPath(sessionName);
+  // Socket path is PID-based: each bridge instance gets its own unique path
+  const socketPath = session.pid ? getSocketPath(sessionName, session.pid) : null;
 
   // Quick check: is the process alive?
   const processAlive = session.pid ? isProcessAlive(session.pid) : false;
 
-  if (processAlive) {
+  if (processAlive && socketPath) {
     // Process alive, try getServerDetails (blocks until MCP connected)
     const result = await checkBridgeHealth(socketPath);
     if (result.healthy) {
@@ -642,16 +634,23 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   // Bridge not healthy - restart it
   // Use 'connecting' if the session has never successfully connected (no lastSeenAt),
   // 'reconnecting' if it was previously active.
+  // Set lastConnectionAttemptAt to prevent parallel CLI processes from
+  // also triggering a restart via consolidateSessions/reconnectCrashedSessions.
   const restartStatus = session.lastSeenAt ? 'reconnecting' : 'connecting';
-  await updateSession(sessionName, { status: restartStatus });
-  await restartBridge(sessionName);
+  await updateSession(sessionName, {
+    status: restartStatus,
+    lastConnectionAttemptAt: new Date().toISOString(),
+  });
+  const { pid: newPid } = await restartBridge(sessionName);
+
+  const newSocketPath = getSocketPath(sessionName, newPid);
 
   // Try getServerDetails on restarted bridge (blocks until MCP connected)
-  const result = await checkBridgeHealth(socketPath);
+  const result = await checkBridgeHealth(newSocketPath);
   if (result.healthy) {
     await updateSession(sessionName, { status: 'active' });
     logger.debug(`Bridge for ${sessionName} passed health check`);
-    return socketPath;
+    return newSocketPath;
   }
 
   // Not healthy after restart - classify the error

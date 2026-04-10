@@ -125,8 +125,10 @@ class BridgeProcess {
 
   constructor(options: BridgeOptions) {
     this.options = options;
-    // Compute socket path from session name (platform-aware: Unix socket or Windows named pipe)
-    this.socketPath = getSocketPath(options.sessionName);
+    // Each bridge instance gets a unique socket path based on its PID, so that
+    // overlapping bridges (e.g. background reconnect racing with explicit restart)
+    // never delete each other's sockets during cleanup.
+    this.socketPath = getSocketPath(options.sessionName, process.pid);
 
     // Create promise that resolves when MCP client connects
     this.mcpClientReady = new Promise<void>((resolve, reject) => {
@@ -1516,6 +1518,7 @@ class BridgeProcess {
       });
 
       // Remove socket file (Unix only - Windows named pipes don't leave files)
+      // Safe because each bridge has a unique PID-based socket path.
       if (process.platform !== 'win32') {
         try {
           if (await fileExists(this.socketPath)) {

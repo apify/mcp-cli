@@ -65,18 +65,20 @@ export function getBridgesDir(): string {
  *             to avoid conflicts between different mcpc instances.
  *
  * @param sessionName - The session name (e.g., "@my-session")
+ * @param pid - The bridge process PID (each bridge gets a unique socket path)
  * @returns The platform-appropriate socket/pipe path
  */
-export function getSocketPath(sessionName: string): string {
+export function getSocketPath(sessionName: string, pid: number): string {
+  const suffix = `.${pid}`;
   if (process.platform === 'win32') {
     // Windows named pipes are global, so include a hash of the home directory
     // to avoid conflicts between different mcpc instances
     const homeHash = createHash('sha256').update(getMcpcHome()).digest('hex').slice(0, 8);
-    return `\\\\.\\pipe\\mcpc-${homeHash}-${sessionName}`;
+    return `\\\\.\\pipe\\mcpc-${homeHash}-${sessionName}${suffix}`;
   }
 
   // Unix/macOS: use socket file in bridges directory (naturally isolated per home dir)
-  return join(getBridgesDir(), `${sessionName}.sock`);
+  return join(getBridgesDir(), `${sessionName}${suffix}.sock`);
 }
 
 /**

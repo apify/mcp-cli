@@ -305,8 +305,8 @@ export async function consolidateSessions(
           }
 
           // Delete socket file (Unix only - Windows named pipes don't leave files)
-          if (process.platform !== 'win32') {
-            const socketPath = getSocketPath(name);
+          if (process.platform !== 'win32' && session.pid) {
+            const socketPath = getSocketPath(name, session.pid);
             try {
               await unlink(socketPath);
               logger.debug(`Removed stale socket: ${socketPath}`);
@@ -321,6 +321,14 @@ export async function consolidateSessions(
         // Check bridge status - always remove pid if process is not alive
         if (session.pid && !isProcessAlive(session.pid)) {
           logger.debug(`Clearing crashed bridge PID for session: ${name} (PID: ${session.pid})`);
+          // Clean up the PID-based socket file for this dead bridge
+          if (process.platform !== 'win32') {
+            try {
+              await unlink(getSocketPath(name, session.pid));
+            } catch {
+              // Ignore - file may already be deleted by bridge cleanup
+            }
+          }
           delete session.pid;
           hasChanges = true;
           // Don't overwrite terminal/transient statuses

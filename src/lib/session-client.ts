@@ -104,10 +104,10 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
       // Restart bridge
       await updateSession(this.sessionName, { status: 'reconnecting' });
-      await restartBridge(this.sessionName);
+      const { pid: newPid } = await restartBridge(this.sessionName);
 
-      // Reconnect using computed socket path
-      const socketPath = getSocketPath(this.sessionName);
+      // Reconnect using the new bridge's PID-based socket path
+      const socketPath = getSocketPath(this.sessionName, newPid);
       this.bridgeClient = new BridgeClient(socketPath);
       this.setupNotificationForwarding();
       await this.bridgeClient.connect();
@@ -340,9 +340,9 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
       logger.debug(`Socket error during callToolWithTask, will restart bridge...`);
       await this.bridgeClient.close();
-      await restartBridge(this.sessionName);
+      const { pid: newPid } = await restartBridge(this.sessionName);
 
-      const socketPath = getSocketPath(this.sessionName);
+      const socketPath = getSocketPath(this.sessionName, newPid);
       this.bridgeClient = new BridgeClient(socketPath);
       this.setupNotificationForwarding();
       await this.bridgeClient.connect();

@@ -12,6 +12,7 @@ import {
   getLogsDir,
   fileExists,
   cleanupOrphanedLogFiles,
+  cleanupOrphanedSockets,
 } from '../../lib/index.js';
 import { formatOutput, formatSuccess, formatWarning } from '../output.js';
 import { loadSessions, deleteSession, consolidateSessions } from '../../lib/sessions.js';
@@ -33,6 +34,7 @@ interface CleanResult {
   crashedBridges: number;
   expiredSessions: number;
   orphanedBridgeLogs: number;
+  orphanedSockets: number;
   sessions: number;
   profiles: number;
   logs: number;
@@ -47,6 +49,7 @@ async function cleanStale(): Promise<{
   crashedBridges: number;
   expiredSessions: number;
   orphanedBridgeLogs: number;
+  orphanedSockets: number;
 }> {
   // Consolidate sessions, removes expired ones
   const consolidateResult = await consolidateSessions(true);
@@ -54,10 +57,14 @@ async function cleanStale(): Promise<{
   // Clean up orphaned log files (for sessions that no longer exist, older than 7 days)
   const orphanedBridgeLogs = await cleanupOrphanedLogFiles(consolidateResult.sessions);
 
+  // Clean up orphaned socket files (PID-based sockets from dead bridges, older than 5 min)
+  const orphanedSockets = await cleanupOrphanedSockets(consolidateResult.sessions);
+
   return {
     crashedBridges: consolidateResult.crashedBridges,
     expiredSessions: consolidateResult.expiredSessions,
     orphanedBridgeLogs,
+    orphanedSockets,
   };
 }
 
@@ -127,6 +134,7 @@ async function cleanAll(): Promise<CleanResult> {
     crashedBridges: 0,
     expiredSessions: 0,
     orphanedBridgeLogs: 0,
+    orphanedSockets: 0,
     sessions: 0,
     profiles: 0,
     logs: 0,
@@ -148,6 +156,7 @@ async function cleanAll(): Promise<CleanResult> {
   result.crashedBridges = staleResult.crashedBridges;
   result.expiredSessions = staleResult.expiredSessions;
   result.orphanedBridgeLogs = staleResult.orphanedBridgeLogs;
+  result.orphanedSockets = staleResult.orphanedSockets;
 
   // Remove any remaining empty directories
   const mcpcHome = getMcpcHome();
@@ -188,6 +197,7 @@ export async function clean(options: CleanOptions): Promise<void> {
     crashedBridges: 0,
     expiredSessions: 0,
     orphanedBridgeLogs: 0,
+    orphanedSockets: 0,
     sessions: 0,
     profiles: 0,
     logs: 0,
@@ -223,6 +233,7 @@ export async function clean(options: CleanOptions): Promise<void> {
     result.crashedBridges = staleResult.crashedBridges;
     result.expiredSessions = staleResult.expiredSessions;
     result.orphanedBridgeLogs = staleResult.orphanedBridgeLogs;
+    result.orphanedSockets = staleResult.orphanedSockets;
   }
 
   // Clean specific resources if requested
@@ -246,7 +257,10 @@ export async function clean(options: CleanOptions): Promise<void> {
 
     if (!cleaningSpecific) {
       const hasCleanups =
-        result.crashedBridges > 0 || result.expiredSessions > 0 || result.orphanedBridgeLogs > 0;
+        result.crashedBridges > 0 ||
+        result.expiredSessions > 0 ||
+        result.orphanedBridgeLogs > 0 ||
+        result.orphanedSockets > 0;
 
       if (hasCleanups) {
         const parts: string[] = [];
@@ -254,6 +268,7 @@ export async function clean(options: CleanOptions): Promise<void> {
         if (result.expiredSessions > 0) parts.push(`${result.expiredSessions} expired session(s)`);
         if (result.orphanedBridgeLogs > 0)
           parts.push(`${result.orphanedBridgeLogs} orphaned log(s)`);
+        if (result.orphanedSockets > 0) parts.push(`${result.orphanedSockets} orphaned socket(s)`);
         messages.push(`Cleaned ${parts.join(', ')}`);
       } else {
         messages.push('No stale resources found');
