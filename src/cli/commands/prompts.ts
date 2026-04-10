@@ -3,7 +3,7 @@
  */
 
 import type { CommandOptions } from '../../lib/types.js';
-import { formatOutput, formatWarning, truncateOutput } from '../output.js';
+import { formatOutput, formatWarning } from '../output.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs, hasStdinData, readStdinArgs } from '../parser.js';
 import { ClientError } from '../../lib/errors.js';
@@ -31,7 +31,11 @@ export async function listPrompts(target: string, options: CommandOptions): Prom
       cursor = result.nextCursor;
     } while (cursor);
 
-    console.log(formatOutput(allPrompts, options.outputMode));
+    console.log(
+      formatOutput(allPrompts, options.outputMode, {
+        ...(options.maxChars && { maxChars: options.maxChars }),
+      })
+    );
   });
 }
 
@@ -107,10 +111,10 @@ export async function getPrompt(
 
     const result = await client.getPrompt(name, promptArgs);
 
-    let output = formatOutput(result, options.outputMode);
-    if (options.maxChars) {
-      output = truncateOutput(output, options.maxChars);
-    }
-    console.log(output);
+    console.log(
+      formatOutput(result, options.outputMode, {
+        ...(options.maxChars && { maxChars: options.maxChars }),
+      })
+    );
   });
 }

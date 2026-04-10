@@ -400,7 +400,7 @@ function createTopLevelProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
-    .option('--max-chars <n>', 'Truncate tool/prompt output to this many characters')
+    .option('--max-chars <n>', 'Truncate output to n characters (ignored in --json mode)')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .version(mcpcVersion, '-v, --version', 'Output the version number')
     .helpOption('-h, --help', 'Display help');
@@ -1180,7 +1180,7 @@ function createSessionProgram(): Command {
     .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
-    .option('--max-chars <n>', 'Truncate tool/prompt output to this many characters')
+    .option('--max-chars <n>', 'Truncate output to n characters (ignored in --json mode)')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .addHelpText(
       'after',
