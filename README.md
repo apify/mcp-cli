@@ -676,11 +676,14 @@ For a complete example script, see [`docs/examples/company-lookup.sh`](./docs/ex
 
 ### Schema validation
 
-The `tools-call` command supports `--schema` to validate a tool's schema against an expected snapshot before calling it. This helps detect breaking changes early in scripts and CI:
+The `tools-get` and `tools-call` commands support `--schema` to validate a tool's schema against an expected snapshot. This helps detect breaking changes early in scripts and CI:
 
 ```bash
 # Save expected schema
 mcpc --json @apify tools-get search-actors > expected.json
+
+# Validate without calling (read-only check)
+mcpc @apify tools-get search-actors --schema expected.json
 
 # Validate before calling (fails if schema changed incompatibly)
 mcpc @apify tools-call search-actors --schema expected.json keywords:="test"
