@@ -641,11 +641,9 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
     status: restartStatus,
     lastConnectionAttemptAt: new Date().toISOString(),
   });
-  await restartBridge(sessionName);
+  const { pid: newPid } = await restartBridge(sessionName);
 
-  // Re-read session to get the new PID from restartBridge and compute socket path
-  const updatedSession = await getSession(sessionName);
-  const newSocketPath = getSocketPath(sessionName, updatedSession?.pid);
+  const newSocketPath = getSocketPath(sessionName, newPid);
 
   // Try getServerDetails on restarted bridge (blocks until MCP connected)
   const result = await checkBridgeHealth(newSocketPath);

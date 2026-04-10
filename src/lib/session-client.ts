@@ -33,7 +33,7 @@ import type {
 import type { ListResourceTemplatesResult } from '@modelcontextprotocol/sdk/types.js';
 import { BridgeClient } from './bridge-client.js';
 import { ensureBridgeReady, restartBridge } from './bridge-manager.js';
-import { updateSession, getSession } from './sessions.js';
+import { updateSession } from './sessions.js';
 import { NetworkError } from './errors.js';
 import { getSocketPath, getLogsDir, generateRequestId } from './utils.js';
 import { createLogger } from './logger.js';
@@ -104,11 +104,10 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
       // Restart bridge
       await updateSession(this.sessionName, { status: 'reconnecting' });
-      await restartBridge(this.sessionName);
+      const { pid: newPid } = await restartBridge(this.sessionName);
 
       // Reconnect using the new bridge's PID-based socket path
-      const updatedSession = await getSession(this.sessionName);
-      const socketPath = getSocketPath(this.sessionName, updatedSession?.pid);
+      const socketPath = getSocketPath(this.sessionName, newPid);
       this.bridgeClient = new BridgeClient(socketPath);
       this.setupNotificationForwarding();
       await this.bridgeClient.connect();
@@ -341,10 +340,9 @@ export class SessionClient extends EventEmitter implements IMcpClient {
 
       logger.debug(`Socket error during callToolWithTask, will restart bridge...`);
       await this.bridgeClient.close();
-      await restartBridge(this.sessionName);
+      const { pid: newPid } = await restartBridge(this.sessionName);
 
-      const updatedSession = await getSession(this.sessionName);
-      const socketPath = getSocketPath(this.sessionName, updatedSession?.pid);
+      const socketPath = getSocketPath(this.sessionName, newPid);
       this.bridgeClient = new BridgeClient(socketPath);
       this.setupNotificationForwarding();
       await this.bridgeClient.connect();
