@@ -902,10 +902,10 @@ ${chalk.bold('Schema validation:')}
   --schema <file>       Validate against expected schema (save with tools-get --json)
   --schema-mode <mode>  strict | compatible (default) | ignore
 ${jsonHelp(
-        '`Tool` object',
-        '`{ name, description?, inputSchema, annotations? }`',
-        `${SCHEMA_BASE}#tool`
-      )}`
+  '`Tool` object',
+  '`{ name, description?, inputSchema, annotations? }`',
+  `${SCHEMA_BASE}#tool`
+)}`
     )
     .action(async (name, _options, command) => {
       await tools.getTool(session, name, getOptionsFromCommand(command));
