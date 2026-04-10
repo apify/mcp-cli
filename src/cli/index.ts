@@ -397,8 +397,6 @@ function createTopLevelProgram(): Command {
     .option('--json', 'Output in JSON format for scripting')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
-    .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
-    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--max-chars <n>', 'Truncate output to n characters (ignored in --json mode)')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
@@ -436,9 +434,7 @@ Full docs: ${docsUrl}`
   program
     .command('connect [server] [@session]')
     .usage('<server> [@session]')
-    .description(
-      'Connect to an MCP server and start a named @session (name auto-generated if omitted)'
-    )
+    .description('Connect to an MCP server and start a named @session') // keep this short
     .option('-H, --header <header>', 'HTTP header (can be repeated)')
     .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
     .option('--no-profile', 'Skip OAuth profile (connect anonymously)')
@@ -897,13 +893,19 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
   program
     .command('tools-get <name>')
     .description('Get details and schema for an MCP tool.')
+    .option('--schema <file>', 'Validate tool schema against expected schema')
+    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .addHelpText(
       'after',
-      jsonHelp(
-        '`Tool` object',
-        '`{ name, description?, inputSchema, annotations? }`',
-        `${SCHEMA_BASE}#tool`
-      )
+      `
+${chalk.bold('Schema validation:')}
+  --schema <file>       Validate against expected schema (save with tools-get --json)
+  --schema-mode <mode>  strict | compatible (default) | ignore
+${jsonHelp(
+  '`Tool` object',
+  '`{ name, description?, inputSchema, annotations? }`',
+  `${SCHEMA_BASE}#tool`
+)}`
     )
     .action(async (name, _options, command) => {
       await tools.getTool(session, name, getOptionsFromCommand(command));
@@ -915,6 +917,8 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
     .helpOption(false) // Disable built-in --help so we can intercept it for tool schema
     .option('--task', 'Use async task execution (experimental)')
     .option('--detach', 'Start task and return immediately with task ID (implies --task)')
+    .option('--schema <file>', 'Validate tool schema against expected schema before calling')
+    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .addHelpText(
       'after',
       `
@@ -925,6 +929,10 @@ ${chalk.bold('Arguments:')}
 
   Values are auto-parsed: strings, numbers, booleans, JSON objects/arrays.
   To force a string, wrap in quotes: id:='"123"'
+
+${chalk.bold('Schema validation:')}
+  --schema <file>       Validate tool schema before calling (save with tools-get --json)
+  --schema-mode <mode>  strict | compatible (default) | ignore
 ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`', `${SCHEMA_BASE}#calltoolresult`)}`
     )
     .action(async (name, args, options, command) => {
@@ -1177,8 +1185,6 @@ function createSessionProgram(): Command {
     .option('--json', 'Output in JSON format for scripting and code mode')
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile override')
-    .option('--schema <file>', 'Validate tool/prompt schema against expected schema')
-    .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
     .option('--max-chars <n>', 'Truncate output to n characters (ignored in --json mode)')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')

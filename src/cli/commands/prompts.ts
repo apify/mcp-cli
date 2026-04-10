@@ -3,17 +3,9 @@
  */
 
 import type { CommandOptions } from '../../lib/types.js';
-import { formatOutput, formatWarning } from '../output.js';
+import { formatOutput } from '../output.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs, hasStdinData, readStdinArgs } from '../parser.js';
-import { ClientError } from '../../lib/errors.js';
-import {
-  loadSchemaFromFile,
-  validatePromptSchema,
-  formatValidationError,
-  type PromptSchema,
-  type SchemaMode,
-} from '../../lib/schema-validator.js';
 
 /**
  * List available prompts
@@ -73,42 +65,7 @@ export async function getPrompt(
     promptArgs[key] = typeof value === 'string' ? value : JSON.stringify(value);
   }
 
-  // Load expected schema if provided
-  let expectedSchema: PromptSchema | undefined;
-  if (options.schema) {
-    expectedSchema = (await loadSchemaFromFile(options.schema)) as PromptSchema;
-  }
-
   await withMcpClient(target, options, async (client, _context) => {
-    // Validate schema if provided (skip entirely in ignore mode)
-    const schemaMode: SchemaMode = options.schemaMode || 'compatible';
-    if (expectedSchema && schemaMode !== 'ignore') {
-      const result = await client.listPrompts();
-      const actualSchema = result.prompts.find((p) => p.name === name);
-
-      if (!actualSchema) {
-        throw new ClientError(`Prompt not found: ${name}`);
-      }
-
-      const validation = validatePromptSchema(
-        actualSchema as PromptSchema,
-        expectedSchema,
-        schemaMode,
-        promptArgs
-      );
-
-      if (!validation.valid) {
-        throw new ClientError(formatValidationError(validation, `prompt "${name}"`));
-      }
-
-      // Show warnings in human mode
-      if (validation.warnings.length > 0 && options.outputMode === 'human') {
-        for (const warning of validation.warnings) {
-          console.log(formatWarning(`Schema warning: ${warning}`));
-        }
-      }
-    }
-
     const result = await client.getPrompt(name, promptArgs);
 
     console.log(
