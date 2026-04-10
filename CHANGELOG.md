@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `connect` command now auto-generates session name when `@session` is omitted (e.g., `mcpc connect mcp.apify.com` creates `@apify`). If a session for the same server already exists with matching auth settings, it is reused instead of creating a duplicate.
-- `--max-chars <chars>` global option to truncate large tool/prompt/resource output
+- `--max-chars <n>` global option to truncate output to a given number of characters (ignored in `--json` mode)
 - `tools-call <tool> --help` shows tool parameter schema (shortcut for `tools-get`)
 - "Did you mean?" suggestions for unknown commands, including reversed names (e.g., `list-tools` → `tools-list`)
 - `--json` output documentation in `--help` for all commands, describing the MCP object shape returned
@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - JSON output for session info (`mcpc @session --json` and `mcpc connect --json`) now returns `toolNames` (array of tool name strings) instead of full `tools` objects, keeping it concise and consistent with the human-readable output
-- `--schema` and `--schema-mode` options moved from global scope to `tools-call` only (removed from `tools-get` and `prompts-get`)
+- `--schema` and `--schema-mode` options moved from global scope to `tools-get` and `tools-call` only (removed from `prompts-get`)
 
 ### Fixed
 

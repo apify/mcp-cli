@@ -398,7 +398,7 @@ function createTopLevelProgram(): Command {
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile for the server ("default" if not provided)')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
-    .option('--max-chars <n>', 'Truncate tool/prompt output to this many characters')
+    .option('--max-chars <n>', 'Truncate output to n characters (ignored in --json mode)')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .version(mcpcVersion, '-v, --version', 'Output the version number')
     .helpOption('-h, --help', 'Display help');
@@ -1182,7 +1182,7 @@ function createSessionProgram(): Command {
     .option('--verbose', 'Enable debug logging')
     .option('--profile <name>', 'OAuth profile override')
     .option('--timeout <seconds>', 'Request timeout in seconds (default: 300)')
-    .option('--max-chars <n>', 'Truncate tool/prompt output to this many characters')
+    .option('--max-chars <n>', 'Truncate output to n characters (ignored in --json mode)')
     .option('--insecure', 'Skip TLS certificate verification (for self-signed certs)')
     .addHelpText(
       'after',

@@ -127,7 +127,7 @@ Options:
   --verbose                    Enable debug logging
   --profile <name>             OAuth profile for the server ("default" if not provided)
   --timeout <seconds>          Request timeout in seconds (default: 300)
-  --max-chars <n>              Truncate tool/prompt output to this many characters
+  --max-chars <n>              Truncate output to n characters (ignored in --json mode)
   --insecure                   Skip TLS certificate verification (for self-signed certs)
   -v, --version                Output the version number
   -h, --help                   Display help
