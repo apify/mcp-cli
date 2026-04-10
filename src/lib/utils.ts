@@ -65,10 +65,11 @@ export function getBridgesDir(): string {
  *             to avoid conflicts between different mcpc instances.
  *
  * @param sessionName - The session name (e.g., "@my-session")
+ * @param pid - The bridge process PID (each bridge gets a unique socket path)
  * @returns The platform-appropriate socket/pipe path
  */
-export function getSocketPath(sessionName: string, pid?: number): string {
-  const suffix = pid ? `.${pid}` : '';
+export function getSocketPath(sessionName: string, pid: number): string {
+  const suffix = `.${pid}`;
   if (process.platform === 'win32') {
     // Windows named pipes are global, so include a hash of the home directory
     // to avoid conflicts between different mcpc instances
