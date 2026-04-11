@@ -447,6 +447,7 @@ Full docs: ${docsUrl}`
 ${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
+  ~/.vscode/mcp.json            Config file — connect all servers in the file
 
 ${chalk.bold('Session name:')}
   If @session is omitted, a name is auto-generated from the server hostname
@@ -454,6 +455,7 @@ ${chalk.bold('Session name:')}
   already exists (same server URL, OAuth profile, and HTTP header names), it
   is reused (restarted if not live). Header values are not compared — they
   are stored securely in OS keychain.
+  When connecting all servers from a config file, @session cannot be specified.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
@@ -477,6 +479,25 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
           `Invalid server: "${server}"\n\n` +
             `Expected a URL (e.g. mcp.apify.com) or a config file entry (e.g. ~/.vscode/mcp.json:filesystem)`
         );
+      }
+
+      // Config file without :entry — connect all servers from the file
+      if (parsed.type === 'config-file') {
+        if (sessionName) {
+          throw new ClientError(
+            `Cannot specify @session name when connecting all servers from a config file.\n` +
+              `To connect a specific entry, use: mcpc connect ${server}:<entry> ${sessionName}`
+          );
+        }
+        await sessions.connectAllFromConfig(parsed.file, {
+          ...globalOpts,
+          ...(headers && { headers }),
+          ...(opts.proxy && { proxy: opts.proxy as string }),
+          ...(opts.proxyBearerToken && { proxyBearerToken: opts.proxyBearerToken as string }),
+          ...(opts.x402 && { x402: opts.x402 as boolean }),
+          ...(globalOpts.insecure && { insecure: true }),
+        });
+        return;
       }
 
       // Auto-generate session name if not provided

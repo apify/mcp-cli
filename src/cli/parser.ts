@@ -359,7 +359,11 @@ function looksLikeFilePath(s: string): boolean {
  */
 export function parseServerArg(
   arg: string
-): { type: 'url'; url: string } | { type: 'config'; file: string; entry: string } | null {
+):
+  | { type: 'url'; url: string }
+  | { type: 'config'; file: string; entry: string }
+  | { type: 'config-file'; file: string }
+  | null {
   // Step 1a: try arg as-is (covers full URLs like https://... or ftp://...)
   if (isValidUrlWithHost(arg)) {
     return { type: 'url', url: arg };
@@ -373,11 +377,13 @@ export function parseServerArg(
 
   // Step 2: try adding https:// prefix for bare hostnames and host:port combos.
   // Skip if arg starts with a path character — those are file paths, not hostnames.
+  // Skip if arg ends with a config file extension (e.g., config.json) — clearly a file, not a hostname.
   // Skip if arg ends with ':' — dangling colon is not a valid hostname.
   const isWindowsDrive = /^[A-Za-z]:[/\\]/.test(arg);
   const startsWithPathChar =
     arg.startsWith('/') || arg.startsWith('~') || arg.startsWith('.') || isWindowsDrive;
-  if (!startsWithPathChar && !arg.endsWith(':')) {
+  const hasConfigExtension = /\.(json|yaml|yml)$/i.test(arg);
+  if (!startsWithPathChar && !hasConfigExtension && !arg.endsWith(':')) {
     if (isValidUrlWithHost('https://' + arg)) {
       return { type: 'url', url: arg };
     }
@@ -397,7 +403,13 @@ export function parseServerArg(
     }
   }
 
-  // Step 4: unrecognised
+  // Step 4: bare config file path (no :entry suffix) — connect all servers from the file.
+  // Matches if the entire arg looks like a file path (e.g., ~/.vscode/mcp.json, ./config.json)
+  if (looksLikeFilePath(arg)) {
+    return { type: 'config-file', file: arg };
+  }
+
+  // Step 5: unrecognised
   return null;
 }
 

@@ -157,6 +157,56 @@ describe('parseServerArg', () => {
     const result2 = parseServerArg('D:/projects/config.yaml:myserver');
     expect(result2).toEqual({ type: 'config', file: 'D:/projects/config.yaml', entry: 'myserver' });
   });
+
+  it('should parse bare config file path (no :entry) as config-file', () => {
+    expect(parseServerArg('~/.vscode/mcp.json')).toEqual({
+      type: 'config-file',
+      file: '~/.vscode/mcp.json',
+    });
+
+    expect(parseServerArg('./mcp.json')).toEqual({
+      type: 'config-file',
+      file: './mcp.json',
+    });
+
+    expect(parseServerArg('/absolute/path/config.json')).toEqual({
+      type: 'config-file',
+      file: '/absolute/path/config.json',
+    });
+
+    expect(parseServerArg('../config.yaml')).toEqual({
+      type: 'config-file',
+      file: '../config.yaml',
+    });
+
+    expect(parseServerArg('config.json')).toEqual({
+      type: 'config-file',
+      file: 'config.json',
+    });
+
+    expect(parseServerArg('config.yml')).toEqual({
+      type: 'config-file',
+      file: 'config.yml',
+    });
+  });
+
+  it('should parse Windows bare config file path as config-file', () => {
+    expect(parseServerArg('C:\\Users\\me\\mcp.json')).toEqual({
+      type: 'config-file',
+      file: 'C:\\Users\\me\\mcp.json',
+    });
+
+    expect(parseServerArg('D:/projects/config.yaml')).toEqual({
+      type: 'config-file',
+      file: 'D:/projects/config.yaml',
+    });
+  });
+
+  it('should NOT parse bare hostname as config-file', () => {
+    // These should still be URLs, not config files
+    expect(parseServerArg('example.com')).toEqual({ type: 'url', url: 'example.com' });
+    expect(parseServerArg('mcp.apify.com')).toEqual({ type: 'url', url: 'mcp.apify.com' });
+  });
 });
 
 describe('extractOptions', () => {

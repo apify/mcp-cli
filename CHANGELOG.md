@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `mcpc connect <config-file>` connects all servers defined in the config file at once, auto-generating session names from entry names (e.g., `mcpc connect ~/.vscode/mcp.json`)
 - `connect` command now auto-generates session name when `@session` is omitted (e.g., `mcpc connect mcp.apify.com` creates `@apify`). If a session for the same server already exists with matching auth settings, it is reused instead of creating a duplicate.
 - `--max-chars <n>` global option to truncate output to a given number of characters (ignored in `--json` mode)
 - `tools-call <tool> --help` shows tool parameter schema (shortcut for `tools-get`)

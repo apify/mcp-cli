@@ -54,6 +54,7 @@ import { getWallet } from '../../lib/wallets.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
 import { parseProxyArg } from '../parser.js';
+import { loadConfig, listServers } from '../../lib/config.js';
 
 const logger = createLogger('sessions');
 
@@ -875,8 +876,102 @@ export async function restartSession(
 }
 
 /**
- * Show help for a server (alias for getInstructions)
+ * Connect all servers defined in a config file, auto-generating session names from entry names.
+ * Connects servers sequentially so bridge startup and session name deduplication are reliable.
  */
+export async function connectAllFromConfig(
+  configFile: string,
+  options: {
+    outputMode: OutputMode;
+    verbose?: boolean;
+    headers?: string[];
+    timeout?: number;
+    profile?: string;
+    noProfile?: boolean;
+    proxy?: string;
+    proxyBearerToken?: string;
+    x402?: boolean;
+    insecure?: boolean;
+  }
+): Promise<void> {
+  const config = loadConfig(configFile);
+  const serverNames = listServers(config);
+
+  if (serverNames.length === 0) {
+    throw new ClientError(`No servers found in config file: ${configFile}`);
+  }
+
+  if (options.outputMode === 'human') {
+    console.log(
+      chalk.cyan(
+        `Connecting ${serverNames.length} server${serverNames.length === 1 ? '' : 's'} from ${configFile}...`
+      )
+    );
+    console.log('');
+  }
+
+  const results: { entry: string; sessionName: string; success: boolean; error?: string }[] = [];
+
+  for (const entry of serverNames) {
+    const parsed = { type: 'config' as const, file: configFile, entry };
+    const sessionName = await resolveSessionName(parsed, {
+      outputMode: options.outputMode,
+      ...(options.profile && { profile: options.profile }),
+      ...(options.headers && { headers: options.headers }),
+      ...(options.noProfile && { noProfile: options.noProfile }),
+    });
+
+    try {
+      await connectSession(entry, sessionName, {
+        ...options,
+        config: configFile,
+      });
+      results.push({ entry, sessionName, success: true });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      results.push({ entry, sessionName, success: false, error: errorMsg });
+      if (options.outputMode === 'human') {
+        console.error(formatError(`Failed to connect "${entry}": ${errorMsg}`));
+        console.log('');
+      }
+    }
+  }
+
+  // Print summary
+  const succeeded = results.filter((r) => r.success).length;
+  const failed = results.filter((r) => !r.success).length;
+
+  if (options.outputMode === 'json') {
+    console.log(
+      formatOutput(
+        {
+          configFile,
+          results: results.map((r) => ({
+            entry: r.entry,
+            sessionName: r.sessionName,
+            ...(r.success ? { connected: true } : { connected: false, error: r.error }),
+          })),
+        },
+        'json'
+      )
+    );
+  } else if (serverNames.length > 1) {
+    console.log('');
+    if (failed === 0) {
+      console.log(formatSuccess(`All ${succeeded} servers connected`));
+    } else {
+      console.log(
+        formatWarning(`${succeeded} of ${serverNames.length} servers connected, ${failed} failed`)
+      );
+    }
+  }
+
+  // If ALL servers failed, exit with error
+  if (succeeded === 0) {
+    throw new ClientError(`Failed to connect any servers from ${configFile}`);
+  }
+}
+
 /**
  * Open an interactive shell for a target
  */
