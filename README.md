@@ -133,7 +133,7 @@ Options:
   -h, --help                   Display help
 
 MCP session commands (after connecting):
-  <@session>                   Show MCP server info, capabilities, and tools
+  <@session>                   Show MCP server info, capabilities, and tools overview
   <@session> grep <pattern>    Search tools and instructions
   <@session> tools-list        List all server tools
   <@session> tools-get <name>  Get tool details and schema

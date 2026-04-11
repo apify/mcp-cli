@@ -407,7 +407,7 @@ function createTopLevelProgram(): Command {
     'after',
     `
 ${chalk.bold('MCP session commands (after connecting):')}
-  <@session>                   Show MCP server info, capabilities, and tools
+  <@session>                   Show MCP server info, capabilities, and tools overview
   <@session> ${chalk.cyan('grep')} <pattern>    Search tools and instructions
   <@session> ${chalk.cyan('tools-list')}        List all server tools
   <@session> ${chalk.cyan('tools-get')} <name>  Get tool details and schema
@@ -454,7 +454,7 @@ ${chalk.bold('Session name:')}
   already exists (same server URL, OAuth profile, and HTTP header names), it
   is reused (restarted if not live). Header values are not compared — they
   are stored securely in OS keychain.
-${jsonHelp('`InitializeResult` extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
+${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
       if (!server) {
@@ -864,7 +864,7 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
   program
     .command('tools')
     .description('List MCP tools (shorthand for tools-list).')
-    .option('--full', 'Show full tool details including complete input schema')
+    .option('--full', 'Show full tool details including schema')
     .addHelpText(
       'after',
       jsonHelp(
@@ -880,7 +880,7 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
   program
     .command('tools-list')
     .description('List all MCP tools.')
-    .option('--full', 'Show full tool details including complete input schema')
+    .option('--full', 'Show full tool details including schema')
     .addHelpText(
       'after',
       jsonHelp(
@@ -936,7 +936,7 @@ ${chalk.bold('Arguments:')}
 ${chalk.bold('Schema validation:')}
   --schema <file>       Validate tool schema before calling (save with tools-get --json)
   --schema-mode <mode>  strict | compatible (default) | ignore
-${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`', `${SCHEMA_BASE}#calltoolresult`)}`
+${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`', `${SCHEMA_BASE}#calltoolresult`)}`
     )
     .action(async (name, args, options, command) => {
       // Intercept --help: with helpOption(false) Commander won't catch it.
@@ -1043,7 +1043,7 @@ ${jsonHelp('`CallToolResult`', '`{ content: [{ type, text?, ... }], isError?, st
     .addHelpText(
       'after',
       jsonHelp(
-        '`ReadResourceResult`',
+        '`ReadResourceResult` object',
         '`{ contents: [{ uri, mimeType?, text? | blob? }] }`',
         `${SCHEMA_BASE}#readresourceresult`
       )
@@ -1131,7 +1131,7 @@ ${chalk.bold('Arguments:')}
 
   Values are auto-parsed: strings, numbers, booleans, JSON objects/arrays.
   To force a string, wrap in quotes: id:='"123"'
-${jsonHelp('`GetPromptResult`', '`{ description?, messages: [{ role, content: { type, text?, ... } }] }`', `${SCHEMA_BASE}#getpromptresult`)}`
+${jsonHelp('`GetPromptResult` object', '`{ description?, messages: [{ role, content: { type, text?, ... } }] }`', `${SCHEMA_BASE}#getpromptresult`)}`
     )
     .action(async (name, args, _options, command) => {
       await prompts.getPrompt(session, name, {
