@@ -746,11 +746,14 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
   return program;
 }
 
+/** Commands that don't support --json output. */
+const NO_JSON_COMMANDS = new Set(['shell']);
+
 /**
  * Tune a command's help display: add --json option and hide --help.
  */
 function tuneCommandHelp(cmd: Command): void {
-  if (!cmd.options.some((o) => o.long === '--json')) {
+  if (!NO_JSON_COMMANDS.has(cmd.name()) && !cmd.options.some((o) => o.long === '--json')) {
     cmd.option('--json', 'Output in JSON format');
   }
   cmd.helpOption('-h, --help', 'Display help');
