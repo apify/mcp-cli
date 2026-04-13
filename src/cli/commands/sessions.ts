@@ -913,13 +913,10 @@ export async function connectAllFromConfig(
   const results: { entry: string; sessionName: string; success: boolean; error?: string }[] = [];
 
   for (const entry of serverNames) {
-    const parsed = { type: 'config' as const, file: configFile, entry };
-    const sessionName = await resolveSessionName(parsed, {
-      outputMode: options.outputMode,
-      ...(options.profile && { profile: options.profile }),
-      ...(options.headers && { headers: options.headers }),
-      ...(options.noProfile && { noProfile: options.noProfile }),
-    });
+    // Use a deterministic name derived from the entry name (e.g., "alpha" → "@alpha").
+    // This ensures re-running `mcpc connect <file>` reuses existing sessions
+    // (via connectSession's "already active" path) instead of creating @alpha-2.
+    const sessionName = generateSessionName({ type: 'config', file: configFile, entry });
 
     try {
       await connectSession(entry, sessionName, {
