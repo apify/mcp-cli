@@ -22,7 +22,8 @@ import type {
   Task,
 } from '../lib/types.js';
 import { extractSingleTextContent } from './tool-result.js';
-import { isValidSessionName } from '../lib/utils.js';
+import { join } from 'node:path';
+import { isValidSessionName, getLogsDir } from '../lib/utils.js';
 import { getSession } from '../lib/sessions.js';
 
 // Re-export for external use
@@ -1320,6 +1321,15 @@ export function formatServerDetails(
 
   lines.push(commands.join('\n'));
   lines.push('');
+
+  // Debugging hint: bridge log file path (only shown for sessions, i.e. @name targets)
+  if (target.startsWith('@')) {
+    const sessionName = target.slice(1);
+    const logPath = join(getLogsDir(), `bridge-${sessionName}.log`);
+    lines.push(chalk.bold('Debugging:'));
+    lines.push(`${bullet} bridge log: ${bt}${logPath}${bt}`);
+    lines.push('');
+  }
 
   return lines.join('\n');
 }
