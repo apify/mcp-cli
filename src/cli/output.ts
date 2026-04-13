@@ -1326,8 +1326,7 @@ export function formatServerDetails(
   if (target.startsWith('@')) {
     const sessionName = target.slice(1);
     const logPath = join(getLogsDir(), `bridge-${sessionName}.log`);
-    lines.push(chalk.bold('Debugging:'));
-    lines.push(`${bullet} bridge log: ${bt}${logPath}${bt}`);
+    lines.push(chalk.dim(`Session log for debugging: ${logPath}`));
     lines.push('');
   }
 
