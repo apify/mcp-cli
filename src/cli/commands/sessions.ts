@@ -212,6 +212,7 @@ export async function connectSession(
     proxyBearerToken?: string;
     x402?: boolean;
     insecure?: boolean;
+    skipDetails?: boolean;
   }
 ): Promise<void> {
   // Validate session name
@@ -258,7 +259,9 @@ export async function connectSession(
       if (options.outputMode === 'human') {
         console.log(formatSuccess(`Session ${name} is already active`));
       }
-      await showServerDetails(name, { ...options, hideTarget: false });
+      if (!options.skipDetails) {
+        await showServerDetails(name, { ...options, hideTarget: false });
+      }
       return;
     }
 
@@ -420,6 +423,16 @@ export async function connectSession(
       }
     }
     throw error;
+  }
+
+  // When skipDetails is set (bulk connect from config file), print success immediately
+  // without waiting for the bridge to complete MCP handshake. The session will auto-recover
+  // if the server is slow or unreachable; the user can check status with `mcpc @session`.
+  if (options.skipDetails) {
+    if (options.outputMode === 'human') {
+      console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
+    }
+    return;
   }
 
   // Verify the connection works by fetching server details.
@@ -922,6 +935,7 @@ export async function connectAllFromConfig(
       await connectSession(entry, sessionName, {
         ...options,
         config: configFile,
+        skipDetails: true,
       });
       results.push({ entry, sessionName, success: true });
     } catch (error) {
