@@ -986,7 +986,9 @@ export async function connectAllFromConfig(
           console.log(`  ${chalk.green('●')} ${name} ${chalk.green('reconnected')}`);
           break;
         case 'failed':
-          console.log(`  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}`);
+          console.log(
+            `  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}`
+          );
           break;
       }
     }
