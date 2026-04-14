@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Did you mean?" suggestions for unknown commands, including reversed names (e.g., `list-tools` → `tools-list`)
 - `--json` output documentation in `--help` for all commands, describing the MCP object shape returned
 - `tools-get` now shows an example `tools-call` command with placeholder arguments based on the tool's schema
+- Session info output (`mcpc @session`) now shows the path to the bridge log file under a "Debugging" section, helping AI agents and users locate logs when troubleshooting
 
 ### Changed
 
