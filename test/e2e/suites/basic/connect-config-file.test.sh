@@ -36,8 +36,9 @@ _SESSIONS_CREATED+=("@alpha" "@bravo")
 test_case "first connect creates @alpha and @bravo from config entries"
 run_mcpc connect "$CONFIG_FILE"
 assert_success "first connect should succeed"
-assert_contains "$STDOUT" "alpha"
-assert_contains "$STDOUT" "bravo"
+assert_contains "$STDOUT" "@alpha"
+assert_contains "$STDOUT" "@bravo"
+assert_contains "$STDOUT" "connected"
 
 # Verify both sessions exist with names derived from entry names
 run_mcpc --json

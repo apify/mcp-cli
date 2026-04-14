@@ -213,6 +213,7 @@ export async function connectSession(
     x402?: boolean;
     insecure?: boolean;
     skipDetails?: boolean;
+    quiet?: boolean;
   }
 ): Promise<void> {
   // Validate session name
@@ -256,7 +257,7 @@ export async function connectSession(
 
     if (bridgeStatus === 'live') {
       // Session exists and bridge is running - just show server info
-      if (options.outputMode === 'human') {
+      if (options.outputMode === 'human' && !options.quiet) {
         console.log(formatSuccess(`Session ${name} is already active`));
       }
       if (!options.skipDetails) {
@@ -266,7 +267,7 @@ export async function connectSession(
     }
 
     // Bridge has crashed or expired - reconnect with warning
-    if (options.outputMode === 'human') {
+    if (options.outputMode === 'human' && !options.quiet) {
       console.log(
         chalk.yellow(`Session ${name} exists but bridge is ${bridgeStatus}, reconnecting...`)
       );
@@ -429,7 +430,7 @@ export async function connectSession(
   // without waiting for the bridge to complete MCP handshake. The session will auto-recover
   // if the server is slow or unreachable; the user can check status with `mcpc @session`.
   if (options.skipDetails) {
-    if (options.outputMode === 'human') {
+    if (options.outputMode === 'human' && !options.quiet) {
       console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
     }
     return;
@@ -890,7 +891,7 @@ export async function restartSession(
 
 /**
  * Connect all servers defined in a config file, auto-generating session names from entry names.
- * Connects servers sequentially so bridge startup and session name deduplication are reliable.
+ * Launches all bridge processes in parallel and displays status badges when done.
  */
 export async function connectAllFromConfig(
   configFile: string,
@@ -920,37 +921,79 @@ export async function connectAllFromConfig(
         `Connecting ${serverNames.length} server${serverNames.length === 1 ? '' : 's'} from ${configFile}...`
       )
     );
-    console.log('');
   }
 
-  const results: { entry: string; sessionName: string; success: boolean; error?: string }[] = [];
+  // Prepare entries with deterministic session names derived from entry names.
+  // Re-running `mcpc connect <file>` reuses existing sessions via connectSession's
+  // "already active" path instead of creating @entry-2 duplicates.
+  const entries = serverNames.map((entry) => ({
+    entry,
+    sessionName: generateSessionName({ type: 'config', file: configFile, entry }),
+  }));
 
-  for (const entry of serverNames) {
-    // Use a deterministic name derived from the entry name (e.g., "alpha" → "@alpha").
-    // This ensures re-running `mcpc connect <file>` reuses existing sessions
-    // (via connectSession's "already active" path) instead of creating @alpha-2.
-    const sessionName = generateSessionName({ type: 'config', file: configFile, entry });
+  // Pre-check which sessions are already live (for accurate status badges)
+  const liveSet = new Set<string>();
+  for (const { sessionName } of entries) {
+    const session = await getSession(sessionName);
+    if (session && getBridgeStatus(session) === 'live') {
+      liveSet.add(sessionName);
+    }
+  }
 
-    try {
-      await connectSession(entry, sessionName, {
+  // Launch all connections in parallel (quiet mode — we display results below)
+  const settled = await Promise.allSettled(
+    entries.map(async ({ entry, sessionName }) =>
+      connectSession(entry, sessionName, {
         ...options,
         config: configFile,
         skipDetails: true,
-      });
-      results.push({ entry, sessionName, success: true });
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      results.push({ entry, sessionName, success: false, error: errorMsg });
-      if (options.outputMode === 'human') {
-        console.error(formatError(`Failed to connect "${entry}": ${errorMsg}`));
-        console.log('');
+        quiet: true,
+      })
+    )
+  );
+
+  // Build results with status badges
+  type ConnectResult = {
+    entry: string;
+    sessionName: string;
+    status: 'created' | 'active' | 'reconnected' | 'failed';
+    error?: string;
+  };
+  const results: ConnectResult[] = settled.map((outcome, i) => {
+    const { entry, sessionName } = entries[i]!;
+    if (outcome.status === 'fulfilled') {
+      if (liveSet.has(sessionName)) {
+        return { entry, sessionName, status: 'active' };
+      }
+      return { entry, sessionName, status: 'created' };
+    }
+    const error = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+    return { entry, sessionName, status: 'failed', error };
+  });
+
+  // Display badges
+  if (options.outputMode === 'human') {
+    for (const r of results) {
+      const name = chalk.cyan(r.sessionName);
+      switch (r.status) {
+        case 'created':
+          console.log(`  ${chalk.green('●')} ${name} ${chalk.green('connected')}`);
+          break;
+        case 'active':
+          console.log(`  ${chalk.green('●')} ${name} ${chalk.dim('already active')}`);
+          break;
+        case 'reconnected':
+          console.log(`  ${chalk.green('●')} ${name} ${chalk.green('reconnected')}`);
+          break;
+        case 'failed':
+          console.log(`  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}`);
+          break;
       }
     }
   }
 
-  // Print summary
-  const succeeded = results.filter((r) => r.success).length;
-  const failed = results.filter((r) => !r.success).length;
+  const succeeded = results.filter((r) => r.status !== 'failed').length;
+  const failed = results.filter((r) => r.status === 'failed').length;
 
   if (options.outputMode === 'json') {
     console.log(
@@ -960,19 +1003,19 @@ export async function connectAllFromConfig(
           results: results.map((r) => ({
             entry: r.entry,
             sessionName: r.sessionName,
-            ...(r.success ? { connected: true } : { connected: false, error: r.error }),
+            status: r.status,
+            ...(r.error && { error: r.error }),
           })),
         },
         'json'
       )
     );
-  } else if (serverNames.length > 1) {
-    console.log('');
+  } else if (results.length > 1) {
     if (failed === 0) {
       console.log(formatSuccess(`All ${succeeded} servers connected`));
-    } else {
+    } else if (succeeded > 0) {
       console.log(
-        formatWarning(`${succeeded} of ${serverNames.length} servers connected, ${failed} failed`)
+        formatWarning(`${succeeded} of ${results.length} servers connected, ${failed} failed`)
       );
     }
   }
