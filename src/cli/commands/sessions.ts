@@ -54,6 +54,7 @@ import { getWallet } from '../../lib/wallets.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
 import { parseProxyArg } from '../parser.js';
+import { loadConfig, listServers } from '../../lib/config.js';
 
 const logger = createLogger('sessions');
 
@@ -211,6 +212,8 @@ export async function connectSession(
     proxyBearerToken?: string;
     x402?: boolean;
     insecure?: boolean;
+    skipDetails?: boolean;
+    quiet?: boolean;
   }
 ): Promise<void> {
   // Validate session name
@@ -254,15 +257,17 @@ export async function connectSession(
 
     if (bridgeStatus === 'live') {
       // Session exists and bridge is running - just show server info
-      if (options.outputMode === 'human') {
+      if (options.outputMode === 'human' && !options.quiet) {
         console.log(formatSuccess(`Session ${name} is already active`));
       }
-      await showServerDetails(name, { ...options, hideTarget: false });
+      if (!options.skipDetails) {
+        await showServerDetails(name, { ...options, hideTarget: false });
+      }
       return;
     }
 
     // Bridge has crashed or expired - reconnect with warning
-    if (options.outputMode === 'human') {
+    if (options.outputMode === 'human' && !options.quiet) {
       console.log(
         chalk.yellow(`Session ${name} exists but bridge is ${bridgeStatus}, reconnecting...`)
       );
@@ -419,6 +424,16 @@ export async function connectSession(
       }
     }
     throw error;
+  }
+
+  // When skipDetails is set (bulk connect from config file), print success immediately
+  // without waiting for the bridge to complete MCP handshake. The session will auto-recover
+  // if the server is slow or unreachable; the user can check status with `mcpc @session`.
+  if (options.skipDetails) {
+    if (options.outputMode === 'human' && !options.quiet) {
+      console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
+    }
+    return;
   }
 
   // Verify the connection works by fetching server details.
@@ -875,8 +890,152 @@ export async function restartSession(
 }
 
 /**
- * Show help for a server (alias for getInstructions)
+ * Connect all servers defined in a config file, auto-generating session names from entry names.
+ * Launches all bridge processes in parallel and displays status badges when done.
  */
+export async function connectAllFromConfig(
+  configFile: string,
+  options: {
+    outputMode: OutputMode;
+    verbose?: boolean;
+    headers?: string[];
+    timeout?: number;
+    profile?: string;
+    noProfile?: boolean;
+    proxy?: string;
+    proxyBearerToken?: string;
+    x402?: boolean;
+    insecure?: boolean;
+  }
+): Promise<void> {
+  const config = loadConfig(configFile);
+  const serverNames = listServers(config);
+
+  if (serverNames.length === 0) {
+    throw new ClientError(`No servers found in config file: ${configFile}`);
+  }
+
+  if (options.outputMode === 'human') {
+    console.log(
+      chalk.cyan(
+        `Connecting ${serverNames.length} server${serverNames.length === 1 ? '' : 's'} from ${configFile}...`
+      )
+    );
+  }
+
+  // Prepare entries with deterministic session names derived from entry names.
+  // Re-running `mcpc connect <file>` reuses existing sessions via connectSession's
+  // "already active" path instead of creating @entry-2 duplicates.
+  const entries = serverNames.map((entry) => ({
+    entry,
+    sessionName: generateSessionName({ type: 'config', file: configFile, entry }),
+  }));
+
+  // Pre-check which sessions are already live (for accurate status badges)
+  const liveSet = new Set<string>();
+  for (const { sessionName } of entries) {
+    const session = await getSession(sessionName);
+    if (session && getBridgeStatus(session) === 'live') {
+      liveSet.add(sessionName);
+    }
+  }
+
+  // Launch all connections in parallel (quiet mode — we display results below)
+  const settled = await Promise.allSettled(
+    entries.map(async ({ entry, sessionName }) =>
+      connectSession(entry, sessionName, {
+        ...options,
+        config: configFile,
+        skipDetails: true,
+        quiet: true,
+      })
+    )
+  );
+
+  // Build results with status badges
+  type ConnectResult = {
+    entry: string;
+    sessionName: string;
+    status: 'created' | 'active' | 'reconnected' | 'failed';
+    error?: string;
+  };
+  const results: ConnectResult[] = settled.map((outcome, i) => {
+    const { entry, sessionName } = entries[i]!;
+    if (outcome.status === 'fulfilled') {
+      if (liveSet.has(sessionName)) {
+        return { entry, sessionName, status: 'active' };
+      }
+      return { entry, sessionName, status: 'created' };
+    }
+    const error = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+    return { entry, sessionName, status: 'failed', error };
+  });
+
+  // Display badges
+  if (options.outputMode === 'human') {
+    for (const r of results) {
+      const name = chalk.cyan(r.sessionName);
+      switch (r.status) {
+        case 'created':
+          // Bridge started but MCP handshake not yet verified
+          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('connecting')}`);
+          break;
+        case 'active':
+          console.log(`  ${chalk.green('●')} ${name} ${chalk.dim('already active')}`);
+          break;
+        case 'reconnected':
+          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('reconnecting')}`);
+          break;
+        case 'failed':
+          console.log(
+            `  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}`
+          );
+          break;
+      }
+    }
+  }
+
+  const active = results.filter((r) => r.status === 'active').length;
+  const connecting = results.filter(
+    (r) => r.status === 'created' || r.status === 'reconnected'
+  ).length;
+  const failed = results.filter((r) => r.status === 'failed').length;
+
+  if (options.outputMode === 'json') {
+    console.log(
+      formatOutput(
+        {
+          configFile,
+          results: results.map((r) => ({
+            entry: r.entry,
+            sessionName: r.sessionName,
+            status: r.status,
+            ...(r.error && { error: r.error }),
+          })),
+        },
+        'json'
+      )
+    );
+  } else if (results.length > 1) {
+    const parts: string[] = [];
+    if (active > 0) parts.push(`${active} already active`);
+    if (connecting > 0) parts.push(`${connecting} connecting`);
+    if (failed > 0) parts.push(`${failed} failed`);
+    const summary = parts.join(', ');
+
+    if (failed === 0) {
+      console.log(formatSuccess(summary));
+    } else if (active + connecting > 0) {
+      console.log(formatWarning(summary));
+    }
+  }
+
+  // If ALL servers failed, exit with error
+  if (active + connecting === 0) {
+    throw new ClientError(`Failed to connect any servers from ${configFile}`);
+  }
+}
+
 /**
  * Open an interactive shell for a target
  */
