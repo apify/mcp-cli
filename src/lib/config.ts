@@ -132,6 +132,12 @@ function substituteEnvVars(config: ServerConfig): ServerConfig {
 }
 
 /**
+ * Track which environment variables have already been warned about
+ * to avoid noisy repeated warnings (e.g., during bulk connect from config file).
+ */
+const warnedEnvVars = new Set<string>();
+
+/**
  * Substitute environment variables in a string
  * Replaces ${VAR_NAME} with process.env.VAR_NAME
  *
@@ -142,7 +148,10 @@ function substituteString(str: string): string {
   return str.replace(/\$\{([^}]+)}/g, (_match, varName: string) => {
     const value = process.env[varName];
     if (value === undefined) {
-      logger.warn(`Environment variable not found: ${varName}, using empty string`);
+      if (!warnedEnvVars.has(varName)) {
+        warnedEnvVars.add(varName);
+        logger.warn(`Environment variable not found: ${varName}, using empty string`);
+      }
       return '';
     }
     return value;
