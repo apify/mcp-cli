@@ -1324,8 +1324,7 @@ export function formatServerDetails(
 
   // Debugging hint: bridge log file path (only shown for sessions, i.e. @name targets)
   if (target.startsWith('@')) {
-    const sessionName = target.slice(1);
-    const logPath = join(getLogsDir(), `bridge-${sessionName}.log`);
+    const logPath = join(getLogsDir(), `bridge-${target}.log`);
     lines.push(chalk.dim(`Session log for debugging: ${logPath}`));
     lines.push('');
   }
