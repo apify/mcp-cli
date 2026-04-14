@@ -977,13 +977,14 @@ export async function connectAllFromConfig(
       const name = chalk.cyan(r.sessionName);
       switch (r.status) {
         case 'created':
-          console.log(`  ${chalk.green('●')} ${name} ${chalk.green('connected')}`);
+          // Bridge started but MCP handshake not yet verified
+          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('connecting')}`);
           break;
         case 'active':
           console.log(`  ${chalk.green('●')} ${name} ${chalk.dim('already active')}`);
           break;
         case 'reconnected':
-          console.log(`  ${chalk.green('●')} ${name} ${chalk.green('reconnected')}`);
+          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('reconnecting')}`);
           break;
         case 'failed':
           console.log(
@@ -994,7 +995,10 @@ export async function connectAllFromConfig(
     }
   }
 
-  const succeeded = results.filter((r) => r.status !== 'failed').length;
+  const active = results.filter((r) => r.status === 'active').length;
+  const connecting = results.filter(
+    (r) => r.status === 'created' || r.status === 'reconnected'
+  ).length;
   const failed = results.filter((r) => r.status === 'failed').length;
 
   if (options.outputMode === 'json') {
@@ -1013,17 +1017,21 @@ export async function connectAllFromConfig(
       )
     );
   } else if (results.length > 1) {
+    const parts: string[] = [];
+    if (active > 0) parts.push(`${active} already active`);
+    if (connecting > 0) parts.push(`${connecting} connecting`);
+    if (failed > 0) parts.push(`${failed} failed`);
+    const summary = parts.join(', ');
+
     if (failed === 0) {
-      console.log(formatSuccess(`All ${succeeded} servers connected`));
-    } else if (succeeded > 0) {
-      console.log(
-        formatWarning(`${succeeded} of ${results.length} servers connected, ${failed} failed`)
-      );
+      console.log(formatSuccess(summary));
+    } else if (active + connecting > 0) {
+      console.log(formatWarning(summary));
     }
   }
 
   // If ALL servers failed, exit with error
-  if (succeeded === 0) {
+  if (active + connecting === 0) {
     throw new ClientError(`Failed to connect any servers from ${configFile}`);
   }
 }
