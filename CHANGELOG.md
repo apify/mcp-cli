@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `connect` now verifies the server responds before reporting success; shows a warning with the actual error when the server is unreachable
 - HTTP 404 during initial connect no longer misclassified as "session expired"; error messages now include the actual HTTP error and server URL
 - `build:readme` script failing on macOS due to `sed -i` platform difference
+- `mcpc login --json` now writes interactive prompts (authorization URL, "Press Enter to open browser", browser-open status, callback-URL paste prompt) to stderr, so stdout contains only the final JSON result and is safe to pipe to `jq` or redirect to a file
 
 ## [0.2.4] - 2026-04-07
 
