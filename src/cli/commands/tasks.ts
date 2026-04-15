@@ -4,7 +4,7 @@
  */
 
 import chalk from 'chalk';
-import { formatOutput, formatSuccess, formatError, formatInfo } from '../output.js';
+import { formatOutput, formatSuccess, formatError } from '../output.js';
 import type { CommandOptions } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
 import { formatTask, formatTasks } from '../output.js';
@@ -50,8 +50,8 @@ export async function listTasks(target: string, options: CommandOptions): Promis
       } else {
         console.log(formatTasks(allTasks));
         console.log(
-          formatInfo(
-            `Run ${chalk.bold(`mcpc ${target} tasks-result <taskId>`)} to fetch the task's final result (blocks until it finishes)`
+          chalk.dim(
+            `To fetch the task's final result, run:\n  mcpc ${target} tasks-result <taskId>`
           )
         );
       }
