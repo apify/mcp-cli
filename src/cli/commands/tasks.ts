@@ -50,9 +50,7 @@ export async function listTasks(target: string, options: CommandOptions): Promis
       } else {
         console.log(formatTasks(allTasks));
         console.log(
-          chalk.dim(
-            `To fetch the task's final result, run:\n  mcpc ${target} tasks-result <taskId>`
-          )
+          `\nTo fetch the task's final result, run:\n  mcpc ${target} tasks-result <taskId>`
         );
       }
     } else {
