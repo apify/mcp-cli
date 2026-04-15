@@ -3,7 +3,6 @@
  * Manage async tasks on MCP servers that support the tasks capability
  */
 
-import chalk from 'chalk';
 import { formatOutput, formatSuccess, formatError } from '../output.js';
 import type { CommandOptions } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
