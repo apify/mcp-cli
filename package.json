@@ -22,8 +22,8 @@
   },
   "homepage": "https://github.com/apify/mcp-cli",
   "bin": {
-    "mcpc": "./bin/mcpc",
-    "mcpc-bridge": "./bin/mcpc-bridge"
+    "mcpc": "bin/mcpc",
+    "mcpc-bridge": "bin/mcpc-bridge"
   },
   "engines": {
     "node": ">=20.0.0"
