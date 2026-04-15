@@ -488,11 +488,11 @@ When logging in, `mcpc` supports all three OAuth client registration approaches 
 [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#client-registration-approaches),
 picking the one the authorization server advertises in its OAuth metadata:
 
-| **Approach**                         | **`mcpc login` flags**                         |
-| :----------------------------------- | :--------------------------------------------- |
-| **Pre-registration**                 | `--client-id` (and optional `--client-secret`) |
-| **Client ID Metadata Documents**     | `--client-metadata-url <https-url>`            |
-| **Dynamic Client Registration**      | _(default, no flags needed)_                   |
+| **Approach**                            | **`mcpc login` flags**                         |
+|:----------------------------------------| :--------------------------------------------- |
+| **Pre-registration**                    | `--client-id` (and optional `--client-secret`) |
+| **Client ID Metadata Documents (CIMD)** | `--client-metadata-url <https-url>`            |
+| **Dynamic Client Registration (DCR)**   | _(default, no flags needed)_                   |
 
 ```bash
 # Pre-registered OAuth client (public or confidential)
