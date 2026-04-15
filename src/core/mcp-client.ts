@@ -773,6 +773,29 @@ export class McpClient implements IMcpClient {
   }
 
   /**
+   * Get the final result of a task.
+   * Blocks on the server until the task reaches a terminal state, per
+   * the MCP `tasks/result` protocol method.
+   */
+  async getTaskResult(taskId: string): Promise<CallToolResult> {
+    try {
+      this.logger.debug(`Getting task result: ${taskId}`);
+      const result = (await this.client.experimental.tasks.getTaskResult(
+        taskId,
+        CallToolResultSchema,
+        this.getRequestOptions()
+      )) as CallToolResult;
+      this.logger.debug(`Task ${taskId} result received`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get task result ${taskId}:`, error);
+      throw new ServerError(`Failed to get task result ${taskId}: ${(error as Error).message}`, {
+        originalError: error,
+      });
+    }
+  }
+
+  /**
    * Cancel a running task
    */
   async cancelTask(taskId: string): Promise<CancelTaskResult> {

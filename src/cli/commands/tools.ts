@@ -14,7 +14,7 @@ import {
   formatInfo,
 } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
-import type { CommandOptions, TaskUpdate } from '../../lib/types.js';
+import type { CallToolResult, CommandOptions, TaskUpdate } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs, hasStdinData, readStdinArgs } from '../parser.js';
 import {
@@ -24,6 +24,45 @@ import {
   type ToolSchema,
   type SchemaMode,
 } from '../../lib/schema-validator.js';
+
+/**
+ * Render a `CallToolResult` payload.
+ *
+ * In human mode, prints a success/error banner before the payload and an
+ * optional hint after errors. In `--json` mode, only the raw payload is
+ * printed. Honors `--max-chars` truncation.
+ *
+ * Shared by `tools-call` and `tasks-result` so both commands render results
+ * identically.
+ */
+export function renderCallToolResult(
+  result: CallToolResult,
+  options: Pick<CommandOptions, 'outputMode' | 'maxChars'>,
+  banners?: {
+    success?: string;
+    error?: string;
+    /** Hint shown only in human mode when the result is an error */
+    errorHint?: string;
+  }
+): void {
+  if (options.outputMode === 'human' && banners) {
+    if (result.isError && banners.error) {
+      console.log(formatError(banners.error));
+    } else if (!result.isError && banners.success) {
+      console.log(formatSuccess(banners.success));
+    }
+  }
+
+  console.log(
+    formatOutput(result, options.outputMode, {
+      ...(options.maxChars && { maxChars: options.maxChars }),
+    })
+  );
+
+  if (result.isError && options.outputMode === 'human' && banners?.errorHint) {
+    console.log(formatInfo(banners.errorHint));
+  }
+}
 
 /**
  * List available tools
@@ -263,6 +302,9 @@ export async function callTool(
 
       if (options.outputMode === 'human') {
         console.log(formatSuccess(`Task started: ${taskUpdate.taskId}`));
+        console.log(
+          `\nTo fetch the task's final result, run:\n  mcpc ${target} tasks-result ${taskUpdate.taskId}`
+        );
       } else {
         console.log(formatOutput({ taskId: taskUpdate.taskId, status: taskUpdate.status }, 'json'));
       }
@@ -332,6 +374,11 @@ export async function callTool(
             if (spinner) {
               spinner.info(`Detached. Task ${chalk.bold(capturedTaskId!)} continues in background`);
             }
+            if (options.outputMode === 'human') {
+              console.log(
+                `\nTo fetch the task's final result, run:\n  mcpc ${target} tasks-result ${capturedTaskId!}`
+              );
+            }
             return;
           }
 
@@ -361,28 +408,17 @@ export async function callTool(
     } else {
       // Synchronous execution (default)
       result = await client.callTool(name, parsedArgs);
-      if (options.outputMode === 'human') {
-        if (result.isError) {
-          console.log(formatError(`Tool ${name} returned an error`));
-        } else {
-          console.log(formatSuccess(`Tool ${name} executed successfully`));
-        }
-      }
     }
 
-    console.log(
-      formatOutput(result, options.outputMode, {
-        ...(options.maxChars && { maxChars: options.maxChars }),
-      })
-    );
-
-    // Show hint for getting tool schema when the tool returned an error
-    if (result.isError && options.outputMode === 'human') {
-      console.log(
-        formatInfo(
-          `Run ${chalk.bold(`mcpc ${target} tools-get ${name}`)} to see the tool schema and usage`
-        )
-      );
-    }
+    // Render the result using the shared CallToolResult renderer.
+    // The --task branch already shows success/fail via spinner, so suppress
+    // the duplicate banners in that case.
+    renderCallToolResult(result, options, {
+      ...(!useTask && {
+        success: `Tool ${name} executed successfully`,
+        error: `Tool ${name} returned an error`,
+      }),
+      errorHint: `Run ${chalk.bold(`mcpc ${target} tools-get ${name}`)} to see the tool schema and usage`,
+    });
   });
 }

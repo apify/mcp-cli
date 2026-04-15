@@ -1329,6 +1329,7 @@ export function formatServerDetails(
   if (capabilities?.tasks) {
     commands.push(`${bullet} ${bt}mcpc ${target} tasks-list${bt}`);
     commands.push(`${bullet} ${bt}mcpc ${target} tasks-get <taskId>${bt}`);
+    commands.push(`${bullet} ${bt}mcpc ${target} tasks-result <taskId>${bt}`);
     commands.push(`${bullet} ${bt}mcpc ${target} tasks-cancel <taskId>${bt}`);
   }
 
