@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `tools-get` "Call example" now wraps JSON values (arrays, objects, strings) in single quotes so they can be copy-pasted into a shell verbatim without being mangled by word-splitting (e.g., `outputFormats:='["markdown"]'` instead of `outputFormats:=["markdown"]`)
+
 ## [0.2.5] - 2026-04-15
 
 ### Added

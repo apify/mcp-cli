@@ -849,8 +849,8 @@ describe('formatToolCallExample', () => {
     expect(output).not.toBeNull();
     expect(output).toContain('tools-call read_file');
     expect(output).toContain('@fs');
-    expect(output).toContain('path:="something"');
-    expect(output).toContain('encoding:="utf-8"');
+    expect(output).toContain(`path:='"something"'`);
+    expect(output).toContain(`encoding:='"utf-8"'`);
     expect(output).toContain('tail:=0');
   });
 
@@ -868,7 +868,7 @@ describe('formatToolCallExample', () => {
     };
 
     const output = formatToolCallExample(tool, '@test');
-    expect(output).toContain('query:="something"');
+    expect(output).toContain(`query:='"something"'`);
     expect(output).toContain('limit:=10');
   });
 
@@ -898,7 +898,7 @@ describe('formatToolCallExample', () => {
     };
 
     const output = formatToolCallExample(tool, '@s');
-    expect(output).toContain('mode:="fast"');
+    expect(output).toContain(`mode:='"fast"'`);
   });
 
   it('should use placeholder <@session> when no session name provided', () => {
@@ -932,6 +932,42 @@ describe('formatToolCallExample', () => {
 
     const output = formatToolCallExample(tool, '@s');
     expect(output).toContain('[--task]');
+  });
+
+  it('should shell-quote array default values so they survive shell parsing', () => {
+    // Regression: array defaults like ["markdown"] were being rendered without
+    // shell quoting, so the shell stripped the inner double quotes and mcpc
+    // received `[markdown]`, which is not valid JSON.
+    const tool: Tool = {
+      name: 'rag-web-browser',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+          outputFormats: { type: 'array', default: ['markdown'] },
+        },
+        required: ['query'],
+      },
+    };
+
+    const output = formatToolCallExample(tool, '@apify');
+    expect(output).toContain(`outputFormats:='["markdown"]'`);
+  });
+
+  it('should shell-quote object default values', () => {
+    const tool: Tool = {
+      name: 'configure',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          config: { type: 'object', default: { key: 'value' } },
+        },
+        required: ['config'],
+      },
+    };
+
+    const output = formatToolCallExample(tool, '@s');
+    expect(output).toContain(`config:='{"key":"value"}'`);
   });
 });
 

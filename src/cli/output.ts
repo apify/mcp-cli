@@ -630,6 +630,25 @@ function exampleValue(propSchema: Record<string, unknown>): string {
 }
 
 /**
+ * Wrap a JSON-stringified example value in single quotes if it contains
+ * characters that would be mangled by a POSIX shell (double quotes, brackets,
+ * braces, spaces, etc.). This ensures the "Call example" line can be
+ * copy-pasted into a shell verbatim and still round-trip through the parser.
+ *
+ * Without this, values like `["markdown"]` lose their inner quotes to shell
+ * word-splitting and reach mcpc as `[markdown]`, which is not valid JSON.
+ */
+function shellSafeExampleValue(jsonValue: string): string {
+  // Numbers, booleans, null, and simple identifier-like tokens are safe as-is.
+  if (/^[a-zA-Z0-9_.+-]+$/.test(jsonValue)) {
+    return jsonValue;
+  }
+  // Single-quote the value, escaping any embedded single quotes using the
+  // POSIX-portable `'\''` trick.
+  return `'${jsonValue.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
  * Format a tools-call usage example for a tool, showing how to invoke it.
  * Shows required params first, then fills with optional params up to 3 total.
  */
@@ -665,7 +684,7 @@ export function formatToolCallExample(tool: Tool, sessionName?: string): string 
   }
 
   const argParts = params.map((name) => {
-    const val = exampleValue(properties[name] ?? {});
+    const val = shellSafeExampleValue(exampleValue(properties[name] ?? {}));
     return `${name}:=${val}`;
   });
 
