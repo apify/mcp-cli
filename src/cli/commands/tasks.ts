@@ -7,6 +7,7 @@ import { formatOutput, formatSuccess, formatError } from '../output.js';
 import type { CommandOptions } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
 import { formatTask, formatTasks } from '../output.js';
+import { renderCallToolResult } from './tools.js';
 
 /**
  * Get the final result of a task (wraps MCP `tasks/result`).
@@ -20,20 +21,10 @@ export async function getTaskResult(
 ): Promise<void> {
   await withMcpClient(target, options, async (client, _context) => {
     const result = await client.getTaskResult(taskId);
-
-    if (options.outputMode === 'human') {
-      if (result.isError) {
-        console.log(formatError(`Task ${taskId} returned an error`));
-      } else {
-        console.log(formatSuccess(`Task ${taskId} result`));
-      }
-    }
-
-    console.log(
-      formatOutput(result, options.outputMode, {
-        ...(options.maxChars && { maxChars: options.maxChars }),
-      })
-    );
+    renderCallToolResult(result, options, {
+      success: `Task ${taskId} completed`,
+      error: `Task ${taskId} returned an error`,
+    });
   });
 }
 

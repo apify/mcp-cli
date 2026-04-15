@@ -1028,11 +1028,11 @@ ${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isErr
     .description('Get MCP task final result (blocks until task reaches a terminal state).')
     .addHelpText(
       'after',
-      jsonHelp(
-        '`CallToolResult` object',
-        '`{ content: [...], structuredContent?, isError? }`',
-        `${SCHEMA_BASE}#calltoolresult`
-      )
+      `
+Blocks on the server until the task reaches a terminal state (completed,
+failed, or cancelled), then prints the ${chalk.bold('CallToolResult')} payload using the
+same renderer as ${chalk.bold('tools-call')}.
+${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`', `${SCHEMA_BASE}#calltoolresult`)}`
     )
     .action(async (taskId, _options, command) => {
       await tasks.getTaskResult(session, taskId, getOptionsFromCommand(command));
