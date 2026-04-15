@@ -47,6 +47,16 @@ jobs:
             exit 1
           fi
 
+      - name: Verify NPM_TOKEN secret is set
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [[ -z "$NPM_TOKEN" ]]; then
+            echo "::error::NPM_TOKEN secret is missing or empty. Set it in repository settings (Settings → Secrets and variables → Actions) with an npm automation or granular access token that has publish permission for @apify/mcpc."
+            exit 1
+          fi
+          echo "NPM_TOKEN secret is present."
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
