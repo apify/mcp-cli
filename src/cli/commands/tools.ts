@@ -26,7 +26,7 @@ import {
 } from '../../lib/schema-validator.js';
 
 /**
- * Render a `CallToolResult` payload using the same renderer as `tools-call`.
+ * Render a `CallToolResult` payload.
  *
  * In human mode, prints a success/error banner before the payload and an
  * optional hint after errors. In `--json` mode, only the raw payload is
