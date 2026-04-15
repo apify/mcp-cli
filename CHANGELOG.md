@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-04-15
+
 ### Added
 
 - New `tasks-result <taskId>` command that fetches the final `CallToolResult` payload of an async task via the MCP `tasks/result` method. Blocks until the task reaches a terminal state, then prints the payload using the same renderer as `tools-call` (`--json` returns the raw result).
@@ -233,7 +235,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive shell mode
 - JSON output mode for scripting
 
-[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/apify/mcpc/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/apify/mcpc/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/apify/mcpc/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/apify/mcpc/compare/v0.2.2...v0.2.3
