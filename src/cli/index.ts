@@ -582,34 +582,25 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
       '--scope <scopes>',
       'OAuth scopes to request, quoted and space-separated (e.g. --scope "read write")'
     )
-    .option(
-      '--client-id <id>',
-      'Pre-registered OAuth client ID (skips Client ID Metadata Documents and Dynamic Client Registration)'
-    )
+    .option('--client-id <id>', 'Pre-registered OAuth client ID (skips CIMD and DCR)')
     .option('--client-secret <secret>', 'Pre-registered OAuth client secret (requires --client-id)')
     .option(
       '--client-metadata-url <url>',
-      'HTTPS URL of an OAuth Client ID Metadata Document (CIMD) to use as the client_id. ' +
-        'Used when the authorization server advertises ' +
-        '"client_id_metadata_document_supported: true"; otherwise mcpc falls back to Dynamic ' +
-        'Client Registration.'
+      'HTTPS URL of an OAuth Client ID Metadata Document (CIMD) to use as the client_id'
     )
     .addHelpText(
       'after',
       `
-${chalk.bold('Client registration approaches (per MCP authorization spec):')}
+${chalk.bold('OAuth client registration approaches (per MCP authorization spec):')}
 
-  When no pre-registered --client-id is provided, mcpc uses the registration
-  approach that the authorization server advertises, in this priority order:
+  1. Pre-registration: --client-id (and optionally --client-secret).
+  2. Client ID Metadata Documents (CIMD): --client-metadata-url <https-url>.
+     Used when the authorization server advertises
+     "client_id_metadata_document_supported: true".
+  3. Dynamic Client Registration (DCR): default fallback when the server
+     exposes a "registration_endpoint". No flags required.
 
-  1. Pre-registration   Pass --client-id (and optionally --client-secret).
-  2. Client ID Metadata Documents (CIMD)
-                        Pass --client-metadata-url <https-url> pointing to a
-                        JSON metadata document. Used when the authorization
-                        server advertises "client_id_metadata_document_supported".
-  3. Dynamic Client Registration (DCR)
-                        Default fallback. Used when the server exposes a
-                        "registration_endpoint". No configuration required.
+  See https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
 
 ${jsonHelp('`{ profile, serverUrl, scopes }`')}`
     )
