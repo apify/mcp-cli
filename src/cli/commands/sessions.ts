@@ -7,11 +7,12 @@ import {
   OutputMode,
   isValidSessionName,
   generateSessionName,
-  normalizeServerUrl,
   validateProfileName,
   isProcessAlive,
   getServerHost,
   redactHeaders,
+  matchSessionByTarget,
+  pickAvailableSessionName,
 } from '../../lib/index.js';
 import { DISCONNECTED_THRESHOLD_MS } from '../../lib/types.js';
 import type { ServerConfig, ProxyConfig } from '../../lib/types.js';
@@ -90,57 +91,15 @@ async function checkPortAvailable(host: string, port: number): Promise<boolean> 
  *
  * @returns The matching session name (with @ prefix), or undefined if no match found
  */
-async function findMatchingSession(
-  parsed: { type: 'url'; url: string } | { type: 'config'; file: string; entry: string },
+export async function findMatchingSession(
+  parsed:
+    | { type: 'url'; url: string }
+    | { type: 'config'; file: string; entry: string }
+    | { type: 'command'; command: string; args: string[]; env?: Record<string, string> },
   options: { profile?: string; headers?: string[]; noProfile?: boolean }
 ): Promise<string | undefined> {
   const storage = await loadSessions();
-  const sessions = Object.values(storage.sessions);
-
-  if (sessions.length === 0) return undefined;
-
-  // Determine the effective profile name for comparison
-  const effectiveProfile = options.noProfile ? undefined : (options.profile ?? 'default');
-
-  for (const session of sessions) {
-    if (!session.server) continue;
-
-    // Match server target
-    if (parsed.type === 'url') {
-      if (!session.server.url) continue;
-      // Compare normalized URLs
-      try {
-        const existingUrl = normalizeServerUrl(session.server.url);
-        const newUrl = normalizeServerUrl(parsed.url);
-        if (existingUrl !== newUrl) continue;
-      } catch {
-        continue;
-      }
-    } else {
-      // Config entry: match by command (stdio transport)
-      // Config entries produce stdio configs with command/args, so we can't easily
-      // compare them. Instead, just compare generated session names for config targets.
-      // This is handled by the caller (resolveSessionName) via name-based dedup.
-      continue;
-    }
-
-    // Match profile
-    const sessionProfile = session.profileName ?? 'default';
-    if (effectiveProfile !== sessionProfile) continue;
-
-    // Match header keys (values are redacted, so we only compare key sets)
-    const existingHeaderKeys = Object.keys(session.server.headers || {}).sort();
-    const newHeaderKeys = (options.headers || [])
-      .map((h) => h.split(':')[0]?.trim() || '')
-      .filter(Boolean)
-      .sort();
-    if (existingHeaderKeys.join(',') !== newHeaderKeys.join(',')) continue;
-
-    // Found a match
-    return session.name;
-  }
-
-  return undefined;
+  return matchSessionByTarget(storage, parsed, options);
 }
 
 /**
@@ -150,7 +109,10 @@ async function findMatchingSession(
  * @returns Session name with @ prefix
  */
 export async function resolveSessionName(
-  parsed: { type: 'url'; url: string } | { type: 'config'; file: string; entry: string },
+  parsed:
+    | { type: 'url'; url: string }
+    | { type: 'config'; file: string; entry: string }
+    | { type: 'command'; command: string; args: string[]; env?: Record<string, string> },
   options: {
     outputMode: OutputMode;
     profile?: string;
@@ -167,29 +129,29 @@ export async function resolveSessionName(
   // Generate a new session name
   const candidateName = generateSessionName(parsed);
 
-  // Check if the candidate name is already taken by a different server
+  // For inline commands, always append a numeric suffix (starting at -1) since the binary
+  // basename is rarely as distinctive as a hostname or config entry.
+  // For URL/config targets, try the bare name first, then -2, -3, ...
   const storage = await loadSessions();
-  if (!(candidateName in storage.sessions)) {
+  const picked = pickAvailableSessionName(storage, candidateName, parsed.type === 'command');
+  if (picked) {
     if (options.outputMode === 'human') {
-      console.log(chalk.cyan(`Using session name: ${candidateName}`));
+      console.log(chalk.cyan(`Using session name: ${picked}`));
     }
-    return candidateName;
+    return picked;
   }
 
-  // Name is taken - try suffixed variants
-  for (let i = 2; i <= 99; i++) {
-    const suffixed = `${candidateName}-${i}`;
-    if (isValidSessionName(suffixed) && !(suffixed in storage.sessions)) {
-      if (options.outputMode === 'human') {
-        console.log(chalk.cyan(`Using session name: ${suffixed}`));
-      }
-      return suffixed;
-    }
+  let targetDescription: string;
+  if (parsed.type === 'url') {
+    targetDescription = parsed.url;
+  } else if (parsed.type === 'config') {
+    targetDescription = `${parsed.file}:${parsed.entry}`;
+  } else {
+    targetDescription = [parsed.command, ...parsed.args].join(' ');
   }
-
   throw new ClientError(
     `Cannot auto-generate session name: too many sessions for this server.\n` +
-      `Specify a name explicitly: mcpc connect ${parsed.type === 'url' ? parsed.url : `${parsed.file}:${parsed.entry}`} @my-session`
+      `Specify a name explicitly: mcpc connect ${targetDescription} @my-session`
   );
 }
 
@@ -214,6 +176,11 @@ export async function connectSession(
     insecure?: boolean;
     skipDetails?: boolean;
     quiet?: boolean;
+    /**
+     * Pre-built ServerConfig (for inline stdio commands). When provided,
+     * resolveTarget() is skipped and this config is used directly.
+     */
+    inlineServerConfig?: ServerConfig;
   }
 ): Promise<void> {
   // Validate session name
@@ -281,8 +248,10 @@ export async function connectSession(
     }
   }
 
-  // Resolve target to transport config
-  const serverConfig = await resolveTarget(target, options);
+  // Resolve target to transport config (or use the pre-built inline config for stdio commands)
+  const serverConfig = options.inlineServerConfig
+    ? options.inlineServerConfig
+    : await resolveTarget(target, options);
 
   // Detect conflicting auth flags: --profile and --header "Authorization: ..." are mutually exclusive
   const hasExplicitAuthHeader = serverConfig.headers?.Authorization !== undefined;

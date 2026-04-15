@@ -2,7 +2,7 @@
  * Command-line argument parsing utilities
  * Pure functions with no external dependencies for easy testing
  */
-import { ClientError } from '../lib/index.js';
+import { ClientError, shellSplit } from '../lib/index.js';
 
 /**
  * Check if an environment variable is set to a truthy value
@@ -348,7 +348,7 @@ function looksLikeFilePath(s: string): boolean {
 }
 
 /**
- * Parse a server argument into a URL or config file entry.
+ * Parse a server argument into a URL, config file entry, or inline stdio command.
  *
  * 1. URL: arg (as-is, or prefixed with https:// or http://) is a valid URL with a non-empty host.
  *    Args that start with a path character (/, ~, .) skip the prefix check to avoid false positives
@@ -356,7 +356,10 @@ function looksLikeFilePath(s: string): boolean {
  * 2. If arg contains "://" but failed URL validation above → null (invalid full-URL syntax).
  * 3. Config entry: colon present, entry non-empty, AND left side looks like a file path.
  *    Windows drive-letter paths (C:\...) use lastIndexOf(':') so the drive colon is skipped.
- * 4. Otherwise: returns null (caller should report an error)
+ * 4. Bare config file path (no :entry suffix) — connect all servers from the file.
+ * 4a. Inline stdio command — arg contains whitespace and isn't a URL/config-file path.
+ *     The string is shell-split into [command, ...args]. (NEW)
+ * 5. Otherwise: returns null (caller should report an error)
  */
 export function parseServerArg(
   arg: string
@@ -364,6 +367,7 @@ export function parseServerArg(
   | { type: 'url'; url: string }
   | { type: 'config'; file: string; entry: string }
   | { type: 'config-file'; file: string }
+  | { type: 'command'; command: string; args: string[] }
   | null {
   // Step 1a: try arg as-is (covers full URLs like https://... or ftp://...)
   if (isValidUrlWithHost(arg)) {
@@ -380,11 +384,13 @@ export function parseServerArg(
   // Skip if arg starts with a path character — those are file paths, not hostnames.
   // Skip if arg ends with a config file extension (e.g., config.json) — clearly a file, not a hostname.
   // Skip if arg ends with ':' — dangling colon is not a valid hostname.
+  // Skip if arg contains whitespace — that's clearly an inline command, not a hostname.
   const isWindowsDrive = /^[A-Za-z]:[/\\]/.test(arg);
   const startsWithPathChar =
     arg.startsWith('/') || arg.startsWith('~') || arg.startsWith('.') || isWindowsDrive;
   const hasConfigExtension = /\.(json|yaml|yml)$/i.test(arg);
-  if (!startsWithPathChar && !hasConfigExtension && !arg.endsWith(':')) {
+  const hasWhitespace = /\s/.test(arg);
+  if (!startsWithPathChar && !hasConfigExtension && !arg.endsWith(':') && !hasWhitespace) {
     if (isValidUrlWithHost('https://' + arg)) {
       return { type: 'url', url: arg };
     }
@@ -405,9 +411,26 @@ export function parseServerArg(
   }
 
   // Step 4: bare config file path (no :entry suffix) — connect all servers from the file.
-  // Matches if the entire arg looks like a file path (e.g., ~/.vscode/mcp.json, ./config.json)
-  if (looksLikeFilePath(arg)) {
+  // Matches if the entire arg looks like a file path (e.g., ~/.vscode/mcp.json, ./config.json).
+  // Strings containing whitespace are only treated as config files when they end in a known
+  // extension (.json/.yaml/.yml) — otherwise they're far more likely to be inline stdio commands
+  // (e.g. "npx -y @scope/pkg /tmp" contains a slash but isn't a file path).
+  if (looksLikeFilePath(arg) && (!hasWhitespace || hasConfigExtension)) {
     return { type: 'config-file', file: arg };
+  }
+
+  // Step 4a: inline stdio command — anything containing whitespace that wasn't a file or URL.
+  // shellSplit throws ClientError for unbalanced quotes / trailing backslashes.
+  if (hasWhitespace) {
+    const tokens = shellSplit(arg);
+    if (tokens.length === 0) {
+      return null;
+    }
+    const [command, ...rest] = tokens;
+    if (!command) {
+      return null;
+    }
+    return { type: 'command', command, args: rest };
   }
 
   // Step 5: unrecognised

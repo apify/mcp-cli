@@ -20,3 +20,6 @@ export * from './file-logger.js';
 
 // Export cleanup utilities
 export * from './cleanup.js';
+
+// Export session-matching helpers
+export * from './session-matching.js';

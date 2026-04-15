@@ -27,7 +27,7 @@ import * as tasks from './commands/tasks.js';
 import * as grepCmd from './commands/grep.js';
 import { handleX402Command } from './commands/x402.js';
 import { clean } from './commands/clean.js';
-import type { OutputMode } from '../lib/index.js';
+import type { OutputMode, ServerConfig } from '../lib/index.js';
 import {
   extractOptions,
   getVerboseFromEnv,
@@ -134,6 +134,66 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
 }
 
 /**
+ * Inline stdio command tokens captured from `mcpc connect [...] -- <cmd> <args...>`.
+ * Set by extractInlineCommandTokens() before Commander parses argv, consumed by the
+ * connect action handler. Module-level storage avoids threading raw argv through Commander.
+ */
+let pendingInlineCommandTokens: string[] | undefined;
+
+/**
+ * If args contain `--` after the `connect` token, extract the trailing tokens as the inline
+ * stdio command and remove `--` and the trailing tokens from both `args` and `process.argv`
+ * so Commander never sees them. Stores the trailing tokens in `pendingInlineCommandTokens`.
+ *
+ * @returns The cleaned args array (with `--` and post-`--` tokens removed)
+ * @throws ClientError if `--` is used outside a `connect` command
+ */
+function extractInlineCommandTokens(args: string[]): string[] {
+  const dashIndex = args.indexOf('--');
+  if (dashIndex < 0) return args;
+
+  // `--` is only meaningful for the `connect` command. Find the first non-option token to
+  // verify we're in a connect invocation; reject otherwise so users get a clear error.
+  let connectIndex = -1;
+  for (let i = 0; i < dashIndex; i++) {
+    const arg = args[i];
+    if (!arg) continue;
+    if (arg.startsWith('-')) {
+      if (optionTakesValue(arg) && !arg.includes('=') && i + 1 < dashIndex) {
+        i++;
+      }
+      continue;
+    }
+    if (arg === 'connect') {
+      connectIndex = i;
+    }
+    break;
+  }
+  if (connectIndex < 0) {
+    throw new ClientError(
+      `'--' separator is only supported with 'connect'.\n` +
+        `Example: mcpc connect @session -- npx -y @modelcontextprotocol/server-filesystem /`
+    );
+  }
+
+  const trailing = args.slice(dashIndex + 1);
+  if (trailing.length === 0) {
+    throw new ClientError(
+      `'--' must be followed by an inline stdio command.\n` +
+        `Example: mcpc connect @session -- npx -y @modelcontextprotocol/server-filesystem /`
+    );
+  }
+
+  pendingInlineCommandTokens = trailing;
+
+  // Remove `--` and trailing tokens from process.argv so Commander never parses them.
+  // process.argv = [node, script, ...args], so dashIndex in args corresponds to dashIndex+2 in argv.
+  process.argv = process.argv.slice(0, dashIndex + 2);
+
+  return args.slice(0, dashIndex);
+}
+
+/**
  * Format a JSON output help line with backtick-style Markdown formatting.
  * Optional schemaUrl adds a "Schema:" link for AI agents.
  */
@@ -146,7 +206,17 @@ function jsonHelp(description: string, shape?: string, schemaUrl?: string): stri
 const SCHEMA_BASE = 'https://modelcontextprotocol.io/specification/2025-11-25/schema';
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+  let args = process.argv.slice(2);
+
+  // Extract inline stdio command tokens (after `--`) for `mcpc connect`. This must happen
+  // before validateOptions(), which would otherwise reject `--` as an unknown option.
+  // Mutates process.argv to remove `--` and trailing tokens so Commander never sees them.
+  try {
+    args = extractInlineCommandTokens(args);
+  } catch (error) {
+    console.error(chalk.red(formatHumanError(error as Error, false)));
+    process.exit(1);
+  }
 
   // Set up cleanup handlers for graceful shutdown
   const handleExit = (): void => {
@@ -449,24 +519,28 @@ ${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
   ~/.vscode/mcp.json            Config file — connect all servers in the file
+  "npx -y @scope/server-foo"    Inline stdio command (quote the whole string)
+  -- node dist/stdio.js         Inline stdio command via '--' (everything after is argv)
 
 ${chalk.bold('Session name:')}
   If @session is omitted, a name is auto-generated from the server hostname
-  (e.g. mcp.apify.com → @apify) or config entry name. If a matching session
-  already exists (same server URL, OAuth profile, and HTTP header names), it
-  is reused (restarted if not live). Header values are not compared — they
-  are stored securely in OS keychain.
+  (e.g. mcp.apify.com → @apify), config entry name, or command basename
+  (e.g. "npx ..." → @npx-1, "node ..." → @node-1). If a matching session
+  already exists (same server URL, OAuth profile, and HTTP header names — or for
+  stdio commands, exact match on command + args + env), it is reused (restarted
+  if not live). Header values are not compared — they are stored securely in OS
+  keychain.
   When connecting all servers from a config file, @session cannot be specified.
+
+${chalk.bold('Inline stdio commands:')}
+  No \${VAR} substitution is applied to inline commands — your shell is the only
+  expansion layer. Use double quotes to interpolate (\`"node \${PWD}/dist/foo.js"\`)
+  or single quotes to pass the literal string. Auth flags (--header, --profile,
+  --no-profile, --x402) cannot be combined with an inline command.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
-      if (!server) {
-        throw new ClientError(
-          'Missing required argument: server\n\nExample: mcpc connect mcp.apify.com @myapp'
-        );
-      }
       const globalOpts = getOptionsFromCommand(command);
-      const parsed = parseServerArg(server);
 
       // Extract --header from connect-specific opts
       const headers: string[] | undefined = opts.header
@@ -475,11 +549,84 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
           : [opts.header as string]
         : undefined;
 
-      if (!parsed) {
-        throw new ClientError(
-          `Invalid server: "${server}"\n\n` +
-            `Expected a URL (e.g. mcp.apify.com) or a config file entry (e.g. ~/.vscode/mcp.json:filesystem)`
-        );
+      // Inline stdio command via `--` separator: tokens were extracted before Commander ran.
+      // The `server` positional is forbidden in this form; if it looks like @session, shift it.
+      let parsed: ReturnType<typeof parseServerArg>;
+      if (pendingInlineCommandTokens) {
+        if (server) {
+          if (server.startsWith('@') && !sessionName) {
+            // mcpc connect @stdio -- node dist/foo.js
+            sessionName = server;
+            server = undefined;
+          } else {
+            throw new ClientError(
+              `Cannot combine a server argument with '--'.\n` +
+                `Use either:\n` +
+                `  mcpc connect "${server}" [@session]   (heuristic form)\n` +
+                `  mcpc connect [@session] -- <cmd> <args...>   ('--' form, no server arg)`
+            );
+          }
+        }
+        const [cmd, ...rest] = pendingInlineCommandTokens;
+        if (!cmd) {
+          throw new ClientError(`'--' must be followed by an inline stdio command.`);
+        }
+        parsed = { type: 'command', command: cmd, args: rest };
+      } else {
+        if (!server) {
+          throw new ClientError(
+            'Missing required argument: server\n\nExample: mcpc connect mcp.apify.com @myapp'
+          );
+        }
+        parsed = parseServerArg(server);
+        if (!parsed) {
+          throw new ClientError(
+            `Invalid server: "${server}"\n\n` +
+              `Expected a URL (e.g. mcp.apify.com), a config file entry (e.g. ~/.vscode/mcp.json:filesystem), or an inline stdio command (e.g. "npx -y @modelcontextprotocol/server-filesystem /").`
+          );
+        }
+      }
+
+      // Inline stdio command: validate incompatible flags and route via inlineServerConfig
+      if (parsed.type === 'command') {
+        const incompatibleFlags: string[] = [];
+        if (headers && headers.length > 0) incompatibleFlags.push('--header');
+        if (globalOpts.profile) incompatibleFlags.push('--profile');
+        if (globalOpts.noProfile) incompatibleFlags.push('--no-profile');
+        if (globalOpts.x402) incompatibleFlags.push('--x402');
+        if (incompatibleFlags.length > 0) {
+          throw new ClientError(
+            `${incompatibleFlags.join(', ')} cannot be combined with an inline stdio command.\n` +
+              `These flags only apply to HTTP servers.`
+          );
+        }
+
+        // Auto-generate session name if not provided
+        if (!sessionName) {
+          sessionName = await sessions.resolveSessionName(parsed, {
+            outputMode: globalOpts.outputMode,
+          });
+        }
+
+        const inlineServerConfig: ServerConfig = {
+          command: parsed.command,
+          args: parsed.args,
+        };
+        // Inform the user what binary is being launched (security-relevant — see issue #163)
+        if (globalOpts.outputMode === 'human') {
+          const printable = [parsed.command, ...parsed.args]
+            .map((t) => (/\s/.test(t) ? `"${t}"` : t))
+            .join(' ');
+          console.error(chalk.dim(`Launching: ${printable}`));
+        }
+        await sessions.connectSession(parsed.command, sessionName, {
+          ...globalOpts,
+          inlineServerConfig,
+          proxy: opts.proxy,
+          proxyBearerToken: opts.proxyBearerToken,
+          ...(globalOpts.insecure && { insecure: true }),
+        });
+        return;
       }
 
       // Config file without :entry — connect all servers from the file
