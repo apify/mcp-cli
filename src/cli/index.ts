@@ -948,6 +948,7 @@ ${jsonHelp(
       await tools.getTool(session, name, getOptionsFromCommand(command));
     });
 
+  // Keep jsonHelp() consistent with tasks-result!
   program
     .command('tools-call <name> [args...]')
     .description('Call an MCP tool with arguments.')
@@ -1023,17 +1024,17 @@ ${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isErr
       await tasks.getTask(session, taskId, getOptionsFromCommand(command));
     });
 
+  // Keep jsonHelp() consistent with tools-call!
   program
     .command('tasks-result <taskId>')
     .description('Get MCP task final result (blocks until task reaches a terminal state).')
     .addHelpText(
       'after',
-      jsonHelp(
-        '`CallToolResult` object',
-        // Keep this consistent with tools-call!
-        '`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }`',
-        `${SCHEMA_BASE}#calltoolresult`
-      )
+      `
+Blocks on the server until the task reaches a terminal state (completed,
+failed, or cancelled), then prints the ${chalk.bold('CallToolResult')} payload using the
+same renderer as ${chalk.bold('tools-call')}.
+${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }`', `${SCHEMA_BASE}#calltoolresult`)}`
     )
     .action(async (taskId, _options, command) => {
       await tasks.getTaskResult(session, taskId, getOptionsFromCommand(command));
