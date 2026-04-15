@@ -1030,7 +1030,6 @@ ${toolsCallJsonHelp}`
       await tasks.getTask(session, taskId, getOptionsFromCommand(command));
     });
 
-  // Keep jsonHelp() consistent with tools-call!
   program
     .command('tasks-result <taskId>')
     .description('Get MCP task final result (blocks until task reaches a terminal state).')
