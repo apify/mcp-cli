@@ -20,6 +20,7 @@ import {
   getSocketPath,
   waitForFile,
   isProcessAlive,
+  invalidateProcessAliveCache,
   getLogsDir,
   isSessionExpiredError,
   enrichErrorMessage,
@@ -190,6 +191,13 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
     detached: true,
     stdio: 'ignore', // Don't inherit stdio (run in background)
   });
+
+  // Reset the Windows tasklist cache so the freshly spawned PID is observable
+  // by subsequent isProcessAlive() checks within this CLI invocation (e.g. the
+  // ensureBridgeReady health check run right after this in restart/connect).
+  // Without this, a stale pre-spawn snapshot returns false for the new PID,
+  // triggering a spurious double-restart that breaks explicit restart semantics.
+  invalidateProcessAliveCache();
 
   // Allow the bridge to run independently
   bridgeProcess.unref();
