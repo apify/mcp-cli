@@ -596,7 +596,10 @@ ${chalk.bold('OAuth client registration approaches (per MCP authorization spec):
 
   See https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
 
-${jsonHelp('`{ profile, serverUrl, scopes }`')}`
+${jsonHelp('`{ profile, serverUrl, scopes }`')}
+  Interactive prompts and the authorization URL are written to stderr, so
+  stdout contains only the final JSON result and is safe to pipe or redirect.
+`
     )
     .action(async (server, opts, command) => {
       if (!server) {

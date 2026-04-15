@@ -115,10 +115,10 @@ async function waitForEnterKey(prompt: string): Promise<boolean> {
     return true;
   }
 
-  process.stdout.write(prompt);
+  process.stderr.write(prompt);
 
   const { promise } = setupKeyListener<boolean>((char) => {
-    console.log(''); // Print newline after keypress
+    console.error(''); // Print newline after keypress
     if (char === ENTER_CR || char === ENTER_LF) {
       return { done: true, value: true };
     }
@@ -359,7 +359,7 @@ function promptForCallbackUrl(): {
 } {
   const rl = createInterface({
     input: process.stdin,
-    output: process.stdout,
+    output: process.stderr,
   });
 
   let cleaned = false;
@@ -528,7 +528,8 @@ export async function performOAuthFlow(
     // Override redirectToAuthorization to open browser
     provider.redirectToAuthorization = async (authorizationUrl: URL) => {
       logger.debug('Opening browser for authorization...');
-      console.log(`\nAuthorization URL: ${authorizationUrl.toString()}`);
+      // Interactive chatter goes to stderr so stdout stays clean for --json output.
+      console.error(`\nAuthorization URL: ${authorizationUrl.toString()}`);
 
       // Ask for confirmation before opening browser
       const confirmed = await waitForEnterKey(
@@ -538,20 +539,20 @@ export async function performOAuthFlow(
         throw new ClientError('Authentication cancelled by user');
       }
 
-      console.log('Opening browser...');
+      console.error('Opening browser...');
       const opened = await tryOpenBrowser(authorizationUrl.toString());
 
       if (opened) {
-        console.log('If the browser does not open automatically, please visit the URL above.');
-        console.log('Press Esc to cancel.\n');
+        console.error('If the browser does not open automatically, please visit the URL above.');
+        console.error('Press Esc to cancel.\n');
         // Set up escape key handler AFTER Enter confirmation (to avoid raw mode conflicts)
         escapeHandlerRef.current = waitForEscapeKey();
       } else {
         browserFailed = true;
-        console.log(
+        console.error(
           '\nCould not open browser. Please open the authorization URL above in your browser.'
         );
-        console.log(
+        console.error(
           'After authorizing, copy the full callback URL from the browser address bar and paste it here.'
         );
       }
