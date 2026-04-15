@@ -302,6 +302,11 @@ export async function callTool(
 
       if (options.outputMode === 'human') {
         console.log(formatSuccess(`Task started: ${taskUpdate.taskId}`));
+        console.log(
+          formatInfo(
+            `Run ${chalk.bold(`mcpc ${target} tasks-result ${taskUpdate.taskId}`)} to fetch the result once the task completes`
+          )
+        );
       } else {
         console.log(formatOutput({ taskId: taskUpdate.taskId, status: taskUpdate.status }, 'json'));
       }
@@ -370,6 +375,13 @@ export async function callTool(
             if (timerInterval) clearInterval(timerInterval);
             if (spinner) {
               spinner.info(`Detached. Task ${chalk.bold(capturedTaskId!)} continues in background`);
+            }
+            if (options.outputMode === 'human') {
+              console.log(
+                formatInfo(
+                  `Run ${chalk.bold(`mcpc ${target} tasks-result ${capturedTaskId!}`)} to fetch the result once the task completes`
+                )
+              );
             }
             return;
           }
