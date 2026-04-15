@@ -948,7 +948,13 @@ ${jsonHelp(
       await tools.getTool(session, name, getOptionsFromCommand(command));
     });
 
-  // Keep jsonHelp() consistent with tasks-result!
+  // Keep jsonHelp() consistent across tools-call and tasks-result!
+  const toolsCallJsonHelp = jsonHelp(
+    '`CallToolResult` object',
+    '`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }`',
+    `${SCHEMA_BASE}#calltoolresult`
+  );
+
   program
     .command('tools-call <name> [args...]')
     .description('Call an MCP tool with arguments.')
@@ -971,7 +977,7 @@ ${chalk.bold('Arguments:')}
 ${chalk.bold('Schema validation:')}
   --schema <file>       Validate tool schema before calling (save with tools-get --json)
   --schema-mode <mode>  strict | compatible (default) | ignore
-${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }`', `${SCHEMA_BASE}#calltoolresult`)}`
+${toolsCallJsonHelp}`
     )
     .action(async (name, args, options, command) => {
       // Intercept --help: with helpOption(false) Commander won't catch it.
@@ -1028,14 +1034,7 @@ ${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isErr
   program
     .command('tasks-result <taskId>')
     .description('Get MCP task final result (blocks until task reaches a terminal state).')
-    .addHelpText(
-      'after',
-      `
-Blocks on the server until the task reaches a terminal state (completed,
-failed, or cancelled), then prints the ${chalk.bold('CallToolResult')} payload using the
-same renderer as ${chalk.bold('tools-call')}.
-${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }`', `${SCHEMA_BASE}#calltoolresult`)}`
-    )
+    .addHelpText('after', toolsCallJsonHelp)
     .action(async (taskId, _options, command) => {
       await tasks.getTaskResult(session, taskId, getOptionsFromCommand(command));
     });
