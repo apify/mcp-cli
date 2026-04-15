@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - New `npm run test:conformance` script (and on-demand `Conformance` GitHub Actions workflow) that runs the `@modelcontextprotocol/conformance` framework against mcpc to verify adherence to the MCP specification. The conformance adapter now covers the `initialize`, `tools_call`, and `sse-retry` client scenarios and exercises a broader set of mcpc sub-commands (`tools-list`, `tools-get`, `tools-call` with and without `--task`, `ping`, `logging-set-level`, `resources-list`, `resources-templates-list`, `prompts-list`) against the conformance test server.
+- `mcpc connect` (with no arguments) now auto-discovers standard MCP config files (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.kiro/settings/mcp.json`, `~/.claude.json`, `~/.codeium/windsurf/mcp_config.json`, Claude Desktop's platform-specific config, etc.) in the current directory and home directory, and connects every server defined across them. Entries with duplicate session names across files are deduplicated (project-scoped files win over global ones).
 
 ### Changed
 

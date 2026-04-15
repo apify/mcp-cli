@@ -10,6 +10,8 @@ import {
   validateServerConfig,
   listServers,
   isStdioEntry,
+  getStandardMcpConfigPaths,
+  discoverMcpConfigFiles,
 } from '../../../src/lib/config.js';
 import { ClientError } from '../../../src/lib/errors.js';
 
@@ -282,5 +284,298 @@ describe('environment variable substitution', () => {
 
     const serverConfig = getServerConfig(config, 'test');
     expect(serverConfig.url).toBe('https://example.com');
+  });
+});
+
+describe('getStandardMcpConfigPaths', () => {
+  it('returns project-scoped paths first, then global', () => {
+    const paths = getStandardMcpConfigPaths({
+      homeDir: '/home/alice',
+      cwd: '/work/project',
+      platform: 'linux',
+    });
+
+    // Project scope first
+    expect(paths[0]?.scope).toBe('project');
+    // Global scope afterwards
+    const firstGlobalIdx = paths.findIndex((p) => p.scope === 'global');
+    expect(firstGlobalIdx).toBeGreaterThan(0);
+    // All 'project' entries come before all 'global' entries
+    for (let i = 0; i < firstGlobalIdx; i++) {
+      expect(paths[i]?.scope).toBe('project');
+    }
+    for (let i = firstGlobalIdx; i < paths.length; i++) {
+      expect(paths[i]?.scope).toBe('global');
+    }
+  });
+
+  it('includes standard project-level locations under cwd', () => {
+    const paths = getStandardMcpConfigPaths({
+      homeDir: '/home/alice',
+      cwd: '/work/project',
+      platform: 'linux',
+    });
+    const projectPaths = paths.filter((p) => p.scope === 'project').map((p) => p.path);
+    expect(projectPaths).toContain('/work/project/.mcp.json');
+    expect(projectPaths).toContain('/work/project/.cursor/mcp.json');
+    expect(projectPaths).toContain('/work/project/.vscode/mcp.json');
+    expect(projectPaths).toContain('/work/project/.kiro/settings/mcp.json');
+  });
+
+  it('includes standard global locations under homeDir', () => {
+    const paths = getStandardMcpConfigPaths({
+      homeDir: '/home/alice',
+      cwd: '/work/project',
+      platform: 'linux',
+    });
+    const globalPaths = paths.filter((p) => p.scope === 'global').map((p) => p.path);
+    expect(globalPaths).toContain('/home/alice/.cursor/mcp.json');
+    expect(globalPaths).toContain('/home/alice/.vscode/mcp.json');
+    expect(globalPaths).toContain('/home/alice/.codeium/windsurf/mcp_config.json');
+    expect(globalPaths).toContain('/home/alice/.kiro/settings/mcp.json');
+    expect(globalPaths).toContain('/home/alice/.claude.json');
+  });
+
+  it('uses macOS-specific Claude Desktop path on darwin', () => {
+    const paths = getStandardMcpConfigPaths({
+      homeDir: '/Users/alice',
+      cwd: '/work',
+      platform: 'darwin',
+    });
+    const paths_ = paths.map((p) => p.path);
+    expect(paths_).toContain(
+      '/Users/alice/Library/Application Support/Claude/claude_desktop_config.json'
+    );
+  });
+
+  it('uses Linux XDG-style Claude Desktop path', () => {
+    const paths = getStandardMcpConfigPaths({
+      homeDir: '/home/alice',
+      cwd: '/work',
+      platform: 'linux',
+    });
+    const paths_ = paths.map((p) => p.path);
+    expect(paths_).toContain('/home/alice/.config/Claude/claude_desktop_config.json');
+  });
+
+  it('uses APPDATA-based Claude Desktop path on win32', () => {
+    const paths = getStandardMcpConfigPaths({
+      homeDir: 'C:\\Users\\alice',
+      cwd: 'C:\\work',
+      platform: 'win32',
+      appData: 'C:\\Users\\alice\\AppData\\Roaming',
+    });
+    const paths_ = paths.map((p) => p.path);
+    expect(
+      paths_.some((p) => p.includes('Claude') && p.endsWith('claude_desktop_config.json'))
+    ).toBe(true);
+  });
+
+  it('omits Claude Desktop entry on win32 when APPDATA is missing', () => {
+    const paths = getStandardMcpConfigPaths({
+      homeDir: 'C:\\Users\\alice',
+      cwd: 'C:\\work',
+      platform: 'win32',
+      appData: undefined,
+    });
+    const paths_ = paths.map((p) => p.path);
+    expect(paths_.some((p) => p.includes('claude_desktop_config.json'))).toBe(false);
+  });
+
+  it('deduplicates paths when cwd equals homeDir', () => {
+    // If someone runs from their home directory, project-scoped and global paths may overlap.
+    const paths = getStandardMcpConfigPaths({
+      homeDir: '/home/alice',
+      cwd: '/home/alice',
+      platform: 'linux',
+    });
+    const pathStrs = paths.map((p) => p.path);
+    const unique = new Set(pathStrs);
+    expect(pathStrs.length).toBe(unique.size);
+  });
+});
+
+describe('discoverMcpConfigFiles', () => {
+  const DISCOVERY_TMP = join(process.cwd(), 'test-tmp-discovery');
+
+  beforeEach(() => {
+    rmSync(DISCOVERY_TMP, { recursive: true, force: true });
+    mkdirSync(DISCOVERY_TMP, { recursive: true });
+  });
+
+  afterAll(() => {
+    rmSync(DISCOVERY_TMP, { recursive: true, force: true });
+  });
+
+  it('returns empty array when no config files exist', () => {
+    const emptyHome = join(DISCOVERY_TMP, 'home-empty');
+    const emptyCwd = join(DISCOVERY_TMP, 'cwd-empty');
+    mkdirSync(emptyHome, { recursive: true });
+    mkdirSync(emptyCwd, { recursive: true });
+
+    const discovered = discoverMcpConfigFiles({
+      homeDir: emptyHome,
+      cwd: emptyCwd,
+      platform: 'linux',
+    });
+    expect(discovered).toEqual([]);
+  });
+
+  it('discovers a project-scope .mcp.json', () => {
+    const home = join(DISCOVERY_TMP, 'home-a');
+    const cwd = join(DISCOVERY_TMP, 'cwd-a');
+    mkdirSync(home, { recursive: true });
+    mkdirSync(cwd, { recursive: true });
+
+    writeFileSync(
+      join(cwd, '.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          foo: { url: 'https://foo.example.com' },
+        },
+      })
+    );
+
+    const discovered = discoverMcpConfigFiles({
+      homeDir: home,
+      cwd,
+      platform: 'linux',
+    });
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0]?.scope).toBe('project');
+    expect(discovered[0]?.label).toBe('Claude Code (project)');
+    expect(discovered[0]?.serverCount).toBe(1);
+    expect(Object.keys(discovered[0]?.config.mcpServers ?? {})).toEqual(['foo']);
+  });
+
+  it('discovers a global ~/.cursor/mcp.json', () => {
+    const home = join(DISCOVERY_TMP, 'home-b');
+    const cwd = join(DISCOVERY_TMP, 'cwd-b');
+    mkdirSync(join(home, '.cursor'), { recursive: true });
+    mkdirSync(cwd, { recursive: true });
+
+    writeFileSync(
+      join(home, '.cursor/mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          bar: { url: 'https://bar.example.com' },
+        },
+      })
+    );
+
+    const discovered = discoverMcpConfigFiles({
+      homeDir: home,
+      cwd,
+      platform: 'linux',
+    });
+    expect(discovered.map((d) => d.label)).toContain('Cursor');
+  });
+
+  it('returns project configs before global configs', () => {
+    const home = join(DISCOVERY_TMP, 'home-c');
+    const cwd = join(DISCOVERY_TMP, 'cwd-c');
+    mkdirSync(join(home, '.cursor'), { recursive: true });
+    mkdirSync(join(cwd, '.cursor'), { recursive: true });
+
+    writeFileSync(
+      join(cwd, '.cursor/mcp.json'),
+      JSON.stringify({ mcpServers: { a: { url: 'https://a.example.com' } } })
+    );
+    writeFileSync(
+      join(home, '.cursor/mcp.json'),
+      JSON.stringify({ mcpServers: { b: { url: 'https://b.example.com' } } })
+    );
+
+    const discovered = discoverMcpConfigFiles({
+      homeDir: home,
+      cwd,
+      platform: 'linux',
+    });
+    expect(discovered).toHaveLength(2);
+    expect(discovered[0]?.scope).toBe('project');
+    expect(discovered[1]?.scope).toBe('global');
+  });
+
+  it('silently skips files without an mcpServers field', () => {
+    const home = join(DISCOVERY_TMP, 'home-d');
+    const cwd = join(DISCOVERY_TMP, 'cwd-d');
+    mkdirSync(home, { recursive: true });
+    mkdirSync(cwd, { recursive: true });
+
+    // ~/.claude.json exists but has no mcpServers (common case for Claude Code users)
+    writeFileSync(join(home, '.claude.json'), JSON.stringify({ numStartups: 5, theme: 'dark' }));
+
+    const discovered = discoverMcpConfigFiles({
+      homeDir: home,
+      cwd,
+      platform: 'linux',
+    });
+    expect(discovered).toHaveLength(0);
+  });
+
+  it('skips files with empty mcpServers object', () => {
+    const home = join(DISCOVERY_TMP, 'home-e');
+    const cwd = join(DISCOVERY_TMP, 'cwd-e');
+    mkdirSync(home, { recursive: true });
+    mkdirSync(cwd, { recursive: true });
+
+    writeFileSync(join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: {} }));
+
+    const discovered = discoverMcpConfigFiles({
+      homeDir: home,
+      cwd,
+      platform: 'linux',
+    });
+    expect(discovered).toHaveLength(0);
+  });
+
+  it('skips files with invalid JSON without throwing', () => {
+    const home = join(DISCOVERY_TMP, 'home-f');
+    const cwd = join(DISCOVERY_TMP, 'cwd-f');
+    mkdirSync(home, { recursive: true });
+    mkdirSync(cwd, { recursive: true });
+
+    writeFileSync(join(cwd, '.mcp.json'), '{ not valid json');
+
+    expect(() =>
+      discoverMcpConfigFiles({
+        homeDir: home,
+        cwd,
+        platform: 'linux',
+      })
+    ).not.toThrow();
+  });
+
+  it('discovers multiple config files across project and global scopes', () => {
+    const home = join(DISCOVERY_TMP, 'home-g');
+    const cwd = join(DISCOVERY_TMP, 'cwd-g');
+    mkdirSync(join(home, '.cursor'), { recursive: true });
+    mkdirSync(join(home, '.vscode'), { recursive: true });
+    mkdirSync(join(cwd, '.vscode'), { recursive: true });
+
+    writeFileSync(
+      join(cwd, '.mcp.json'),
+      JSON.stringify({ mcpServers: { p: { url: 'https://p.example.com' } } })
+    );
+    writeFileSync(
+      join(cwd, '.vscode/mcp.json'),
+      JSON.stringify({ mcpServers: { q: { url: 'https://q.example.com' } } })
+    );
+    writeFileSync(
+      join(home, '.cursor/mcp.json'),
+      JSON.stringify({ mcpServers: { r: { url: 'https://r.example.com' } } })
+    );
+    writeFileSync(
+      join(home, '.vscode/mcp.json'),
+      JSON.stringify({ mcpServers: { s: { url: 'https://s.example.com' } } })
+    );
+
+    const discovered = discoverMcpConfigFiles({
+      homeDir: home,
+      cwd,
+      platform: 'linux',
+    });
+    const labels = discovered.map((d) => d.label);
+    expect(labels).toEqual(['Claude Code (project)', 'VS Code (project)', 'Cursor', 'VS Code']);
   });
 });

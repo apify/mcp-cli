@@ -55,7 +55,14 @@ import { getWallet } from '../../lib/wallets.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
 import { parseProxyArg } from '../parser.js';
-import { loadConfig, listServers, isStdioEntry } from '../../lib/config.js';
+import {
+  loadConfig,
+  listServers,
+  isStdioEntry,
+  discoverMcpConfigFiles,
+  getStandardMcpConfigPaths,
+  type DiscoveredConfig,
+} from '../../lib/config.js';
 
 const logger = createLogger('sessions');
 
@@ -897,24 +904,137 @@ export async function restartSession(
 }
 
 /**
+ * Shared options for bulk connect commands.
+ */
+type BulkConnectOptions = {
+  outputMode: OutputMode;
+  verbose?: boolean;
+  headers?: string[];
+  timeout?: number;
+  profile?: string;
+  noProfile?: boolean;
+  proxy?: string;
+  proxyBearerToken?: string;
+  x402?: boolean;
+  insecure?: boolean;
+};
+
+/**
+ * A single entry to connect in a bulk operation.
+ */
+type BulkConnectEntry = {
+  /** Config file path that defines this entry. */
+  configFile: string;
+  /** Friendly label for the source config (for display, e.g. "VS Code"). */
+  configLabel?: string;
+  /** Entry name inside the config's `mcpServers` object. */
+  entry: string;
+  /** Resolved session name (with @ prefix). */
+  sessionName: string;
+};
+
+type BulkConnectResult = BulkConnectEntry & {
+  status: 'created' | 'active' | 'failed';
+  error?: string;
+};
+
+/**
+ * Connect a list of entries in parallel, printing compact status badges when done.
+ * Returns the per-entry results so callers can build summaries and exit codes.
+ */
+async function bulkConnectEntries(
+  entries: BulkConnectEntry[],
+  options: BulkConnectOptions & { showSource?: boolean }
+): Promise<BulkConnectResult[]> {
+  // Pre-check which sessions are already live (for accurate status badges)
+  const liveSet = new Set<string>();
+  for (const { sessionName } of entries) {
+    const session = await getSession(sessionName);
+    if (session && getBridgeStatus(session) === 'live') {
+      liveSet.add(sessionName);
+    }
+  }
+
+  // Launch all connections in parallel (quiet mode — we display results below)
+  const settled = await Promise.allSettled(
+    entries.map(async ({ entry, sessionName, configFile }) =>
+      connectSession(entry, sessionName, {
+        ...options,
+        config: configFile,
+        skipDetails: true,
+        quiet: true,
+      })
+    )
+  );
+
+  const results: BulkConnectResult[] = settled.map((outcome, i) => {
+    const base = entries[i]!;
+    if (outcome.status === 'fulfilled') {
+      return { ...base, status: liveSet.has(base.sessionName) ? 'active' : 'created' };
+    }
+    const error = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+    return { ...base, status: 'failed', error };
+  });
+
+  // Display badges in human mode
+  if (options.outputMode === 'human') {
+    for (const r of results) {
+      const name = chalk.cyan(r.sessionName);
+      const suffix = options.showSource && r.configLabel ? chalk.dim(` from ${r.configLabel}`) : '';
+      switch (r.status) {
+        case 'created':
+          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('connecting')}${suffix}`);
+          break;
+        case 'active':
+          console.log(`  ${chalk.green('●')} ${name} ${chalk.dim('already active')}${suffix}`);
+          break;
+        case 'failed':
+          console.log(
+            `  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}${suffix}`
+          );
+          break;
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Build a summary string and print it in human mode.
+ */
+function printBulkConnectSummary(
+  results: BulkConnectResult[],
+  options: { outputMode: OutputMode }
+): { active: number; connecting: number; failed: number } {
+  const active = results.filter((r) => r.status === 'active').length;
+  const connecting = results.filter((r) => r.status === 'created').length;
+  const failed = results.filter((r) => r.status === 'failed').length;
+
+  if (options.outputMode === 'human' && results.length > 1) {
+    const parts: string[] = [];
+    if (active > 0) parts.push(`${active} already active`);
+    if (connecting > 0) parts.push(`${connecting} connecting`);
+    if (failed > 0) parts.push(`${failed} failed`);
+    const summary = parts.join(', ');
+
+    if (failed === 0) {
+      console.log(formatSuccess(summary));
+    } else if (active + connecting > 0) {
+      console.log(formatWarning(summary));
+    }
+  }
+
+  return { active, connecting, failed };
+}
+
+/**
  * Connect all servers defined in a config file, auto-generating session names from entry names.
  * Launches all bridge processes in parallel and displays status badges when done.
  */
 export async function connectAllFromConfig(
   configFile: string,
-  options: {
-    outputMode: OutputMode;
-    verbose?: boolean;
-    headers?: string[];
-    timeout?: number;
-    profile?: string;
-    noProfile?: boolean;
-    proxy?: string;
-    proxyBearerToken?: string;
-    stdio?: boolean;
-    x402?: boolean;
-    insecure?: boolean;
-  }
+  options: BulkConnectOptions
 ): Promise<void> {
   const config = loadConfig(configFile);
   const allNames = listServers(config);
@@ -979,80 +1099,13 @@ export async function connectAllFromConfig(
   // Prepare entries with deterministic session names derived from entry names.
   // Re-running `mcpc connect <file>` reuses existing sessions via connectSession's
   // "already active" path instead of creating @entry-2 duplicates.
-  const entries = serverNames.map((entry) => ({
+  const entries: BulkConnectEntry[] = serverNames.map((entry) => ({
+    configFile,
     entry,
     sessionName: generateSessionName({ type: 'config', file: configFile, entry }),
   }));
 
-  // Pre-check which sessions are already live (for accurate status badges)
-  const liveSet = new Set<string>();
-  for (const { sessionName } of entries) {
-    const session = await getSession(sessionName);
-    if (session && getBridgeStatus(session) === 'live') {
-      liveSet.add(sessionName);
-    }
-  }
-
-  // Launch all connections in parallel (quiet mode — we display results below)
-  const settled = await Promise.allSettled(
-    entries.map(async ({ entry, sessionName }) =>
-      connectSession(entry, sessionName, {
-        ...options,
-        config: configFile,
-        skipDetails: true,
-        quiet: true,
-      })
-    )
-  );
-
-  // Build results with status badges
-  type ConnectResult = {
-    entry: string;
-    sessionName: string;
-    status: 'created' | 'active' | 'reconnected' | 'failed';
-    error?: string;
-  };
-  const results: ConnectResult[] = settled.map((outcome, i) => {
-    const { entry, sessionName } = entries[i]!;
-    if (outcome.status === 'fulfilled') {
-      if (liveSet.has(sessionName)) {
-        return { entry, sessionName, status: 'active' };
-      }
-      return { entry, sessionName, status: 'created' };
-    }
-    const error = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
-    return { entry, sessionName, status: 'failed', error };
-  });
-
-  // Display badges
-  if (options.outputMode === 'human') {
-    for (const r of results) {
-      const name = chalk.cyan(r.sessionName);
-      switch (r.status) {
-        case 'created':
-          // Bridge started but MCP handshake not yet verified
-          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('connecting')}`);
-          break;
-        case 'active':
-          console.log(`  ${chalk.green('●')} ${name} ${chalk.dim('already active')}`);
-          break;
-        case 'reconnected':
-          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('reconnecting')}`);
-          break;
-        case 'failed':
-          console.log(
-            `  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}`
-          );
-          break;
-      }
-    }
-  }
-
-  const active = results.filter((r) => r.status === 'active').length;
-  const connecting = results.filter(
-    (r) => r.status === 'created' || r.status === 'reconnected'
-  ).length;
-  const failed = results.filter((r) => r.status === 'failed').length;
+  const results = await bulkConnectEntries(entries, options);
 
   if (options.outputMode === 'json') {
     console.log(
@@ -1076,23 +1129,157 @@ export async function connectAllFromConfig(
         'json'
       )
     );
-  } else if (results.length > 1) {
-    const parts: string[] = [];
-    if (active > 0) parts.push(`${active} already active`);
-    if (connecting > 0) parts.push(`${connecting} connecting`);
-    if (failed > 0) parts.push(`${failed} failed`);
-    const summary = parts.join(', ');
+    return;
+  }
 
-    if (failed === 0) {
-      console.log(formatSuccess(summary));
-    } else if (active + connecting > 0) {
-      console.log(formatWarning(summary));
+  const { active, connecting, failed } = printBulkConnectSummary(results, options);
+
+  // If ALL servers failed, exit with error
+  if (active + connecting === 0 && failed > 0) {
+    throw new ClientError(`Failed to connect any servers from ${configFile}`);
+  }
+}
+
+/**
+ * Aggregate config entries from multiple discovered config files into a flat list of
+ * bulk-connect entries. Resolves session-name collisions by taking the first occurrence
+ * (project-scoped configs win over global ones due to discovery order).
+ */
+function aggregateDiscoveredEntries(discovered: DiscoveredConfig[]): {
+  entries: BulkConnectEntry[];
+  skipped: { configFile: string; configLabel: string; entry: string; sessionName: string }[];
+} {
+  const entries: BulkConnectEntry[] = [];
+  const skipped: { configFile: string; configLabel: string; entry: string; sessionName: string }[] =
+    [];
+  const seenNames = new Set<string>();
+
+  for (const d of discovered) {
+    for (const entry of Object.keys(d.config.mcpServers)) {
+      const sessionName = generateSessionName({ type: 'config', file: d.path, entry });
+      if (seenNames.has(sessionName)) {
+        skipped.push({ configFile: d.path, configLabel: d.label, entry, sessionName });
+        continue;
+      }
+      seenNames.add(sessionName);
+      entries.push({
+        configFile: d.path,
+        configLabel: d.label,
+        entry,
+        sessionName,
+      });
     }
   }
 
+  return { entries, skipped };
+}
+
+/**
+ * Discover MCP config files in standard locations and connect all servers defined in them.
+ *
+ * Locations searched (in priority order):
+ *   1. Project-level files in the current directory (.mcp.json, .cursor/mcp.json, ...)
+ *   2. Global files in the user's home dir (~/.claude.json, ~/.cursor/mcp.json, ...)
+ *   3. Platform-specific Claude Desktop config
+ *
+ * Entries with the same auto-generated session name across multiple configs are deduplicated —
+ * the first occurrence wins. Re-running the command reuses existing sessions.
+ */
+export async function connectAllFromStandardConfigs(options: BulkConnectOptions): Promise<void> {
+  const discovered = discoverMcpConfigFiles();
+
+  if (discovered.length === 0) {
+    if (options.outputMode === 'json') {
+      console.log(
+        formatOutput(
+          {
+            discovered: [],
+            results: [],
+            searchPaths: getStandardMcpConfigPaths().map((c) => c.path),
+          },
+          'json'
+        )
+      );
+      return;
+    }
+    const searchPaths = getStandardMcpConfigPaths()
+      .map((c) => `  ${c.path}`)
+      .join('\n');
+    throw new ClientError(
+      `No MCP config files found in standard locations.\n\n` +
+        `Searched:\n${searchPaths}\n\n` +
+        `Connect a specific server:    mcpc connect mcp.example.com\n` +
+        `Connect from a specific file: mcpc connect /path/to/mcp.json`
+    );
+  }
+
+  const { entries, skipped } = aggregateDiscoveredEntries(discovered);
+
+  if (options.outputMode === 'human') {
+    const totalEntries = entries.length + skipped.length;
+    console.log(
+      chalk.cyan(
+        `Found ${discovered.length} MCP config file${discovered.length === 1 ? '' : 's'} ` +
+          `with ${totalEntries} server${totalEntries === 1 ? '' : 's'}:`
+      )
+    );
+    for (const d of discovered) {
+      console.log(
+        `  ${chalk.dim('-')} ${d.path} ${chalk.dim(`(${d.label}, ${d.serverCount} server${d.serverCount === 1 ? '' : 's'})`)}`
+      );
+    }
+    if (skipped.length > 0) {
+      console.log(
+        chalk.dim(
+          `  skipping ${skipped.length} duplicate${skipped.length === 1 ? '' : 's'}: ` +
+            skipped.map((s) => `${s.sessionName} from ${s.configLabel}`).join(', ')
+        )
+      );
+    }
+    console.log(
+      chalk.cyan(`\nConnecting ${entries.length} server${entries.length === 1 ? '' : 's'}...`)
+    );
+  }
+
+  const results = await bulkConnectEntries(entries, { ...options, showSource: true });
+
+  if (options.outputMode === 'json') {
+    console.log(
+      formatOutput(
+        {
+          discovered: discovered.map((d) => ({
+            path: d.path,
+            label: d.label,
+            scope: d.scope,
+            serverCount: d.serverCount,
+          })),
+          results: results.map((r) => ({
+            entry: r.entry,
+            sessionName: r.sessionName,
+            configFile: r.configFile,
+            configLabel: r.configLabel,
+            status: r.status,
+            ...(r.error && { error: r.error }),
+          })),
+          skipped: skipped.map((s) => ({
+            entry: s.entry,
+            sessionName: s.sessionName,
+            configFile: s.configFile,
+            configLabel: s.configLabel,
+            reason: 'duplicate',
+          })),
+        },
+        'json'
+      )
+    );
+    return;
+  }
+
+  const { active, connecting, failed } = printBulkConnectSummary(results, options);
+
   // If ALL servers failed, exit with error
-  if (active + connecting === 0) {
-    throw new ClientError(`Failed to connect any servers from ${configFile}`);
+  if (active + connecting === 0 && failed > 0) {
+    throw new ClientError(`Failed to connect any servers from discovered config files`);
   }
 }
 

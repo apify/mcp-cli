@@ -3,8 +3,9 @@
  * Loads and parses MCP server configuration files (Claude Desktop format)
  */
 
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync, statSync } from 'fs';
+import { homedir, platform } from 'os';
+import { join, resolve } from 'path';
 import type { McpConfig, ServerConfig } from './types.js';
 import { ClientError } from './errors.js';
 import { createLogger } from './logger.js';
@@ -235,4 +236,189 @@ export function validateServerConfig(config: ServerConfig): boolean {
  */
 export function isStdioEntry(config: McpConfig, entryName: string): boolean {
   return config.mcpServers[entryName]?.command !== undefined;
+}
+
+// ----------------------------------------------------------------------------
+// Standard MCP config discovery
+// ----------------------------------------------------------------------------
+
+/**
+ * A well-known config file location with a friendly label.
+ */
+export interface ConfigCandidate {
+  /** Absolute path to the config file. */
+  path: string;
+  /** Friendly label for display (e.g., "VS Code", "Cursor"). */
+  label: string;
+  /** Scope: 'project' (CWD-relative) or 'global' (home-relative). */
+  scope: 'project' | 'global';
+}
+
+/**
+ * A discovered config file — candidate metadata plus the parsed content.
+ */
+export interface DiscoveredConfig extends ConfigCandidate {
+  /** Parsed MCP configuration. */
+  config: McpConfig;
+  /** Number of servers defined in the config. */
+  serverCount: number;
+}
+
+/**
+ * Return the list of standard MCP config file paths to search.
+ *
+ * Paths are returned in priority order: project-level first (CWD), then global (home).
+ * This determines which entry wins in case of session-name collisions across configs.
+ *
+ * Supported locations (inspired by https://www.withone.ai/docs/cli#mcp-server-installation):
+ *  - Claude Code (global):     ~/.claude.json
+ *  - Claude Code (project):    .mcp.json
+ *  - Claude Desktop:           platform-specific app-support directory
+ *  - Cursor:                   ~/.cursor/mcp.json, .cursor/mcp.json
+ *  - VS Code:                  ~/.vscode/mcp.json, .vscode/mcp.json
+ *  - Windsurf:                 ~/.codeium/windsurf/mcp_config.json
+ *  - Kiro:                     ~/.kiro/settings/mcp.json, .kiro/settings/mcp.json
+ *
+ * TOML-based configs (e.g. Codex's `~/.codex/config.toml`) are not supported.
+ *
+ * @param options - Optional overrides for home dir, cwd, and platform (useful for testing)
+ */
+export function getStandardMcpConfigPaths(options?: {
+  homeDir?: string;
+  cwd?: string;
+  platform?: NodeJS.Platform;
+  appData?: string;
+}): ConfigCandidate[] {
+  const home = options?.homeDir ?? homedir();
+  const cwd = options?.cwd ?? process.cwd();
+  const os = options?.platform ?? platform();
+  const appData = options?.appData ?? process.env.APPDATA;
+
+  const candidates: ConfigCandidate[] = [];
+
+  // Project-level configs (CWD) — highest priority, most specific
+  candidates.push(
+    { path: join(cwd, '.mcp.json'), label: 'Claude Code (project)', scope: 'project' },
+    { path: join(cwd, '.cursor/mcp.json'), label: 'Cursor (project)', scope: 'project' },
+    { path: join(cwd, '.vscode/mcp.json'), label: 'VS Code (project)', scope: 'project' },
+    { path: join(cwd, '.kiro/settings/mcp.json'), label: 'Kiro (project)', scope: 'project' }
+  );
+
+  // Global / user-level configs
+  candidates.push(
+    { path: join(home, '.cursor/mcp.json'), label: 'Cursor', scope: 'global' },
+    { path: join(home, '.vscode/mcp.json'), label: 'VS Code', scope: 'global' },
+    { path: join(home, '.codeium/windsurf/mcp_config.json'), label: 'Windsurf', scope: 'global' },
+    { path: join(home, '.kiro/settings/mcp.json'), label: 'Kiro', scope: 'global' },
+    { path: join(home, '.claude.json'), label: 'Claude Code', scope: 'global' }
+  );
+
+  // Claude Desktop — platform-specific path
+  if (os === 'darwin') {
+    candidates.push({
+      path: join(home, 'Library/Application Support/Claude/claude_desktop_config.json'),
+      label: 'Claude Desktop',
+      scope: 'global',
+    });
+  } else if (os === 'win32') {
+    if (appData) {
+      candidates.push({
+        path: join(appData, 'Claude/claude_desktop_config.json'),
+        label: 'Claude Desktop',
+        scope: 'global',
+      });
+    }
+  } else {
+    // Linux / other — XDG-style
+    candidates.push({
+      path: join(home, '.config/Claude/claude_desktop_config.json'),
+      label: 'Claude Desktop',
+      scope: 'global',
+    });
+  }
+
+  // Dedup by resolved absolute path (preserve order — first occurrence wins)
+  const seen = new Set<string>();
+  const deduped: ConfigCandidate[] = [];
+  for (const candidate of candidates) {
+    const absolute = resolve(candidate.path);
+    if (seen.has(absolute)) continue;
+    seen.add(absolute);
+    deduped.push({ ...candidate, path: absolute });
+  }
+
+  return deduped;
+}
+
+/**
+ * Leniently parse a JSON file that may or may not be an MCP config.
+ * Returns the parsed `McpConfig` if the file exists, is valid JSON, and has a non-empty
+ * `mcpServers` object. Returns `null` for missing files or files without `mcpServers`
+ * (some config files like `~/.claude.json` are shared with other features and may
+ * legitimately have no MCP servers). Invalid JSON is still logged and skipped.
+ */
+function tryReadMcpConfig(configPath: string): McpConfig | null {
+  let content: string;
+  try {
+    const stat = statSync(configPath);
+    if (!stat.isFile()) return null;
+    content = readFileSync(configPath, 'utf-8');
+  } catch {
+    // File missing or unreadable — silently skip
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (error) {
+    logger.warn(`Skipping invalid JSON in ${configPath}: ${(error as Error).message}`);
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== 'object') return null;
+  const maybeConfig = parsed as { mcpServers?: unknown };
+  if (
+    !maybeConfig.mcpServers ||
+    typeof maybeConfig.mcpServers !== 'object' ||
+    Array.isArray(maybeConfig.mcpServers)
+  ) {
+    return null;
+  }
+  return parsed as McpConfig;
+}
+
+/**
+ * Discover MCP config files from standard locations.
+ * Only returns files that exist and contain at least one server.
+ * Files with parse errors are logged and skipped — discovery does not fail.
+ *
+ * Results are returned in priority order (project-level first, then global),
+ * so callers can deterministically resolve collisions by taking the first occurrence.
+ *
+ * @param options - Optional overrides for home dir, cwd, and platform (useful for testing)
+ */
+export function discoverMcpConfigFiles(options?: {
+  homeDir?: string;
+  cwd?: string;
+  platform?: NodeJS.Platform;
+  appData?: string;
+}): DiscoveredConfig[] {
+  const candidates = getStandardMcpConfigPaths(options);
+  const discovered: DiscoveredConfig[] = [];
+
+  for (const candidate of candidates) {
+    const config = tryReadMcpConfig(candidate.path);
+    if (!config) continue;
+
+    const serverCount = Object.keys(config.mcpServers).length;
+    if (serverCount === 0) {
+      logger.debug(`Skipping ${candidate.path} — no servers defined`);
+      continue;
+    }
+
+    discovered.push({ ...candidate, config, serverCount });
+  }
+
+  return discovered;
 }
