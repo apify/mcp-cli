@@ -585,7 +585,7 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
     .addHelpText(
       'after',
       `
-${chalk.bold('OAuth client registration approaches (per MCP authorization spec):')}
+${chalk.bold('OAuth client registration approaches:')}
 
   1. Pre-registration: --client-id (and optionally --client-secret).
   2. Client ID Metadata Documents (CIMD): --client-metadata-url <https-url>.
@@ -596,9 +596,7 @@ ${chalk.bold('OAuth client registration approaches (per MCP authorization spec):
 
   See https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
 
-${jsonHelp('`{ profile, serverUrl, scopes }`')}
-  Interactive prompts and the authorization URL are written to stderr, so
-  stdout contains only the final JSON result and is safe to pipe or redirect.
+${jsonHelp('Interactive prompts are written to stderr, stdout contains a clean JSON object', '`{ profile, serverUrl, scopes }`')}
 `
     )
     .action(async (server, opts, command) => {
