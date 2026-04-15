@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--json` output documentation in `--help` for all commands, describing the MCP object shape returned
 - `tools-get` now shows an example `tools-call` command with placeholder arguments based on the tool's schema
 - Session info output (`mcpc @session`) now shows the path to the bridge log file under a "Debugging" section, helping AI agents and users locate logs when troubleshooting
+- `mcpc login --client-metadata-url <https-url>` flag adds explicit support for [OAuth Client ID Metadata Documents (CIMD)](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00) per the MCP authorization spec. When the authorization server advertises `client_id_metadata_document_supported: true`, mcpc uses the URL as the `client_id`; otherwise it falls back to Dynamic Client Registration. New README section documents all three supported client registration approaches (Pre-registration, CIMD, DCR).
 
 ### Changed
 

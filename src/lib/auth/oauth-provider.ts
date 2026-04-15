@@ -98,6 +98,15 @@ export interface OAuthProviderOptions {
     clientId: string;
     clientSecret?: string;
   };
+
+  /**
+   * OAuth Client ID Metadata Document URL (CIMD, draft-ietf-oauth-client-id-metadata-document).
+   * An HTTPS URL that the authorization server fetches to obtain this client's metadata
+   * (client_name, redirect_uris, etc). When provided and the authorization server advertises
+   * `client_id_metadata_document_supported: true`, the URL is used as the client_id.
+   * Otherwise, the SDK falls back to Dynamic Client Registration.
+   */
+  clientMetadataUrl?: string;
 }
 
 /**
@@ -111,6 +120,15 @@ export class OAuthProvider implements OAuthClientProvider {
   private _redirectUrl: string;
   private _forceReauth: boolean;
   private _clientCredentials?: { clientId: string; clientSecret?: string };
+
+  /**
+   * OAuth Client ID Metadata Document URL (CIMD).
+   * Consumed by the MCP SDK when the authorization server advertises
+   * `client_id_metadata_document_supported: true`. Only defined when the
+   * caller passed a URL so it stays "absent" (not `undefined`) under
+   * `exactOptionalPropertyTypes` on the SDK's OAuthClientProvider interface.
+   */
+  clientMetadataUrl?: string;
 
   // Auth flow state (only used during interactive OAuth)
   private _authProfile?: AuthProfile;
@@ -131,6 +149,9 @@ export class OAuthProvider implements OAuthClientProvider {
     }
     if (options.clientCredentials) {
       this._clientCredentials = options.clientCredentials;
+    }
+    if (options.clientMetadataUrl) {
+      this.clientMetadataUrl = options.clientMetadataUrl;
     }
   }
 

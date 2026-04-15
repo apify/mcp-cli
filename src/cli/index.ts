@@ -582,12 +582,37 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
       '--scope <scopes>',
       'OAuth scopes to request, quoted and space-separated (e.g. --scope "read write")'
     )
-    .option('--client-id <id>', 'OAuth client ID (for servers without dynamic client registration)')
     .option(
-      '--client-secret <secret>',
-      'OAuth client secret (for servers without dynamic client registration)'
+      '--client-id <id>',
+      'Pre-registered OAuth client ID (skips Client ID Metadata Documents and Dynamic Client Registration)'
     )
-    .addHelpText('after', jsonHelp('`{ profile, serverUrl, scopes }`'))
+    .option('--client-secret <secret>', 'Pre-registered OAuth client secret (requires --client-id)')
+    .option(
+      '--client-metadata-url <url>',
+      'HTTPS URL of an OAuth Client ID Metadata Document (CIMD) to use as the client_id. ' +
+        'Used when the authorization server advertises ' +
+        '"client_id_metadata_document_supported: true"; otherwise mcpc falls back to Dynamic ' +
+        'Client Registration.'
+    )
+    .addHelpText(
+      'after',
+      `
+${chalk.bold('Client registration approaches (per MCP authorization spec):')}
+
+  When no pre-registered --client-id is provided, mcpc uses the registration
+  approach that the authorization server advertises, in this priority order:
+
+  1. Pre-registration   Pass --client-id (and optionally --client-secret).
+  2. Client ID Metadata Documents (CIMD)
+                        Pass --client-metadata-url <https-url> pointing to a
+                        JSON metadata document. Used when the authorization
+                        server advertises "client_id_metadata_document_supported".
+  3. Dynamic Client Registration (DCR)
+                        Default fallback. Used when the server exposes a
+                        "registration_endpoint". No configuration required.
+
+${jsonHelp('`{ profile, serverUrl, scopes }`')}`
+    )
     .action(async (server, opts, command) => {
       if (!server) {
         throw new ClientError(
@@ -599,6 +624,7 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
         scope: opts.scope,
         clientId: opts.clientId,
         clientSecret: opts.clientSecret,
+        clientMetadataUrl: opts.clientMetadataUrl,
         ...getOptionsFromCommand(command),
       });
     });

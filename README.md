@@ -434,9 +434,20 @@ mcpc @apify tools-list
 
 ### OAuth profiles
 
-For OAuth-enabled remote MCP servers, `mcpc` implements the full OAuth 2.1 flow with PKCE,
-including `WWW-Authenticate` header discovery, server metadata discovery, client ID metadata documents,
-dynamic client registration, and automatic token refresh.
+For OAuth-enabled remote MCP servers, `mcpc` implements the full
+[OAuth 2.1 flow with PKCE](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
+mandated by the MCP authorization spec, including:
+
+- `WWW-Authenticate` 401 challenge handling and Protected Resource Metadata
+  discovery ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728))
+- Authorization server metadata discovery via OAuth 2.0 `oauth-authorization-server`
+  and OpenID Connect `openid-configuration` well-known endpoints
+- All three [client registration approaches](#client-registration-approaches):
+  pre-registration, OAuth Client ID Metadata Documents, and Dynamic Client Registration
+- Resource Indicators ([RFC 8707](https://www.rfc-editor.org/rfc/rfc8707)) sent on
+  every authorization and token request
+- PKCE with `S256` code challenge
+- Automatic refresh-token rotation and persistence
 
 The OAuth authentication **always** needs to be initiated by the user calling the `login` command,
 which opens a web browser with login screen. `mcpc` never opens the web browser on its own.
@@ -478,6 +489,100 @@ mcpc login mcp.apify.com --profile work
 mcpc logout mcp.apify.com
 mcpc logout mcp.apify.com --profile work
 ```
+
+### Client registration approaches
+
+The MCP authorization spec defines three ways for an OAuth client to obtain a `client_id`
+for a server it has never spoken to before. `mcpc` supports all three, picks them in the
+spec-recommended priority order, and falls back automatically based on what the
+authorization server advertises in its OAuth metadata.
+
+| **Approach**                                                              | **When to use**                                                        | **mcpc flags**                          |
+| :------------------------------------------------------------------------ | :--------------------------------------------------------------------- | :-------------------------------------- |
+| **Pre-registration**                                                      | You've already registered an OAuth client with the server out-of-band. | `--client-id` (and optional `--client-secret`) |
+| **Client ID Metadata Documents** ([CIMD](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00)) | The authorization server advertises `client_id_metadata_document_supported: true`. | `--client-metadata-url`                 |
+| **Dynamic Client Registration** ([DCR](https://datatracker.ietf.org/doc/html/rfc7591))                                          | The authorization server exposes a `registration_endpoint`.            | _(default, no flags needed)_            |
+
+The selection logic during `mcpc login` follows the spec priority:
+
+1. If you pass `--client-id`, that pre-registered client is used directly.
+2. Else if you pass `--client-metadata-url` _and_ the authorization server advertises
+   `client_id_metadata_document_supported: true`, the URL itself is used as the `client_id` (CIMD).
+3. Else if the authorization server exposes a `registration_endpoint`, `mcpc` performs Dynamic
+   Client Registration on the fly.
+4. Otherwise login fails with a clear error.
+
+#### Pre-registration
+
+Use this when the authorization server doesn't support DCR or CIMD, or when you want to share a
+single OAuth client across multiple users. Register your client out-of-band (e.g. through the
+server's admin UI), then pass the credentials to `mcpc login`:
+
+```bash
+# Public client (no secret, e.g. native/CLI app)
+mcpc login mcp.example.com --client-id my-preregistered-client-id
+
+# Confidential client (with client secret)
+mcpc login mcp.example.com \
+  --client-id my-preregistered-client-id \
+  --client-secret my-preregistered-client-secret
+```
+
+The credentials are stored in the OS keychain alongside the OAuth tokens.
+
+#### Client ID Metadata Documents (CIMD)
+
+CIMD lets the authorization server fetch your client metadata from an HTTPS URL instead of
+requiring out-of-band registration. The URL itself becomes the `client_id`. This is the
+**recommended** approach when the client and server have no prior relationship.
+
+To use CIMD, host a JSON document at any HTTPS URL (with a path component) and pass it via
+`--client-metadata-url`:
+
+```bash
+mcpc login mcp.example.com \
+  --client-metadata-url https://example.com/mcpc-client-metadata.json
+```
+
+Example metadata document (must be served from the URL above):
+
+```json
+{
+  "client_id": "https://example.com/mcpc-client-metadata.json",
+  "client_name": "mcpc CLI for Alice",
+  "client_uri": "https://github.com/apify/mcpc",
+  "redirect_uris": [
+    "http://127.0.0.1:8000/callback",
+    "http://localhost:8000/callback"
+  ],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}
+```
+
+Notes:
+
+- The `client_id` field in the JSON **must** match the URL exactly.
+- `mcpc` binds the OAuth callback to a free port in the range `8000–8099`. List the ports you
+  expect to use in `redirect_uris` (or pin a specific port at the OS level if you need
+  reproducibility).
+- If the authorization server doesn't advertise `client_id_metadata_document_supported`,
+  `mcpc` automatically falls back to Dynamic Client Registration.
+
+#### Dynamic Client Registration (DCR)
+
+If you don't pass `--client-id` or `--client-metadata-url`, `mcpc` falls back to Dynamic Client
+Registration: it `POST`s its client metadata to the server's `registration_endpoint` and uses
+the returned `client_id` (and `client_secret`, if any) for the rest of the flow.
+
+```bash
+# No flags needed - mcpc registers a fresh OAuth client automatically
+mcpc login mcp.apify.com
+```
+
+DCR registration results are cached per profile in the OS keychain so that subsequent commands
+reuse the same `client_id` instead of re-registering on every run.
 
 ### Authentication precedence
 

@@ -20,6 +20,7 @@ export async function login(
     scope?: string;
     clientId?: string;
     clientSecret?: string;
+    clientMetadataUrl?: string;
   }
 ): Promise<void> {
   try {
@@ -32,18 +33,32 @@ export async function login(
       throw new Error('--client-secret requires --client-id');
     }
 
+    if (options.clientMetadataUrl && options.clientId) {
+      throw new Error(
+        '--client-metadata-url cannot be combined with --client-id (they are mutually exclusive ' +
+          'client registration approaches)'
+      );
+    }
+
     if (options.outputMode === 'human') {
       console.log(formatInfo(`Starting OAuth authentication for ${normalizedUrl}`));
       console.log(formatInfo(`Profile: ${chalk.magenta(profileName)}`));
     }
 
     // Perform OAuth flow
-    const clientCredentials: { clientId?: string; clientSecret?: string } = {};
+    const clientCredentials: {
+      clientId?: string;
+      clientSecret?: string;
+      clientMetadataUrl?: string;
+    } = {};
     if (options.clientId) {
       clientCredentials.clientId = options.clientId;
     }
     if (options.clientSecret) {
       clientCredentials.clientSecret = options.clientSecret;
+    }
+    if (options.clientMetadataUrl) {
+      clientCredentials.clientMetadataUrl = options.clientMetadataUrl;
     }
     const result = await performOAuthFlow(
       normalizedUrl,
