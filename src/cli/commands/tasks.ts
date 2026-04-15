@@ -51,7 +51,7 @@ export async function listTasks(target: string, options: CommandOptions): Promis
         console.log(formatTasks(allTasks));
         console.log(
           formatInfo(
-            `Run ${chalk.bold(`mcpc ${target} tasks-result <taskId>`)} to fetch the final result of a task`
+            `Run ${chalk.bold(`mcpc ${target} tasks-result <taskId>`)} to fetch the task's final result (blocks until it finishes)`
           )
         );
       }

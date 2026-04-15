@@ -304,7 +304,7 @@ export async function callTool(
         console.log(formatSuccess(`Task started: ${taskUpdate.taskId}`));
         console.log(
           formatInfo(
-            `Run ${chalk.bold(`mcpc ${target} tasks-result ${taskUpdate.taskId}`)} to fetch the result once the task completes`
+            `Run ${chalk.bold(`mcpc ${target} tasks-result ${taskUpdate.taskId}`)} to fetch the task's final result (blocks until it finishes)`
           )
         );
       } else {
@@ -379,7 +379,7 @@ export async function callTool(
             if (options.outputMode === 'human') {
               console.log(
                 formatInfo(
-                  `Run ${chalk.bold(`mcpc ${target} tasks-result ${capturedTaskId!}`)} to fetch the result once the task completes`
+                  `Run ${chalk.bold(`mcpc ${target} tasks-result ${capturedTaskId!}`)} to fetch the task's final result (blocks until it finishes)`
                 )
               );
             }
