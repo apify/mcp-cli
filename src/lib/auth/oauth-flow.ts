@@ -397,6 +397,38 @@ function promptForCallbackUrl(): {
 }
 
 /**
+ * Validate that a Client ID Metadata Document URL meets the requirements of
+ * draft-ietf-oauth-client-id-metadata-document-00 and the MCP authorization spec.
+ *
+ * Requirements:
+ * - MUST use the "https" scheme
+ * - MUST contain a path component (not just "/")
+ */
+function validateClientMetadataUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new ClientError(
+      `Invalid --client-metadata-url: ${url} is not a valid URL. ` +
+        `It must be an HTTPS URL pointing to the client metadata JSON document.`
+    );
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new ClientError(
+      `Invalid --client-metadata-url: ${url} must use the "https" scheme ` +
+        `(per OAuth Client ID Metadata Document spec).`
+    );
+  }
+  if (!parsed.pathname || parsed.pathname === '/') {
+    throw new ClientError(
+      `Invalid --client-metadata-url: ${url} must contain a non-root path component, ` +
+        `e.g. https://example.com/client.json`
+    );
+  }
+}
+
+/**
  * Perform interactive OAuth flow
  * Opens browser for user authentication and handles callback
  * Falls back to manual URL paste when browser cannot be opened
@@ -405,7 +437,7 @@ export async function performOAuthFlow(
   serverUrl: string,
   profileName: string,
   scope?: string,
-  clientCredentials?: { clientId?: string; clientSecret?: string }
+  clientCredentials?: { clientId?: string; clientSecret?: string; clientMetadataUrl?: string }
 ): Promise<OAuthFlowResult> {
   logger.debug(`Starting OAuth flow for ${serverUrl} (profile: ${profileName})`);
 
@@ -428,6 +460,11 @@ export async function performOAuthFlow(
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);
 
+  // Validate --client-metadata-url (CIMD) early so users get a clear error
+  if (clientCredentials?.clientMetadataUrl) {
+    validateClientMetadataUrl(clientCredentials.clientMetadataUrl);
+  }
+
   // When client credentials are provided, skip deleting existing client info
   // and pre-store the credentials so the provider uses them instead of dynamic registration
   let resolvedClientCredentials: { clientId: string; clientSecret?: string } | undefined;
@@ -439,9 +476,10 @@ export async function performOAuthFlow(
     }
     await storeKeychainOAuthClientInfo(normalizedServerUrl, profileName, resolvedClientCredentials);
   } else {
-    // Delete existing OAuth client info from keychain before re-authenticating
+    // Delete existing OAuth client info from keychain before re-authenticating.
     // This ensures we get a fresh client-id with the correct redirect URI
-    // (old client-id might have been registered with different redirect URI)
+    // (an old client-id may have been registered with a different redirect URI,
+    // or the authorization server may now advertise CIMD support, etc).
     logger.debug(`Removing existing OAuth client info for ${profileName} @ ${normalizedServerUrl}`);
     await removeKeychainOAuthClientInfo(normalizedServerUrl, profileName);
   }
@@ -457,6 +495,9 @@ export async function performOAuthFlow(
   };
   if (resolvedClientCredentials) {
     providerOptions.clientCredentials = resolvedClientCredentials;
+  }
+  if (clientCredentials?.clientMetadataUrl) {
+    providerOptions.clientMetadataUrl = clientCredentials.clientMetadataUrl;
   }
   const provider = new OAuthProvider(providerOptions);
 

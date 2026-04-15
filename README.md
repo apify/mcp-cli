@@ -434,9 +434,12 @@ mcpc @apify tools-list
 
 ### OAuth profiles
 
-For OAuth-enabled remote MCP servers, `mcpc` implements the full OAuth 2.1 flow with PKCE,
-including `WWW-Authenticate` header discovery, server metadata discovery, client ID metadata documents,
-dynamic client registration, and automatic token refresh.
+For OAuth-enabled remote MCP servers, `mcpc` implements the full OAuth 2.1 flow with PKCE as
+mandated by the [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization):
+`WWW-Authenticate` 401 challenges, Protected Resource Metadata and authorization server metadata
+discovery, all three [client registration approaches](#client-registration-approaches),
+[resource indicators (RFC 8707)](https://www.rfc-editor.org/rfc/rfc8707), and automatic
+refresh-token rotation.
 
 The OAuth authentication **always** needs to be initiated by the user calling the `login` command,
 which opens a web browser with login screen. `mcpc` never opens the web browser on its own.
@@ -478,6 +481,34 @@ mcpc login mcp.apify.com --profile work
 mcpc logout mcp.apify.com
 mcpc logout mcp.apify.com --profile work
 ```
+
+### Client registration approaches
+
+When logging in, `mcpc` supports all three OAuth client registration approaches defined in the
+[MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#client-registration-approaches),
+picking the one the authorization server advertises in its OAuth metadata:
+
+| **Approach**                            | **`mcpc login` flags**                         |
+|:----------------------------------------| :--------------------------------------------- |
+| **Pre-registration**                    | `--client-id` (and optional `--client-secret`) |
+| **Client ID Metadata Documents (CIMD)** | `--client-metadata-url <https-url>`            |
+| **Dynamic Client Registration (DCR)**   | _(default, no flags needed)_                   |
+
+```bash
+# Pre-registered OAuth client (public or confidential)
+mcpc login mcp.example.com --client-id <id> [--client-secret <secret>]
+
+# Client ID Metadata Documents (CIMD): URL points to a JSON document served over HTTPS.
+# Used only if the authorization server advertises client_id_metadata_document_supported: true;
+# otherwise mcpc falls back to Dynamic Client Registration.
+mcpc login mcp.example.com --client-metadata-url https://example.com/mcpc-client.json
+
+# Dynamic Client Registration (DCR): default when the server has a registration_endpoint.
+mcpc login mcp.apify.com
+```
+
+See the [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#client-registration-approaches)
+for details on each approach and the format of Client ID Metadata Documents.
 
 ### Authentication precedence
 

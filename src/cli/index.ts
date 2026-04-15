@@ -578,16 +578,26 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
     .usage('<server>')
     .description('Interactively login to a server using OAuth and save profile')
     .option('--profile <name>', 'Profile name (default: "default")')
-    .option(
-      '--scope <scopes>',
-      'OAuth scopes to request, quoted and space-separated (e.g. --scope "read write")'
+    .option('--scope <scopes>', 'OAuth scopes to request (e.g. --scope "read write")')
+    .option('--client-id <id>', 'Pre-registered OAuth client ID (skips CIMD and DCR)')
+    .option('--client-secret <secret>', 'Pre-registered OAuth client secret (requires --client-id)')
+    .option('--client-metadata-url <url>', 'HTTPS URL of an OAuth CIMD to use as the Client ID')
+    .addHelpText(
+      'after',
+      `
+${chalk.bold('OAuth client registration approaches (per MCP authorization spec):')}
+
+  1. Pre-registration: --client-id (and optionally --client-secret).
+  2. Client ID Metadata Documents (CIMD): --client-metadata-url <https-url>.
+     Used when the authorization server advertises
+     "client_id_metadata_document_supported: true".
+  3. Dynamic Client Registration (DCR): default fallback when the server
+     exposes a "registration_endpoint". No flags required.
+
+  See https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
+
+${jsonHelp('`{ profile, serverUrl, scopes }`')}`
     )
-    .option('--client-id <id>', 'OAuth client ID (for servers without dynamic client registration)')
-    .option(
-      '--client-secret <secret>',
-      'OAuth client secret (for servers without dynamic client registration)'
-    )
-    .addHelpText('after', jsonHelp('`{ profile, serverUrl, scopes }`'))
     .action(async (server, opts, command) => {
       if (!server) {
         throw new ClientError(
@@ -599,6 +609,7 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
         scope: opts.scope,
         clientId: opts.clientId,
         clientSecret: opts.clientSecret,
+        clientMetadataUrl: opts.clientMetadataUrl,
         ...getOptionsFromCommand(command),
       });
     });

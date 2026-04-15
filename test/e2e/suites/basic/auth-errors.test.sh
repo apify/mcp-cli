@@ -91,4 +91,46 @@ if [[ -z "$error_msg" ]] || ! echo "$error_msg" | grep -qi "login"; then
 fi
 test_pass
 
+# =============================================================================
+# Test: login command client registration approach validation
+# These tests verify CLI flag parsing and validation for the OAuth client
+# registration approaches (Pre-registration, CIMD, DCR) without going through
+# a real OAuth flow.
+# =============================================================================
+
+test_case "login --help documents all three client registration approaches"
+run_mcpc help login
+assert_success
+assert_contains "$STDOUT" "--client-id"
+assert_contains "$STDOUT" "--client-secret"
+assert_contains "$STDOUT" "--client-metadata-url"
+assert_contains "$STDOUT" "Pre-registration"
+assert_contains "$STDOUT" "Client ID Metadata Documents"
+assert_contains "$STDOUT" "Dynamic Client Registration"
+test_pass
+
+test_case "login --client-secret without --client-id fails"
+run_xmcpc login mcp.example.com --client-secret some-secret
+assert_failure
+assert_contains "$STDERR" "--client-secret requires --client-id"
+test_pass
+
+test_case "login --client-id with --client-metadata-url is rejected as mutually exclusive"
+run_xmcpc login mcp.example.com --client-id foo --client-metadata-url https://example.com/meta.json
+assert_failure
+assert_contains "$STDERR" "mutually exclusive"
+test_pass
+
+test_case "login --client-metadata-url with non-https URL is rejected"
+run_xmcpc login mcp.example.com --client-metadata-url http://example.com/meta.json
+assert_failure
+assert_contains "$STDERR" "https"
+test_pass
+
+test_case "login --client-metadata-url without a path component is rejected"
+run_xmcpc login mcp.example.com --client-metadata-url https://example.com
+assert_failure
+assert_contains "$STDERR" "path component"
+test_pass
+
 test_done
