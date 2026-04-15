@@ -970,7 +970,7 @@ ${chalk.bold('Arguments:')}
 ${chalk.bold('Schema validation:')}
   --schema <file>       Validate tool schema before calling (save with tools-get --json)
   --schema-mode <mode>  strict | compatible (default) | ignore
-${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`', `${SCHEMA_BASE}#calltoolresult`)}`
+${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }`', `${SCHEMA_BASE}#calltoolresult`)}`
     )
     .action(async (name, args, options, command) => {
       // Intercept --help: with helpOption(false) Commander won't catch it.
@@ -1030,7 +1030,8 @@ ${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isErr
       'after',
       jsonHelp(
         '`CallToolResult` object',
-        '`{ content: [...], structuredContent?, isError? }`',
+        // Keep this consistent with tools-call!
+        '`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }`',
         `${SCHEMA_BASE}#calltoolresult`
       )
     )
