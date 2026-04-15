@@ -219,6 +219,115 @@ export function isValidSessionName(name: string): boolean {
   return /^@[a-zA-Z0-9_-]{1,64}$/.test(name);
 }
 
+/**
+ * Split a shell-style command string into argv tokens.
+ *
+ * Supports:
+ *   - Whitespace as token separator (spaces and tabs, consecutive runs collapsed)
+ *   - Single quotes (literal, no escapes inside)
+ *   - Double quotes (allow `\"`, `\\`, `\$`, `\`` escapes)
+ *   - Backslash escapes outside quotes (`\<char>` → `<char>`)
+ *
+ * Does NOT perform variable expansion (`${VAR}` is preserved verbatim).
+ *
+ * @throws ClientError if quoting is unbalanced or a trailing backslash is present.
+ */
+export function shellSplit(input: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let hasToken = false; // distinguishes empty quoted token "" from no token
+  let i = 0;
+  const n = input.length;
+
+  while (i < n) {
+    const ch = input[i] as string;
+
+    if (ch === ' ' || ch === '\t' || ch === '\n') {
+      if (hasToken) {
+        tokens.push(current);
+        current = '';
+        hasToken = false;
+      }
+      i++;
+      continue;
+    }
+
+    if (ch === "'") {
+      // Single-quoted: everything literal until next single quote
+      const close = input.indexOf("'", i + 1);
+      if (close === -1) {
+        throw new ClientError(
+          `Unbalanced single quote in command string: ${input}\n` +
+            `Tip: each opening quote must have a matching closing quote.`
+        );
+      }
+      current += input.slice(i + 1, close);
+      hasToken = true;
+      i = close + 1;
+      continue;
+    }
+
+    if (ch === '"') {
+      // Double-quoted: handle a small set of backslash escapes
+      i++;
+      let closed = false;
+      while (i < n) {
+        const c = input[i] as string;
+        if (c === '"') {
+          closed = true;
+          i++;
+          break;
+        }
+        if (c === '\\' && i + 1 < n) {
+          const next = input[i + 1] as string;
+          if (next === '"' || next === '\\' || next === '$' || next === '`') {
+            current += next;
+            i += 2;
+            continue;
+          }
+          // Unrecognised escape: keep the backslash literal (matches POSIX shell)
+          current += c;
+          i++;
+          continue;
+        }
+        current += c;
+        i++;
+      }
+      if (!closed) {
+        throw new ClientError(
+          `Unbalanced double quote in command string: ${input}\n` +
+            `Tip: each opening quote must have a matching closing quote.`
+        );
+      }
+      hasToken = true;
+      continue;
+    }
+
+    if (ch === '\\') {
+      if (i + 1 >= n) {
+        throw new ClientError(
+          `Trailing backslash in command string: ${input}\n` +
+            `Tip: escape the backslash itself (\\\\) if you meant a literal backslash.`
+        );
+      }
+      current += input[i + 1] as string;
+      hasToken = true;
+      i += 2;
+      continue;
+    }
+
+    current += ch;
+    hasToken = true;
+    i++;
+  }
+
+  if (hasToken) {
+    tokens.push(current);
+  }
+
+  return tokens;
+}
+
 /** Common hostname prefixes to strip when generating session names */
 const COMMON_HOST_PREFIXES = ['mcp.', 'api.', 'www.'];
 
@@ -248,14 +357,32 @@ function sanitizeSessionName(raw: string): string {
  * For config entries: uses the entry name directly (sanitized).
  *   Example: ~/.vscode/mcp.json:filesystem → filesystem
  *
+ * For inline commands: uses the basename of the command binary, with common script
+ * extensions stripped. Caller is expected to always append a `-N` suffix because the
+ * binary name is rarely as distinctive as a hostname or config entry.
+ *   Examples: npx -y ... → @npx (caller adds -1), node dist/stdio.js → @node,
+ *   /usr/local/bin/python → @python, server.py → @server, ./my-mcp-server → @my-mcp-server
+ *
  * @returns Session name with @ prefix (e.g., @apify)
  */
 export function generateSessionName(
-  parsed: { type: 'url'; url: string } | { type: 'config'; file: string; entry: string }
+  parsed:
+    | { type: 'url'; url: string }
+    | { type: 'config'; file: string; entry: string }
+    | { type: 'command'; command: string; args: string[] }
 ): string {
   if (parsed.type === 'config') {
     const name = sanitizeSessionName(parsed.entry);
     return `@${name || 'session'}`;
+  }
+
+  if (parsed.type === 'command') {
+    // basename: strip directory, then strip common script extensions
+    const slashIdx = Math.max(parsed.command.lastIndexOf('/'), parsed.command.lastIndexOf('\\'));
+    let base = slashIdx >= 0 ? parsed.command.slice(slashIdx + 1) : parsed.command;
+    base = base.replace(/\.(js|mjs|cjs|ts|py|sh|exe|bat|cmd)$/i, '');
+    const sanitized = sanitizeSessionName(base);
+    return `@${sanitized || 'session'}`;
   }
 
   // URL case: parse and extract hostname

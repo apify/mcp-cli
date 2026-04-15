@@ -207,6 +207,101 @@ describe('parseServerArg', () => {
     expect(parseServerArg('example.com')).toEqual({ type: 'url', url: 'example.com' });
     expect(parseServerArg('mcp.apify.com')).toEqual({ type: 'url', url: 'mcp.apify.com' });
   });
+
+  describe('inline stdio command', () => {
+    it('should parse a simple command with args', () => {
+      expect(parseServerArg('npx -y foo')).toEqual({
+        type: 'command',
+        command: 'npx',
+        args: ['-y', 'foo'],
+      });
+    });
+
+    it('should parse "node dist/stdio.js" as inline command', () => {
+      expect(parseServerArg('node dist/stdio.js')).toEqual({
+        type: 'command',
+        command: 'node',
+        args: ['dist/stdio.js'],
+      });
+    });
+
+    it('should parse a real-world npx command', () => {
+      expect(parseServerArg('npx -y @modelcontextprotocol/server-filesystem /')).toEqual({
+        type: 'command',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-filesystem', '/'],
+      });
+    });
+
+    it('should parse a uvx command with --flag=value', () => {
+      expect(parseServerArg('uvx mcp-server-time --local-timezone=Europe/Prague')).toEqual({
+        type: 'command',
+        command: 'uvx',
+        args: ['mcp-server-time', '--local-timezone=Europe/Prague'],
+      });
+    });
+
+    it('should preserve single-quoted tokens', () => {
+      expect(parseServerArg("python -c 'import x; x.run()'")).toEqual({
+        type: 'command',
+        command: 'python',
+        args: ['-c', 'import x; x.run()'],
+      });
+    });
+
+    it('should preserve double-quoted tokens with spaces', () => {
+      expect(parseServerArg('node "my server.js"')).toEqual({
+        type: 'command',
+        command: 'node',
+        args: ['my server.js'],
+      });
+    });
+
+    it('should preserve ${VAR}-looking literals (no expansion)', () => {
+      expect(parseServerArg("node 'dist/foo.js' '${PWD}/data'")).toEqual({
+        type: 'command',
+        command: 'node',
+        args: ['dist/foo.js', '${PWD}/data'],
+      });
+    });
+
+    it('should throw on unbalanced double quote', () => {
+      expect(() => parseServerArg('node "unclosed')).toThrow(/Unbalanced double quote/);
+    });
+
+    it('should throw on unbalanced single quote', () => {
+      expect(() => parseServerArg("node 'unclosed")).toThrow(/Unbalanced single quote/);
+    });
+
+    it('should NOT parse a single-word non-hostname as inline command', () => {
+      // No whitespace → falls through to URL step, which succeeds for any non-special token.
+      // Single-word stdio binaries require the `--` form (handled by the CLI, not parseServerArg).
+      expect(parseServerArg('mcp-fs')).toEqual({ type: 'url', url: 'mcp-fs' });
+    });
+
+    it('should prefer config-file branch for paths-with-spaces ending in .json', () => {
+      // Config file extension wins over whitespace heuristic.
+      expect(parseServerArg('./path with space.json')).toEqual({
+        type: 'config-file',
+        file: './path with space.json',
+      });
+    });
+
+    it('should prefer config-file branch for absolute paths-with-spaces', () => {
+      // Path-character heuristic wins over whitespace heuristic.
+      expect(parseServerArg('./my dir/server.json')).toEqual({
+        type: 'config-file',
+        file: './my dir/server.json',
+      });
+    });
+
+    it('should not parse URL-with-port-and-path as command (no whitespace)', () => {
+      expect(parseServerArg('mcp.apify.com:8000/v1')).toEqual({
+        type: 'url',
+        url: 'mcp.apify.com:8000/v1',
+      });
+    });
+  });
 });
 
 describe('extractOptions', () => {

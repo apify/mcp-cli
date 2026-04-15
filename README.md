@@ -99,6 +99,10 @@ mcpc --json @test tools-list
 # Use a local MCP server package (stdio) referenced from config file
 mcpc connect ./.vscode/mcp.json:filesystem @fs
 mcpc @fs tools-list
+
+# Or spawn a local stdio server inline (no config file needed)
+mcpc connect "npx -y @modelcontextprotocol/server-filesystem ${PWD}"
+mcpc @npx-1 tools-list
 ```
 
 ## Usage
@@ -178,6 +182,7 @@ The `connect`, `login`, and `logout` commands accept a `<server>` argument in th
 
 - **Remote URL** (e.g. `mcp.apify.com` or `https://mcp.apify.com`) — scheme defaults to `https://`
 - **Config file entry** (e.g. `~/.vscode/mcp.json:filesystem`) — `file:entry-name` syntax
+- **Inline stdio command** (e.g. `"npx -y @modelcontextprotocol/server-filesystem /tmp"`) — quote the whole command, or use `--` after the session name (e.g. `mcpc connect @fs -- node dist/stdio.js`). Your shell handles `${VAR}` expansion; `mcpc` does not substitute env vars in inline commands.
 
 ### MCP commands
 
@@ -193,6 +198,11 @@ mcpc @apify tools-call search-apify-docs query:="What are Actors?"
 mcpc connect ~/.vscode/mcp.json:filesystem @fs
 mcpc @fs tools-list
 mcpc @fs tools-call list_directory path:=/
+
+# Connect to a local stdio server inline (no config file)
+mcpc connect "npx -y @modelcontextprotocol/server-filesystem ${PWD}"
+mcpc connect @stdio -- node dist/stdio.js     # explicit form via '--'
+mcpc @npx-1 tools-list                        # auto-named from binary basename
 ```
 
 See [MCP feature support](#mcp-feature-support) for details about all supported MCP features and commands.

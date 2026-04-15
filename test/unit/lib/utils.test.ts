@@ -16,6 +16,7 @@ import {
   getServerHost,
   isValidSessionName,
   generateSessionName,
+  shellSplit,
   isValidProfileName,
   validateProfileName,
   isValidResourceUri,
@@ -395,6 +396,129 @@ describe('generateSessionName', () => {
         expect(isValidSessionName(name)).toBe(true);
       }
     });
+  });
+
+  describe('inline command targets', () => {
+    it('should return basename for plain commands', () => {
+      expect(generateSessionName({ type: 'command', command: 'npx', args: [] })).toBe('@npx');
+      expect(generateSessionName({ type: 'command', command: 'node', args: ['dist/foo.js'] })).toBe(
+        '@node'
+      );
+    });
+
+    it('should strip directory prefix from command path', () => {
+      expect(
+        generateSessionName({ type: 'command', command: '/usr/local/bin/python', args: [] })
+      ).toBe('@python');
+      expect(generateSessionName({ type: 'command', command: './my-mcp-server', args: [] })).toBe(
+        '@my-mcp-server'
+      );
+    });
+
+    it('should strip Windows-style backslash directory prefix', () => {
+      expect(
+        generateSessionName({ type: 'command', command: 'C:\\tools\\node.exe', args: [] })
+      ).toBe('@node');
+    });
+
+    it('should strip common script extensions', () => {
+      expect(generateSessionName({ type: 'command', command: 'server.py', args: [] })).toBe(
+        '@server'
+      );
+      expect(generateSessionName({ type: 'command', command: 'app.js', args: [] })).toBe('@app');
+      expect(generateSessionName({ type: 'command', command: 'tool.mjs', args: [] })).toBe('@tool');
+      expect(generateSessionName({ type: 'command', command: 'run.sh', args: [] })).toBe('@run');
+    });
+
+    it('should sanitize special characters', () => {
+      expect(generateSessionName({ type: 'command', command: 'weird name!', args: [] })).toBe(
+        '@weird-name'
+      );
+    });
+
+    it('should fall back to "session" for empty/invalid command basename', () => {
+      expect(generateSessionName({ type: 'command', command: '!!!', args: [] })).toBe('@session');
+    });
+
+    it('should produce valid session names', () => {
+      const commands = ['npx', 'node', 'python', 'mcp-fs', './my-mcp-server', 'server.py'];
+      for (const command of commands) {
+        const name = generateSessionName({ type: 'command', command, args: [] });
+        expect(isValidSessionName(name)).toBe(true);
+      }
+    });
+  });
+});
+
+describe('shellSplit', () => {
+  it('returns empty array for empty input', () => {
+    expect(shellSplit('')).toEqual([]);
+    expect(shellSplit('   ')).toEqual([]);
+  });
+
+  it('splits on whitespace', () => {
+    expect(shellSplit('a b c')).toEqual(['a', 'b', 'c']);
+    expect(shellSplit('npx -y foo')).toEqual(['npx', '-y', 'foo']);
+  });
+
+  it('collapses consecutive whitespace', () => {
+    expect(shellSplit('a   b\t\tc')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('handles double-quoted tokens with spaces', () => {
+    expect(shellSplit('node "my server.js"')).toEqual(['node', 'my server.js']);
+    expect(shellSplit('"a b" "c d"')).toEqual(['a b', 'c d']);
+  });
+
+  it('handles single-quoted tokens (literal, no escapes)', () => {
+    expect(shellSplit("python -c 'import x; x.run()'")).toEqual([
+      'python',
+      '-c',
+      'import x; x.run()',
+    ]);
+  });
+
+  it('handles escaped quotes inside double quotes', () => {
+    expect(shellSplit('echo "say \\"hi\\""')).toEqual(['echo', 'say "hi"']);
+  });
+
+  it('handles backslash escapes for backslash, dollar, backtick inside double quotes', () => {
+    expect(shellSplit('echo "\\\\"')).toEqual(['echo', '\\']);
+    expect(shellSplit('echo "\\$VAR"')).toEqual(['echo', '$VAR']);
+    expect(shellSplit('echo "\\`cmd\\`"')).toEqual(['echo', '`cmd`']);
+  });
+
+  it('preserves ${VAR} literals (no expansion)', () => {
+    expect(shellSplit('node ${PWD}/foo')).toEqual(['node', '${PWD}/foo']);
+    expect(shellSplit("node '${PWD}/foo'")).toEqual(['node', '${PWD}/foo']);
+    expect(shellSplit('node "${PWD}/foo"')).toEqual(['node', '${PWD}/foo']);
+  });
+
+  it('handles backslash escapes outside quotes', () => {
+    expect(shellSplit('echo path\\ with\\ spaces')).toEqual(['echo', 'path with spaces']);
+    expect(shellSplit('echo \\"hi\\"')).toEqual(['echo', '"hi"']);
+  });
+
+  it('preserves @scope/pkg-style tokens', () => {
+    expect(shellSplit('npx -y "@scope/pkg" foo')).toEqual(['npx', '-y', '@scope/pkg', 'foo']);
+    expect(shellSplit('npx -y @scope/pkg foo')).toEqual(['npx', '-y', '@scope/pkg', 'foo']);
+  });
+
+  it('throws on unclosed double quote', () => {
+    expect(() => shellSplit('echo "unclosed')).toThrow(/Unbalanced double quote/);
+  });
+
+  it('throws on unclosed single quote', () => {
+    expect(() => shellSplit("echo 'unclosed")).toThrow(/Unbalanced single quote/);
+  });
+
+  it('throws on trailing backslash', () => {
+    expect(() => shellSplit('echo foo\\')).toThrow(/Trailing backslash/);
+  });
+
+  it('handles empty quoted token', () => {
+    expect(shellSplit('echo "" foo')).toEqual(['echo', '', 'foo']);
+    expect(shellSplit("echo '' foo")).toEqual(['echo', '', 'foo']);
   });
 });
 
