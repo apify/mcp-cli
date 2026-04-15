@@ -19,6 +19,11 @@ on:
           - patch
           - minor
           - major
+      skip-windows-e2e:
+        description: 'Skip Windows E2E tests (they take a long time)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -30,14 +35,20 @@ concurrency:
 
 jobs:
   e2e-windows:
+    if: ${{ !inputs.skip-windows-e2e }}
     uses: ./.github/workflows/e2e-windows.yml
 
   release:
     name: Publish ${{ inputs.type }}
     runs-on: ubuntu-latest
     needs: [e2e-windows]
-    # Release must be from main; pre-release can be from any branch
-    if: inputs.type == 'pre-release' || github.ref == 'refs/heads/main'
+    # Release must be from main; pre-release can be from any branch.
+    # Allow the e2e-windows dependency to be either successful or skipped
+    # (when the user opts out via skip-windows-e2e).
+    if: |
+      always() &&
+      (needs.e2e-windows.result == 'success' || needs.e2e-windows.result == 'skipped') &&
+      (inputs.type == 'pre-release' || github.ref == 'refs/heads/main')
 
     steps:
       - name: Validate inputs
