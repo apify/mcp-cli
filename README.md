@@ -106,52 +106,6 @@ mcpc @fs tools-list
 <!-- AUTO-GENERATED: mcpc --help -->
 
 ```
-Usage: mcpc [<@session>] [<command>] [options]
-
-Universal command-line client for the Model Context Protocol (MCP).
-
-Commands:
-  connect <server> [@session]  Connect to an MCP server and start a named @session
-  close <@session>             Close a session
-  restart <@session>           Restart a session (losing all state)
-  shell <@session>             Open interactive shell for a session
-  login <server>               Interactively login to a server using OAuth and save profile
-  logout <server>              Delete an OAuth profile for a server
-  clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
-  grep <pattern>               Search tools and instructions across all active sessions
-  x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
-  help [command] [subcommand]  Show help for a specific command
-
-Options:
-  --json                       Output in JSON format for scripting
-  --verbose                    Enable debug logging
-  --profile <name>             OAuth profile for the server ("default" if not provided)
-  --timeout <seconds>          Request timeout in seconds (default: 300)
-  --max-chars <n>              Truncate output to n characters (ignored in --json mode)
-  --insecure                   Skip TLS certificate verification (for self-signed certs)
-  -v, --version                Output the version number
-  -h, --help                   Display help
-
-MCP session commands (after connecting):
-  <@session>                   Show MCP server info, capabilities, and tools overview
-  <@session> grep <pattern>    Search tools and instructions
-  <@session> tools-list        List all server tools
-  <@session> tools-get <name>  Get tool details and schema
-  <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
-  <@session> prompts-list
-  <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
-  <@session> resources-list
-  <@session> resources-read <uri>
-  <@session> resources-subscribe <uri>
-  <@session> resources-unsubscribe <uri>
-  <@session> resources-templates-list
-  <@session> tasks-list
-  <@session> tasks-get <taskId>
-  <@session> tasks-cancel <taskId>
-  <@session> logging-set-level <level>
-  <@session> ping
-
-Run "mcpc" without arguments to show active sessions and OAuth profiles.
 ```
 
 ### General actions
