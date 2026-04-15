@@ -106,6 +106,53 @@ mcpc @fs tools-list
 <!-- AUTO-GENERATED: mcpc --help -->
 
 ```
+Usage: mcpc [<@session>] [<command>] [options]
+
+Universal command-line client for the Model Context Protocol (MCP).
+
+Commands:
+  connect <server> [@session]  Connect to an MCP server and start a named @session
+  close <@session>             Close a session
+  restart <@session>           Restart a session (losing all state)
+  shell <@session>             Open interactive shell for a session
+  login <server>               Interactively login to a server using OAuth and save profile
+  logout <server>              Delete an OAuth profile for a server
+  clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
+  grep <pattern>               Search tools and instructions across all active sessions
+  x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
+  help [command] [subcommand]  Show help for a specific command
+
+Options:
+  --json                       Output in JSON format for scripting
+  --verbose                    Enable debug logging
+  --profile <name>             OAuth profile for the server ("default" if not provided)
+  --timeout <seconds>          Request timeout in seconds (default: 300)
+  --max-chars <n>              Truncate output to n characters (ignored in --json mode)
+  --insecure                   Skip TLS certificate verification (for self-signed certs)
+  -v, --version                Output the version number
+  -h, --help                   Display help
+
+MCP session commands (after connecting):
+  <@session>                   Show MCP server info, capabilities, and tools overview
+  <@session> grep <pattern>    Search tools and instructions
+  <@session> tools-list        List all server tools
+  <@session> tools-get <name>  Get tool details and schema
+  <@session> tools-call <name> [arg:=val ... | <json> | <stdin]
+  <@session> prompts-list
+  <@session> prompts-get <name> [arg:=val ... | <json> | <stdin]
+  <@session> resources-list
+  <@session> resources-read <uri>
+  <@session> resources-subscribe <uri>
+  <@session> resources-unsubscribe <uri>
+  <@session> resources-templates-list
+  <@session> tasks-list
+  <@session> tasks-get <taskId>
+  <@session> tasks-result <taskId>
+  <@session> tasks-cancel <taskId>
+  <@session> logging-set-level <level>
+  <@session> ping
+
+Run "mcpc" without arguments to show active sessions and OAuth profiles.
 ```
 
 ### General actions
@@ -1016,6 +1063,9 @@ mcpc @apify tasks-list
 # Check task status
 mcpc @apify tasks-get <taskId>
 
+# Get the task result (blocks until the task reaches a terminal state)
+mcpc @apify tasks-result <taskId>
+
 # Cancel a running task
 mcpc @apify tasks-cancel <taskId>
 ```
@@ -1023,6 +1073,8 @@ mcpc @apify tasks-cancel <taskId>
 With `--task`, the CLI shows a progress spinner with elapsed time, server status messages,
 and progress notifications. Press **ESC** during execution to detach and get the task ID
 for later retrieval. With `--detach`, the task starts and returns the task ID immediately.
+Use `tasks-result <taskId>` to fetch the final `CallToolResult` payload once the task
+completes.
 
 `tools-list` and `tools-get` show task support annotations per tool:
 `[task:optional]`, `[task:required]`, or `[task:forbidden]`.

@@ -320,6 +320,16 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
         break;
       }
 
+      case 'tasks-result': {
+        if (args.length === 0) {
+          console.log(chalk.red('Error: tasks-result requires a task ID'));
+          console.log('Usage: tasks-result <taskId>');
+          return;
+        }
+        await tasks.getTaskResult(ctx.target, args[0] as string, options);
+        break;
+      }
+
       case 'tasks-cancel': {
         if (args.length === 0) {
           console.log(chalk.red('Error: tasks-cancel requires a task ID'));

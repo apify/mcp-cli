@@ -413,5 +413,6 @@ export interface IMcpClient {
   pollTask(taskId: string, onUpdate?: (update: TaskUpdate) => void): Promise<CallToolResult>;
   listTasks(cursor?: string): Promise<ListTasksResult>;
   getTask(taskId: string): Promise<GetTaskResult>;
+  getTaskResult(taskId: string): Promise<CallToolResult>;
   cancelTask(taskId: string): Promise<CancelTaskResult>;
 }

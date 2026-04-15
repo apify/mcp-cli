@@ -433,6 +433,18 @@ export class SessionClient extends EventEmitter implements IMcpClient {
     );
   }
 
+  async getTaskResult(taskId: string): Promise<CallToolResult> {
+    return this.withRetry(
+      () =>
+        this.bridgeClient.request(
+          'getTaskResult',
+          { taskId },
+          this.requestTimeout
+        ) as Promise<CallToolResult>,
+      'getTaskResult'
+    );
+  }
+
   async cancelTask(taskId: string): Promise<CancelTaskResult> {
     return this.withRetry(
       () =>

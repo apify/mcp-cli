@@ -9,6 +9,35 @@ import { withMcpClient } from '../helpers.js';
 import { formatTask, formatTasks } from '../output.js';
 
 /**
+ * Get the final result of a task (wraps MCP `tasks/result`).
+ * Blocks on the server until the task reaches a terminal state, then prints
+ * the `CallToolResult` payload using the same renderer as `tools-call`.
+ */
+export async function getTaskResult(
+  target: string,
+  taskId: string,
+  options: CommandOptions
+): Promise<void> {
+  await withMcpClient(target, options, async (client, _context) => {
+    const result = await client.getTaskResult(taskId);
+
+    if (options.outputMode === 'human') {
+      if (result.isError) {
+        console.log(formatError(`Task ${taskId} returned an error`));
+      } else {
+        console.log(formatSuccess(`Task ${taskId} result`));
+      }
+    }
+
+    console.log(
+      formatOutput(result, options.outputMode, {
+        ...(options.maxChars && { maxChars: options.maxChars }),
+      })
+    );
+  });
+}
+
+/**
  * List active tasks on the server
  */
 export async function listTasks(target: string, options: CommandOptions): Promise<void> {

@@ -421,6 +421,7 @@ ${chalk.bold('MCP session commands (after connecting):')}
   <@session> ${chalk.cyan('resources-templates-list')}
   <@session> ${chalk.cyan('tasks-list')}
   <@session> ${chalk.cyan('tasks-get')} <taskId>
+  <@session> ${chalk.cyan('tasks-result')} <taskId>
   <@session> ${chalk.cyan('tasks-cancel')} <taskId>
   <@session> ${chalk.cyan('logging-set-level')} <level>
   <@session> ${chalk.cyan('ping')}
@@ -1020,6 +1021,21 @@ ${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isErr
     )
     .action(async (taskId, _options, command) => {
       await tasks.getTask(session, taskId, getOptionsFromCommand(command));
+    });
+
+  program
+    .command('tasks-result <taskId>')
+    .description('Get MCP task final result (blocks until task reaches a terminal state).')
+    .addHelpText(
+      'after',
+      jsonHelp(
+        '`CallToolResult` object',
+        '`{ content: [...], structuredContent?, isError? }`',
+        `${SCHEMA_BASE}#calltoolresult`
+      )
+    )
+    .action(async (taskId, _options, command) => {
+      await tasks.getTaskResult(session, taskId, getOptionsFromCommand(command));
     });
 
   program
