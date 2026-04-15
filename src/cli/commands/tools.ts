@@ -29,8 +29,9 @@ import {
  * Render a `CallToolResult` payload.
  *
  * In human mode, prints a success/error banner before the payload and an
- * optional hint after errors. In `--json` mode, only the raw payload is
- * printed. Honors `--max-chars` truncation.
+ * optional hint after errors. The `_meta` field is omitted from human-mode
+ * output to reduce noise; the full payload is still available via `--json`.
+ * Honors `--max-chars` truncation.
  *
  * Shared by `tools-call` and `tasks-result` so both commands render results
  * identically.
@@ -53,8 +54,16 @@ export function renderCallToolResult(
     }
   }
 
+  // Strip `_meta` in human mode — it's protocol noise that LLMs and humans
+  // rarely care about. The full payload is still available via --json.
+  let dataToRender: unknown = result;
+  if (options.outputMode === 'human' && '_meta' in result && result._meta !== undefined) {
+    const { _meta: _ignored, ...rest } = result;
+    dataToRender = rest;
+  }
+
   console.log(
-    formatOutput(result, options.outputMode, {
+    formatOutput(dataToRender, options.outputMode, {
       ...(options.maxChars && { maxChars: options.maxChars }),
     })
   );

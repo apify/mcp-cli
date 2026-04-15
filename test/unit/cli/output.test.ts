@@ -2,7 +2,7 @@
  * Tests for CLI output formatting
  */
 
-import { extractSingleTextContent } from '../../../src/cli/tool-result.js';
+import { extractAllTextContent } from '../../../src/cli/tool-result.js';
 
 // Mock chalk to return plain strings (required because Jest can't handle chalk's ESM imports)
 jest.mock('chalk', () => ({
@@ -68,12 +68,12 @@ import type {
   SessionData,
 } from '../../../src/lib/types.js';
 
-describe('extractSingleTextContent', () => {
+describe('extractAllTextContent', () => {
   it('should return text for single text content item', () => {
     const result = {
       content: [{ type: 'text', text: 'Hello world' }],
     };
-    expect(extractSingleTextContent(result)).toBe('Hello world');
+    expect(extractAllTextContent(result)).toBe('Hello world');
   });
 
   it('should return text even if structuredContent is present', () => {
@@ -81,66 +81,76 @@ describe('extractSingleTextContent', () => {
       content: [{ type: 'text', text: 'Some markdown' }],
       structuredContent: { foo: 'bar' },
     };
-    expect(extractSingleTextContent(result)).toBe('Some markdown');
+    expect(extractAllTextContent(result)).toBe('Some markdown');
   });
 
-  it('should return undefined for multiple content items', () => {
+  it('should join texts when content is multiple text items', () => {
     const result = {
       content: [
         { type: 'text', text: 'First' },
         { type: 'text', text: 'Second' },
       ],
     };
-    expect(extractSingleTextContent(result)).toBeUndefined();
+    expect(extractAllTextContent(result)).toBe('First\nSecond');
+  });
+
+  it('should return undefined when content mixes text and non-text items', () => {
+    const result = {
+      content: [
+        { type: 'text', text: 'First' },
+        { type: 'image', data: 'base64...' },
+      ],
+    };
+    expect(extractAllTextContent(result)).toBeUndefined();
   });
 
   it('should return undefined for non-text content type', () => {
     const result = {
       content: [{ type: 'image', data: 'base64...' }],
     };
-    expect(extractSingleTextContent(result)).toBeUndefined();
+    expect(extractAllTextContent(result)).toBeUndefined();
   });
 
   it('should return undefined for empty content array', () => {
     const result = {
       content: [],
     };
-    expect(extractSingleTextContent(result)).toBeUndefined();
+    expect(extractAllTextContent(result)).toBeUndefined();
   });
 
   it('should return undefined for missing content field', () => {
     const result = {
       structuredContent: { foo: 'bar' },
     };
-    expect(extractSingleTextContent(result)).toBeUndefined();
+    expect(extractAllTextContent(result)).toBeUndefined();
   });
 
   it('should return undefined for null', () => {
-    expect(extractSingleTextContent(null)).toBeUndefined();
+    expect(extractAllTextContent(null)).toBeUndefined();
   });
 
   it('should return undefined for undefined', () => {
-    expect(extractSingleTextContent(undefined)).toBeUndefined();
+    expect(extractAllTextContent(undefined)).toBeUndefined();
   });
 
   it('should return undefined for non-object', () => {
-    expect(extractSingleTextContent('string')).toBeUndefined();
-    expect(extractSingleTextContent(123)).toBeUndefined();
-    expect(extractSingleTextContent(true)).toBeUndefined();
+    expect(extractAllTextContent('string')).toBeUndefined();
+    expect(extractAllTextContent(123)).toBeUndefined();
+    expect(extractAllTextContent(true)).toBeUndefined();
   });
 
   it('should return undefined if text field is not a string', () => {
     const result = {
       content: [{ type: 'text', text: 123 }],
     };
-    expect(extractSingleTextContent(result)).toBeUndefined();
+    expect(extractAllTextContent(result)).toBeUndefined();
   });
 
   it('should handle empty string text', () => {
     const result = {
       content: [{ type: 'text', text: '' }],
     };
-    expect(extractSingleTextContent(result)).toBe('');
+    expect(extractAllTextContent(result)).toBe('');
   });
 });
 

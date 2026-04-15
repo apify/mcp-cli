@@ -21,13 +21,13 @@ import type {
   ServerDetails,
   Task,
 } from '../lib/types.js';
-import { extractSingleTextContent } from './tool-result.js';
+import { extractAllTextContent } from './tool-result.js';
 import { join } from 'node:path';
 import { isValidSessionName, getLogsDir } from '../lib/utils.js';
 import { getSession } from '../lib/sessions.js';
 
 // Re-export for external use
-export { extractSingleTextContent } from './tool-result.js';
+export { extractAllTextContent } from './tool-result.js';
 
 /**
  * Convert HSL to RGB hex color
@@ -163,11 +163,13 @@ export function formatHuman(data: unknown, options?: FormatOptions): string {
     return chalk.gray('(no data)');
   }
 
-  // Check if this is a tool call result with a single text content
-  // If so, wrap it in quadruple backticks to prevent markdown interference
-  const singleText = extractSingleTextContent(data);
-  if (singleText !== undefined) {
-    return `${chalk.gray('````')}\n${singleText}\n${chalk.gray('````')}`;
+  // Check if this is a tool call result whose `content` is an array of only
+  // `type: "text"` items. If so, render just the texts wrapped in quadruple
+  // backticks so the content is unambiguously quoted (and skip any
+  // `structuredContent` — the texts are the canonical view).
+  const textContent = extractAllTextContent(data);
+  if (textContent !== undefined) {
+    return `${chalk.gray('````')}\n${textContent}\n${chalk.gray('````')}`;
   }
 
   // Handle different data types
