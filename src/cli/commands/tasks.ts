@@ -7,6 +7,26 @@ import { formatOutput, formatSuccess, formatError } from '../output.js';
 import type { CommandOptions } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
 import { formatTask, formatTasks } from '../output.js';
+import { renderCallToolResult } from './tools.js';
+
+/**
+ * Get the final result of a task (wraps MCP `tasks/result`).
+ * Blocks on the server until the task reaches a terminal state, then prints
+ * the `CallToolResult` payload using the same renderer as `tools-call`.
+ */
+export async function getTaskResult(
+  target: string,
+  taskId: string,
+  options: CommandOptions
+): Promise<void> {
+  await withMcpClient(target, options, async (client, _context) => {
+    const result = await client.getTaskResult(taskId);
+    renderCallToolResult(result, options, {
+      success: `Task ${taskId} completed`,
+      error: `Task ${taskId} returned an error`,
+    });
+  });
+}
 
 /**
  * List active tasks on the server
@@ -28,6 +48,9 @@ export async function listTasks(target: string, options: CommandOptions): Promis
         console.log(formatSuccess('No active tasks'));
       } else {
         console.log(formatTasks(allTasks));
+        console.log(
+          `\nTo fetch the task's final result, run:\n  mcpc ${target} tasks-result <taskId>`
+        );
       }
     } else {
       console.log(formatOutput({ tasks: allTasks }, 'json'));

@@ -1294,6 +1294,12 @@ class BridgeProcess {
           break;
         }
 
+        case 'getTaskResult': {
+          const params = message.params as { taskId: string };
+          result = await this.client.getTaskResult(params.taskId);
+          break;
+        }
+
         case 'cancelTask': {
           const params = message.params as { taskId: string };
           result = await this.client.cancelTask(params.taskId);

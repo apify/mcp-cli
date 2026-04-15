@@ -110,6 +110,7 @@ export const KNOWN_SESSION_COMMANDS = [
   'ping',
   'tasks-list',
   'tasks-get',
+  'tasks-result',
   'tasks-cancel',
   'grep',
 ];

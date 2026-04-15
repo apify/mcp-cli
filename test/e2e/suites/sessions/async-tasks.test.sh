@@ -119,6 +119,36 @@ assert_json_eq "$STDOUT" '.status' 'completed'
 assert_contains "$STDOUT" "Done (2 steps)"
 test_pass
 
+# ── tasks-result (fetch final CallToolResult payload) ────────
+
+test_case "tasks-result returns the CallToolResult payload"
+run_mcpc "$SESSION" tasks-result "$WAIT_TASK_ID"
+assert_success
+assert_contains "$STDOUT" "Completed 2 steps in 500ms"
+test_pass
+
+test_case "tasks-result --json returns the raw CallToolResult"
+run_mcpc --json "$SESSION" tasks-result "$WAIT_TASK_ID"
+assert_success
+assert_json_valid "$STDOUT"
+assert_contains "$STDOUT" "Completed 2 steps in 500ms"
+# The payload is a CallToolResult, so it must contain a content[] array
+content_type=$(echo "$STDOUT" | jq -r '.content[0].type')
+assert_eq "$content_type" "text"
+test_pass
+
+test_case "tasks-result blocks until the task reaches a terminal state"
+# Start a task that takes ~1.5 seconds and immediately ask for its result
+run_mcpc --json "$SESSION" tools-call --detach slow-task ms:=1500 steps:=3
+assert_success
+RESULT_TASK_ID=$(echo "$STDOUT" | jq -r '.taskId')
+# This should block on the server until the task completes, then return the payload
+run_mcpc --json "$SESSION" tasks-result "$RESULT_TASK_ID"
+assert_success
+assert_json_valid "$STDOUT"
+assert_contains "$STDOUT" "Completed 3 steps in 1500ms"
+test_pass
+
 # ── Synchronous fallback (no --task) ─────────────────────────
 
 test_case "tools-call without --task runs synchronously"
