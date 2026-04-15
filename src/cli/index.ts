@@ -578,16 +578,10 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
     .usage('<server>')
     .description('Interactively login to a server using OAuth and save profile')
     .option('--profile <name>', 'Profile name (default: "default")')
-    .option(
-      '--scope <scopes>',
-      'OAuth scopes to request, quoted and space-separated (e.g. --scope "read write")'
-    )
+    .option('--scope <scopes>', 'OAuth scopes to request (e.g. --scope "read write")')
     .option('--client-id <id>', 'Pre-registered OAuth client ID (skips CIMD and DCR)')
     .option('--client-secret <secret>', 'Pre-registered OAuth client secret (requires --client-id)')
-    .option(
-      '--client-metadata-url <url>',
-      'HTTPS URL of an OAuth Client ID Metadata Document (CIMD) to use as the client_id'
-    )
+    .option('--client-metadata-url <url>', 'HTTPS URL of an OAuth CIMD to use as the Client ID')
     .addHelpText(
       'after',
       `
