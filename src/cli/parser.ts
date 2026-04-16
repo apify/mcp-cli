@@ -159,11 +159,11 @@ export function suggestCommand(
     if (reversedMatch) return reversedMatch;
   }
 
-  // Check for bare prefix (e.g., "tools" → "tools-call", "resources" → "resources-read")
+  // Check for bare prefix (e.g., "tools" → "tools-list", "resources" → "resources-list")
   const prefixSuggestions: Record<string, string> = {
-    tools: 'tools-call',
-    resources: 'resources-read',
-    prompts: 'prompts-get',
+    tools: 'tools-list',
+    resources: 'resources-list',
+    prompts: 'prompts-list',
   };
   const prefixSuggestion = prefixSuggestions[normalized];
   if (prefixSuggestion && commands.includes(prefixSuggestion)) {

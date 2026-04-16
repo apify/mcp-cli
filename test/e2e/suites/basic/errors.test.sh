@@ -52,28 +52,28 @@ assert_failure
 assert_contains "$STDERR" "Did you mean: mcpc @test tools-list"
 test_pass
 
-# Test: bare "tools" command suggests tools-call
-test_case "bare tools suggests tools-call"
+# Test: bare "tools" command suggests tools-list
+test_case "bare tools suggests tools-list"
 run_mcpc @test tools
 assert_failure
 assert_contains "$STDERR" "Unknown command: tools"
-assert_contains "$STDERR" "Did you mean: mcpc @test tools-call"
+assert_contains "$STDERR" "Did you mean: mcpc @test tools-list"
 test_pass
 
-# Test: bare "resources" command suggests resources-read
-test_case "bare resources suggests resources-read"
+# Test: bare "resources" command suggests resources-list
+test_case "bare resources suggests resources-list"
 run_mcpc @test resources
 assert_failure
 assert_contains "$STDERR" "Unknown command: resources"
-assert_contains "$STDERR" "Did you mean: mcpc @test resources-read"
+assert_contains "$STDERR" "Did you mean: mcpc @test resources-list"
 test_pass
 
-# Test: bare "prompts" command suggests prompts-get
-test_case "bare prompts suggests prompts-get"
+# Test: bare "prompts" command suggests prompts-list
+test_case "bare prompts suggests prompts-list"
 run_mcpc @test prompts
 assert_failure
 assert_contains "$STDERR" "Unknown command: prompts"
-assert_contains "$STDERR" "Did you mean: mcpc @test prompts-get"
+assert_contains "$STDERR" "Did you mean: mcpc @test prompts-list"
 test_pass
 
 # Test: completely unknown command shows help text but no suggestion
@@ -114,7 +114,7 @@ test_case "top-level bare tools suggests session subcommand"
 run_mcpc tools
 assert_failure
 assert_contains "$STDERR" "Unknown command: tools"
-assert_contains "$STDERR" "Did you mean: mcpc <@session> tools-call"
+assert_contains "$STDERR" "Did you mean: mcpc <@session> tools-list"
 test_pass
 
 # Test: top-level typo that matches a session subcommand
