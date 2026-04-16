@@ -326,6 +326,20 @@ export async function callTool(
 
       const escHintText = escListener.promise ? ` ${chalk.dim('(ESC to detach)')}` : '';
 
+      // Set up SIGINT handler to print task ID hint on Ctrl+C (human mode only)
+      const sigintHandler = (): void => {
+        escListener.cleanup();
+        if (timerInterval) clearInterval(timerInterval);
+        if (spinner) spinner.stop();
+        if (capturedTaskId && options.outputMode === 'human') {
+          console.error(`\nInterrupted. Task \`${capturedTaskId}\` continues on the server.`);
+          console.error(`- \`mcpc ${target} tasks-result ${capturedTaskId}\` to fetch the result`);
+          console.error(`- \`mcpc ${target} tasks-cancel ${capturedTaskId}\` to stop it`);
+        }
+        process.exit(0);
+      };
+      process.on('SIGINT', sigintHandler);
+
       const updateSpinnerText = (): void => {
         if (!spinner) return;
         const elapsed = formatElapsed(Date.now() - startTime);
@@ -403,6 +417,7 @@ export async function callTool(
         }
         throw error;
       } finally {
+        process.off('SIGINT', sigintHandler);
         if (timerInterval) clearInterval(timerInterval);
       }
     } else {
