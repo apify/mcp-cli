@@ -1608,7 +1608,7 @@ describe('formatSessionLine', () => {
 
     expect(output).toContain('@test');
     expect(output).toContain('https://mcp.example.com');
-    expect(output).toContain('HTTP');
+    expect(output).not.toContain('HTTP');
     expect(output).toContain('OAuth');
     expect(output).toContain('default');
     expect(output).not.toContain('MCP:');
@@ -1628,7 +1628,7 @@ describe('formatSessionLine', () => {
 
     expect(output).toContain('@fs');
     expect(output).toContain('npx');
-    expect(output).toContain('stdio');
+    expect(output).not.toContain('stdio');
   });
 
   it('should include proxy info when configured', () => {
@@ -1731,7 +1731,7 @@ describe('logTarget', () => {
 
     // Should show command info
     expect(output).toContain('npx');
-    expect(output).toContain('stdio');
+    expect(output).not.toContain('stdio');
   });
 
   it('should not output anything in json mode', async () => {

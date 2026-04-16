@@ -1129,19 +1129,11 @@ export function formatSessionLine(session: SessionData): string {
   }
   const targetStr = truncateWithEllipsis(target, 80);
 
-  // Format transport/auth info
-  const parts: string[] = [];
-
-  if (session.server.command) {
-    parts.push('stdio');
-  } else {
-    parts.push('HTTP');
-    if (session.profileName) {
-      parts.push('OAuth: ' + chalk.magenta(session.profileName) + chalk.dim(''));
-    }
+  // Format auth info (transport type omitted — obvious from context)
+  let infoStr = '';
+  if (!session.server.command && session.profileName) {
+    infoStr = chalk.dim('(OAuth: ') + chalk.magenta(session.profileName) + chalk.dim(')');
   }
-
-  const infoStr = chalk.dim('(') + chalk.dim(parts.join(', ')) + chalk.dim(')');
 
   // Add proxy info separately (not dimmed, for visibility)
   let proxyStr = '';
@@ -1153,7 +1145,8 @@ export function formatSessionLine(session: SessionData): string {
       chalk.green(']');
   }
 
-  return `${nameStr} → ${targetStr} ${infoStr}${proxyStr}`;
+  const suffix = [infoStr, proxyStr].filter(Boolean).join(' ');
+  return `${nameStr} → ${targetStr}${suffix ? ' ' + suffix : ''}`;
 }
 
 /**
@@ -1168,8 +1161,8 @@ export interface LogTargetOptions {
 
 /**
  * Log target prefix (only in human mode)
- * For sessions: [@name → server (transport, auth)]
- * For direct connections: [target (transport, auth)]
+ * For sessions: [@name → server (auth)]
+ * For direct connections: [target (auth)]
  */
 export async function logTarget(target: string, options: LogTargetOptions): Promise<void> {
   if (options.outputMode !== 'human' || options.hide) {
@@ -1195,17 +1188,19 @@ export async function logTarget(target: string, options: LogTargetOptions): Prom
       targetStr += ' ' + tc.args.join(' ');
     }
     targetStr = truncateWithEllipsis(targetStr, 80);
-    console.log(`[→ ${targetStr} ${chalk.dim('(stdio)')}]`);
+    console.log(`[→ ${targetStr}]`);
     return;
   }
 
   // HTTP transport: show server URL with auth info
   const serverStr = tc?.url || target;
-  const parts: string[] = ['HTTP'];
   if (options.profileName) {
-    parts.push('OAuth: ' + chalk.magenta(options.profileName));
+    console.log(
+      `[→ ${serverStr} ${chalk.dim('(OAuth: ') + chalk.magenta(options.profileName) + chalk.dim(')')}]\n`
+    );
+  } else {
+    console.log(`[→ ${serverStr}]\n`);
   }
-  console.log(`[→ ${serverStr} ${chalk.dim('(' + parts.join(', ') + ')')}]\n`);
 }
 
 /**
