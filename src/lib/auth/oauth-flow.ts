@@ -456,7 +456,7 @@ export async function performOAuthFlow(
 
   // Find available port for callback server
   const port = await findAvailablePort(8000);
-  const redirectUrl = `http://localhost:${port}/callback`;
+  const redirectUrl = `http://127.0.0.1:${port}/callback`;
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);
 
