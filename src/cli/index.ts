@@ -896,22 +896,6 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
 
   // Tools commands
   program
-    .command('tools')
-    .description('List MCP tools (shorthand for tools-list).')
-    .option('--full', 'Show full tool details including schema')
-    .addHelpText(
-      'after',
-      jsonHelp(
-        'Array of `Tool` objects',
-        '`[{ name, description?, inputSchema, annotations? }, ...]`',
-        `${SCHEMA_BASE}#tool`
-      )
-    )
-    .action(async (_options, command) => {
-      await tools.listTools(session, getOptionsFromCommand(command));
-    });
-
-  program
     .command('tools-list')
     .description('List all MCP tools.')
     .option('--full', 'Show full tool details including schema')
@@ -1069,21 +1053,6 @@ ${toolsCallJsonHelp}${toolsCallDetachJsonHelp}`
 
   // Resources commands
   program
-    .command('resources')
-    .description('List MCP resources (shorthand for resources-list).')
-    .addHelpText(
-      'after',
-      jsonHelp(
-        'Array of `Resource` objects',
-        '`[{ uri, name?, description?, mimeType? }, ...]`',
-        `${SCHEMA_BASE}#resource`
-      )
-    )
-    .action(async (_options, command) => {
-      await resources.listResources(session, getOptionsFromCommand(command));
-    });
-
-  program
     .command('resources-list')
     .description('List all MCP resources.')
     .addHelpText(
@@ -1151,21 +1120,6 @@ ${toolsCallJsonHelp}${toolsCallDetachJsonHelp}`
     });
 
   // Prompts commands
-  program
-    .command('prompts')
-    .description('List MCP prompts (shorthand for prompts-list).')
-    .addHelpText(
-      'after',
-      jsonHelp(
-        'Array of `Prompt` objects',
-        '`[{ name, description?, arguments?: [{ name, required? }] }, ...]`',
-        `${SCHEMA_BASE}#prompt`
-      )
-    )
-    .action(async (_options, command) => {
-      await prompts.listPrompts(session, getOptionsFromCommand(command));
-    });
-
   program
     .command('prompts-list')
     .description('List all MCP prompts.')

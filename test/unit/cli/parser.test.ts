@@ -527,6 +527,15 @@ describe('suggestCommand', () => {
     expect(suggestCommand('list-prompts', commands)).toBe('prompts-list');
   });
 
+  it('suggests list command for bare prefix (tools, resources, prompts)', () => {
+    expect(suggestCommand('tools', commands)).toBe('tools-list');
+    expect(suggestCommand('resources', commands)).toBe('resources-list');
+    expect(suggestCommand('prompts', commands)).toBe('prompts-list');
+    // Case-insensitive
+    expect(suggestCommand('TOOLS', commands)).toBe('tools-list');
+    expect(suggestCommand('Resources', commands)).toBe('resources-list');
+  });
+
   it('suggests the closest match for typos', () => {
     expect(suggestCommand('tools-lst', commands)).toBe('tools-list');
     expect(suggestCommand('conect', commands)).toBe('connect');
