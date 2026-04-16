@@ -1086,6 +1086,16 @@ export function formatInfo(message: string): string {
   return chalk.cyan(`ℹ ${message}`);
 }
 
+export function formatTaskCommandsHint(target: string, taskId?: string): string {
+  const id = taskId ?? '<taskId>';
+  return [
+    '\nAvailable commands:',
+    `  mcpc ${target} tasks-get ${id}`,
+    `  mcpc ${target} tasks-result ${id}`,
+    `  mcpc ${target} tasks-cancel ${id}`,
+  ].join('\n');
+}
+
 /**
  * Truncate formatted output string to maxChars, appending a notice about truncation.
  * Returns the original string if within limit.

@@ -12,6 +12,7 @@ import {
   formatError,
   formatWarning,
   formatInfo,
+  formatTaskCommandsHint,
 } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import type { CallToolResult, CommandOptions, TaskUpdate } from '../../lib/types.js';
@@ -302,9 +303,7 @@ export async function callTool(
 
       if (options.outputMode === 'human') {
         console.log(formatSuccess(`Task started: ${taskUpdate.taskId}`));
-        console.log(
-          `\nTo fetch the task's final result, run:\n  mcpc ${target} tasks-result ${taskUpdate.taskId}`
-        );
+        console.log(formatTaskCommandsHint(target, taskUpdate.taskId));
       } else {
         console.log(formatOutput({ taskId: taskUpdate.taskId, status: taskUpdate.status }, 'json'));
       }
@@ -330,10 +329,7 @@ export async function callTool(
         if (spinner) {
           spinner.info(`Detached. Task ${chalk.bold(`\`${taskId}\``)} continues in background`);
         }
-        console.log(
-          `\nTo wait for the task and fetch its result, run:\n  mcpc ${target} tasks-result ${taskId}`
-        );
-        console.log(`\nTo cancel the task, run:\n  mcpc ${target} tasks-cancel ${taskId}`);
+        console.log(formatTaskCommandsHint(target, taskId));
       };
 
       // Set up SIGINT handler to print task ID hint on Ctrl+C (human mode only)
