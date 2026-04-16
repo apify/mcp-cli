@@ -326,15 +326,22 @@ export async function callTool(
 
       const escHintText = escListener.promise ? ` ${chalk.dim('(ESC to detach)')}` : '';
 
+      const printDetachedHint = (taskId: string): void => {
+        if (spinner) {
+          spinner.info(`Detached. Task ${chalk.bold(`\`${taskId}\``)} continues in background`);
+        }
+        console.log(
+          `\nTo wait for the task and fetch its result, run:\n  mcpc ${target} tasks-result ${taskId}`
+        );
+        console.log(`\nTo cancel the task, run:\n  mcpc ${target} tasks-cancel ${taskId}`);
+      };
+
       // Set up SIGINT handler to print task ID hint on Ctrl+C (human mode only)
       const sigintHandler = (): void => {
         escListener.cleanup();
         if (timerInterval) clearInterval(timerInterval);
-        if (spinner) spinner.stop();
         if (capturedTaskId && options.outputMode === 'human') {
-          console.error(`\nInterrupted. Task \`${capturedTaskId}\` continues on the server.`);
-          console.error(`- \`mcpc ${target} tasks-result ${capturedTaskId}\` to fetch the result`);
-          console.error(`- \`mcpc ${target} tasks-cancel ${capturedTaskId}\` to stop it`);
+          printDetachedHint(capturedTaskId);
         }
         process.exit(0);
       };
@@ -385,14 +392,7 @@ export async function callTool(
 
           if (raceResult.type === 'detached') {
             if (timerInterval) clearInterval(timerInterval);
-            if (spinner) {
-              spinner.info(`Detached. Task ${chalk.bold(capturedTaskId!)} continues in background`);
-            }
-            if (options.outputMode === 'human') {
-              console.log(
-                `\nTo fetch the task's final result, run:\n  mcpc ${target} tasks-result ${capturedTaskId!}`
-              );
-            }
+            printDetachedHint(capturedTaskId!);
             return;
           }
 
