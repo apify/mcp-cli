@@ -1814,34 +1814,38 @@ describe('formatCallToolResultHuman', () => {
     expect(output).not.toContain('Structured content');
   });
 
-  it('should skip structuredContent when a text block contains the same JSON', () => {
+  it('should skip the duplicate text block when it matches structuredContent', () => {
     const sc = { results: [{ title: 'Test', url: 'https://example.com' }] };
     const result = {
       content: [{ type: 'text' as const, text: JSON.stringify(sc) }],
       structuredContent: sc,
     };
     const output = formatCallToolResultHuman(result);
-    // The text block is shown, but no separate "Structured content:" section
-    expect(output).toContain('Content:');
-    expect(output).not.toContain('Structured content:');
+    // The duplicate text block is omitted; structuredContent section is shown instead
+    expect(output).not.toContain('Content:');
+    expect(output).toContain('Structured content:');
+    expect(output).toContain('"results"');
   });
 
-  it('should skip structuredContent when a text block has pretty-printed matching JSON', () => {
+  it('should skip duplicate text block even when pretty-printed', () => {
     const sc = { a: 1, b: 2 };
     const result = {
       content: [{ type: 'text' as const, text: JSON.stringify(sc, null, 2) }],
       structuredContent: sc,
     };
     const output = formatCallToolResultHuman(result);
-    expect(output).not.toContain('Structured content:');
+    expect(output).not.toContain('Content:');
+    expect(output).toContain('Structured content:');
   });
 
-  it('should show structuredContent when text blocks do not match it', () => {
+  it('should keep non-matching text blocks alongside structuredContent', () => {
     const result = {
       content: [{ type: 'text' as const, text: 'Human-readable summary' }],
       structuredContent: { results: [1, 2, 3] },
     };
     const output = formatCallToolResultHuman(result);
+    expect(output).toContain('Content:');
+    expect(output).toContain('Human-readable summary');
     expect(output).toContain('Structured content:');
     expect(output).toContain('"results"');
   });
@@ -1855,6 +1859,22 @@ describe('formatCallToolResultHuman', () => {
     expect(output).toContain('Structured content:');
     expect(output).toContain('"answer"');
     expect(output).toContain('42');
+  });
+
+  it('should only skip the matching text block among multiple blocks', () => {
+    const sc = { key: 'val' };
+    const result = {
+      content: [
+        { type: 'text' as const, text: 'Summary' },
+        { type: 'text' as const, text: JSON.stringify(sc) },
+      ],
+      structuredContent: sc,
+    };
+    const output = formatCallToolResultHuman(result);
+    // The first text block (non-matching) is kept; the JSON duplicate is omitted
+    expect(output).toContain('Content:');
+    expect(output).toContain('Summary');
+    expect(output).toContain('Structured content:');
   });
 
   it('should format resource_link content blocks', () => {

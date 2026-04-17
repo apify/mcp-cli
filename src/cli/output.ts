@@ -1090,25 +1090,28 @@ function formatContentBlock(block: ContentBlock, lines: string[]): void {
 }
 
 /**
- * Check whether any text content block is a JSON serialization of
- * `structuredContent`.  Per the MCP spec, servers SHOULD include such a
- * block for backwards compatibility, so this avoids printing duplicate data.
+ * Return the indices of text content blocks that are JSON serializations of
+ * `structuredContent`.  Per the MCP spec, servers SHOULD include such a block
+ * for backwards compatibility — we skip those blocks from the Content section
+ * so the better-formatted Structured content section is the canonical view.
  */
-function isStructuredContentInTextBlocks(
+function findDuplicateTextBlocks(
   content: CallToolResult['content'],
   structuredContent: Record<string, unknown>
-): boolean {
+): Set<number> {
+  const dupes = new Set<number>();
   const canonical = JSON.stringify(structuredContent);
-  for (const block of content) {
-    if (block.type !== 'text') continue;
+  for (let i = 0; i < content.length; i++) {
+    const block = content[i];
+    if (!block || block.type !== 'text') continue;
     try {
-      const parsed: unknown = JSON.parse(block.text.trim());
-      if (JSON.stringify(parsed) === canonical) return true;
+      const parsed: unknown = JSON.parse((block as { text: string }).text.trim());
+      if (JSON.stringify(parsed) === canonical) dupes.add(i);
     } catch {
-      // not valid JSON — skip
+      // not valid JSON — keep the block
     }
   }
-  return false;
+  return dupes;
 }
 
 /**
@@ -1116,10 +1119,9 @@ function isStructuredContentInTextBlocks(
  *
  * Sections (each printed only when present):
  * 1. **Metadata** — `_meta` rendered as pretty JSON
- * 2. **Content:** — each content block rendered per its type
- * 3. **Structured content:** — `structuredContent` as pretty JSON, unless
- *    a text block already contains the same data (per MCP spec, servers
- *    SHOULD include a serialized-JSON text block for backwards compat)
+ * 2. **Content:** — each content block rendered per its type (text blocks
+ *    that duplicate `structuredContent` are omitted)
+ * 3. **Structured content:** — `structuredContent` as syntax-highlighted JSON
  */
 export function formatCallToolResultHuman(result: CallToolResult): string {
   const lines: string[] = [];
@@ -1132,24 +1134,33 @@ export function formatCallToolResultHuman(result: CallToolResult): string {
     lines.push('');
   }
 
-  // Content section
+  // Identify text blocks that are just a JSON dump of structuredContent
+  const sc = result.structuredContent;
+  const hasStructuredContent = !!sc && Object.keys(sc).length > 0;
   const content = result.content;
+  let skipIndices = new Set<number>();
+  if (hasStructuredContent && content && sc) {
+    skipIndices = findDuplicateTextBlocks(content, sc);
+  }
+
+  // Content section — skip duplicate text blocks
   if (content && content.length > 0) {
-    lines.push(chalk.bold('Content:'));
-    for (let i = 0; i < content.length; i++) {
-      if (i > 0) lines.push('');
-      formatContentBlock(content[i] as ContentBlock, lines);
+    const visible = content.filter((_, i) => !skipIndices.has(i));
+    if (visible.length > 0) {
+      lines.push(chalk.bold('Content:'));
+      for (let i = 0; i < visible.length; i++) {
+        if (i > 0) lines.push('');
+        formatContentBlock(visible[i] as ContentBlock, lines);
+      }
     }
   }
 
-  // Structured content section — show as JSON unless already in text blocks
-  const sc = result.structuredContent;
-  if (sc && Object.keys(sc).length > 0) {
-    if (!content || !isStructuredContentInTextBlocks(content, sc)) {
-      if (lines.length > 0) lines.push('');
-      lines.push(chalk.bold('Structured content:'));
-      lines.push(JSON.stringify(sc, null, 2));
-    }
+  // Structured content section — syntax-highlighted JSON
+  if (hasStructuredContent) {
+    if (lines.length > 0) lines.push('');
+    lines.push(chalk.bold('Structured content:'));
+    const scJson = JSON.stringify(sc, null, 2);
+    lines.push(process.stdout.isTTY ? highlightJson(scJson) : scJson);
   }
 
   if (lines.length === 0) {
