@@ -1087,14 +1087,23 @@ export function formatInfo(message: string): string {
   return chalk.cyan(`ℹ ${message}`);
 }
 
-export function formatTaskCommandsHint(target: string, taskId?: string): string {
+export function formatTaskCommandsHint(
+  target: string,
+  taskId?: string,
+  status?: Task['status']
+): string {
   const id = taskId ?? '<taskId>';
-  return [
+  const lines = [
     '\nAvailable commands:',
     `  mcpc ${target} tasks-get ${id}`,
     `  mcpc ${target} tasks-result ${id}`,
-    `  mcpc ${target} tasks-cancel ${id}`,
-  ].join('\n');
+  ];
+  // Only suggest cancel while the task is still active (or when status is unknown,
+  // e.g. the generic list hint where individual task statuses vary).
+  if (status === undefined || status === 'working' || status === 'input_required') {
+    lines.push(`  mcpc ${target} tasks-cancel ${id}`);
+  }
+  return lines.join('\n');
 }
 
 /**
