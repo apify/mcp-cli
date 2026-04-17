@@ -120,10 +120,10 @@ async function waitForEnterKey(prompt: string): Promise<boolean> {
     return true;
   }
 
-  process.stdout.write(prompt);
+  process.stderr.write(prompt);
 
   const { promise } = setupKeyListener<boolean>((char) => {
-    console.log(''); // Print newline after keypress
+    console.error(''); // Print newline after keypress
     if (char === ENTER_CR || char === ENTER_LF) {
       return { done: true, value: true };
     }
@@ -369,7 +369,7 @@ function promptForCallbackUrl(): {
 } {
   const rl = createInterface({
     input: process.stdin,
-    output: process.stdout,
+    output: process.stderr,
   });
 
   let cleaned = false;
@@ -415,7 +415,8 @@ export async function performOAuthFlow(
   serverUrl: string,
   profileName: string,
   scope?: string,
-  clientCredentials?: { clientId?: string; clientSecret?: string; clientMetadataUrl?: string }
+  clientCredentials?: { clientId?: string; clientSecret?: string; clientMetadataUrl?: string },
+  callbackPort?: number
 ): Promise<OAuthFlowResult> {
   logger.debug(`Starting OAuth flow for ${serverUrl} (profile: ${profileName})`);
 
@@ -432,13 +433,12 @@ export async function performOAuthFlow(
     console.warn('\nWarning: OAuth over plain HTTP is insecure. Only use for local development.\n');
   }
 
-  // Find available port for callback server from the fixed mcpc port range.
-  // These ports match the redirect_uris in mcpc's hosted CIMD document
-  // (ports 13316–13325). Using the same range for DCR and --client-id keeps
-  // the callback port predictable for firewalls, pre-registered clients,
-  // and docs regardless of which registration approach the server uses.
-  const port = await findAvailablePort(MCPC_OAUTH_CALLBACK_PORT, MCPC_OAUTH_CALLBACK_PORT_RANGE);
-  const redirectUrl = `http://localhost:${port}/callback`;
+  // When --callback-port is set, use that exact port. Otherwise try the
+  // fixed mcpc range (13316–13325) that matches the hosted CIMD's redirect_uris.
+  const port = callbackPort
+    ? await findAvailablePort(callbackPort, 1)
+    : await findAvailablePort(MCPC_OAUTH_CALLBACK_PORT, MCPC_OAUTH_CALLBACK_PORT_RANGE);
+  const redirectUrl = `http://127.0.0.1:${port}/callback`;
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);
 
@@ -510,7 +510,8 @@ export async function performOAuthFlow(
     // Override redirectToAuthorization to open browser
     provider.redirectToAuthorization = async (authorizationUrl: URL) => {
       logger.debug('Opening browser for authorization...');
-      console.log(`\nAuthorization URL: ${authorizationUrl.toString()}`);
+      // Interactive chatter goes to stderr so stdout stays clean for --json output.
+      console.error(`\nAuthorization URL: ${authorizationUrl.toString()}`);
 
       // Ask for confirmation before opening browser
       const confirmed = await waitForEnterKey(
@@ -520,20 +521,20 @@ export async function performOAuthFlow(
         throw new ClientError('Authentication cancelled by user');
       }
 
-      console.log('Opening browser...');
+      console.error('Opening browser...');
       const opened = await tryOpenBrowser(authorizationUrl.toString());
 
       if (opened) {
-        console.log('If the browser does not open automatically, please visit the URL above.');
-        console.log('Press Esc to cancel.\n');
+        console.error('If the browser does not open automatically, please visit the URL above.');
+        console.error('Press Esc to cancel.\n');
         // Set up escape key handler AFTER Enter confirmation (to avoid raw mode conflicts)
         escapeHandlerRef.current = waitForEscapeKey();
       } else {
         browserFailed = true;
-        console.log(
+        console.error(
           '\nCould not open browser. Please open the authorization URL above in your browser.'
         );
-        console.log(
+        console.error(
           'After authorizing, copy the full callback URL from the browser address bar and paste it here.'
         );
       }

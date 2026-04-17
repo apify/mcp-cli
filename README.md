@@ -147,6 +147,7 @@ MCP session commands (after connecting):
   <@session> resources-templates-list
   <@session> tasks-list
   <@session> tasks-get <taskId>
+  <@session> tasks-result <taskId>
   <@session> tasks-cancel <taskId>
   <@session> logging-set-level <level>
   <@session> ping
@@ -494,7 +495,7 @@ picking the one the authorization server advertises in its OAuth metadata:
 | **Client ID Metadata Documents (CIMD)** | default (or `--client-metadata-url <url>`)     |
 | **Dynamic Client Registration (DCR)**   | fallback (or force with `--no-client-metadata-url`) |
 
-`mcpc` ships with a hosted [Client ID Metadata Document](https://apify.github.io/mcpc/client.json)
+`mcpc` ships with a hosted [Client ID Metadata Document](https://apify.github.io/mcpc/client-metadata.json)
 so every installation presents the same client identity to CIMD-capable authorization servers.
 When the authorization server advertises `client_id_metadata_document_supported: true`, the CIMD
 URL is used as the `client_id`; otherwise mcpc falls back to Dynamic Client Registration.
@@ -1068,6 +1069,9 @@ mcpc @apify tasks-list
 # Check task status
 mcpc @apify tasks-get <taskId>
 
+# Get the task result (blocks until the task reaches a terminal state)
+mcpc @apify tasks-result <taskId>
+
 # Cancel a running task
 mcpc @apify tasks-cancel <taskId>
 ```
@@ -1075,6 +1079,8 @@ mcpc @apify tasks-cancel <taskId>
 With `--task`, the CLI shows a progress spinner with elapsed time, server status messages,
 and progress notifications. Press **ESC** during execution to detach and get the task ID
 for later retrieval. With `--detach`, the task starts and returns the task ID immediately.
+Use `tasks-result <taskId>` to fetch the final `CallToolResult` payload once the task
+completes.
 
 `tools-list` and `tools-get` show task support annotations per tool:
 `[task:optional]`, `[task:required]`, or `[task:forbidden]`.

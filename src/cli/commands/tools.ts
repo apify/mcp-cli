@@ -8,13 +8,16 @@ import {
   formatOutput,
   formatToolDetail,
   formatToolCallExample,
+  formatCallToolResultHuman,
+  truncateOutput,
   formatSuccess,
   formatError,
   formatWarning,
   formatInfo,
+  formatTaskCommandsHint,
 } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
-import type { CommandOptions, TaskUpdate } from '../../lib/types.js';
+import type { CallToolResult, CommandOptions, TaskUpdate } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs, hasStdinData, readStdinArgs } from '../parser.js';
 import {
@@ -24,6 +27,56 @@ import {
   type ToolSchema,
   type SchemaMode,
 } from '../../lib/schema-validator.js';
+
+/**
+ * Render a `CallToolResult` payload.
+ *
+ * In human mode, prints a success/error banner followed by a structured view:
+ * Metadata (from `_meta`), Content (text blocks, resource links, etc.), and
+ * a hint when `structuredContent` is available. In `--json` mode, only the
+ * raw payload is printed. Honors `--max-chars` truncation.
+ *
+ * Shared by `tools-call` and `tasks-result` so both commands render results
+ * identically.
+ */
+export function renderCallToolResult(
+  result: CallToolResult,
+  options: Pick<CommandOptions, 'outputMode' | 'maxChars'>,
+  banners?: {
+    success?: string;
+    error?: string;
+    /** Hint shown only in human mode when the result is an error */
+    errorHint?: string;
+  }
+): void {
+  if (options.outputMode === 'human') {
+    if (banners) {
+      if (result.isError && banners.error) {
+        console.log(formatError(banners.error));
+      } else if (!result.isError && banners.success) {
+        console.log(formatSuccess(banners.success));
+      }
+    }
+
+    let output = formatCallToolResultHuman(result);
+    if (options.maxChars) {
+      output = truncateOutput(output, options.maxChars);
+    }
+    console.log('\n' + output);
+
+    if (result.isError && banners?.errorHint) {
+      console.log(formatInfo(banners.errorHint));
+    }
+    return;
+  }
+
+  // JSON mode — raw payload
+  console.log(
+    formatOutput(result, options.outputMode, {
+      ...(options.maxChars && { maxChars: options.maxChars }),
+    })
+  );
+}
 
 /**
  * List available tools
@@ -263,6 +316,7 @@ export async function callTool(
 
       if (options.outputMode === 'human') {
         console.log(formatSuccess(`Task started: ${taskUpdate.taskId}`));
+        console.log(formatTaskCommandsHint(target, taskUpdate.taskId, taskUpdate.status));
       } else {
         console.log(formatOutput({ taskId: taskUpdate.taskId, status: taskUpdate.status }, 'json'));
       }
@@ -275,6 +329,7 @@ export async function callTool(
       let lastStatusMessage: string | undefined;
       let lastProgressMessage: string | undefined;
       let capturedTaskId: string | undefined;
+      let capturedTaskStatus: TaskUpdate['status'] | undefined;
 
       // Set up ESC key listener for detaching (TTY + human mode only, not in interactive shell)
       const escListener = setupEscListener(
@@ -283,6 +338,24 @@ export async function callTool(
       );
 
       const escHintText = escListener.promise ? ` ${chalk.dim('(ESC to detach)')}` : '';
+
+      const printDetachedHint = (taskId: string): void => {
+        if (spinner) {
+          spinner.info(`Detached. Task ${chalk.bold(`\`${taskId}\``)} continues in background`);
+        }
+        console.log(formatTaskCommandsHint(target, taskId, capturedTaskStatus ?? 'working'));
+      };
+
+      // Set up SIGINT handler to print task ID hint on Ctrl+C (human mode only)
+      const sigintHandler = (): void => {
+        escListener.cleanup();
+        if (timerInterval) clearInterval(timerInterval);
+        if (capturedTaskId && options.outputMode === 'human') {
+          printDetachedHint(capturedTaskId);
+        }
+        process.exit(0);
+      };
+      process.on('SIGINT', sigintHandler);
 
       const updateSpinnerText = (): void => {
         if (!spinner) return;
@@ -304,6 +377,9 @@ export async function callTool(
       const onUpdate = (update: TaskUpdate): void => {
         if (update.taskId) {
           capturedTaskId = update.taskId;
+        }
+        if (update.status) {
+          capturedTaskStatus = update.status;
         }
         if (update.statusMessage) {
           lastStatusMessage = update.statusMessage;
@@ -329,9 +405,7 @@ export async function callTool(
 
           if (raceResult.type === 'detached') {
             if (timerInterval) clearInterval(timerInterval);
-            if (spinner) {
-              spinner.info(`Detached. Task ${chalk.bold(capturedTaskId!)} continues in background`);
-            }
+            printDetachedHint(capturedTaskId!);
             return;
           }
 
@@ -345,7 +419,9 @@ export async function callTool(
           if (result && (result as Record<string, unknown>).isError) {
             spinner.fail(`Tool ${chalk.bold(name)} returned an error (${elapsed})`);
           } else {
-            spinner.succeed(`Tool ${chalk.bold(name)} executed successfully (${elapsed})`);
+            spinner.succeed(
+              `Tool ${chalk.bold(name)} executed successfully (${elapsed}) with these results:`
+            );
           }
         }
       } catch (error) {
@@ -356,33 +432,23 @@ export async function callTool(
         }
         throw error;
       } finally {
+        process.off('SIGINT', sigintHandler);
         if (timerInterval) clearInterval(timerInterval);
       }
     } else {
       // Synchronous execution (default)
       result = await client.callTool(name, parsedArgs);
-      if (options.outputMode === 'human') {
-        if (result.isError) {
-          console.log(formatError(`Tool ${name} returned an error`));
-        } else {
-          console.log(formatSuccess(`Tool ${name} executed successfully`));
-        }
-      }
     }
 
-    console.log(
-      formatOutput(result, options.outputMode, {
-        ...(options.maxChars && { maxChars: options.maxChars }),
-      })
-    );
-
-    // Show hint for getting tool schema when the tool returned an error
-    if (result.isError && options.outputMode === 'human') {
-      console.log(
-        formatInfo(
-          `Run ${chalk.bold(`mcpc ${target} tools-get ${name}`)} to see the tool schema and usage`
-        )
-      );
-    }
+    // Render the result using the shared CallToolResult renderer.
+    // The --task branch already shows success/fail via spinner, so suppress
+    // the duplicate banners in that case.
+    renderCallToolResult(result, options, {
+      ...(!useTask && {
+        success: `Tool ${name} executed successfully with these results:`,
+        error: `Tool ${name} returned an error`,
+      }),
+      errorHint: `Run ${chalk.bold(`mcpc ${target} tools-get ${name}`)} to see the tool schema and usage`,
+    });
   });
 }

@@ -421,6 +421,7 @@ ${chalk.bold('MCP session commands (after connecting):')}
   <@session> ${chalk.cyan('resources-templates-list')}
   <@session> ${chalk.cyan('tasks-list')}
   <@session> ${chalk.cyan('tasks-get')} <taskId>
+  <@session> ${chalk.cyan('tasks-result')} <taskId>
   <@session> ${chalk.cyan('tasks-cancel')} <taskId>
   <@session> ${chalk.cyan('logging-set-level')} <level>
   <@session> ${chalk.cyan('ping')}
@@ -450,12 +451,14 @@ ${chalk.bold('Server formats:')}
   ~/.vscode/mcp.json            Config file — connect all servers in the file
 
 ${chalk.bold('Session name:')}
-  If @session is omitted, a name is auto-generated from the server hostname
-  (e.g. mcp.apify.com → @apify) or config entry name. If a matching session
-  already exists (same server URL, OAuth profile, and HTTP header names), it
-  is reused (restarted if not live). Header values are not compared — they
-  are stored securely in OS keychain.
-  When connecting all servers from a config file, @session cannot be specified.
+  If @session is omitted, it is derived from the server hostname or config
+  entry name. A matching existing session (same URL, profile, and header
+  names) is reused, and restarted if not live. Cannot be set when connecting
+  all servers from a config file.
+
+${chalk.bold('Security:')}
+  Stdio config entries execute the configured command locally on connect,
+  even if the MCP handshake later fails. Only connect to configs you trust.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
@@ -583,17 +586,18 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
     .option('--client-secret <secret>', 'Pre-registered OAuth client secret (requires --client-id)')
     .option(
       '--client-metadata-url <url>',
-      'HTTPS URL of an OAuth CIMD (default: https://apify.github.io/mcpc/client.json)'
+      'HTTPS URL of an OAuth CIMD (default: https://apify.github.io/mcpc/client-metadata.json)'
     )
     .option('--no-client-metadata-url', 'Disable CIMD; force DCR on CIMD-capable servers')
+    .option('--callback-port <port>', 'Loopback port for OAuth callback (default: 13316–13325)')
     .addHelpText(
       'after',
       `
-${chalk.bold('OAuth client registration approaches (per MCP authorization spec):')}
+${chalk.bold('OAuth client registration approaches:')}
 
   1. Pre-registration: --client-id (and optionally --client-secret).
   2. Client ID Metadata Documents (CIMD): used by default. mcpc ships with a
-     hosted CIMD at https://apify.github.io/mcpc/client.json
+     hosted CIMD at https://apify.github.io/mcpc/client-metadata.json
      which identifies all mcpc installs as the same client. Override with
      --client-metadata-url <url> or disable with --no-client-metadata-url.
      Active only when the authorization server advertises
@@ -603,7 +607,8 @@ ${chalk.bold('OAuth client registration approaches (per MCP authorization spec):
 
   See https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
 
-${jsonHelp('`{ profile, serverUrl, scopes }`')}`
+${jsonHelp('Interactive prompts are written to stderr, stdout contains a clean JSON object', '`{ profile, serverUrl, scopes }`')}
+`
     )
     .action(async (server, opts, command) => {
       if (!server) {
@@ -617,6 +622,7 @@ ${jsonHelp('`{ profile, serverUrl, scopes }`')}`
         clientId: opts.clientId,
         clientSecret: opts.clientSecret,
         clientMetadataUrl: opts.clientMetadataUrl,
+        ...(opts.callbackPort ? { callbackPort: parseInt(opts.callbackPort as string, 10) } : {}),
         ...getOptionsFromCommand(command),
       });
     });
@@ -767,6 +773,10 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
       if (showSessionCommandHelp(cmdName)) return;
 
       console.error(`Unknown command: ${cmdName}`);
+      const suggestion = suggestCommand(cmdName, [...KNOWN_COMMANDS, ...KNOWN_SESSION_COMMANDS]);
+      if (suggestion) {
+        console.error(`\nDid you mean: mcpc help ${suggestion}`);
+      }
       console.error(`Run "mcpc --help" for usage information.`);
       process.exit(1);
     });
@@ -901,22 +911,6 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
 
   // Tools commands
   program
-    .command('tools')
-    .description('List MCP tools (shorthand for tools-list).')
-    .option('--full', 'Show full tool details including schema')
-    .addHelpText(
-      'after',
-      jsonHelp(
-        'Array of `Tool` objects',
-        '`[{ name, description?, inputSchema, annotations? }, ...]`',
-        `${SCHEMA_BASE}#tool`
-      )
-    )
-    .action(async (_options, command) => {
-      await tools.listTools(session, getOptionsFromCommand(command));
-    });
-
-  program
     .command('tools-list')
     .description('List all MCP tools.')
     .option('--full', 'Show full tool details including schema')
@@ -924,7 +918,7 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
       'after',
       jsonHelp(
         'Array of `Tool` objects',
-        '`[{ name, description?, inputSchema, annotations? }, ...]`',
+        '`[{ name, description?, inputSchema, outputSchema?, annotations? }, ...]`',
         `${SCHEMA_BASE}#tool`
       )
     )
@@ -945,7 +939,7 @@ ${chalk.bold('Schema validation:')}
   --schema-mode <mode>  strict | compatible (default) | ignore
 ${jsonHelp(
   '`Tool` object',
-  '`{ name, description?, inputSchema, annotations? }`',
+  '`{ name, description?, inputSchema, outputSchema?, annotations? }`',
   `${SCHEMA_BASE}#tool`
 )}`
     )
@@ -953,11 +947,32 @@ ${jsonHelp(
       await tools.getTool(session, name, getOptionsFromCommand(command));
     });
 
+  // Keep the CallToolResult line consistent across tools-call and tasks-result!
+  const toolsCallJsonHelp = jsonHelp(
+    '`CallToolResult` object',
+    '`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }`',
+    `${SCHEMA_BASE}#calltoolresult`
+  );
+
+  const toolsCallCombinedJsonHelp = `
+${chalk.bold('JSON output (--json):')}
+  \`CallToolResult\` object:
+  \`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }\`
+  Schema: ${SCHEMA_BASE}#calltoolresult
+
+  With \`--detach\`: \`CreateTaskResult\` object:
+  \`{ taskId: string, status: string }\`
+  Schema: ${SCHEMA_BASE}#createtaskresult
+`;
+
   program
     .command('tools-call <name> [args...]')
     .description('Call an MCP tool with arguments.')
     .helpOption(false) // Disable built-in --help so we can intercept it for tool schema
-    .option('--task', 'Use async task execution (experimental)')
+    .option(
+      '--task',
+      'Use async task execution; Ctrl+C prints the task ID and exits (experimental)'
+    )
     .option('--detach', 'Start task and return immediately with task ID (implies --task)')
     .option('--schema <file>', 'Validate tool schema against expected schema before calling')
     .option('--schema-mode <mode>', 'Schema validation mode: strict, compatible (default), ignore')
@@ -972,10 +987,16 @@ ${chalk.bold('Arguments:')}
   Values are auto-parsed: strings, numbers, booleans, JSON objects/arrays.
   To force a string, wrap in quotes: id:='"123"'
 
+${chalk.bold('Async tasks (--task, --detach):')}
+  --task shows a progress spinner while the task runs on the server.
+  If you press Ctrl+C, the task keeps running and a hint with the task ID
+  is printed so you can fetch or cancel it later.
+  --detach returns the task ID immediately without waiting.
+
 ${chalk.bold('Schema validation:')}
   --schema <file>       Validate tool schema before calling (save with tools-get --json)
   --schema-mode <mode>  strict | compatible (default) | ignore
-${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isError?, structuredContent? }`', `${SCHEMA_BASE}#calltoolresult`)}`
+${toolsCallCombinedJsonHelp}`
     )
     .action(async (name, args, options, command) => {
       // Intercept --help: with helpOption(false) Commander won't catch it.
@@ -1029,6 +1050,14 @@ ${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isErr
     });
 
   program
+    .command('tasks-result <taskId>')
+    .description('Get MCP task final result (blocks until task reaches a terminal state).')
+    .addHelpText('after', toolsCallJsonHelp)
+    .action(async (taskId, _options, command) => {
+      await tasks.getTaskResult(session, taskId, getOptionsFromCommand(command));
+    });
+
+  program
     .command('tasks-cancel <taskId>')
     .description('Cancel an MCP task.')
     .addHelpText(
@@ -1044,21 +1073,6 @@ ${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isErr
     });
 
   // Resources commands
-  program
-    .command('resources')
-    .description('List MCP resources (shorthand for resources-list).')
-    .addHelpText(
-      'after',
-      jsonHelp(
-        'Array of `Resource` objects',
-        '`[{ uri, name?, description?, mimeType? }, ...]`',
-        `${SCHEMA_BASE}#resource`
-      )
-    )
-    .action(async (_options, command) => {
-      await resources.listResources(session, getOptionsFromCommand(command));
-    });
-
   program
     .command('resources-list')
     .description('List all MCP resources.')
@@ -1127,21 +1141,6 @@ ${jsonHelp('`CallToolResult` object', '`{ content: [{ type, text?, ... }], isErr
     });
 
   // Prompts commands
-  program
-    .command('prompts')
-    .description('List MCP prompts (shorthand for prompts-list).')
-    .addHelpText(
-      'after',
-      jsonHelp(
-        'Array of `Prompt` objects',
-        '`[{ name, description?, arguments?: [{ name, required? }] }, ...]`',
-        `${SCHEMA_BASE}#prompt`
-      )
-    )
-    .action(async (_options, command) => {
-      await prompts.listPrompts(session, getOptionsFromCommand(command));
-    });
-
   program
     .command('prompts-list')
     .description('List all MCP prompts.')
@@ -1258,6 +1257,7 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
   }
 
   const program = createSessionProgram();
+  program.name(`mcpc ${session}`);
 
   // Override exit so Commander throws instead of calling process.exit()
   program.exitOverride();

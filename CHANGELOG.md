@@ -7,29 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `restart` success message now notes that previous session state (resource subscriptions, pending notifications, async tasks) was lost, since explicit restart always creates a fresh MCP session
+- `tasks-list` now shows a hint on how to start a new task (`mcpc @session tools-call <name> [args] --task`) when there are no active tasks
+- `mcpc help <command>` now shows a "Did you mean?" suggestion when the command is unknown (e.g., `mcpc help tasks-gfet` → suggests `tasks-get`)
+- `tools-call --task` now prints the task ID and recovery commands when interrupted with Ctrl+C, so you can fetch or cancel the server-side task later
+- `tasks-get` no longer suggests `tasks-cancel` when the task has already reached a terminal state (completed, failed, or cancelled)
+
+### Removed
+
+- Removed `tools`, `resources`, and `prompts` shorthand commands — use the full names (`tools-list`, `resources-list`, `prompts-list`) instead
+
+## [0.2.6] - 2026-04-15
+
 ### Added
 
-- `mcpc connect <config-file>` connects all servers defined in the config file at once, auto-generating session names from entry names (e.g., `mcpc connect ~/.vscode/mcp.json`)
-- `connect` command now auto-generates session name when `@session` is omitted (e.g., `mcpc connect mcp.apify.com` creates `@apify`). If a session for the same server already exists with matching auth settings, it is reused instead of creating a duplicate.
-- `--max-chars <n>` global option to truncate output to a given number of characters (ignored in `--json` mode)
-- `tools-call <tool> --help` shows tool parameter schema (shortcut for `tools-get`)
-- "Did you mean?" suggestions for unknown commands, including reversed names (e.g., `list-tools` → `tools-list`)
-- `--json` output documentation in `--help` for all commands, describing the MCP object shape returned
-- `tools-get` now shows an example `tools-call` command with placeholder arguments based on the tool's schema
-- Session info output (`mcpc @session`) now shows the path to the bridge log file under a "Debugging" section, helping AI agents and users locate logs when troubleshooting
-- `mcpc login --client-metadata-url <https-url>` flag adds explicit support for [OAuth Client ID Metadata Documents (CIMD)](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00) per the MCP authorization spec. When the authorization server advertises `client_id_metadata_document_supported: true`, mcpc uses the URL as the `client_id`; otherwise it falls back to Dynamic Client Registration. New README section documents all three supported client registration approaches (Pre-registration, CIMD, DCR).
-- Public [Client ID Metadata Document](https://apify.github.io/mcpc/client.json) hosted via GitHub Pages, giving every `mcpc` installation a consistent client identity on CIMD-capable authorization servers. `mcpc login` now uses this hosted document by default; override with `--client-metadata-url <url>` or disable with `--no-client-metadata-url` to force Dynamic Client Registration. The OAuth callback uses a fixed loopback port range (13316–13325) to match the registered redirect URIs.
+- New `tasks-result <taskId>` command that fetches the final `CallToolResult` payload of an async task via the MCP `tasks/result` method. Blocks until the task reaches a terminal state, then prints the payload using the same renderer as `tools-call` (`--json` returns the raw result).
+- Public [Client ID Metadata Document](https://apify.github.io/mcpc/client-metadata.json) hosted via GitHub Pages, giving every `mcpc` installation a consistent client identity on CIMD-capable authorization servers. `mcpc login` now uses this hosted document by default; override with `--client-metadata-url <url>` or disable with `--no-client-metadata-url` to force Dynamic Client Registration. The OAuth callback uses a fixed loopback port range (13316–13325) to match the registered redirect URIs.
 
 ### Changed
 
-- JSON output for session info (`mcpc @session --json` and `mcpc connect --json`) now returns `toolNames` (array of tool name strings) instead of full `tools` objects, keeping it concise and consistent with the human-readable output
-- `--schema` and `--schema-mode` options moved from global scope to `tools-get` and `tools-call` only (removed from `prompts-get`)
+- Human-mode `tools-call` / `tasks-result` output now uses a structured layout: **Metadata** (`_meta`), **Content** (each text/resource/image block rendered per type), and **Structured content** (shown as JSON when not already present in a text block). Replaces the raw key-value dump with a cleaner, more readable format.
+
+### Fixed
+
+- `tools-get` "Call example" now wraps JSON values (arrays, objects, strings) in single quotes so they can be copy-pasted into a shell verbatim without being mangled by word-splitting (e.g., `outputFormats:='["markdown"]'` instead of `outputFormats:=["markdown"]`)
+
+## [0.2.5] - 2026-04-15
+
+### Added
+
+- `mcpc connect <config-file>` connects all servers defined in a config file at once, auto-generating session names from entry names (e.g., `mcpc connect ~/.vscode/mcp.json`)
+- `connect` auto-generates a session name when `@session` is omitted (e.g., `mcpc connect mcp.apify.com` creates `@apify`), reusing an existing session when auth settings match
+- `--max-chars <n>` global option to truncate output to a given number of characters (ignored in `--json` mode)
+- "Did you mean?" suggestions for unknown commands, including reversed names (e.g., `list-tools` → `tools-list`)
+- `mcpc login --client-metadata-url <https-url>` flag adds support for [OAuth Client ID Metadata Documents (CIMD)](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00). When the authorization server advertises `client_id_metadata_document_supported: true`, mcpc uses the URL as the `client_id`; otherwise it falls back to Dynamic Client Registration.
+
+### Changed
+
+- Session info JSON output (`mcpc @session --json`, `mcpc connect --json`) returns `toolNames` (array of strings) instead of full `tools` objects
+- `--schema` and `--schema-mode` options scoped to `tools-get` and `tools-call` only (removed from `prompts-get`)
 
 ### Fixed
 
 - `connect` now verifies the server responds before reporting success; shows a warning with the actual error when the server is unreachable
 - HTTP 404 during initial connect no longer misclassified as "session expired"; error messages now include the actual HTTP error and server URL
-- `build:readme` script failing on macOS due to `sed -i` platform difference
+- `mcpc login --json` now writes interactive prompts to stderr, so stdout contains only the final JSON result and is safe to pipe to `jq` or redirect to a file
 
 ## [0.2.4] - 2026-04-07
 
@@ -228,7 +252,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive shell mode
 - JSON output mode for scripting
 
-[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/apify/mcpc/compare/v0.2.5...v0.2.6
+[0.2.5]: https://github.com/apify/mcpc/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/apify/mcpc/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/apify/mcpc/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/apify/mcpc/compare/v0.2.1...v0.2.2

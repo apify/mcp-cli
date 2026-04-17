@@ -9,7 +9,7 @@ import { normalizeServerUrl, isValidSessionName, getServerHost } from '../lib/ut
 import { setVerbose, createLogger } from '../lib/logger.js';
 import { loadConfig, getServerConfig, validateServerConfig } from '../lib/config.js';
 import { getAuthProfile } from '../lib/auth/profiles.js';
-import { logTarget } from './output.js';
+import { formatSessionLine } from './output.js';
 import { DEFAULT_AUTH_PROFILE } from '../lib/auth/oauth-utils.js';
 import { parseHeaderFlags } from './parser.js';
 
@@ -181,11 +181,8 @@ export async function withMcpClient<T>(
   };
 
   // Log target prefix (unless hidden)
-  if (options.outputMode) {
-    await logTarget(target, {
-      outputMode: options.outputMode,
-      hide: options.hideTarget,
-    });
+  if (options.outputMode === 'human' && !options.hideTarget && session) {
+    console.log(`[${formatSessionLine(session)}]\n`);
   }
 
   // Use session client (SessionClient implements IMcpClient interface)

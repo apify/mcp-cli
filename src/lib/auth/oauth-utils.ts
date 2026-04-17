@@ -11,7 +11,7 @@ const logger = createLogger('oauth-utils');
 
 export const DEFAULT_AUTH_PROFILE = 'default';
 
-export const DEFAULT_CLIENT_METADATA_URL = 'https://apify.github.io/mcpc/client.json';
+export const DEFAULT_CLIENT_METADATA_URL = 'https://apify.github.io/mcpc/client-metadata.json';
 
 export const MCPC_OAUTH_CALLBACK_PORT = 13316;
 export const MCPC_OAUTH_CALLBACK_PORT_RANGE = 10;

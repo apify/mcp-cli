@@ -416,6 +416,17 @@ let _tasklistCache: Set<number> | null = null;
 let _tasklistCacheTime = 0;
 const TASKLIST_CACHE_TTL = 2000; // 2 seconds
 
+/**
+ * Invalidate the Windows tasklist cache used by isProcessAlive().
+ * Call this after spawning a new child process so subsequent
+ * isProcessAlive() checks pick up the new PID instead of returning
+ * a stale false-negative from the pre-spawn snapshot.
+ */
+export function invalidateProcessAliveCache(): void {
+  _tasklistCache = null;
+  _tasklistCacheTime = 0;
+}
+
 function isProcessAliveTasklist(pid: number): boolean {
   const now = Date.now();
   if (_tasklistCache && now - _tasklistCacheTime < TASKLIST_CACHE_TTL) {

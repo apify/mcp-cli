@@ -11,7 +11,7 @@ import type {
   PromptMessage,
   ContentBlock,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { OutputMode, ServerConfig } from '../lib/index.js';
+import type { OutputMode } from '../lib/index.js';
 import type {
   Tool,
   Resource,
@@ -20,14 +20,15 @@ import type {
   SessionData,
   ServerDetails,
   Task,
+  CallToolResult,
 } from '../lib/types.js';
-import { extractSingleTextContent } from './tool-result.js';
+import { extractAllTextContent } from './tool-result.js';
 import { join } from 'node:path';
-import { isValidSessionName, getLogsDir } from '../lib/utils.js';
+import { getLogsDir } from '../lib/utils.js';
 import { getSession } from '../lib/sessions.js';
 
 // Re-export for external use
-export { extractSingleTextContent } from './tool-result.js';
+export { extractAllTextContent } from './tool-result.js';
 
 /**
  * Convert HSL to RGB hex color
@@ -163,11 +164,13 @@ export function formatHuman(data: unknown, options?: FormatOptions): string {
     return chalk.gray('(no data)');
   }
 
-  // Check if this is a tool call result with a single text content
-  // If so, wrap it in quadruple backticks to prevent markdown interference
-  const singleText = extractSingleTextContent(data);
-  if (singleText !== undefined) {
-    return `${chalk.gray('````')}\n${singleText}\n${chalk.gray('````')}`;
+  // Check if this is a tool call result whose `content` is an array of only
+  // `type: "text"` items. If so, render just the texts wrapped in quadruple
+  // backticks so the content is unambiguously quoted (and skip any
+  // `structuredContent` — the texts are the canonical view).
+  const textContent = extractAllTextContent(data);
+  if (textContent !== undefined) {
+    return `${chalk.gray('````')}\n${textContent}\n${chalk.gray('````')}`;
   }
 
   // Handle different data types
@@ -630,6 +633,25 @@ function exampleValue(propSchema: Record<string, unknown>): string {
 }
 
 /**
+ * Wrap a JSON-stringified example value in single quotes if it contains
+ * characters that would be mangled by a POSIX shell (double quotes, brackets,
+ * braces, spaces, etc.). This ensures the "Call example" line can be
+ * copy-pasted into a shell verbatim and still round-trip through the parser.
+ *
+ * Without this, values like `["markdown"]` lose their inner quotes to shell
+ * word-splitting and reach mcpc as `[markdown]`, which is not valid JSON.
+ */
+function shellSafeExampleValue(jsonValue: string): string {
+  // Numbers, booleans, null, and simple identifier-like tokens are safe as-is.
+  if (/^[a-zA-Z0-9_.+-]+$/.test(jsonValue)) {
+    return jsonValue;
+  }
+  // Single-quote the value, escaping any embedded single quotes using the
+  // POSIX-portable `'\''` trick.
+  return `'${jsonValue.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
  * Format a tools-call usage example for a tool, showing how to invoke it.
  * Shows required params first, then fills with optional params up to 3 total.
  */
@@ -665,7 +687,7 @@ export function formatToolCallExample(tool: Tool, sessionName?: string): string 
   }
 
   const argParts = params.map((name) => {
-    const val = exampleValue(properties[name] ?? {});
+    const val = shellSafeExampleValue(exampleValue(properties[name] ?? {}));
     return `${name}:=${val}`;
   });
 
@@ -952,20 +974,21 @@ function formatPromptContent(content: PromptMessage['content']): string {
 /**
  * Get a colored status indicator for a task status
  */
-function taskStatusIcon(status: string): string {
+function taskStatusLabel(status: string): string {
+  const label = (icon: string): string => `${icon} ${status}`;
   switch (status) {
     case 'working':
-      return chalk.cyan('⟳');
+      return chalk.cyan(label('⟳'));
     case 'input_required':
-      return chalk.yellow('?');
+      return chalk.yellow(label('?'));
     case 'completed':
-      return chalk.green('✔');
+      return chalk.green(label('✔'));
     case 'failed':
-      return chalk.red('✖');
+      return chalk.red(label('✖'));
     case 'cancelled':
-      return chalk.gray('⊘');
+      return chalk.gray(label('⊘'));
     default:
-      return chalk.gray('·');
+      return chalk.gray(label('·'));
   }
 }
 
@@ -975,8 +998,8 @@ function taskStatusIcon(status: string): string {
 export function formatTask(task: Task): string {
   const lines: string[] = [];
 
-  lines.push(`${chalk.bold('Task:')} ${inBackticks(task.taskId)}`);
-  lines.push(`${chalk.bold('Status:')} ${taskStatusIcon(task.status)} ${task.status}`);
+  lines.push(`${chalk.bold('Task ID:')} ${inBackticks(task.taskId)}`);
+  lines.push(`${chalk.bold('Status:')} ${taskStatusLabel(task.status)}`);
 
   if (task.statusMessage) {
     lines.push(`${chalk.bold('Message:')} ${task.statusMessage}`);
@@ -1002,9 +1025,147 @@ export function formatTasks(taskList: Task[]): string {
 
   const bullet = chalk.dim('*');
   for (const task of taskList) {
-    const statusStr = `${taskStatusIcon(task.status)} ${task.status}`;
+    const statusStr = taskStatusLabel(task.status);
     const msgStr = task.statusMessage ? chalk.dim(` - ${task.statusMessage}`) : '';
     lines.push(`${bullet} ${inBackticks(task.taskId)}  ${statusStr}${msgStr}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a single MCP content block for human display.
+ * Used by `formatCallToolResultHuman` to render each block in the Content section.
+ */
+function formatContentBlock(block: ContentBlock, lines: string[]): void {
+  const bullet = chalk.dim('*');
+
+  switch (block.type) {
+    case 'text':
+      lines.push(chalk.gray('````'));
+      lines.push(block.text);
+      lines.push(chalk.gray('````'));
+      break;
+
+    case 'resource_link':
+      lines.push(chalk.bold('Resource link'));
+      lines.push(`${bullet} URI: ${block.uri}`);
+      if (block.name) lines.push(`${bullet} Name: ${block.name}`);
+      if (block.description) {
+        lines.push(
+          `${bullet} Description: ${chalk.gray('````')}${block.description}${chalk.gray('````')}`
+        );
+      }
+      if (block.mimeType) lines.push(`${bullet} MIME type: ${block.mimeType}`);
+      break;
+
+    case 'image':
+      lines.push(
+        `[Image: ${block.mimeType || 'unknown type'}${block.data ? `, ${block.data.length} chars base64` : ''}]`
+      );
+      break;
+
+    case 'audio':
+      lines.push(
+        `[Audio: ${block.mimeType || 'unknown type'}${block.data ? `, ${block.data.length} chars base64` : ''}]`
+      );
+      break;
+
+    case 'resource':
+      lines.push(chalk.bold('Embedded resource'));
+      if (block.resource) {
+        lines.push(`${bullet} URI: ${block.resource.uri}`);
+        if (block.resource.mimeType) lines.push(`${bullet} MIME type: ${block.resource.mimeType}`);
+        if ('text' in block.resource && block.resource.text) {
+          lines.push(chalk.gray('````'));
+          lines.push(block.resource.text);
+          lines.push(chalk.gray('````'));
+        }
+      }
+      break;
+
+    default:
+      lines.push(JSON.stringify(block, null, 2));
+  }
+}
+
+/**
+ * Return the indices of text content blocks that are JSON serializations of
+ * `structuredContent`.  Per the MCP spec, servers SHOULD include such a block
+ * for backwards compatibility — we skip those blocks from the Content section
+ * so the better-formatted Structured content section is the canonical view.
+ */
+function findDuplicateTextBlocks(
+  content: CallToolResult['content'],
+  structuredContent: Record<string, unknown>
+): Set<number> {
+  const dupes = new Set<number>();
+  const canonical = JSON.stringify(structuredContent);
+  for (let i = 0; i < content.length; i++) {
+    const block = content[i];
+    if (!block || block.type !== 'text') continue;
+    try {
+      const parsed: unknown = JSON.parse((block as { text: string }).text.trim());
+      if (JSON.stringify(parsed) === canonical) dupes.add(i);
+    } catch {
+      // not valid JSON — keep the block
+    }
+  }
+  return dupes;
+}
+
+/**
+ * Format a `CallToolResult` for human-readable display.
+ *
+ * Sections (each printed only when present):
+ * 1. **Content:** — each content block rendered per its type (text blocks
+ *    that duplicate `structuredContent` are omitted)
+ * 2. **Structured content:** — `structuredContent` as syntax-highlighted JSON
+ * 3. **Metadata:** — `_meta` as syntax-highlighted JSON
+ */
+export function formatCallToolResultHuman(result: CallToolResult): string {
+  const lines: string[] = [];
+
+  // Identify text blocks that are just a JSON dump of structuredContent
+  const sc = result.structuredContent;
+  const hasStructuredContent = !!sc && Object.keys(sc).length > 0;
+  const content = result.content;
+  let skipIndices = new Set<number>();
+  if (hasStructuredContent && content && sc) {
+    skipIndices = findDuplicateTextBlocks(content, sc);
+  }
+
+  // Content section — skip duplicate text blocks
+  if (content && content.length > 0) {
+    const visible = content.filter((_, i) => !skipIndices.has(i));
+    if (visible.length > 0) {
+      lines.push(chalk.bold('Content:'));
+      for (let i = 0; i < visible.length; i++) {
+        if (i > 0) lines.push('');
+        formatContentBlock(visible[i] as ContentBlock, lines);
+      }
+    }
+  }
+
+  // Structured content section — syntax-highlighted JSON
+  if (hasStructuredContent) {
+    if (lines.length > 0) lines.push('');
+    lines.push(chalk.bold('Structured content:'));
+    const scJson = JSON.stringify(sc, null, 2);
+    lines.push(process.stdout.isTTY ? highlightJson(scJson) : scJson);
+  }
+
+  // Metadata section — syntax-highlighted JSON, shown last
+  const meta = result._meta;
+  if (meta && typeof meta === 'object' && Object.keys(meta).length > 0) {
+    if (lines.length > 0) lines.push('');
+    lines.push(chalk.bold('Metadata:'));
+    const metaJson = JSON.stringify(meta, null, 2);
+    lines.push(process.stdout.isTTY ? highlightJson(metaJson) : metaJson);
+  }
+
+  if (lines.length === 0) {
+    return chalk.gray('(no content)');
   }
 
   return lines.join('\n');
@@ -1067,6 +1228,25 @@ export function formatInfo(message: string): string {
   return chalk.cyan(`ℹ ${message}`);
 }
 
+export function formatTaskCommandsHint(
+  target: string,
+  taskId?: string,
+  status?: Task['status']
+): string {
+  const id = taskId ?? '<taskId>';
+  const lines = [
+    '\nAvailable commands:',
+    `  mcpc ${target} tasks-get ${id}`,
+    `  mcpc ${target} tasks-result ${id}`,
+  ];
+  // Only suggest cancel while the task is still active (or when status is unknown,
+  // e.g. the generic list hint where individual task statuses vary).
+  if (status === undefined || status === 'working' || status === 'input_required') {
+    lines.push(`  mcpc ${target} tasks-cancel ${id}`);
+  }
+  return lines.join('\n');
+}
+
 /**
  * Truncate formatted output string to maxChars, appending a notice about truncation.
  * Returns the original string if within limit.
@@ -1090,7 +1270,7 @@ function truncateWithEllipsis(str: string, maxLen: number): string {
 
 /**
  * Format a session line for display (without status)
- * Returns: "@name → target (transport, MCP: version)" with colors applied
+ * Returns: "@name → target (OAuth: profile)" with colors applied
  */
 export function formatSessionLine(session: SessionData): string {
   // Format session name (cyan)
@@ -1110,19 +1290,11 @@ export function formatSessionLine(session: SessionData): string {
   }
   const targetStr = truncateWithEllipsis(target, 80);
 
-  // Format transport/auth info
-  const parts: string[] = [];
-
-  if (session.server.command) {
-    parts.push('stdio');
-  } else {
-    parts.push('HTTP');
-    if (session.profileName) {
-      parts.push('OAuth: ' + chalk.magenta(session.profileName) + chalk.dim(''));
-    }
+  // Format auth info (transport type omitted — obvious from context)
+  let infoStr = '';
+  if (!session.server.command && session.profileName) {
+    infoStr = chalk.dim('(OAuth: ') + chalk.magenta(session.profileName) + chalk.dim(')');
   }
-
-  const infoStr = chalk.dim('(') + chalk.dim(parts.join(', ')) + chalk.dim(')');
 
   // Add proxy info separately (not dimmed, for visibility)
   let proxyStr = '';
@@ -1134,7 +1306,8 @@ export function formatSessionLine(session: SessionData): string {
       chalk.green(']');
   }
 
-  return `${nameStr} → ${targetStr} ${infoStr}${proxyStr}`;
+  const suffix = [infoStr, proxyStr].filter(Boolean).join(' ');
+  return `${nameStr} → ${targetStr}${suffix ? ' ' + suffix : ''}`;
 }
 
 /**
@@ -1143,50 +1316,22 @@ export function formatSessionLine(session: SessionData): string {
 export interface LogTargetOptions {
   outputMode: OutputMode;
   hide?: boolean | undefined;
-  profileName?: string | undefined; // Auth profile being used (for http targets)
-  serverConfig?: ServerConfig | undefined; // Resolved transport config (for non-session targets)
 }
 
 /**
- * Log target prefix (only in human mode)
- * For sessions: [@name → server (transport, auth)]
- * For direct connections: [target (transport, auth)]
+ * Log session info prefix (only in human mode)
+ * Shows: [@name → server (auth)]
  */
 export async function logTarget(target: string, options: LogTargetOptions): Promise<void> {
   if (options.outputMode !== 'human' || options.hide) {
     return;
   }
 
-  // For session targets, show rich info
-  if (isValidSessionName(target)) {
-    const session = await getSession(target);
-    if (session) {
-      console.log(`[${formatSessionLine(session)}]\n`);
-    }
-    // Session not found - don't print anything, let the error handler show the message
-    return;
+  const session = await getSession(target);
+  if (session) {
+    console.log(`[${formatSessionLine(session)}]\n`);
   }
-
-  // For direct connections, use transportConfig if available
-  const tc = options.serverConfig;
-  if (tc?.command) {
-    // Stdio transport: show command + args
-    let targetStr = tc.command;
-    if (tc.args && tc.args.length > 0) {
-      targetStr += ' ' + tc.args.join(' ');
-    }
-    targetStr = truncateWithEllipsis(targetStr, 80);
-    console.log(`[→ ${targetStr} ${chalk.dim('(stdio)')}]`);
-    return;
-  }
-
-  // HTTP transport: show server URL with auth info
-  const serverStr = tc?.url || target;
-  const parts: string[] = ['HTTP'];
-  if (options.profileName) {
-    parts.push('OAuth: ' + chalk.magenta(options.profileName));
-  }
-  console.log(`[→ ${serverStr} ${chalk.dim('(' + parts.join(', ') + ')')}]\n`);
+  // Session not found - don't print anything, let the error handler show the message
 }
 
 /**
@@ -1310,6 +1455,7 @@ export function formatServerDetails(
   if (capabilities?.tasks) {
     commands.push(`${bullet} ${bt}mcpc ${target} tasks-list${bt}`);
     commands.push(`${bullet} ${bt}mcpc ${target} tasks-get <taskId>${bt}`);
+    commands.push(`${bullet} ${bt}mcpc ${target} tasks-result <taskId>${bt}`);
     commands.push(`${bullet} ${bt}mcpc ${target} tasks-cancel <taskId>${bt}`);
   }
 
