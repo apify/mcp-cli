@@ -907,7 +907,7 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
       'after',
       jsonHelp(
         'Array of `Tool` objects',
-        '`[{ name, description?, inputSchema, annotations? }, ...]`',
+        '`[{ name, description?, inputSchema, outputSchema?, annotations? }, ...]`',
         `${SCHEMA_BASE}#tool`
       )
     )
@@ -928,7 +928,7 @@ ${chalk.bold('Schema validation:')}
   --schema-mode <mode>  strict | compatible (default) | ignore
 ${jsonHelp(
   '`Tool` object',
-  '`{ name, description?, inputSchema, annotations? }`',
+  '`{ name, description?, inputSchema, outputSchema?, annotations? }`',
   `${SCHEMA_BASE}#tool`
 )}`
     )
