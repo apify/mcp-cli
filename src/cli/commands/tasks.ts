@@ -4,7 +4,7 @@
  */
 
 import chalk from 'chalk';
-import { formatOutput, formatSuccess, formatError } from '../output.js';
+import { formatOutput, formatSuccess, formatError, formatTaskCommandsHint } from '../output.js';
 import type { CommandOptions } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
 import { formatTask, formatTasks } from '../output.js';
@@ -52,9 +52,7 @@ export async function listTasks(target: string, options: CommandOptions): Promis
         );
       } else {
         console.log(formatTasks(allTasks));
-        console.log(
-          `\nTo fetch the task's final result, run:\n  mcpc ${target} tasks-result <taskId>`
-        );
+        console.log(formatTaskCommandsHint(target));
       }
     } else {
       console.log(formatOutput({ tasks: allTasks }, 'json'));
@@ -75,6 +73,7 @@ export async function getTask(
 
     if (options.outputMode === 'human') {
       console.log(formatTask(result));
+      console.log(formatTaskCommandsHint(target, taskId));
     } else {
       console.log(formatOutput(result, 'json'));
     }

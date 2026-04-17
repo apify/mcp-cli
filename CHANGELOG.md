@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `restart` success message now notes that previous session state (resource subscriptions, pending notifications, async tasks) was lost, since explicit restart always creates a fresh MCP session
 - `tasks-list` now shows a hint on how to start a new task (`mcpc @session tools-call <name> [args] --task`) when there are no active tasks
 - `mcpc help <command>` now shows a "Did you mean?" suggestion when the command is unknown (e.g., `mcpc help tasks-gfet` → suggests `tasks-get`)
+- `tools-call --task` now prints the task ID and recovery commands when interrupted with Ctrl+C, so you can fetch or cancel the server-side task later
 
 ### Removed
 

@@ -12,6 +12,7 @@ import {
   formatError,
   formatWarning,
   formatInfo,
+  formatTaskCommandsHint,
 } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import type { CallToolResult, CommandOptions, TaskUpdate } from '../../lib/types.js';
@@ -302,9 +303,7 @@ export async function callTool(
 
       if (options.outputMode === 'human') {
         console.log(formatSuccess(`Task started: ${taskUpdate.taskId}`));
-        console.log(
-          `\nTo fetch the task's final result, run:\n  mcpc ${target} tasks-result ${taskUpdate.taskId}`
-        );
+        console.log(formatTaskCommandsHint(target, taskUpdate.taskId));
       } else {
         console.log(formatOutput({ taskId: taskUpdate.taskId, status: taskUpdate.status }, 'json'));
       }
@@ -325,6 +324,24 @@ export async function callTool(
       );
 
       const escHintText = escListener.promise ? ` ${chalk.dim('(ESC to detach)')}` : '';
+
+      const printDetachedHint = (taskId: string): void => {
+        if (spinner) {
+          spinner.info(`Detached. Task ${chalk.bold(`\`${taskId}\``)} continues in background`);
+        }
+        console.log(formatTaskCommandsHint(target, taskId));
+      };
+
+      // Set up SIGINT handler to print task ID hint on Ctrl+C (human mode only)
+      const sigintHandler = (): void => {
+        escListener.cleanup();
+        if (timerInterval) clearInterval(timerInterval);
+        if (capturedTaskId && options.outputMode === 'human') {
+          printDetachedHint(capturedTaskId);
+        }
+        process.exit(0);
+      };
+      process.on('SIGINT', sigintHandler);
 
       const updateSpinnerText = (): void => {
         if (!spinner) return;
@@ -371,14 +388,7 @@ export async function callTool(
 
           if (raceResult.type === 'detached') {
             if (timerInterval) clearInterval(timerInterval);
-            if (spinner) {
-              spinner.info(`Detached. Task ${chalk.bold(capturedTaskId!)} continues in background`);
-            }
-            if (options.outputMode === 'human') {
-              console.log(
-                `\nTo fetch the task's final result, run:\n  mcpc ${target} tasks-result ${capturedTaskId!}`
-              );
-            }
+            printDetachedHint(capturedTaskId!);
             return;
           }
 
@@ -403,6 +413,7 @@ export async function callTool(
         }
         throw error;
       } finally {
+        process.off('SIGINT', sigintHandler);
         if (timerInterval) clearInterval(timerInterval);
       }
     } else {
