@@ -947,6 +947,7 @@ ${chalk.bold('JSON output (--json):')}
 
   With \`--detach\`: \`CreateTaskResult\` object:
   \`{ taskId: string, status: string }\`
+  Schema: ${SCHEMA_BASE}#createtaskresult
 `;
 
   program
