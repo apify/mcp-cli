@@ -15,6 +15,11 @@ import { ClientError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import { removeKeychainOAuthClientInfo, storeKeychainOAuthClientInfo } from './keychain.js';
 import type { AuthProfile } from '../types.js';
+import {
+  MCPC_OAUTH_CALLBACK_PORT,
+  MCPC_OAUTH_CALLBACK_PORT_RANGE,
+  validateClientMetadataUrl,
+} from './oauth-utils.js';
 
 const logger = createLogger('oauth-flow');
 
@@ -253,8 +258,8 @@ function startCallbackServer(port: number): {
 /**
  * Find an available port for the callback server
  */
-async function findAvailablePort(startPort: number = 8000): Promise<number> {
-  for (let port = startPort; port < startPort + 100; port++) {
+async function findAvailablePort(startPort: number = 8000, range: number = 100): Promise<number> {
+  for (let port = startPort; port < startPort + range; port++) {
     try {
       await new Promise<void>((resolve, reject) => {
         const testServer = createServer();
@@ -269,7 +274,12 @@ async function findAvailablePort(startPort: number = 8000): Promise<number> {
       // Port is in use, try next one
     }
   }
-  throw new ClientError('Could not find available port for OAuth callback server');
+  throw new ClientError(
+    `Could not find available port for OAuth callback server (tried ports ${startPort}–${startPort + range - 1}). ` +
+      (startPort === MCPC_OAUTH_CALLBACK_PORT
+        ? 'If multiple logins are running concurrently, wait for them to finish or use --no-client-metadata-url to fall back to Dynamic Client Registration with a random port.'
+        : '')
+  );
 }
 
 /**
@@ -397,38 +407,6 @@ function promptForCallbackUrl(): {
 }
 
 /**
- * Validate that a Client ID Metadata Document URL meets the requirements of
- * draft-ietf-oauth-client-id-metadata-document-00 and the MCP authorization spec.
- *
- * Requirements:
- * - MUST use the "https" scheme
- * - MUST contain a path component (not just "/")
- */
-function validateClientMetadataUrl(url: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new ClientError(
-      `Invalid --client-metadata-url: ${url} is not a valid URL. ` +
-        `It must be an HTTPS URL pointing to the client metadata JSON document.`
-    );
-  }
-  if (parsed.protocol !== 'https:') {
-    throw new ClientError(
-      `Invalid --client-metadata-url: ${url} must use the "https" scheme ` +
-        `(per OAuth Client ID Metadata Document spec).`
-    );
-  }
-  if (!parsed.pathname || parsed.pathname === '/') {
-    throw new ClientError(
-      `Invalid --client-metadata-url: ${url} must contain a non-root path component, ` +
-        `e.g. https://example.com/client.json`
-    );
-  }
-}
-
-/**
  * Perform interactive OAuth flow
  * Opens browser for user authentication and handles callback
  * Falls back to manual URL paste when browser cannot be opened
@@ -454,8 +432,16 @@ export async function performOAuthFlow(
     console.warn('\nWarning: OAuth over plain HTTP is insecure. Only use for local development.\n');
   }
 
-  // Find available port for callback server
-  const port = await findAvailablePort(8000);
+  // Find available port for callback server.
+  // When CIMD is active, use the fixed port range (13316–13325) that matches
+  // the redirect_uris in the hosted CIMD document. When CIMD is disabled
+  // (--no-client-metadata-url or --client-id), use any available port for
+  // full DCR compatibility.
+  const useCimdPorts =
+    !clientCredentials?.clientId && clientCredentials?.clientMetadataUrl !== undefined;
+  const port = useCimdPorts
+    ? await findAvailablePort(MCPC_OAUTH_CALLBACK_PORT, MCPC_OAUTH_CALLBACK_PORT_RANGE)
+    : await findAvailablePort(8000, 100);
   const redirectUrl = `http://localhost:${port}/callback`;
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);

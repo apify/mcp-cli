@@ -8,7 +8,7 @@ import { deleteAuthProfiles } from '../../lib/auth/profiles.js';
 import { performOAuthFlow } from '../../lib/auth/oauth-flow.js';
 import { normalizeServerUrl, validateProfileName } from '../../lib/utils.js';
 import chalk from 'chalk';
-import { DEFAULT_AUTH_PROFILE } from '../../lib/auth/oauth-utils.js';
+import { DEFAULT_AUTH_PROFILE, DEFAULT_CLIENT_METADATA_URL } from '../../lib/auth/oauth-utils.js';
 
 /**
  * Authenticate with a server and create/update auth profile
@@ -20,7 +20,7 @@ export async function login(
     scope?: string;
     clientId?: string;
     clientSecret?: string;
-    clientMetadataUrl?: string;
+    clientMetadataUrl?: string | false;
   }
 ): Promise<void> {
   try {
@@ -40,6 +40,22 @@ export async function login(
       );
     }
 
+    // Resolve the effective CIMD URL:
+    // - --client-id → no CIMD (pre-registered client)
+    // - --no-client-metadata-url → explicitly disabled (force DCR)
+    // - --client-metadata-url <url> → user override
+    // - default → mcpc's hosted CIMD
+    let resolvedClientMetadataUrl: string | undefined;
+    if (options.clientId) {
+      resolvedClientMetadataUrl = undefined;
+    } else if (options.clientMetadataUrl === false) {
+      resolvedClientMetadataUrl = undefined;
+    } else if (typeof options.clientMetadataUrl === 'string') {
+      resolvedClientMetadataUrl = options.clientMetadataUrl;
+    } else {
+      resolvedClientMetadataUrl = DEFAULT_CLIENT_METADATA_URL;
+    }
+
     if (options.outputMode === 'human') {
       console.log(formatInfo(`Starting OAuth authentication for ${normalizedUrl}`));
       console.log(formatInfo(`Profile: ${chalk.magenta(profileName)}`));
@@ -57,8 +73,8 @@ export async function login(
     if (options.clientSecret) {
       clientCredentials.clientSecret = options.clientSecret;
     }
-    if (options.clientMetadataUrl) {
-      clientCredentials.clientMetadataUrl = options.clientMetadataUrl;
+    if (resolvedClientMetadataUrl) {
+      clientCredentials.clientMetadataUrl = resolvedClientMetadataUrl;
     }
     const result = await performOAuthFlow(
       normalizedUrl,

@@ -133,4 +133,29 @@ assert_failure
 assert_contains "$STDERR" "path component"
 test_pass
 
+test_case "login --client-metadata-url with a fragment is rejected"
+run_xmcpc login mcp.example.com --client-metadata-url "https://example.com/meta.json#frag"
+assert_failure
+assert_contains "$STDERR" "fragment"
+test_pass
+
+test_case "login --client-metadata-url with credentials is rejected"
+run_xmcpc login mcp.example.com --client-metadata-url "https://user:pass@example.com/meta.json"
+assert_failure
+assert_contains "$STDERR" "username or password"
+test_pass
+
+test_case "login --client-metadata-url with dot segments is rejected"
+run_xmcpc login mcp.example.com --client-metadata-url "https://example.com/../meta.json"
+assert_failure
+assert_contains "$STDERR" "path segments"
+test_pass
+
+test_case "login --help documents --no-client-metadata-url"
+run_mcpc help login
+assert_success
+assert_contains "$STDOUT" "--no-client-metadata-url"
+assert_contains "$STDOUT" "apify.github.io"
+test_pass
+
 test_done

@@ -177,6 +177,9 @@ export class OAuthProvider implements OAuthClientProvider {
         : 'none',
       client_name: 'mcpc',
       client_uri: 'https://github.com/apify/mcpc',
+      logo_uri: 'https://apify.github.io/mcpc/client-metadata/logo.png',
+      tos_uri: 'https://github.com/apify/mcpc/blob/main/LICENSE',
+      policy_uri: 'https://github.com/apify/mcpc#security',
     };
   }
 

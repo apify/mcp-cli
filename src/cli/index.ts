@@ -581,18 +581,25 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
     .option('--scope <scopes>', 'OAuth scopes to request (e.g. --scope "read write")')
     .option('--client-id <id>', 'Pre-registered OAuth client ID (skips CIMD and DCR)')
     .option('--client-secret <secret>', 'Pre-registered OAuth client secret (requires --client-id)')
-    .option('--client-metadata-url <url>', 'HTTPS URL of an OAuth CIMD to use as the Client ID')
+    .option(
+      '--client-metadata-url <url>',
+      "HTTPS URL of an OAuth CIMD (default: mcpc's public CIMD at apify.github.io)"
+    )
+    .option('--no-client-metadata-url', 'Disable CIMD; force DCR on CIMD-capable servers')
     .addHelpText(
       'after',
       `
 ${chalk.bold('OAuth client registration approaches (per MCP authorization spec):')}
 
   1. Pre-registration: --client-id (and optionally --client-secret).
-  2. Client ID Metadata Documents (CIMD): --client-metadata-url <https-url>.
-     Used when the authorization server advertises
+  2. Client ID Metadata Documents (CIMD): used by default. mcpc ships with a
+     hosted CIMD at https://apify.github.io/mcpc/client-metadata/v1.json
+     which identifies all mcpc installs as the same client. Override with
+     --client-metadata-url <url> or disable with --no-client-metadata-url.
+     Active only when the authorization server advertises
      "client_id_metadata_document_supported: true".
-  3. Dynamic Client Registration (DCR): default fallback when the server
-     exposes a "registration_endpoint". No flags required.
+  3. Dynamic Client Registration (DCR): fallback when the server exposes a
+     "registration_endpoint" and CIMD is not supported or disabled.
 
   See https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
 
