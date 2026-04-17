@@ -451,18 +451,14 @@ ${chalk.bold('Server formats:')}
   ~/.vscode/mcp.json            Config file — connect all servers in the file
 
 ${chalk.bold('Session name:')}
-  If @session is omitted, a name is auto-generated from the server hostname
-  (e.g. mcp.apify.com → @apify) or config entry name. If a matching session
-  already exists (same server URL, OAuth profile, and HTTP header names), it
-  is reused (restarted if not live). Header values are not compared — they
-  are stored securely in OS keychain.
-  When connecting all servers from a config file, @session cannot be specified.
+  If @session is omitted, it is derived from the server hostname or config
+  entry name. A matching existing session (same URL, profile, and header
+  names) is reused, and restarted if not live. Cannot be set when connecting
+  all servers from a config file.
 
 ${chalk.bold('Security:')}
-  Stdio entries in a config file launch the specified ${chalk.italic('command')} and ${chalk.italic('args')} as a
-  local process — only connect to configs you trust. The command runs even
-  if the MCP handshake later fails, so side effects in the server's startup
-  will execute. Remote (url) entries are not affected.
+  Stdio config entries execute the configured command locally on connect,
+  even if the MCP handshake later fails. Only connect to configs you trust.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
