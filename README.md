@@ -494,7 +494,7 @@ picking the one the authorization server advertises in its OAuth metadata:
 | **Client ID Metadata Documents (CIMD)** | default (or `--client-metadata-url <url>`)     |
 | **Dynamic Client Registration (DCR)**   | fallback (or force with `--no-client-metadata-url`) |
 
-`mcpc` ships with a hosted [Client ID Metadata Document](https://apify.github.io/mcpc/client-metadata/v1.json)
+`mcpc` ships with a hosted [Client ID Metadata Document](https://apify.github.io/mcpc/client.json)
 so every installation presents the same client identity to CIMD-capable authorization servers.
 When the authorization server advertises `client_id_metadata_document_supported: true`, the CIMD
 URL is used as the `client_id`; otherwise mcpc falls back to Dynamic Client Registration.

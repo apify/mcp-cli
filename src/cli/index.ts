@@ -583,7 +583,7 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
     .option('--client-secret <secret>', 'Pre-registered OAuth client secret (requires --client-id)')
     .option(
       '--client-metadata-url <url>',
-      'HTTPS URL of an OAuth CIMD (default: https://apify.github.io/mcpc/client-metadata/v1.json)'
+      'HTTPS URL of an OAuth CIMD (default: https://apify.github.io/mcpc/client.json)'
     )
     .option('--no-client-metadata-url', 'Disable CIMD; force DCR on CIMD-capable servers')
     .addHelpText(
@@ -593,7 +593,7 @@ ${chalk.bold('OAuth client registration approaches (per MCP authorization spec):
 
   1. Pre-registration: --client-id (and optionally --client-secret).
   2. Client ID Metadata Documents (CIMD): used by default. mcpc ships with a
-     hosted CIMD at https://apify.github.io/mcpc/client-metadata/v1.json
+     hosted CIMD at https://apify.github.io/mcpc/client.json
      which identifies all mcpc installs as the same client. Override with
      --client-metadata-url <url> or disable with --no-client-metadata-url.
      Active only when the authorization server advertises
