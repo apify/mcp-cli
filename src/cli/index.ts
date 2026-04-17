@@ -457,6 +457,12 @@ ${chalk.bold('Session name:')}
   is reused (restarted if not live). Header values are not compared — they
   are stored securely in OS keychain.
   When connecting all servers from a config file, @session cannot be specified.
+
+${chalk.bold('Security:')}
+  Stdio entries in a config file launch the specified ${chalk.italic('command')} and ${chalk.italic('args')} as a
+  local process — only connect to configs you trust. The command runs even
+  if the MCP handshake later fails, so side effects in the server's startup
+  will execute. Remote (url) entries are not affected.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
