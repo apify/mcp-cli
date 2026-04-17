@@ -256,9 +256,11 @@ function startCallbackServer(port: number): {
 }
 
 /**
- * Find an available port for the callback server
+ * Find an available port for the OAuth callback server.
+ * Tries `range` consecutive ports starting at `startPort` and returns the
+ * first free one. Throws if all ports in the range are occupied.
  */
-async function findAvailablePort(startPort: number = 8000, range: number = 100): Promise<number> {
+async function findAvailablePort(startPort: number, range: number): Promise<number> {
   for (let port = startPort; port < startPort + range; port++) {
     try {
       await new Promise<void>((resolve, reject) => {
@@ -276,9 +278,7 @@ async function findAvailablePort(startPort: number = 8000, range: number = 100):
   }
   throw new ClientError(
     `Could not find available port for OAuth callback server (tried ports ${startPort}–${startPort + range - 1}). ` +
-      (startPort === MCPC_OAUTH_CALLBACK_PORT
-        ? 'If multiple logins are running concurrently, wait for them to finish or use --no-client-metadata-url to fall back to Dynamic Client Registration with a random port.'
-        : '')
+      'Another mcpc login may be in progress — wait for it to finish and try again.'
   );
 }
 
@@ -432,16 +432,12 @@ export async function performOAuthFlow(
     console.warn('\nWarning: OAuth over plain HTTP is insecure. Only use for local development.\n');
   }
 
-  // Find available port for callback server.
-  // When CIMD is active, use the fixed port range (13316–13325) that matches
-  // the redirect_uris in the hosted CIMD document. When CIMD is disabled
-  // (--no-client-metadata-url or --client-id), use any available port for
-  // full DCR compatibility.
-  const useCimdPorts =
-    !clientCredentials?.clientId && clientCredentials?.clientMetadataUrl !== undefined;
-  const port = useCimdPorts
-    ? await findAvailablePort(MCPC_OAUTH_CALLBACK_PORT, MCPC_OAUTH_CALLBACK_PORT_RANGE)
-    : await findAvailablePort(8000, 100);
+  // Find available port for callback server from the fixed mcpc port range.
+  // These ports match the redirect_uris in mcpc's hosted CIMD document
+  // (ports 13316–13325). Using the same range for DCR and --client-id keeps
+  // the callback port predictable for firewalls, pre-registered clients,
+  // and docs regardless of which registration approach the server uses.
+  const port = await findAvailablePort(MCPC_OAUTH_CALLBACK_PORT, MCPC_OAUTH_CALLBACK_PORT_RANGE);
   const redirectUrl = `http://localhost:${port}/callback`;
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);
