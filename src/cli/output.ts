@@ -20,14 +20,15 @@ import type {
   SessionData,
   ServerDetails,
   Task,
+  CallToolResult,
 } from '../lib/types.js';
-import { extractSingleTextContent } from './tool-result.js';
+import { extractAllTextContent } from './tool-result.js';
 import { join } from 'node:path';
 import { getLogsDir } from '../lib/utils.js';
 import { getSession } from '../lib/sessions.js';
 
 // Re-export for external use
-export { extractSingleTextContent } from './tool-result.js';
+export { extractAllTextContent } from './tool-result.js';
 
 /**
  * Convert HSL to RGB hex color
@@ -163,11 +164,13 @@ export function formatHuman(data: unknown, options?: FormatOptions): string {
     return chalk.gray('(no data)');
   }
 
-  // Check if this is a tool call result with a single text content
-  // If so, wrap it in quadruple backticks to prevent markdown interference
-  const singleText = extractSingleTextContent(data);
-  if (singleText !== undefined) {
-    return `${chalk.gray('````')}\n${singleText}\n${chalk.gray('````')}`;
+  // Check if this is a tool call result whose `content` is an array of only
+  // `type: "text"` items. If so, render just the texts wrapped in quadruple
+  // backticks so the content is unambiguously quoted (and skip any
+  // `structuredContent` — the texts are the canonical view).
+  const textContent = extractAllTextContent(data);
+  if (textContent !== undefined) {
+    return `${chalk.gray('````')}\n${textContent}\n${chalk.gray('````')}`;
   }
 
   // Handle different data types
@@ -1025,6 +1028,144 @@ export function formatTasks(taskList: Task[]): string {
     const statusStr = taskStatusLabel(task.status);
     const msgStr = task.statusMessage ? chalk.dim(` - ${task.statusMessage}`) : '';
     lines.push(`${bullet} ${inBackticks(task.taskId)}  ${statusStr}${msgStr}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a single MCP content block for human display.
+ * Used by `formatCallToolResultHuman` to render each block in the Content section.
+ */
+function formatContentBlock(block: ContentBlock, lines: string[]): void {
+  const bullet = chalk.dim('*');
+
+  switch (block.type) {
+    case 'text':
+      lines.push(chalk.gray('````'));
+      lines.push(block.text);
+      lines.push(chalk.gray('````'));
+      break;
+
+    case 'resource_link':
+      lines.push(chalk.bold('Resource link'));
+      lines.push(`${bullet} URI: ${block.uri}`);
+      if (block.name) lines.push(`${bullet} Name: ${block.name}`);
+      if (block.description) {
+        lines.push(
+          `${bullet} Description: ${chalk.gray('````')}${block.description}${chalk.gray('````')}`
+        );
+      }
+      if (block.mimeType) lines.push(`${bullet} MIME type: ${block.mimeType}`);
+      break;
+
+    case 'image':
+      lines.push(
+        `[Image: ${block.mimeType || 'unknown type'}${block.data ? `, ${block.data.length} chars base64` : ''}]`
+      );
+      break;
+
+    case 'audio':
+      lines.push(
+        `[Audio: ${block.mimeType || 'unknown type'}${block.data ? `, ${block.data.length} chars base64` : ''}]`
+      );
+      break;
+
+    case 'resource':
+      lines.push(chalk.bold('Embedded resource'));
+      if (block.resource) {
+        lines.push(`${bullet} URI: ${block.resource.uri}`);
+        if (block.resource.mimeType) lines.push(`${bullet} MIME type: ${block.resource.mimeType}`);
+        if ('text' in block.resource && block.resource.text) {
+          lines.push(chalk.gray('````'));
+          lines.push(block.resource.text);
+          lines.push(chalk.gray('````'));
+        }
+      }
+      break;
+
+    default:
+      lines.push(JSON.stringify(block, null, 2));
+  }
+}
+
+/**
+ * Return the indices of text content blocks that are JSON serializations of
+ * `structuredContent`.  Per the MCP spec, servers SHOULD include such a block
+ * for backwards compatibility — we skip those blocks from the Content section
+ * so the better-formatted Structured content section is the canonical view.
+ */
+function findDuplicateTextBlocks(
+  content: CallToolResult['content'],
+  structuredContent: Record<string, unknown>
+): Set<number> {
+  const dupes = new Set<number>();
+  const canonical = JSON.stringify(structuredContent);
+  for (let i = 0; i < content.length; i++) {
+    const block = content[i];
+    if (!block || block.type !== 'text') continue;
+    try {
+      const parsed: unknown = JSON.parse((block as { text: string }).text.trim());
+      if (JSON.stringify(parsed) === canonical) dupes.add(i);
+    } catch {
+      // not valid JSON — keep the block
+    }
+  }
+  return dupes;
+}
+
+/**
+ * Format a `CallToolResult` for human-readable display.
+ *
+ * Sections (each printed only when present):
+ * 1. **Content:** — each content block rendered per its type (text blocks
+ *    that duplicate `structuredContent` are omitted)
+ * 2. **Structured content:** — `structuredContent` as syntax-highlighted JSON
+ * 3. **Metadata:** — `_meta` as syntax-highlighted JSON
+ */
+export function formatCallToolResultHuman(result: CallToolResult): string {
+  const lines: string[] = [];
+
+  // Identify text blocks that are just a JSON dump of structuredContent
+  const sc = result.structuredContent;
+  const hasStructuredContent = !!sc && Object.keys(sc).length > 0;
+  const content = result.content;
+  let skipIndices = new Set<number>();
+  if (hasStructuredContent && content && sc) {
+    skipIndices = findDuplicateTextBlocks(content, sc);
+  }
+
+  // Content section — skip duplicate text blocks
+  if (content && content.length > 0) {
+    const visible = content.filter((_, i) => !skipIndices.has(i));
+    if (visible.length > 0) {
+      lines.push(chalk.bold('Content:'));
+      for (let i = 0; i < visible.length; i++) {
+        if (i > 0) lines.push('');
+        formatContentBlock(visible[i] as ContentBlock, lines);
+      }
+    }
+  }
+
+  // Structured content section — syntax-highlighted JSON
+  if (hasStructuredContent) {
+    if (lines.length > 0) lines.push('');
+    lines.push(chalk.bold('Structured content:'));
+    const scJson = JSON.stringify(sc, null, 2);
+    lines.push(process.stdout.isTTY ? highlightJson(scJson) : scJson);
+  }
+
+  // Metadata section — syntax-highlighted JSON, shown last
+  const meta = result._meta;
+  if (meta && typeof meta === 'object' && Object.keys(meta).length > 0) {
+    if (lines.length > 0) lines.push('');
+    lines.push(chalk.bold('Metadata:'));
+    const metaJson = JSON.stringify(meta, null, 2);
+    lines.push(process.stdout.isTTY ? highlightJson(metaJson) : metaJson);
+  }
+
+  if (lines.length === 0) {
+    return chalk.gray('(no content)');
   }
 
   return lines.join('\n');

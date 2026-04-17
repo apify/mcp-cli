@@ -8,6 +8,8 @@ import {
   formatOutput,
   formatToolDetail,
   formatToolCallExample,
+  formatCallToolResultHuman,
+  truncateOutput,
   formatSuccess,
   formatError,
   formatWarning,
@@ -29,9 +31,10 @@ import {
 /**
  * Render a `CallToolResult` payload.
  *
- * In human mode, prints a success/error banner before the payload and an
- * optional hint after errors. In `--json` mode, only the raw payload is
- * printed. Honors `--max-chars` truncation.
+ * In human mode, prints a success/error banner followed by a structured view:
+ * Metadata (from `_meta`), Content (text blocks, resource links, etc.), and
+ * a hint when `structuredContent` is available. In `--json` mode, only the
+ * raw payload is printed. Honors `--max-chars` truncation.
  *
  * Shared by `tools-call` and `tasks-result` so both commands render results
  * identically.
@@ -46,23 +49,33 @@ export function renderCallToolResult(
     errorHint?: string;
   }
 ): void {
-  if (options.outputMode === 'human' && banners) {
-    if (result.isError && banners.error) {
-      console.log(formatError(banners.error));
-    } else if (!result.isError && banners.success) {
-      console.log(formatSuccess(banners.success));
+  if (options.outputMode === 'human') {
+    if (banners) {
+      if (result.isError && banners.error) {
+        console.log(formatError(banners.error));
+      } else if (!result.isError && banners.success) {
+        console.log(formatSuccess(banners.success));
+      }
     }
+
+    let output = formatCallToolResultHuman(result);
+    if (options.maxChars) {
+      output = truncateOutput(output, options.maxChars);
+    }
+    console.log('\n' + output);
+
+    if (result.isError && banners?.errorHint) {
+      console.log(formatInfo(banners.errorHint));
+    }
+    return;
   }
 
+  // JSON mode — raw payload
   console.log(
     formatOutput(result, options.outputMode, {
       ...(options.maxChars && { maxChars: options.maxChars }),
     })
   );
-
-  if (result.isError && options.outputMode === 'human' && banners?.errorHint) {
-    console.log(formatInfo(banners.errorHint));
-  }
 }
 
 /**
@@ -406,7 +419,9 @@ export async function callTool(
           if (result && (result as Record<string, unknown>).isError) {
             spinner.fail(`Tool ${chalk.bold(name)} returned an error (${elapsed})`);
           } else {
-            spinner.succeed(`Tool ${chalk.bold(name)} executed successfully (${elapsed})`);
+            spinner.succeed(
+              `Tool ${chalk.bold(name)} executed successfully (${elapsed}) with these results:`
+            );
           }
         }
       } catch (error) {
@@ -430,7 +445,7 @@ export async function callTool(
     // the duplicate banners in that case.
     renderCallToolResult(result, options, {
       ...(!useTask && {
-        success: `Tool ${name} executed successfully`,
+        success: `Tool ${name} executed successfully with these results:`,
         error: `Tool ${name} returned an error`,
       }),
       errorHint: `Run ${chalk.bold(`mcpc ${target} tools-get ${name}`)} to see the tool schema and usage`,
