@@ -48,7 +48,7 @@ export async function listTasks(target: string, options: CommandOptions): Promis
       if (allTasks.length === 0) {
         console.log(formatSuccess('No active tasks'));
         console.log(
-          chalk.dim(`  To start a new task, run: mcpc ${target} tools-call <name> [args] --task`)
+          chalk.dim(`To start a new task, run: mcpc ${target} tools-call <name> [args] --task`)
         );
       } else {
         console.log(formatTasks(allTasks));
