@@ -1248,6 +1248,7 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
   }
 
   const program = createSessionProgram();
+  program.name(`mcpc ${session}`);
 
   // Override exit so Commander throws instead of calling process.exit()
   program.exitOverride();
