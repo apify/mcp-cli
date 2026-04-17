@@ -971,20 +971,21 @@ function formatPromptContent(content: PromptMessage['content']): string {
 /**
  * Get a colored status indicator for a task status
  */
-function taskStatusIcon(status: string): string {
+function taskStatusLabel(status: string): string {
+  const label = (icon: string): string => `${icon} ${status}`;
   switch (status) {
     case 'working':
-      return chalk.cyan('⟳');
+      return chalk.cyan(label('⟳'));
     case 'input_required':
-      return chalk.yellow('?');
+      return chalk.yellow(label('?'));
     case 'completed':
-      return chalk.green('✔');
+      return chalk.green(label('✔'));
     case 'failed':
-      return chalk.red('✖');
+      return chalk.red(label('✖'));
     case 'cancelled':
-      return chalk.gray('⊘');
+      return chalk.gray(label('⊘'));
     default:
-      return chalk.gray('·');
+      return chalk.gray(label('·'));
   }
 }
 
@@ -994,8 +995,8 @@ function taskStatusIcon(status: string): string {
 export function formatTask(task: Task): string {
   const lines: string[] = [];
 
-  lines.push(`${chalk.bold('Task:')} ${inBackticks(task.taskId)}`);
-  lines.push(`${chalk.bold('Status:')} ${taskStatusIcon(task.status)} ${task.status}`);
+  lines.push(`${chalk.bold('Task ID:')} ${inBackticks(task.taskId)}`);
+  lines.push(`${chalk.bold('Status:')} ${taskStatusLabel(task.status)}`);
 
   if (task.statusMessage) {
     lines.push(`${chalk.bold('Message:')} ${task.statusMessage}`);
@@ -1021,7 +1022,7 @@ export function formatTasks(taskList: Task[]): string {
 
   const bullet = chalk.dim('*');
   for (const task of taskList) {
-    const statusStr = `${taskStatusIcon(task.status)} ${task.status}`;
+    const statusStr = taskStatusLabel(task.status);
     const msgStr = task.statusMessage ? chalk.dim(` - ${task.statusMessage}`) : '';
     lines.push(`${bullet} ${inBackticks(task.taskId)}  ${statusStr}${msgStr}`);
   }
@@ -1084,6 +1085,16 @@ export function formatWarning(message: string): string {
  */
 export function formatInfo(message: string): string {
   return chalk.cyan(`ℹ ${message}`);
+}
+
+export function formatTaskCommandsHint(target: string, taskId?: string): string {
+  const id = taskId ?? '<taskId>';
+  return [
+    '\nAvailable commands:',
+    `  mcpc ${target} tasks-get ${id}`,
+    `  mcpc ${target} tasks-result ${id}`,
+    `  mcpc ${target} tasks-cancel ${id}`,
+  ].join('\n');
 }
 
 /**
