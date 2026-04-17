@@ -11,7 +11,7 @@ import type {
   PromptMessage,
   ContentBlock,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { OutputMode, ServerConfig } from '../lib/index.js';
+import type { OutputMode } from '../lib/index.js';
 import type {
   Tool,
   Resource,
@@ -24,7 +24,7 @@ import type {
 } from '../lib/types.js';
 import { extractAllTextContent } from './tool-result.js';
 import { join } from 'node:path';
-import { isValidSessionName, getLogsDir } from '../lib/utils.js';
+import { getLogsDir } from '../lib/utils.js';
 import { getSession } from '../lib/sessions.js';
 
 // Re-export for external use
@@ -974,20 +974,21 @@ function formatPromptContent(content: PromptMessage['content']): string {
 /**
  * Get a colored status indicator for a task status
  */
-function taskStatusIcon(status: string): string {
+function taskStatusLabel(status: string): string {
+  const label = (icon: string): string => `${icon} ${status}`;
   switch (status) {
     case 'working':
-      return chalk.cyan('⟳');
+      return chalk.cyan(label('⟳'));
     case 'input_required':
-      return chalk.yellow('?');
+      return chalk.yellow(label('?'));
     case 'completed':
-      return chalk.green('✔');
+      return chalk.green(label('✔'));
     case 'failed':
-      return chalk.red('✖');
+      return chalk.red(label('✖'));
     case 'cancelled':
-      return chalk.gray('⊘');
+      return chalk.gray(label('⊘'));
     default:
-      return chalk.gray('·');
+      return chalk.gray(label('·'));
   }
 }
 
@@ -997,8 +998,8 @@ function taskStatusIcon(status: string): string {
 export function formatTask(task: Task): string {
   const lines: string[] = [];
 
-  lines.push(`${chalk.bold('Task:')} ${inBackticks(task.taskId)}`);
-  lines.push(`${chalk.bold('Status:')} ${taskStatusIcon(task.status)} ${task.status}`);
+  lines.push(`${chalk.bold('Task ID:')} ${inBackticks(task.taskId)}`);
+  lines.push(`${chalk.bold('Status:')} ${taskStatusLabel(task.status)}`);
 
   if (task.statusMessage) {
     lines.push(`${chalk.bold('Message:')} ${task.statusMessage}`);
@@ -1024,7 +1025,7 @@ export function formatTasks(taskList: Task[]): string {
 
   const bullet = chalk.dim('*');
   for (const task of taskList) {
-    const statusStr = `${taskStatusIcon(task.status)} ${task.status}`;
+    const statusStr = taskStatusLabel(task.status);
     const msgStr = task.statusMessage ? chalk.dim(` - ${task.statusMessage}`) : '';
     lines.push(`${bullet} ${inBackticks(task.taskId)}  ${statusStr}${msgStr}`);
   }
@@ -1187,6 +1188,25 @@ export function formatInfo(message: string): string {
   return chalk.cyan(`ℹ ${message}`);
 }
 
+export function formatTaskCommandsHint(
+  target: string,
+  taskId?: string,
+  status?: Task['status']
+): string {
+  const id = taskId ?? '<taskId>';
+  const lines = [
+    '\nAvailable commands:',
+    `  mcpc ${target} tasks-get ${id}`,
+    `  mcpc ${target} tasks-result ${id}`,
+  ];
+  // Only suggest cancel while the task is still active (or when status is unknown,
+  // e.g. the generic list hint where individual task statuses vary).
+  if (status === undefined || status === 'working' || status === 'input_required') {
+    lines.push(`  mcpc ${target} tasks-cancel ${id}`);
+  }
+  return lines.join('\n');
+}
+
 /**
  * Truncate formatted output string to maxChars, appending a notice about truncation.
  * Returns the original string if within limit.
@@ -1210,7 +1230,7 @@ function truncateWithEllipsis(str: string, maxLen: number): string {
 
 /**
  * Format a session line for display (without status)
- * Returns: "@name → target (transport, MCP: version)" with colors applied
+ * Returns: "@name → target (OAuth: profile)" with colors applied
  */
 export function formatSessionLine(session: SessionData): string {
   // Format session name (cyan)
@@ -1230,19 +1250,11 @@ export function formatSessionLine(session: SessionData): string {
   }
   const targetStr = truncateWithEllipsis(target, 80);
 
-  // Format transport/auth info
-  const parts: string[] = [];
-
-  if (session.server.command) {
-    parts.push('stdio');
-  } else {
-    parts.push('HTTP');
-    if (session.profileName) {
-      parts.push('OAuth: ' + chalk.magenta(session.profileName) + chalk.dim(''));
-    }
+  // Format auth info (transport type omitted — obvious from context)
+  let infoStr = '';
+  if (!session.server.command && session.profileName) {
+    infoStr = chalk.dim('(OAuth: ') + chalk.magenta(session.profileName) + chalk.dim(')');
   }
-
-  const infoStr = chalk.dim('(') + chalk.dim(parts.join(', ')) + chalk.dim(')');
 
   // Add proxy info separately (not dimmed, for visibility)
   let proxyStr = '';
@@ -1254,7 +1266,8 @@ export function formatSessionLine(session: SessionData): string {
       chalk.green(']');
   }
 
-  return `${nameStr} → ${targetStr} ${infoStr}${proxyStr}`;
+  const suffix = [infoStr, proxyStr].filter(Boolean).join(' ');
+  return `${nameStr} → ${targetStr}${suffix ? ' ' + suffix : ''}`;
 }
 
 /**
@@ -1263,50 +1276,22 @@ export function formatSessionLine(session: SessionData): string {
 export interface LogTargetOptions {
   outputMode: OutputMode;
   hide?: boolean | undefined;
-  profileName?: string | undefined; // Auth profile being used (for http targets)
-  serverConfig?: ServerConfig | undefined; // Resolved transport config (for non-session targets)
 }
 
 /**
- * Log target prefix (only in human mode)
- * For sessions: [@name → server (transport, auth)]
- * For direct connections: [target (transport, auth)]
+ * Log session info prefix (only in human mode)
+ * Shows: [@name → server (auth)]
  */
 export async function logTarget(target: string, options: LogTargetOptions): Promise<void> {
   if (options.outputMode !== 'human' || options.hide) {
     return;
   }
 
-  // For session targets, show rich info
-  if (isValidSessionName(target)) {
-    const session = await getSession(target);
-    if (session) {
-      console.log(`[${formatSessionLine(session)}]\n`);
-    }
-    // Session not found - don't print anything, let the error handler show the message
-    return;
+  const session = await getSession(target);
+  if (session) {
+    console.log(`[${formatSessionLine(session)}]\n`);
   }
-
-  // For direct connections, use transportConfig if available
-  const tc = options.serverConfig;
-  if (tc?.command) {
-    // Stdio transport: show command + args
-    let targetStr = tc.command;
-    if (tc.args && tc.args.length > 0) {
-      targetStr += ' ' + tc.args.join(' ');
-    }
-    targetStr = truncateWithEllipsis(targetStr, 80);
-    console.log(`[→ ${targetStr} ${chalk.dim('(stdio)')}]`);
-    return;
-  }
-
-  // HTTP transport: show server URL with auth info
-  const serverStr = tc?.url || target;
-  const parts: string[] = ['HTTP'];
-  if (options.profileName) {
-    parts.push('OAuth: ' + chalk.magenta(options.profileName));
-  }
-  console.log(`[→ ${serverStr} ${chalk.dim('(' + parts.join(', ') + ')')}]\n`);
+  // Session not found - don't print anything, let the error handler show the message
 }
 
 /**

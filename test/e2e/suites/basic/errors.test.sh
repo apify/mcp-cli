@@ -52,6 +52,30 @@ assert_failure
 assert_contains "$STDERR" "Did you mean: mcpc @test tools-list"
 test_pass
 
+# Test: bare "tools" command suggests tools-list
+test_case "bare tools suggests tools-list"
+run_mcpc @test tools
+assert_failure
+assert_contains "$STDERR" "Unknown command: tools"
+assert_contains "$STDERR" "Did you mean: mcpc @test tools-list"
+test_pass
+
+# Test: bare "resources" command suggests resources-list
+test_case "bare resources suggests resources-list"
+run_mcpc @test resources
+assert_failure
+assert_contains "$STDERR" "Unknown command: resources"
+assert_contains "$STDERR" "Did you mean: mcpc @test resources-list"
+test_pass
+
+# Test: bare "prompts" command suggests prompts-list
+test_case "bare prompts suggests prompts-list"
+run_mcpc @test prompts
+assert_failure
+assert_contains "$STDERR" "Unknown command: prompts"
+assert_contains "$STDERR" "Did you mean: mcpc @test prompts-list"
+test_pass
+
 # Test: completely unknown command shows help text but no suggestion
 test_case "unknown command shows help pointer"
 run_mcpc @test xyzzy-$RANDOM
@@ -82,6 +106,14 @@ test_case "session subcommand without @session suggests adding session"
 run_mcpc tools-list
 assert_failure
 assert_contains "$STDERR" "Missing session target for command: tools-list"
+assert_contains "$STDERR" "Did you mean: mcpc <@session> tools-list"
+test_pass
+
+# Test: bare "tools" without @session suggests session subcommand
+test_case "top-level bare tools suggests session subcommand"
+run_mcpc tools
+assert_failure
+assert_contains "$STDERR" "Unknown command: tools"
 assert_contains "$STDERR" "Did you mean: mcpc <@session> tools-list"
 test_pass
 

@@ -65,7 +65,6 @@ import type {
   ResourceTemplate,
   Prompt,
   ServerDetails,
-  ServerConfig,
   SessionData,
 } from '../../../src/lib/types.js';
 
@@ -1619,7 +1618,7 @@ describe('formatSessionLine', () => {
 
     expect(output).toContain('@test');
     expect(output).toContain('https://mcp.example.com');
-    expect(output).toContain('HTTP');
+    expect(output).not.toContain('HTTP');
     expect(output).toContain('OAuth');
     expect(output).toContain('default');
     expect(output).not.toContain('MCP:');
@@ -1639,7 +1638,7 @@ describe('formatSessionLine', () => {
 
     expect(output).toContain('@fs');
     expect(output).toContain('npx');
-    expect(output).toContain('stdio');
+    expect(output).not.toContain('stdio');
   });
 
   it('should include proxy info when configured', () => {
@@ -1694,71 +1693,20 @@ describe('logTarget', () => {
     consoleSpy.mockRestore();
   });
 
-  it('should not leak serverConfig.headers in output', async () => {
-    const serverConfig: ServerConfig = {
-      url: 'https://mcp.example.com',
-      headers: {
-        Authorization: 'Bearer super-secret-token-12345',
-        'X-Api-Key': 'secret-api-key-67890',
-      },
-    };
-
-    await logTarget('https://mcp.example.com', {
-      outputMode: 'human',
-      serverConfig,
-    });
-
-    // Get the output that was logged
-    const output = consoleSpy.mock.calls.map((call) => call.join(' ')).join('\n');
-
-    // Should NOT contain any header values
-    expect(output).not.toContain('super-secret-token-12345');
-    expect(output).not.toContain('secret-api-key-67890');
-    expect(output).not.toContain('Bearer');
-
-    // Should still show the server URL
-    expect(output).toContain('https://mcp.example.com');
-  });
-
-  it('should not leak headers for stdio transport', async () => {
-    const serverConfig: ServerConfig = {
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-test'],
-      headers: {
-        Authorization: 'Bearer leaked-token',
-      },
-    };
-
-    await logTarget('test-server', {
-      outputMode: 'human',
-      serverConfig,
-    });
-
-    const output = consoleSpy.mock.calls.map((call) => call.join(' ')).join('\n');
-
-    // Should NOT contain header values
-    expect(output).not.toContain('leaked-token');
-    expect(output).not.toContain('Authorization');
-
-    // Should show command info
-    expect(output).toContain('npx');
-    expect(output).toContain('stdio');
-  });
-
   it('should not output anything in json mode', async () => {
-    const serverConfig: ServerConfig = {
-      url: 'https://mcp.example.com',
-      headers: {
-        Authorization: 'Bearer secret',
-      },
-    };
-
-    await logTarget('https://mcp.example.com', {
+    await logTarget('@test', {
       outputMode: 'json',
-      serverConfig,
     });
 
-    // Should not log anything in json mode
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it('should not output anything when hide is true', async () => {
+    await logTarget('@test', {
+      outputMode: 'human',
+      hide: true,
+    });
+
     expect(consoleSpy).not.toHaveBeenCalled();
   });
 });

@@ -93,17 +93,14 @@ export const KNOWN_SESSION_COMMANDS = [
   'shell',
   'close',
   'restart',
-  'tools',
   'tools-list',
   'tools-get',
   'tools-call',
-  'resources',
   'resources-list',
   'resources-read',
   'resources-subscribe',
   'resources-unsubscribe',
   'resources-templates-list',
-  'prompts',
   'prompts-list',
   'prompts-get',
   'logging-set-level',
@@ -160,6 +157,17 @@ export function suggestCommand(
     const reversed = parts.reverse().join('-');
     const reversedMatch = commands.find((cmd) => cmd.toLowerCase() === reversed);
     if (reversedMatch) return reversedMatch;
+  }
+
+  // Check for bare prefix (e.g., "tools" → "tools-list", "resources" → "resources-list")
+  const prefixSuggestions: Record<string, string> = {
+    tools: 'tools-list',
+    resources: 'resources-list',
+    prompts: 'prompts-list',
+  };
+  const prefixSuggestion = prefixSuggestions[normalized];
+  if (prefixSuggestion && commands.includes(prefixSuggestion)) {
+    return prefixSuggestion;
   }
 
   // Fall back to Levenshtein distance
