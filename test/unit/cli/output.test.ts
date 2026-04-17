@@ -1794,22 +1794,67 @@ describe('formatCallToolResultHuman', () => {
     expect(output).not.toContain('Metadata');
   });
 
-  it('should show structuredContent hint when present', () => {
+  it('should show structuredContent as JSON when present', () => {
     const result = {
       content: [{ type: 'text' as const, text: 'data' }],
       structuredContent: { key: 'value' },
     };
     const output = formatCallToolResultHuman(result);
-    expect(output).toContain('Structured content available with --json');
+    expect(output).toContain('Structured content:');
+    expect(output).toContain('"key"');
+    expect(output).toContain('"value"');
   });
 
-  it('should not show structuredContent hint when empty', () => {
+  it('should not show structuredContent section when empty', () => {
     const result = {
       content: [{ type: 'text' as const, text: 'data' }],
       structuredContent: {},
     };
     const output = formatCallToolResultHuman(result);
     expect(output).not.toContain('Structured content');
+  });
+
+  it('should skip structuredContent when a text block contains the same JSON', () => {
+    const sc = { results: [{ title: 'Test', url: 'https://example.com' }] };
+    const result = {
+      content: [{ type: 'text' as const, text: JSON.stringify(sc) }],
+      structuredContent: sc,
+    };
+    const output = formatCallToolResultHuman(result);
+    // The text block is shown, but no separate "Structured content:" section
+    expect(output).toContain('Content:');
+    expect(output).not.toContain('Structured content:');
+  });
+
+  it('should skip structuredContent when a text block has pretty-printed matching JSON', () => {
+    const sc = { a: 1, b: 2 };
+    const result = {
+      content: [{ type: 'text' as const, text: JSON.stringify(sc, null, 2) }],
+      structuredContent: sc,
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).not.toContain('Structured content:');
+  });
+
+  it('should show structuredContent when text blocks do not match it', () => {
+    const result = {
+      content: [{ type: 'text' as const, text: 'Human-readable summary' }],
+      structuredContent: { results: [1, 2, 3] },
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('Structured content:');
+    expect(output).toContain('"results"');
+  });
+
+  it('should show structuredContent when there are no content blocks', () => {
+    const result = {
+      content: [],
+      structuredContent: { answer: 42 },
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('Structured content:');
+    expect(output).toContain('"answer"');
+    expect(output).toContain('42');
   });
 
   it('should format resource_link content blocks', () => {
@@ -1889,7 +1934,7 @@ describe('formatCallToolResultHuman', () => {
     expect(output).toContain('(no content)');
   });
 
-  it('should show all sections together: metadata, content, structuredContent hint', () => {
+  it('should show all sections together in order: metadata, content, structured content', () => {
     const result = {
       _meta: { cost: 0.01 },
       content: [
@@ -1909,11 +1954,11 @@ describe('formatCallToolResultHuman', () => {
     expect(output).toContain('Content:');
     expect(output).toContain('Some output');
     expect(output).toContain('Resource link');
-    expect(output).toContain('Structured content available with --json');
+    expect(output).toContain('Structured content:');
+    expect(output).toContain('"parsed"');
 
-    // Metadata comes before Content
+    // Correct ordering
     expect(output.indexOf('Metadata')).toBeLessThan(output.indexOf('Content:'));
-    // Content comes before structuredContent hint
-    expect(output.indexOf('Content:')).toBeLessThan(output.indexOf('Structured content available'));
+    expect(output.indexOf('Content:')).toBeLessThan(output.indexOf('Structured content:'));
   });
 });

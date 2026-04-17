@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Human-mode `tools-call` / `tasks-result` output now uses a structured layout: **Metadata** (`_meta`), **Content** (each text/resource/image block rendered per type), and a hint when `structuredContent` is available via `--json`. Replaces the raw key-value dump with a cleaner, more readable format.
+- Human-mode `tools-call` / `tasks-result` output now uses a structured layout: **Metadata** (`_meta`), **Content** (each text/resource/image block rendered per type), and **Structured content** (shown as JSON when not already present in a text block). Replaces the raw key-value dump with a cleaner, more readable format.
 
 ### Fixed
 

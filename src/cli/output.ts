@@ -1090,12 +1090,36 @@ function formatContentBlock(block: ContentBlock, lines: string[]): void {
 }
 
 /**
+ * Check whether any text content block is a JSON serialization of
+ * `structuredContent`.  Per the MCP spec, servers SHOULD include such a
+ * block for backwards compatibility, so this avoids printing duplicate data.
+ */
+function isStructuredContentInTextBlocks(
+  content: CallToolResult['content'],
+  structuredContent: Record<string, unknown>
+): boolean {
+  const canonical = JSON.stringify(structuredContent);
+  for (const block of content) {
+    if (block.type !== 'text') continue;
+    try {
+      const parsed: unknown = JSON.parse(block.text.trim());
+      if (JSON.stringify(parsed) === canonical) return true;
+    } catch {
+      // not valid JSON — skip
+    }
+  }
+  return false;
+}
+
+/**
  * Format a `CallToolResult` for human-readable display.
  *
  * Sections (each printed only when present):
  * 1. **Metadata** — `_meta` rendered as pretty JSON
  * 2. **Content:** — each content block rendered per its type
- * 3. "Structured content available with --json" hint
+ * 3. **Structured content:** — `structuredContent` as pretty JSON, unless
+ *    a text block already contains the same data (per MCP spec, servers
+ *    SHOULD include a serialized-JSON text block for backwards compat)
  */
 export function formatCallToolResultHuman(result: CallToolResult): string {
   const lines: string[] = [];
@@ -1118,10 +1142,14 @@ export function formatCallToolResultHuman(result: CallToolResult): string {
     }
   }
 
-  // structuredContent hint
-  if (result.structuredContent && Object.keys(result.structuredContent).length > 0) {
-    if (lines.length > 0) lines.push('');
-    lines.push(chalk.dim('Structured content available with --json'));
+  // Structured content section — show as JSON unless already in text blocks
+  const sc = result.structuredContent;
+  if (sc && Object.keys(sc).length > 0) {
+    if (!content || !isStructuredContentInTextBlocks(content, sc)) {
+      if (lines.length > 0) lines.push('');
+      lines.push(chalk.bold('Structured content:'));
+      lines.push(JSON.stringify(sc, null, 2));
+    }
   }
 
   if (lines.length === 0) {
