@@ -303,7 +303,7 @@ export async function callTool(
 
       if (options.outputMode === 'human') {
         console.log(formatSuccess(`Task started: ${taskUpdate.taskId}`));
-        console.log(formatTaskCommandsHint(target, taskUpdate.taskId));
+        console.log(formatTaskCommandsHint(target, taskUpdate.taskId, taskUpdate.status));
       } else {
         console.log(formatOutput({ taskId: taskUpdate.taskId, status: taskUpdate.status }, 'json'));
       }
@@ -316,6 +316,7 @@ export async function callTool(
       let lastStatusMessage: string | undefined;
       let lastProgressMessage: string | undefined;
       let capturedTaskId: string | undefined;
+      let capturedTaskStatus: TaskUpdate['status'] | undefined;
 
       // Set up ESC key listener for detaching (TTY + human mode only, not in interactive shell)
       const escListener = setupEscListener(
@@ -329,7 +330,7 @@ export async function callTool(
         if (spinner) {
           spinner.info(`Detached. Task ${chalk.bold(`\`${taskId}\``)} continues in background`);
         }
-        console.log(formatTaskCommandsHint(target, taskId));
+        console.log(formatTaskCommandsHint(target, taskId, capturedTaskStatus ?? 'working'));
       };
 
       // Set up SIGINT handler to print task ID hint on Ctrl+C (human mode only)
@@ -363,6 +364,9 @@ export async function callTool(
       const onUpdate = (update: TaskUpdate): void => {
         if (update.taskId) {
           capturedTaskId = update.taskId;
+        }
+        if (update.status) {
+          capturedTaskStatus = update.status;
         }
         if (update.statusMessage) {
           lastStatusMessage = update.statusMessage;

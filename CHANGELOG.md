@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `tools-call --task` now prints the task ID and recovery commands when interrupted with Ctrl+C, so you can fetch or cancel the server-side task later
+- `tasks-get` no longer suggests `tasks-cancel` when the task has already reached a terminal state (completed, failed, or cancelled)
 
 ### Removed
 

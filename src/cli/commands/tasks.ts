@@ -69,7 +69,7 @@ export async function getTask(
 
     if (options.outputMode === 'human') {
       console.log(formatTask(result));
-      console.log(formatTaskCommandsHint(target, taskId));
+      console.log(formatTaskCommandsHint(target, taskId, result.status));
     } else {
       console.log(formatOutput(result, 'json'));
     }
