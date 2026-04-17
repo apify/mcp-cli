@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New `tasks-result <taskId>` command that fetches the final `CallToolResult` payload of an async task via the MCP `tasks/result` method. Blocks until the task reaches a terminal state, then prints the payload using the same renderer as `tools-call` (`--json` returns the raw result).
 - Public [Client ID Metadata Document](https://apify.github.io/mcpc/client-metadata.json) hosted via GitHub Pages, giving every `mcpc` installation a consistent client identity on CIMD-capable authorization servers. `mcpc login` now uses this hosted document by default; override with `--client-metadata-url <url>` or disable with `--no-client-metadata-url` to force Dynamic Client Registration. The OAuth callback uses a fixed loopback port range (13316–13325) to match the registered redirect URIs.
+- `mcpc login --grant client-credentials` flag adds support for the [OAuth 2.1 client_credentials grant](https://modelcontextprotocol.io/extensions/auth/oauth-client-credentials) for non-interactive machine-to-machine authentication. Usage: `mcpc login <server> --grant client-credentials --client-id <id> --client-secret <secret> [--scope "..."] [--token-endpoint <url>]`. mcpc persists the credentials in the OS keychain and automatically re-issues access tokens on expiry.
 
 ### Changed
 

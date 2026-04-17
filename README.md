@@ -517,6 +517,32 @@ mcpc login mcp.example.com --no-client-metadata-url
 See the [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#client-registration-approaches)
 for details on each approach and the format of Client ID Metadata Documents.
 
+### Machine-to-machine authentication (client_credentials grant)
+
+For non-interactive environments (CI pipelines, service accounts, automation),
+`mcpc` supports the [OAuth 2.1 client_credentials grant](https://modelcontextprotocol.io/extensions/auth/oauth-client-credentials).
+No browser is involved — `mcpc` exchanges a pre-issued client ID and secret for
+an access token, and re-issues the token automatically when it expires.
+
+```bash
+# Login using the client_credentials grant (no browser)
+mcpc login mcp.example.com --grant client-credentials \
+  --client-id my-service --client-secret "$SERVICE_SECRET"
+
+# Optionally request specific scopes and pin the token endpoint
+mcpc login mcp.example.com --grant client-credentials \
+  --client-id my-service --client-secret "$SERVICE_SECRET" \
+  --scope "tools:read" \
+  --token-endpoint https://auth.example.com/oauth/token
+
+# Use the resulting profile like any other
+mcpc connect mcp.example.com @svc
+mcpc @svc tools-list
+```
+
+Client ID and secret are stored in the OS keychain. When the access token
+expires, `mcpc` re-runs the `client_credentials` request transparently.
+
 ### Authentication precedence
 
 When multiple authentication methods are available, `mcpc` uses this precedence order:

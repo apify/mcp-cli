@@ -148,13 +148,66 @@ class BridgeProcess {
   setAuthCredentials(credentials: AuthCredentials): void {
     logger.info(`Received auth credentials for profile: ${credentials.profileName}`);
     logger.debug(`  serverUrl: ${credentials.serverUrl}`);
+    logger.debug(`  grantType: ${credentials.grantType ?? 'refresh_token'}`);
     logger.debug(`  refreshToken: ${credentials.refreshToken ? 'present' : 'MISSING'}`);
     logger.debug(`  accessToken: ${credentials.accessToken ? 'present' : 'MISSING'}`);
     logger.debug(`  clientId: ${credentials.clientId ? 'present' : 'MISSING'}`);
+    logger.debug(`  clientSecret: ${credentials.clientSecret ? 'present' : 'MISSING'}`);
     logger.debug(`  headers: ${credentials.headers ? Object.keys(credentials.headers).length : 0}`);
 
+    // Set up OAuth token manager for client_credentials grant
+    if (
+      credentials.grantType === 'client_credentials' &&
+      credentials.clientId &&
+      credentials.clientSecret
+    ) {
+      this.tokenManager = new OAuthTokenManager({
+        serverUrl: credentials.serverUrl,
+        profileName: credentials.profileName,
+        grantType: 'client_credentials',
+        clientId: credentials.clientId,
+        clientSecret: credentials.clientSecret,
+        ...(credentials.accessToken && { accessToken: credentials.accessToken }),
+        ...(credentials.accessTokenExpiresAt !== undefined && {
+          accessTokenExpiresAt: credentials.accessTokenExpiresAt,
+        }),
+        ...(credentials.scope && { scope: credentials.scope }),
+        ...(credentials.tokenEndpoint && { tokenEndpoint: credentials.tokenEndpoint }),
+        // Persist re-issued tokens to keychain so other sessions can reuse them
+        onTokenRefresh: async (tokens) => {
+          logger.debug('client_credentials re-issue detected, persisting tokens to keychain');
+          const tokenInfo: Parameters<typeof storeKeychainOAuthTokenInfo>[2] = {
+            accessToken: tokens.access_token,
+            tokenType: tokens.token_type || 'Bearer',
+          };
+          if (tokens.expires_in !== undefined) {
+            tokenInfo.expiresIn = tokens.expires_in;
+            tokenInfo.expiresAt = Math.floor(Date.now() / 1000) + tokens.expires_in;
+          }
+          if (tokens.scope !== undefined) {
+            tokenInfo.scope = tokens.scope;
+          }
+          await storeKeychainOAuthTokenInfo(
+            credentials.serverUrl,
+            credentials.profileName,
+            tokenInfo
+          );
+          await updateAuthProfileRefreshedAt(credentials.serverUrl, credentials.profileName);
+          logger.debug('client_credentials tokens persisted to keychain');
+        },
+      });
+      logger.debug('OAuth token manager initialized (client_credentials grant)');
+
+      this.authProvider = new OAuthProvider({
+        serverUrl: credentials.serverUrl,
+        profileName: credentials.profileName,
+        tokenManager: this.tokenManager,
+        clientId: credentials.clientId,
+      });
+      logger.debug('OAuthProvider created for SDK transport (runtime mode, client_credentials)');
+    }
     // Set up OAuth token manager if refresh token and client ID are provided
-    if (credentials.refreshToken && credentials.clientId) {
+    else if (credentials.refreshToken && credentials.clientId) {
       this.tokenManager = new OAuthTokenManager({
         serverUrl: credentials.serverUrl,
         profileName: credentials.profileName,

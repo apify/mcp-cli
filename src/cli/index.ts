@@ -590,9 +590,25 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
     )
     .option('--no-client-metadata-url', 'Disable CIMD; force DCR on CIMD-capable servers')
     .option('--callback-port <port>', 'Loopback port for OAuth callback (default: 13316–13325)')
+    .option(
+      '--grant <type>',
+      'OAuth grant type: "authorization-code" (default, interactive browser) or ' +
+        '"client-credentials" (non-interactive, machine-to-machine)'
+    )
+    .option(
+      '--token-endpoint <url>',
+      'OAuth token endpoint URL (client-credentials grant only; auto-discovered if omitted)'
+    )
     .addHelpText(
       'after',
       `
+${chalk.bold('OAuth grant types:')}
+
+  --grant authorization-code   (default) Interactive browser login with PKCE.
+  --grant client-credentials   Non-interactive machine-to-machine login.
+                               Requires --client-id and --client-secret.
+                               See https://modelcontextprotocol.io/extensions/auth/oauth-client-credentials
+
 ${chalk.bold('OAuth client registration approaches:')}
 
   1. Pre-registration: --client-id (and optionally --client-secret).
@@ -606,6 +622,13 @@ ${chalk.bold('OAuth client registration approaches:')}
      "registration_endpoint" and CIMD is not supported or disabled.
 
   See https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
+
+${chalk.bold('Examples:')}
+
+  mcpc login mcp.example.com
+  mcpc login mcp.example.com --scope "tools:read tools:write"
+  mcpc login mcp.example.com --grant client-credentials \\
+    --client-id my-service --client-secret $SERVICE_SECRET
 
 ${jsonHelp('Interactive prompts are written to stderr, stdout contains a clean JSON object', '`{ profile, serverUrl, scopes }`')}
 `
@@ -623,6 +646,8 @@ ${jsonHelp('Interactive prompts are written to stderr, stdout contains a clean J
         clientSecret: opts.clientSecret,
         clientMetadataUrl: opts.clientMetadataUrl,
         ...(opts.callbackPort ? { callbackPort: parseInt(opts.callbackPort as string, 10) } : {}),
+        grant: opts.grant,
+        tokenEndpoint: opts.tokenEndpoint,
         ...getOptionsFromCommand(command),
       });
     });
