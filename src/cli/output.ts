@@ -20,6 +20,7 @@ import type {
   SessionData,
   ServerDetails,
   Task,
+  CallToolResult,
 } from '../lib/types.js';
 import { extractAllTextContent } from './tool-result.js';
 import { join } from 'node:path';
@@ -1026,6 +1027,104 @@ export function formatTasks(taskList: Task[]): string {
     const statusStr = `${taskStatusIcon(task.status)} ${task.status}`;
     const msgStr = task.statusMessage ? chalk.dim(` - ${task.statusMessage}`) : '';
     lines.push(`${bullet} ${inBackticks(task.taskId)}  ${statusStr}${msgStr}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a single MCP content block for human display.
+ * Used by `formatCallToolResultHuman` to render each block in the Content section.
+ */
+function formatContentBlock(block: ContentBlock, lines: string[]): void {
+  const bullet = chalk.dim('*');
+
+  switch (block.type) {
+    case 'text':
+      lines.push(chalk.gray('````'));
+      lines.push(block.text);
+      lines.push(chalk.gray('````'));
+      break;
+
+    case 'resource_link':
+      lines.push(chalk.bold('Resource link'));
+      lines.push(`${bullet} URI: ${block.uri}`);
+      if (block.name) lines.push(`${bullet} Name: ${block.name}`);
+      if (block.description) {
+        lines.push(
+          `${bullet} Description: ${chalk.gray('````')}${block.description}${chalk.gray('````')}`
+        );
+      }
+      if (block.mimeType) lines.push(`${bullet} MIME type: ${block.mimeType}`);
+      break;
+
+    case 'image':
+      lines.push(
+        `[Image: ${block.mimeType || 'unknown type'}${block.data ? `, ${block.data.length} chars base64` : ''}]`
+      );
+      break;
+
+    case 'audio':
+      lines.push(
+        `[Audio: ${block.mimeType || 'unknown type'}${block.data ? `, ${block.data.length} chars base64` : ''}]`
+      );
+      break;
+
+    case 'resource':
+      lines.push(chalk.bold('Embedded resource'));
+      if (block.resource) {
+        lines.push(`${bullet} URI: ${block.resource.uri}`);
+        if (block.resource.mimeType) lines.push(`${bullet} MIME type: ${block.resource.mimeType}`);
+        if ('text' in block.resource && block.resource.text) {
+          lines.push(chalk.gray('````'));
+          lines.push(block.resource.text);
+          lines.push(chalk.gray('````'));
+        }
+      }
+      break;
+
+    default:
+      lines.push(JSON.stringify(block, null, 2));
+  }
+}
+
+/**
+ * Format a `CallToolResult` for human-readable display.
+ *
+ * Sections (each printed only when present):
+ * 1. **Metadata** — `_meta` rendered as pretty JSON
+ * 2. **Content:** — each content block rendered per its type
+ * 3. "Structured content available with --json" hint
+ */
+export function formatCallToolResultHuman(result: CallToolResult): string {
+  const lines: string[] = [];
+
+  // Metadata section
+  const meta = result._meta;
+  if (meta && typeof meta === 'object' && Object.keys(meta).length > 0) {
+    lines.push(chalk.bold('Metadata'));
+    lines.push(JSON.stringify(meta, null, 2));
+    lines.push('');
+  }
+
+  // Content section
+  const content = result.content;
+  if (content && content.length > 0) {
+    lines.push(chalk.bold('Content:'));
+    for (let i = 0; i < content.length; i++) {
+      if (i > 0) lines.push('');
+      formatContentBlock(content[i] as ContentBlock, lines);
+    }
+  }
+
+  // structuredContent hint
+  if (result.structuredContent && Object.keys(result.structuredContent).length > 0) {
+    if (lines.length > 0) lines.push('');
+    lines.push(chalk.dim('Structured content available with --json'));
+  }
+
+  if (lines.length === 0) {
+    return chalk.gray('(no content)');
   }
 
   return lines.join('\n');

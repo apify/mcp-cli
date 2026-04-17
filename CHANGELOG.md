@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Human-mode `tools-call` / `tasks-result` output now hides the `_meta` field (still included in `--json`), and renders the textual content wrapped in quadruple backticks whenever the result's `content` is an array of only `type: "text"` items — not just for a single text item. In that case, `structuredContent` is also skipped, since the texts are the canonical view.
+- Human-mode `tools-call` / `tasks-result` output now uses a structured layout: **Metadata** (`_meta`), **Content** (each text/resource/image block rendered per type), and a hint when `structuredContent` is available via `--json`. Replaces the raw key-value dump with a cleaner, more readable format.
 
 ### Fixed
 

@@ -57,6 +57,7 @@ import {
   logTarget,
   formatToolCallExample,
   formatToolHints,
+  formatCallToolResultHuman,
 } from '../../../src/cli/output.js';
 import type {
   Tool,
@@ -1794,5 +1795,177 @@ describe('truncateOutput', () => {
     const str = 'a'.repeat(200);
     const result = truncateOutput(str, 50);
     expect(result).toContain('200 chars');
+  });
+});
+
+describe('formatCallToolResultHuman', () => {
+  it('should format single text content', () => {
+    const result = {
+      content: [{ type: 'text' as const, text: 'Hello world' }],
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('Content:');
+    expect(output).toContain('````');
+    expect(output).toContain('Hello world');
+  });
+
+  it('should format multiple text content blocks separately', () => {
+    const result = {
+      content: [
+        { type: 'text' as const, text: 'First block' },
+        { type: 'text' as const, text: 'Second block' },
+      ],
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('Content:');
+    expect(output).toContain('First block');
+    expect(output).toContain('Second block');
+    // Each block gets its own backtick wrapper
+    const backtickCount = (output.match(/````/g) || []).length;
+    expect(backtickCount).toBe(4); // open+close for each of the 2 blocks
+  });
+
+  it('should show Metadata section when _meta is present', () => {
+    const result = {
+      content: [{ type: 'text' as const, text: 'data' }],
+      _meta: { usageTotalUsd: 0.005 },
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('Metadata');
+    expect(output).toContain('usageTotalUsd');
+    expect(output).toContain('0.005');
+    expect(output).toContain('Content:');
+  });
+
+  it('should skip Metadata section when _meta is empty', () => {
+    const result = {
+      content: [{ type: 'text' as const, text: 'data' }],
+      _meta: {},
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).not.toContain('Metadata');
+  });
+
+  it('should show structuredContent hint when present', () => {
+    const result = {
+      content: [{ type: 'text' as const, text: 'data' }],
+      structuredContent: { key: 'value' },
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('Structured content available with --json');
+  });
+
+  it('should not show structuredContent hint when empty', () => {
+    const result = {
+      content: [{ type: 'text' as const, text: 'data' }],
+      structuredContent: {},
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).not.toContain('Structured content');
+  });
+
+  it('should format resource_link content blocks', () => {
+    const result = {
+      content: [
+        {
+          type: 'resource_link' as const,
+          uri: 'file:///project/src/main.rs',
+          name: 'main.rs',
+          description: 'Entry point',
+          mimeType: 'text/x-rust',
+        },
+      ],
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('Resource link');
+    expect(output).toContain('file:///project/src/main.rs');
+    expect(output).toContain('main.rs');
+    expect(output).toContain('Entry point');
+    expect(output).toContain('text/x-rust');
+  });
+
+  it('should format image content blocks', () => {
+    const result = {
+      content: [
+        {
+          type: 'image' as const,
+          data: 'aGVsbG8=',
+          mimeType: 'image/png',
+        },
+      ],
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('[Image: image/png');
+    expect(output).toContain('base64');
+  });
+
+  it('should format audio content blocks', () => {
+    const result = {
+      content: [
+        {
+          type: 'audio' as const,
+          data: 'YXVkaW8=',
+          mimeType: 'audio/mp3',
+        },
+      ],
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('[Audio: audio/mp3');
+  });
+
+  it('should format embedded resource content blocks', () => {
+    const result = {
+      content: [
+        {
+          type: 'resource' as const,
+          resource: {
+            uri: 'file:///data.json',
+            mimeType: 'application/json',
+            text: '{"key":"value"}',
+          },
+        },
+      ],
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('Embedded resource');
+    expect(output).toContain('file:///data.json');
+    expect(output).toContain('application/json');
+    expect(output).toContain('{"key":"value"}');
+  });
+
+  it('should return "(no content)" when result is empty', () => {
+    const result = {
+      content: [],
+    };
+    const output = formatCallToolResultHuman(result);
+    expect(output).toContain('(no content)');
+  });
+
+  it('should show all sections together: metadata, content, structuredContent hint', () => {
+    const result = {
+      _meta: { cost: 0.01 },
+      content: [
+        { type: 'text' as const, text: 'Some output' },
+        {
+          type: 'resource_link' as const,
+          uri: 'file:///a.txt',
+          name: 'a.txt',
+        },
+      ],
+      structuredContent: { parsed: true },
+    };
+    const output = formatCallToolResultHuman(result);
+
+    // All sections present
+    expect(output).toContain('Metadata');
+    expect(output).toContain('Content:');
+    expect(output).toContain('Some output');
+    expect(output).toContain('Resource link');
+    expect(output).toContain('Structured content available with --json');
+
+    // Metadata comes before Content
+    expect(output.indexOf('Metadata')).toBeLessThan(output.indexOf('Content:'));
+    // Content comes before structuredContent hint
+    expect(output.indexOf('Content:')).toBeLessThan(output.indexOf('Structured content available'));
   });
 });

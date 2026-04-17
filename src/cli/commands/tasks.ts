@@ -22,7 +22,7 @@ export async function getTaskResult(
   await withMcpClient(target, options, async (client, _context) => {
     const result = await client.getTaskResult(taskId);
     renderCallToolResult(result, options, {
-      success: `Task ${taskId} completed`,
+      success: `Task ${taskId} completed with these results:`,
       error: `Task ${taskId} returned an error`,
     });
   });
