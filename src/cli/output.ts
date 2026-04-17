@@ -1118,21 +1118,13 @@ function findDuplicateTextBlocks(
  * Format a `CallToolResult` for human-readable display.
  *
  * Sections (each printed only when present):
- * 1. **Metadata** — `_meta` rendered as pretty JSON
- * 2. **Content:** — each content block rendered per its type (text blocks
+ * 1. **Content:** — each content block rendered per its type (text blocks
  *    that duplicate `structuredContent` are omitted)
- * 3. **Structured content:** — `structuredContent` as syntax-highlighted JSON
+ * 2. **Structured content:** — `structuredContent` as syntax-highlighted JSON
+ * 3. **Metadata:** — `_meta` as syntax-highlighted JSON
  */
 export function formatCallToolResultHuman(result: CallToolResult): string {
   const lines: string[] = [];
-
-  // Metadata section
-  const meta = result._meta;
-  if (meta && typeof meta === 'object' && Object.keys(meta).length > 0) {
-    lines.push(chalk.bold('Metadata:'));
-    lines.push(JSON.stringify(meta, null, 2));
-    lines.push('');
-  }
 
   // Identify text blocks that are just a JSON dump of structuredContent
   const sc = result.structuredContent;
@@ -1161,6 +1153,15 @@ export function formatCallToolResultHuman(result: CallToolResult): string {
     lines.push(chalk.bold('Structured content:'));
     const scJson = JSON.stringify(sc, null, 2);
     lines.push(process.stdout.isTTY ? highlightJson(scJson) : scJson);
+  }
+
+  // Metadata section — syntax-highlighted JSON, shown last
+  const meta = result._meta;
+  if (meta && typeof meta === 'object' && Object.keys(meta).length > 0) {
+    if (lines.length > 0) lines.push('');
+    lines.push(chalk.bold('Metadata:'));
+    const metaJson = JSON.stringify(meta, null, 2);
+    lines.push(process.stdout.isTTY ? highlightJson(metaJson) : metaJson);
   }
 
   if (lines.length === 0) {

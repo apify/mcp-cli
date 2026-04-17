@@ -1954,7 +1954,7 @@ describe('formatCallToolResultHuman', () => {
     expect(output).toContain('(no content)');
   });
 
-  it('should show all sections together in order: metadata, content, structured content', () => {
+  it('should show all sections in order: content, structured content, metadata', () => {
     const result = {
       _meta: { cost: 0.01 },
       content: [
@@ -1970,15 +1970,16 @@ describe('formatCallToolResultHuman', () => {
     const output = formatCallToolResultHuman(result);
 
     // All sections present
-    expect(output).toContain('Metadata');
     expect(output).toContain('Content:');
     expect(output).toContain('Some output');
     expect(output).toContain('Resource link');
     expect(output).toContain('Structured content:');
     expect(output).toContain('"parsed"');
+    expect(output).toContain('Metadata:');
+    expect(output).toContain('"cost"');
 
-    // Correct ordering
-    expect(output.indexOf('Metadata')).toBeLessThan(output.indexOf('Content:'));
+    // Correct ordering: Content → Structured content → Metadata
     expect(output.indexOf('Content:')).toBeLessThan(output.indexOf('Structured content:'));
+    expect(output.indexOf('Structured content:')).toBeLessThan(output.indexOf('Metadata:'));
   });
 });
