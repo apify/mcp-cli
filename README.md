@@ -492,20 +492,26 @@ picking the one the authorization server advertises in its OAuth metadata:
 | **Approach**                            | **`mcpc login` flags**                         |
 |:----------------------------------------| :--------------------------------------------- |
 | **Pre-registration**                    | `--client-id` (and optional `--client-secret`) |
-| **Client ID Metadata Documents (CIMD)** | `--client-metadata-url <https-url>`            |
-| **Dynamic Client Registration (DCR)**   | _(default, no flags needed)_                   |
+| **Client ID Metadata Documents (CIMD)** | default (or `--client-metadata-url <url>`)     |
+| **Dynamic Client Registration (DCR)**   | fallback (or force with `--no-client-metadata-url`) |
+
+`mcpc` ships with a hosted [Client ID Metadata Document](https://apify.github.io/mcpc/client-metadata.json)
+so every installation presents the same client identity to CIMD-capable authorization servers.
+When the authorization server advertises `client_id_metadata_document_supported: true`, the CIMD
+URL is used as the `client_id`; otherwise mcpc falls back to Dynamic Client Registration.
 
 ```bash
-# Pre-registered OAuth client (public or confidential)
+# Default: mcpc's hosted CIMD is used automatically (no flags needed).
+mcpc login mcp.apify.com
+
+# Pre-registered OAuth client (public or confidential) — skips CIMD.
 mcpc login mcp.example.com --client-id <id> [--client-secret <secret>]
 
-# Client ID Metadata Documents (CIMD): URL points to a JSON document served over HTTPS.
-# Used only if the authorization server advertises client_id_metadata_document_supported: true;
-# otherwise mcpc falls back to Dynamic Client Registration.
-mcpc login mcp.example.com --client-metadata-url https://example.com/mcpc-client.json
+# Custom CIMD: override the default with your own hosted document.
+mcpc login mcp.example.com --client-metadata-url https://example.com/my-client.json
 
-# Dynamic Client Registration (DCR): default when the server has a registration_endpoint.
-mcpc login mcp.apify.com
+# Disable CIMD: force Dynamic Client Registration even if the server supports CIMD.
+mcpc login mcp.example.com --no-client-metadata-url
 ```
 
 See the [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#client-registration-approaches)

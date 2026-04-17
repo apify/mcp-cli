@@ -4,12 +4,17 @@
  */
 
 import { createLogger } from '../logger.js';
-import { AuthError } from '../errors.js';
+import { AuthError, ClientError } from '../errors.js';
 import { proxyFetch } from '../proxy.js';
 
 const logger = createLogger('oauth-utils');
 
 export const DEFAULT_AUTH_PROFILE = 'default';
+
+export const DEFAULT_CLIENT_METADATA_URL = 'https://apify.github.io/mcpc/client-metadata.json';
+
+export const MCPC_OAUTH_CALLBACK_PORT = 13316;
+export const MCPC_OAUTH_CALLBACK_PORT_RANGE = 10;
 
 /**
  * OAuth token endpoint response (per OAuth 2.0 spec - uses snake_case)
@@ -156,4 +161,57 @@ export function createReauthError(
       ? `mcpc ${serverUrl} login`
       : `mcpc ${serverUrl} login --profile ${profileName}`;
   return new AuthError(`${message}. Please re-authenticate with: ${command}`);
+}
+
+/**
+ * Validate that a Client ID Metadata Document URL meets the requirements of
+ * draft-ietf-oauth-client-id-metadata-document and the MCP authorization spec.
+ *
+ * Requirements:
+ * - MUST use the "https" scheme
+ * - MUST contain a path component (not just "/")
+ * - MUST NOT contain a fragment component
+ * - MUST NOT contain a username or password component
+ * - MUST NOT contain single-dot or double-dot path segments
+ */
+export function validateClientMetadataUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new ClientError(
+      `Invalid --client-metadata-url: ${url} is not a valid URL. ` +
+        `It must be an HTTPS URL pointing to the client metadata JSON document.`
+    );
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new ClientError(
+      `Invalid --client-metadata-url: ${url} must use the "https" scheme ` +
+        `(per OAuth Client ID Metadata Document spec).`
+    );
+  }
+  if (!parsed.pathname || parsed.pathname === '/') {
+    throw new ClientError(
+      `Invalid --client-metadata-url: ${url} must contain a non-root path component, ` +
+        `e.g. https://example.com/client.json`
+    );
+  }
+  if (parsed.hash) {
+    throw new ClientError(
+      `Invalid --client-metadata-url: ${url} must not contain a fragment component.`
+    );
+  }
+  if (parsed.username || parsed.password) {
+    throw new ClientError(
+      `Invalid --client-metadata-url: ${url} must not contain a username or password.`
+    );
+  }
+  // Check the raw URL string for dot segments before URL normalization resolves them
+  const pathPart = url.replace(/^https:\/\/[^/]*/, '');
+  const rawSegments = pathPart.split('/');
+  if (rawSegments.some((s) => s === '.' || s === '..')) {
+    throw new ClientError(
+      `Invalid --client-metadata-url: ${url} must not contain "." or ".." path segments.`
+    );
+  }
 }

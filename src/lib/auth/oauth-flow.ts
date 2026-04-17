@@ -15,6 +15,11 @@ import { ClientError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import { removeKeychainOAuthClientInfo, storeKeychainOAuthClientInfo } from './keychain.js';
 import type { AuthProfile } from '../types.js';
+import {
+  MCPC_OAUTH_CALLBACK_PORT,
+  MCPC_OAUTH_CALLBACK_PORT_RANGE,
+  validateClientMetadataUrl,
+} from './oauth-utils.js';
 
 const logger = createLogger('oauth-flow');
 
@@ -251,10 +256,12 @@ function startCallbackServer(port: number): {
 }
 
 /**
- * Find an available port for the callback server
+ * Find an available port for the OAuth callback server.
+ * Tries `range` consecutive ports starting at `startPort` and returns the
+ * first free one. Throws if all ports in the range are occupied.
  */
-async function findAvailablePort(startPort: number = 8000): Promise<number> {
-  for (let port = startPort; port < startPort + 100; port++) {
+async function findAvailablePort(startPort: number, range: number): Promise<number> {
+  for (let port = startPort; port < startPort + range; port++) {
     try {
       await new Promise<void>((resolve, reject) => {
         const testServer = createServer();
@@ -269,7 +276,10 @@ async function findAvailablePort(startPort: number = 8000): Promise<number> {
       // Port is in use, try next one
     }
   }
-  throw new ClientError('Could not find available port for OAuth callback server');
+  throw new ClientError(
+    `Could not find available port for OAuth callback server (tried ports ${startPort}–${startPort + range - 1}). ` +
+      'Another mcpc login may be in progress — wait for it to finish and try again.'
+  );
 }
 
 /**
@@ -397,38 +407,6 @@ function promptForCallbackUrl(): {
 }
 
 /**
- * Validate that a Client ID Metadata Document URL meets the requirements of
- * draft-ietf-oauth-client-id-metadata-document-00 and the MCP authorization spec.
- *
- * Requirements:
- * - MUST use the "https" scheme
- * - MUST contain a path component (not just "/")
- */
-function validateClientMetadataUrl(url: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new ClientError(
-      `Invalid --client-metadata-url: ${url} is not a valid URL. ` +
-        `It must be an HTTPS URL pointing to the client metadata JSON document.`
-    );
-  }
-  if (parsed.protocol !== 'https:') {
-    throw new ClientError(
-      `Invalid --client-metadata-url: ${url} must use the "https" scheme ` +
-        `(per OAuth Client ID Metadata Document spec).`
-    );
-  }
-  if (!parsed.pathname || parsed.pathname === '/') {
-    throw new ClientError(
-      `Invalid --client-metadata-url: ${url} must contain a non-root path component, ` +
-        `e.g. https://example.com/client.json`
-    );
-  }
-}
-
-/**
  * Perform interactive OAuth flow
  * Opens browser for user authentication and handles callback
  * Falls back to manual URL paste when browser cannot be opened
@@ -437,7 +415,8 @@ export async function performOAuthFlow(
   serverUrl: string,
   profileName: string,
   scope?: string,
-  clientCredentials?: { clientId?: string; clientSecret?: string; clientMetadataUrl?: string }
+  clientCredentials?: { clientId?: string; clientSecret?: string; clientMetadataUrl?: string },
+  callbackPort?: number
 ): Promise<OAuthFlowResult> {
   logger.debug(`Starting OAuth flow for ${serverUrl} (profile: ${profileName})`);
 
@@ -454,8 +433,11 @@ export async function performOAuthFlow(
     console.warn('\nWarning: OAuth over plain HTTP is insecure. Only use for local development.\n');
   }
 
-  // Find available port for callback server
-  const port = await findAvailablePort(8000);
+  // When --callback-port is set, use that exact port. Otherwise try the
+  // fixed mcpc range (13316–13325) that matches the hosted CIMD's redirect_uris.
+  const port = callbackPort
+    ? await findAvailablePort(callbackPort, 1)
+    : await findAvailablePort(MCPC_OAUTH_CALLBACK_PORT, MCPC_OAUTH_CALLBACK_PORT_RANGE);
   const redirectUrl = `http://127.0.0.1:${port}/callback`;
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);

@@ -1,0 +1,23 @@
+title: mcpc
+description: Universal MCP command-line client
+theme: jekyll-theme-cayman
+
+# Dev files and directories not meant for the GitHub Pages site.
+# README.md is rendered at the site root.
+exclude:
+  - CLAUDE.md
+  - CONTRIBUTING.md
+  - bin/
+  - dist/
+  - docs/claude-skill/
+  - docs/examples/
+  - jest.config.js
+  - node_modules/
+  - package-lock.json
+  - package.json
+  - renovate.json
+  - scripts/
+  - src/
+  - test/
+  - tsconfig.json
+  - tsconfig.test.json
