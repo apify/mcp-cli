@@ -762,6 +762,10 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
       if (showSessionCommandHelp(cmdName)) return;
 
       console.error(`Unknown command: ${cmdName}`);
+      const suggestion = suggestCommand(cmdName, [...KNOWN_COMMANDS, ...KNOWN_SESSION_COMMANDS]);
+      if (suggestion) {
+        console.error(`\nDid you mean: mcpc help ${suggestion}`);
+      }
       console.error(`Run "mcpc --help" for usage information.`);
       process.exit(1);
     });
@@ -903,7 +907,7 @@ ${jsonHelp('`{ tools?: Tool[], resources?: Resource[], prompts?: Prompt[], instr
       'after',
       jsonHelp(
         'Array of `Tool` objects',
-        '`[{ name, description?, inputSchema, annotations? }, ...]`',
+        '`[{ name, description?, inputSchema, outputSchema?, annotations? }, ...]`',
         `${SCHEMA_BASE}#tool`
       )
     )
@@ -924,7 +928,7 @@ ${chalk.bold('Schema validation:')}
   --schema-mode <mode>  strict | compatible (default) | ignore
 ${jsonHelp(
   '`Tool` object',
-  '`{ name, description?, inputSchema, annotations? }`',
+  '`{ name, description?, inputSchema, outputSchema?, annotations? }`',
   `${SCHEMA_BASE}#tool`
 )}`
     )

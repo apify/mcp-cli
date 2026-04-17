@@ -3,6 +3,7 @@
  * Manage async tasks on MCP servers that support the tasks capability
  */
 
+import chalk from 'chalk';
 import { formatOutput, formatSuccess, formatError, formatTaskCommandsHint } from '../output.js';
 import type { CommandOptions } from '../../lib/types.js';
 import { withMcpClient } from '../helpers.js';
@@ -46,6 +47,9 @@ export async function listTasks(target: string, options: CommandOptions): Promis
     if (options.outputMode === 'human') {
       if (allTasks.length === 0) {
         console.log(formatSuccess('No active tasks'));
+        console.log(
+          chalk.dim(`To start a new task, run: mcpc ${target} tools-call <name> [args] --task`)
+        );
       } else {
         console.log(formatTasks(allTasks));
         console.log(formatTaskCommandsHint(target));
