@@ -1,9 +1,8 @@
 {
   "client_name": "mcpc",
   "client_uri": "https://github.com/apify/mcpc",
-  "logo_uri": "https://apify.github.io/mcpc/logo.png",
-  "tos_uri": "https://github.com/apify/mcpc/blob/main/LICENSE",
-  "policy_uri": "https://github.com/apify/mcpc#security",
+  "logo_uri": "https://apify.github.io/mcpc/client-logo.svg",
+  "tos_uri": "https://apify.github.io/mcpc/LICENSE",
   "redirect_uris": [
     "http://127.0.0.1:13316/callback",
     "http://127.0.0.1:13317/callback",
