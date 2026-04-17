@@ -865,7 +865,7 @@ export async function restartSession(
       console.log(formatSuccess(`Session ${name} restarted`));
       console.log(
         chalk.dim(
-          '  Note: previous session state (resource subscriptions, pending notifications, async tasks) was lost'
+          'Note: previous session state was lost (e.g. added tools, resource subscriptions, async tasks)'
         )
       );
     }
