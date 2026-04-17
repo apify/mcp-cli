@@ -1127,7 +1127,7 @@ export function formatCallToolResultHuman(result: CallToolResult): string {
   // Metadata section
   const meta = result._meta;
   if (meta && typeof meta === 'object' && Object.keys(meta).length > 0) {
-    lines.push(chalk.bold('Metadata'));
+    lines.push(chalk.bold('Metadata:'));
     lines.push(JSON.stringify(meta, null, 2));
     lines.push('');
   }
