@@ -932,17 +932,22 @@ ${jsonHelp(
       await tools.getTool(session, name, getOptionsFromCommand(command));
     });
 
-  // Keep jsonHelp() consistent across tools-call and tasks-result!
+  // Keep the CallToolResult line consistent across tools-call and tasks-result!
   const toolsCallJsonHelp = jsonHelp(
     '`CallToolResult` object',
     '`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }`',
     `${SCHEMA_BASE}#calltoolresult`
   );
 
-  const toolsCallDetachJsonHelp = jsonHelp(
-    'With `--detach`: `CreateTaskResult` object',
-    '`{ taskId: string, status: string }`'
-  );
+  const toolsCallCombinedJsonHelp = `
+${chalk.bold('JSON output (--json):')}
+  \`CallToolResult\` object:
+  \`{ content: [{ type, text?, ... }], isError?, structuredContent?: { ... } }\`
+  Schema: ${SCHEMA_BASE}#calltoolresult
+
+  With \`--detach\`: \`CreateTaskResult\` object:
+  \`{ taskId: string, status: string }\`
+`;
 
   program
     .command('tools-call <name> [args...]')
@@ -975,7 +980,7 @@ ${chalk.bold('Async tasks (--task, --detach):')}
 ${chalk.bold('Schema validation:')}
   --schema <file>       Validate tool schema before calling (save with tools-get --json)
   --schema-mode <mode>  strict | compatible (default) | ignore
-${toolsCallJsonHelp}${toolsCallDetachJsonHelp}`
+${toolsCallCombinedJsonHelp}`
     )
     .action(async (name, args, options, command) => {
       // Intercept --help: with helpOption(false) Commander won't catch it.
