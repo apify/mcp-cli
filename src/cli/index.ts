@@ -583,7 +583,7 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
     .option('--client-secret <secret>', 'Pre-registered OAuth client secret (requires --client-id)')
     .option(
       '--client-metadata-url <url>',
-      "HTTPS URL of an OAuth CIMD (default: mcpc's public CIMD at apify.github.io)"
+      'HTTPS URL of an OAuth CIMD (default: https://apify.github.io/mcpc/client-metadata/v1.json)'
     )
     .option('--no-client-metadata-url', 'Disable CIMD; force DCR on CIMD-capable servers')
     .addHelpText(
