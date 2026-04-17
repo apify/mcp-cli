@@ -863,6 +863,11 @@ export async function restartSession(
     // Success message
     if (options.outputMode === 'human') {
       console.log(formatSuccess(`Session ${name} restarted`));
+      console.log(
+        chalk.dim(
+          '  Note: previous session state (resource subscriptions, pending notifications, async tasks) was lost'
+        )
+      );
     }
 
     // Show server details (like when creating a session)
