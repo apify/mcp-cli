@@ -472,13 +472,32 @@ async function sendAuthCredentialsToBridge(
           credentials.accessToken = tokens.accessToken;
           logger.debug(`Found OAuth access token for profile ${profileName}`);
         }
+        if (tokens.expiresAt !== undefined) {
+          credentials.accessTokenExpiresAt = tokens.expiresAt;
+        }
       }
 
-      // Load client info from keychain (needed for token refresh)
+      // Load client info from keychain (needed for token refresh / re-issuance)
       const clientInfo = await readKeychainOAuthClientInfo(profile.serverUrl, profileName);
       if (clientInfo?.clientId) {
         credentials.clientId = clientInfo.clientId;
         logger.debug(`Found OAuth client ID for profile ${profileName}`);
+      }
+
+      // client_credentials profiles need the client secret + token endpoint
+      // to re-issue access tokens on expiry.
+      if (profile.authType === 'oauth-client-credentials') {
+        credentials.grantType = 'client_credentials';
+        if (clientInfo?.clientSecret) {
+          credentials.clientSecret = clientInfo.clientSecret;
+          logger.debug(`Found OAuth client secret for profile ${profileName}`);
+        }
+        if (profile.tokenEndpoint) {
+          credentials.tokenEndpoint = profile.tokenEndpoint;
+        }
+        if (profile.scopes && profile.scopes.length > 0) {
+          credentials.scope = profile.scopes.join(' ');
+        }
       }
     }
   }

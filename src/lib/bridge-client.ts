@@ -15,7 +15,13 @@
 
 import { connect, type Socket } from 'net';
 import { EventEmitter } from 'events';
-import type { IpcMessage, NotificationData, TaskUpdate, X402WalletCredentials } from './types.js';
+import type {
+  IpcMessage,
+  NotificationData,
+  TaskUpdate,
+  X402WalletCredentials,
+  AuthCredentials,
+} from './types.js';
 import { createLogger } from './logger.js';
 import { NetworkError, ClientError, ServerError, AuthError } from './errors.js';
 import { generateRequestId } from './utils.js';
@@ -260,13 +266,7 @@ export class BridgeClient extends EventEmitter {
   /**
    * Send auth credentials to bridge (one-way, no response expected)
    */
-  sendAuthCredentials(credentials: {
-    serverUrl: string;
-    profileName: string;
-    refreshToken?: string;
-    accessToken?: string;
-    headers?: Record<string, string>;
-  }): void {
+  sendAuthCredentials(credentials: AuthCredentials): void {
     this.send({
       type: 'set-auth-credentials',
       authCredentials: credentials,

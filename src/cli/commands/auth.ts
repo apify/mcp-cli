@@ -6,6 +6,7 @@ import { formatSuccess, formatError, formatOutput, formatInfo, formatWarning } f
 import type { CommandOptions } from '../../lib/types.js';
 import { deleteAuthProfiles } from '../../lib/auth/profiles.js';
 import { performOAuthFlow } from '../../lib/auth/oauth-flow.js';
+import { performClientCredentialsFlow } from '../../lib/auth/client-credentials-flow.js';
 import { normalizeServerUrl, validateProfileName } from '../../lib/utils.js';
 import chalk from 'chalk';
 import { DEFAULT_AUTH_PROFILE, DEFAULT_CLIENT_METADATA_URL } from '../../lib/auth/oauth-utils.js';
@@ -22,6 +23,8 @@ export async function login(
     clientSecret?: string;
     clientMetadataUrl?: string | false;
     callbackPort?: number;
+    grant?: string;
+    tokenEndpoint?: string;
   }
 ): Promise<void> {
   try {
@@ -29,6 +32,65 @@ export async function login(
     const profileName = options.profile || DEFAULT_AUTH_PROFILE;
 
     validateProfileName(profileName);
+
+    // Normalize grant type — accept both hyphen and underscore variants.
+    const grantRaw = (options.grant ?? 'authorization-code').toLowerCase().replace(/_/g, '-');
+    if (grantRaw !== 'authorization-code' && grantRaw !== 'client-credentials') {
+      throw new Error(
+        `Invalid --grant "${options.grant}". Expected "authorization-code" or "client-credentials".`
+      );
+    }
+    const useClientCredentials = grantRaw === 'client-credentials';
+
+    if (useClientCredentials) {
+      if (!options.clientId || !options.clientSecret) {
+        throw new Error('--grant client-credentials requires both --client-id and --client-secret');
+      }
+      if (options.clientMetadataUrl) {
+        throw new Error(
+          '--client-metadata-url is not supported with --grant client-credentials ' +
+            '(CIMD applies to interactive authorization-code flow only)'
+        );
+      }
+
+      if (options.outputMode === 'human') {
+        console.log(
+          formatInfo(`Starting OAuth client_credentials authentication for ${normalizedUrl}`)
+        );
+        console.log(formatInfo(`Profile: ${chalk.magenta(profileName)}`));
+      }
+
+      const result = await performClientCredentialsFlow({
+        serverUrl: normalizedUrl,
+        profileName,
+        clientId: options.clientId,
+        clientSecret: options.clientSecret,
+        ...(options.scope !== undefined && { scope: options.scope }),
+        ...(options.tokenEndpoint !== undefined && { tokenEndpoint: options.tokenEndpoint }),
+      });
+
+      if (options.outputMode === 'human') {
+        console.log(formatSuccess('Authentication successful!'));
+        console.log(formatInfo(`Profile ${chalk.magenta(profileName)} saved`));
+
+        if (result.profile.scopes && result.profile.scopes.length > 0) {
+          console.log(formatInfo(`Scopes: ${result.profile.scopes.join(', ')}`));
+        }
+      } else {
+        console.log(
+          formatOutput(
+            {
+              profile: profileName,
+              serverUrl: normalizedUrl,
+              scopes: result.profile.scopes,
+              grant: 'client-credentials',
+            },
+            'json'
+          )
+        );
+      }
+      return;
+    }
 
     if (options.clientSecret && !options.clientId) {
       throw new Error('--client-secret requires --client-id');
@@ -39,6 +101,10 @@ export async function login(
         '--client-metadata-url cannot be combined with --client-id (they are mutually exclusive ' +
           'client registration approaches)'
       );
+    }
+
+    if (options.tokenEndpoint) {
+      throw new Error('--token-endpoint is only supported with --grant client-credentials');
     }
 
     // Resolve the effective CIMD URL:

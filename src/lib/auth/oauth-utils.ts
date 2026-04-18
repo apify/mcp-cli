@@ -148,6 +148,64 @@ export async function discoverAndRefreshToken(
 }
 
 /**
+ * Request an access token using the OAuth 2.1 client_credentials grant.
+ * Per https://modelcontextprotocol.io/extensions/auth/oauth-client-credentials,
+ * this flow is intended for machine-to-machine auth without user interaction.
+ *
+ * Client credentials are sent in the form body (client_secret_post) rather than
+ * HTTP Basic, because both are permitted by RFC 6749 and the form-body variant
+ * is simpler to reason about for MCP servers.
+ *
+ * @param tokenEndpoint - The OAuth token endpoint URL
+ * @param clientId - The OAuth client ID
+ * @param clientSecret - The OAuth client secret (required - confidential client)
+ * @param scope - Optional space-separated OAuth scopes
+ * @returns The token response from the server
+ * @throws AuthError if the request fails
+ */
+export async function requestClientCredentialsToken(
+  tokenEndpoint: string,
+  clientId: string,
+  clientSecret: string,
+  scope?: string
+): Promise<OAuthTokenResponse> {
+  logger.debug(`Requesting client_credentials token at: ${tokenEndpoint}`);
+
+  const params = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret,
+  });
+  if (scope) {
+    params.set('scope', scope);
+  }
+
+  const response = await proxyFetch(tokenEndpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+    },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    logger.error(`client_credentials token request failed: ${response.status} ${errorText}`);
+
+    if (response.status === 400 || response.status === 401) {
+      throw new AuthError('Client credentials are invalid or the server rejected the grant');
+    }
+
+    throw new AuthError(
+      `Failed to obtain client_credentials token: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return (await response.json()) as OAuthTokenResponse;
+}
+
+/**
  * Create an AuthError with a re-authentication hint
  * Use this for errors that require the user to re-authenticate
  */

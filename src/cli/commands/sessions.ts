@@ -650,6 +650,9 @@ export async function listSessionsAndAuthProfiles(options: {
         const timeLabel = profile.refreshedAt ? 'refreshed' : 'created';
 
         let line = `  ${hostStr} / ${nameStr}`;
+        if (profile.authType === 'oauth-client-credentials') {
+          line += chalk.dim(' [client-credentials]');
+        }
         if (userStr) {
           line += chalk.dim(` (${userStr})`);
         }

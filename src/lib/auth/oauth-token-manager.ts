@@ -8,6 +8,8 @@ import { createLogger } from '../logger.js';
 import { AuthError } from '../errors.js';
 import {
   discoverAndRefreshToken,
+  discoverTokenEndpoint,
+  requestClientCredentialsToken,
   createReauthError,
   type OAuthTokenResponse,
 } from './oauth-utils.js';
@@ -41,10 +43,22 @@ export type OnBeforeRefreshCallback = () => Promise<
 export interface OAuthTokenManagerOptions {
   serverUrl: string;
   profileName: string;
+  /**
+   * Grant used to obtain new access tokens when the current one expires.
+   * Defaults to 'refresh_token'. 'client_credentials' re-issues tokens using
+   * clientId/clientSecret instead of a refresh token.
+   */
+  grantType?: 'refresh_token' | 'client_credentials';
   /** OAuth client ID (required for public clients) */
   clientId: string;
-  /** Initial refresh token */
-  refreshToken: string;
+  /** OAuth client secret (required for client_credentials grant) */
+  clientSecret?: string;
+  /** Refresh token (required for refresh_token grant) */
+  refreshToken?: string;
+  /** OAuth scope to request on re-issuance (client_credentials grant only) */
+  scope?: string;
+  /** Pre-known token endpoint; when absent, it is discovered from server metadata */
+  tokenEndpoint?: string;
   /** Initial access token (optional - will be refreshed if not provided or expired) */
   accessToken?: string;
   /** Unix timestamp when access token expires */
@@ -61,8 +75,12 @@ export interface OAuthTokenManagerOptions {
 export class OAuthTokenManager {
   private serverUrl: string;
   private profileName: string;
+  private grantType: 'refresh_token' | 'client_credentials';
   private clientId: string;
+  private clientSecret?: string;
   private refreshToken: string;
+  private scope?: string;
+  private tokenEndpoint?: string;
   private accessToken: string | null = null;
   private accessTokenExpiresAt: number | null = null; // unix timestamp
   private onTokenRefresh?: OnTokenRefreshCallback;
@@ -71,8 +89,18 @@ export class OAuthTokenManager {
   constructor(options: OAuthTokenManagerOptions) {
     this.serverUrl = options.serverUrl;
     this.profileName = options.profileName;
+    this.grantType = options.grantType ?? 'refresh_token';
     this.clientId = options.clientId;
-    this.refreshToken = options.refreshToken;
+    if (options.clientSecret) {
+      this.clientSecret = options.clientSecret;
+    }
+    this.refreshToken = options.refreshToken ?? '';
+    if (options.scope) {
+      this.scope = options.scope;
+    }
+    if (options.tokenEndpoint) {
+      this.tokenEndpoint = options.tokenEndpoint;
+    }
     this.accessToken = options.accessToken ?? null;
     this.accessTokenExpiresAt = options.accessTokenExpiresAt ?? null;
     if (options.onTokenRefresh) {
@@ -80,6 +108,14 @@ export class OAuthTokenManager {
     }
     if (options.onBeforeRefresh) {
       this.onBeforeRefresh = options.onBeforeRefresh;
+    }
+
+    // Validate required fields per grant type
+    if (this.grantType === 'refresh_token' && !this.refreshToken) {
+      throw new Error('OAuthTokenManager: refresh_token grant requires refreshToken');
+    }
+    if (this.grantType === 'client_credentials' && !this.clientSecret) {
+      throw new Error('OAuthTokenManager: client_credentials grant requires clientSecret');
     }
   }
 
@@ -138,22 +174,48 @@ export class OAuthTokenManager {
       }
     }
 
-    if (!this.refreshToken) {
-      throw createReauthError(
-        this.serverUrl,
-        this.profileName,
-        `No refresh token available for profile ${this.profileName}`
-      );
-    }
-
-    logger.debug(`Refreshing access token for profile: ${this.profileName}`);
+    logger.debug(
+      `Refreshing access token for profile: ${this.profileName} (grant: ${this.grantType})`
+    );
 
     try {
-      const tokenResponse = await discoverAndRefreshToken(
-        this.serverUrl,
-        this.refreshToken,
-        this.clientId
-      );
+      let tokenResponse: OAuthTokenResponse;
+      if (this.grantType === 'client_credentials') {
+        if (!this.clientSecret) {
+          throw createReauthError(
+            this.serverUrl,
+            this.profileName,
+            `No client secret available for profile ${this.profileName}`
+          );
+        }
+        // Resolve token endpoint (cache after first discovery)
+        if (!this.tokenEndpoint) {
+          const discovered = await discoverTokenEndpoint(this.serverUrl);
+          if (!discovered) {
+            throw new AuthError(`Could not discover OAuth token endpoint for ${this.serverUrl}`);
+          }
+          this.tokenEndpoint = discovered;
+        }
+        tokenResponse = await requestClientCredentialsToken(
+          this.tokenEndpoint,
+          this.clientId,
+          this.clientSecret,
+          this.scope
+        );
+      } else {
+        if (!this.refreshToken) {
+          throw createReauthError(
+            this.serverUrl,
+            this.profileName,
+            `No refresh token available for profile ${this.profileName}`
+          );
+        }
+        tokenResponse = await discoverAndRefreshToken(
+          this.serverUrl,
+          this.refreshToken,
+          this.clientId
+        );
+      }
 
       // Store new access token
       this.accessToken = tokenResponse.access_token;
@@ -162,8 +224,8 @@ export class OAuthTokenManager {
       const expiresIn = tokenResponse.expires_in ?? DEFAULT_TOKEN_EXPIRY_SECONDS;
       this.accessTokenExpiresAt = Math.floor(Date.now() / 1000) + expiresIn;
 
-      // Update refresh token if a new one was provided (token rotation)
-      if (tokenResponse.refresh_token) {
+      // Update refresh token if a new one was provided (token rotation; refresh_token grant only)
+      if (tokenResponse.refresh_token && this.grantType === 'refresh_token') {
         this.refreshToken = tokenResponse.refresh_token;
         logger.debug('Received new refresh token (token rotation)');
       }

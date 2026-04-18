@@ -88,6 +88,42 @@ export async function getValidAccessTokenFromKeychain(
     return undefined;
   }
 
+  // Load client info from keychain (needed for token refresh / re-issuance)
+  const clientInfo = await readKeychainOAuthClientInfo(serverUrl, profileName);
+
+  // client_credentials grant: re-issue access tokens using stored client credentials
+  if (profile.authType === 'oauth-client-credentials') {
+    if (!clientInfo?.clientId || !clientInfo.clientSecret) {
+      throw createReauthError(
+        serverUrl,
+        profileName,
+        'Client credentials not found in keychain (required for client_credentials grant)'
+      );
+    }
+
+    // If the current access token is still valid, return it as-is without re-issuing.
+    if (tokens.expiresAt && Date.now() / 1000 <= tokens.expiresAt - 60) {
+      logger.debug(`Using auth profile: ${profileName}`);
+      return tokens.accessToken;
+    }
+
+    const tokenManager = new OAuthTokenManager({
+      serverUrl,
+      profileName,
+      grantType: 'client_credentials',
+      clientId: clientInfo.clientId,
+      clientSecret: clientInfo.clientSecret,
+      accessToken: tokens.accessToken,
+      ...(tokens.expiresAt !== undefined && { accessTokenExpiresAt: tokens.expiresAt }),
+      ...(profile.tokenEndpoint && { tokenEndpoint: profile.tokenEndpoint }),
+      ...(profile.scopes && profile.scopes.length > 0 && { scope: profile.scopes.join(' ') }),
+      onTokenRefresh: createPersistenceCallback(serverUrl, profileName, profile, tokens),
+    });
+
+    logger.debug(`Using auth profile: ${profileName} (client_credentials)`);
+    return await tokenManager.getValidAccessToken();
+  }
+
   // If no refresh token, check if current token is still valid
   if (!tokens.refreshToken) {
     if (tokens.expiresAt && Date.now() / 1000 > tokens.expiresAt - 60) {
@@ -102,8 +138,6 @@ export async function getValidAccessTokenFromKeychain(
     return tokens.accessToken;
   }
 
-  // Load client info from keychain (needed for token refresh)
-  const clientInfo = await readKeychainOAuthClientInfo(serverUrl, profileName);
   if (!clientInfo?.clientId) {
     throw createReauthError(
       serverUrl,

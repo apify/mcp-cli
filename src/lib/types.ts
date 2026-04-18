@@ -185,10 +185,20 @@ export interface SessionsStorage {
 export interface AuthProfile {
   name: string;
   serverUrl: string;
-  authType: 'oauth';
+  /**
+   * 'oauth' - Authorization code grant with PKCE (interactive browser login)
+   * 'oauth-client-credentials' - OAuth 2.1 client_credentials grant (machine-to-machine,
+   *   per https://modelcontextprotocol.io/extensions/auth/oauth-client-credentials)
+   */
+  authType: 'oauth' | 'oauth-client-credentials';
   // OAuth metadata
   oauthIssuer: string;
   scopes?: string[];
+  /**
+   * OAuth token endpoint captured at login time. Only set for client_credentials profiles
+   * so that re-issuing an expired access token does not require re-running discovery.
+   */
+  tokenEndpoint?: string;
   // User info (from OIDC id_token, if available)
   userEmail?: string;
   userName?: string;
@@ -225,11 +235,20 @@ export type IpcMessageType =
 export interface AuthCredentials {
   serverUrl: string;
   profileName: string;
+  /**
+   * Grant type for OAuth re-issuance. Defaults to 'refresh_token' when omitted.
+   * 'client_credentials' triggers machine-to-machine re-issuance using clientId/clientSecret.
+   */
+  grantType?: 'refresh_token' | 'client_credentials';
   // OAuth credentials (for refresh flow)
   clientId?: string;
+  clientSecret?: string; // Required for client_credentials grant (confidential client)
   refreshToken?: string;
   // OAuth access token (used as static Bearer token when no refresh token available)
   accessToken?: string;
+  accessTokenExpiresAt?: number; // Unix timestamp (for client_credentials re-issuance)
+  scope?: string; // Scope to request on re-issuance (client_credentials only)
+  tokenEndpoint?: string; // Cached token endpoint (skips discovery)
   // HTTP headers (from --header flags, stored in keychain)
   headers?: Record<string, string>;
 }

@@ -2,7 +2,11 @@
  * Unit tests for OAuth utility functions
  */
 
-import { discoverTokenEndpoint } from '../../../../src/lib/auth/oauth-utils.js';
+import {
+  discoverTokenEndpoint,
+  requestClientCredentialsToken,
+} from '../../../../src/lib/auth/oauth-utils.js';
+import { AuthError } from '../../../../src/lib/errors.js';
 import * as proxyModule from '../../../../src/lib/proxy.js';
 
 // Helper to create a mock fetch Response
@@ -10,6 +14,17 @@ function mockResponse(body: object | null, ok = true): Response {
   return {
     ok,
     json: () => Promise.resolve(body),
+    text: () => Promise.resolve(body ? JSON.stringify(body) : ''),
+  } as unknown as Response;
+}
+
+function mockResponseWithStatus(body: object | null, status: number): Response {
+  return {
+    ok: false,
+    status,
+    statusText: 'Error',
+    json: () => Promise.resolve(body),
+    text: () => Promise.resolve(body ? JSON.stringify(body) : ''),
   } as unknown as Response;
 }
 
@@ -145,5 +160,88 @@ describe('discoverTokenEndpoint', () => {
       'https://example.com/.well-known/oauth-authorization-server',
       'https://example.com/.well-known/openid-configuration',
     ]);
+  });
+});
+
+describe('requestClientCredentialsToken', () => {
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(proxyModule, 'proxyFetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('POSTs grant_type=client_credentials with client_id and client_secret', async () => {
+    let capturedBody = '';
+    let capturedHeaders: Record<string, string> | undefined;
+    fetchSpy.mockImplementation((_url: string, init: RequestInit) => {
+      capturedBody = init.body as string;
+      capturedHeaders = init.headers as Record<string, string>;
+      return Promise.resolve(
+        mockResponse({
+          access_token: 'abc123',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        })
+      );
+    });
+
+    const result = await requestClientCredentialsToken(
+      'https://example.com/token',
+      'my-client',
+      'my-secret'
+    );
+
+    expect(result.access_token).toBe('abc123');
+    expect(result.token_type).toBe('Bearer');
+    expect(result.expires_in).toBe(3600);
+
+    const params = new URLSearchParams(capturedBody);
+    expect(params.get('grant_type')).toBe('client_credentials');
+    expect(params.get('client_id')).toBe('my-client');
+    expect(params.get('client_secret')).toBe('my-secret');
+    expect(params.get('scope')).toBeNull();
+
+    expect(capturedHeaders?.['Content-Type']).toBe('application/x-www-form-urlencoded');
+  });
+
+  it('includes scope in the request when provided', async () => {
+    let capturedBody = '';
+    fetchSpy.mockImplementation((_url: string, init: RequestInit) => {
+      capturedBody = init.body as string;
+      return Promise.resolve(mockResponse({ access_token: 'x', token_type: 'Bearer' }));
+    });
+
+    await requestClientCredentialsToken(
+      'https://example.com/token',
+      'cid',
+      'csecret',
+      'tools:read tools:write'
+    );
+
+    const params = new URLSearchParams(capturedBody);
+    expect(params.get('scope')).toBe('tools:read tools:write');
+  });
+
+  it('throws AuthError with a clear message on 401', async () => {
+    fetchSpy.mockResolvedValue(mockResponseWithStatus({ error: 'invalid_client' }, 401));
+
+    await expect(
+      requestClientCredentialsToken('https://example.com/token', 'cid', 'bad')
+    ).rejects.toThrow(AuthError);
+    await expect(
+      requestClientCredentialsToken('https://example.com/token', 'cid', 'bad')
+    ).rejects.toThrow(/Client credentials are invalid|rejected/);
+  });
+
+  it('throws AuthError on unexpected 5xx', async () => {
+    fetchSpy.mockResolvedValue(mockResponseWithStatus({ error: 'server_error' }, 500));
+
+    await expect(
+      requestClientCredentialsToken('https://example.com/token', 'cid', 'sec')
+    ).rejects.toThrow(AuthError);
   });
 });
