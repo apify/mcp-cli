@@ -20,7 +20,7 @@ export const DEFAULT_CLIENT_METADATA_URL = 'https://apify.github.io/mcpc/client-
  * chance that a single unrelated process claims all of them.
  */
 export const MCPC_OAUTH_CALLBACK_PORTS: readonly number[] = [
-  13163, 13316, 16133, 16313, 31316, 31613,
+  13316, 13163, 31316, 31613, 16133, 16313,
 ] as const;
 
 /**
