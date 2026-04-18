@@ -1,20 +1,27 @@
-title: mcpc
-description: Universal MCP command-line client
+# GitHub Pages configuration for https://apify.github.io/mcpc/
+#
+# Served content (everything else is excluded):
+#   /                    → README.md (project homepage)
+#   /client-metadata.json → OAuth CIMD document
+#   /client-logo.svg     → Client logo for OAuth consent screens
+#   /LICENSE             → Terms of service (referenced by CIMD tos_uri)
+#   /CHANGELOG.md        → Release history
+#   /docs/               → Additional documentation, examples, images
+#
+# Jekyll has no include-only mode, so we exclude everything that
+# shouldn't be published. node_modules/ is excluded by default.
+
 theme: jekyll-theme-cayman
 
-# Dev files and directories not meant for the GitHub Pages site.
-# README.md is rendered at the site root.
 exclude:
   - CLAUDE.md
   - CONTRIBUTING.md
+  - _config.yml
   - bin/
   - dist/
-  - docs/claude-skill/
-  - docs/examples/
   - jest.config.js
-  - node_modules/
-  - package-lock.json
   - package.json
+  - package-lock.json
   - renovate.json
   - scripts/
   - src/
