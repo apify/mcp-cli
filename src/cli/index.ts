@@ -616,13 +616,23 @@ ${jsonHelp('Interactive prompts are written to stderr, stdout contains a clean J
           'Missing required argument: server\n\nExample: mcpc login mcp.apify.com'
         );
       }
+      let callbackPort: number | undefined;
+      if (opts.callbackPort) {
+        const parsed = parseInt(opts.callbackPort as string, 10);
+        if (isNaN(parsed) || parsed < 1 || parsed > 65535) {
+          throw new ClientError(
+            `Invalid --callback-port value: "${opts.callbackPort as string}". Must be an integer between 1 and 65535.`
+          );
+        }
+        callbackPort = parsed;
+      }
       await auth.login(server, {
         profile: opts.profile,
         scope: opts.scope,
         clientId: opts.clientId,
         clientSecret: opts.clientSecret,
         clientMetadataUrl: opts.clientMetadataUrl,
-        ...(opts.callbackPort ? { callbackPort: parseInt(opts.callbackPort as string, 10) } : {}),
+        ...(callbackPort !== undefined ? { callbackPort } : {}),
         ...getOptionsFromCommand(command),
       });
     });

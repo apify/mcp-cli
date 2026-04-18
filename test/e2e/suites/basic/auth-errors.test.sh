@@ -158,4 +158,101 @@ assert_contains "$STDOUT" "--no-client-metadata-url"
 assert_contains "$STDOUT" "apify.github.io"
 test_pass
 
+test_case "login --help documents --callback-port"
+run_mcpc help login
+assert_success
+assert_contains "$STDOUT" "--callback-port"
+test_pass
+
+test_case "login --help shows full default CIMD URL"
+run_mcpc help login
+assert_success
+assert_contains "$STDOUT" "https://apify.github.io/mcpc/client-metadata.json"
+test_pass
+
+test_case "login --callback-port with non-numeric value is rejected"
+run_xmcpc login mcp.example.com --callback-port abc --no-client-metadata-url
+assert_failure
+assert_contains "$STDERR" "--callback-port"
+test_pass
+
+test_case "login --callback-port with 0 is rejected"
+run_xmcpc login mcp.example.com --callback-port 0 --no-client-metadata-url
+assert_failure
+assert_contains "$STDERR" "--callback-port"
+test_pass
+
+test_case "login --callback-port above 65535 is rejected"
+run_xmcpc login mcp.example.com --callback-port 65536 --no-client-metadata-url
+assert_failure
+assert_contains "$STDERR" "--callback-port"
+test_pass
+
+test_case "login --callback-port negative is rejected"
+run_xmcpc login mcp.example.com --callback-port -1 --no-client-metadata-url
+assert_failure
+assert_contains "$STDERR" "--callback-port"
+test_pass
+
+# =============================================================================
+# Test: Tier 2 - end-to-end callback port binding
+#
+# Starts `mcpc login` in the background with --callback-port set, pointing at
+# a local HTTP server that accepts connections but never responds. This keeps
+# mcpc in the OAuth-discovery phase, so its callback server stays bound long
+# enough to observe. We then verify the expected loopback port is listening.
+# This proves --callback-port is honored end-to-end, not just parsed.
+# =============================================================================
+
+# Pick a likely-free high port outside mcpc's default list for the callback
+TEST_CALLBACK_PORT=47317
+
+test_case "login --callback-port binds the requested port on 127.0.0.1"
+
+# Start a hanging HTTP server on a random local port. mcpc will hit this while
+# trying to discover OAuth metadata and block indefinitely, which is what we
+# want so we can observe the callback server.
+STALL_PORT=47318
+node -e "require('http').createServer(()=>{}).listen(${STALL_PORT}, '127.0.0.1')" &
+STALL_PID=$!
+
+# Wait for the stall server to be ready
+for _ in $(seq 1 20); do
+  if (echo >/dev/tcp/127.0.0.1/$STALL_PORT) >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.1
+done
+
+# Start mcpc login in the background. --no-client-metadata-url skips CIMD
+# so mcpc goes straight to DCR against the stall server (which hangs).
+$MCPC login http://127.0.0.1:$STALL_PORT \
+  --callback-port "$TEST_CALLBACK_PORT" \
+  --no-client-metadata-url \
+  </dev/null >/dev/null 2>&1 &
+LOGIN_PID=$!
+
+# Poll for the callback port to be bound (up to 10 seconds)
+bound=false
+for _ in $(seq 1 100); do
+  if (echo >/dev/tcp/127.0.0.1/$TEST_CALLBACK_PORT) >/dev/null 2>&1; then
+    bound=true
+    break
+  fi
+  sleep 0.1
+done
+
+# Clean up background processes regardless of outcome
+_kill_tree "$LOGIN_PID"
+wait "$LOGIN_PID" 2>/dev/null || true
+_kill_tree "$STALL_PID"
+wait "$STALL_PID" 2>/dev/null || true
+
+if [[ "$bound" == "true" ]]; then
+  test_pass
+else
+  test_fail "Port $TEST_CALLBACK_PORT was not bound within 10s"
+  exit 1
+fi
+
 test_done
