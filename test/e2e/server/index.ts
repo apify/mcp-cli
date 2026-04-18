@@ -7,6 +7,9 @@
  *   PAGINATION_SIZE - items per page, 0 = no pagination (default: 0)
  *   LATENCY_MS - artificial latency in ms (default: 0)
  *   REQUIRE_AUTH - require Authorization header (default: false)
+ *   OAUTH_CLIENT_ID - expected client_id for client_credentials grant (default: "test-client")
+ *   OAUTH_CLIENT_SECRET - expected client_secret for client_credentials grant (default: "test-secret")
+ *   OAUTH_TOKEN - token returned by /token and accepted by auth check (default: "test-token")
  *   NO_TOOLS - disable tools capability (default: false)
  *   NO_RESOURCES - disable resources capability (default: false)
  *   NO_PROMPTS - disable prompts capability (default: false)
@@ -45,6 +48,9 @@ const PORT = parseInt(process.env.PORT || '13456', 10);
 const PAGINATION_SIZE = parseInt(process.env.PAGINATION_SIZE || '0', 10);
 const LATENCY_MS = parseInt(process.env.LATENCY_MS || '0', 10);
 const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true';
+const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || 'test-client';
+const OAUTH_CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET || 'test-secret';
+const OAUTH_TOKEN = process.env.OAUTH_TOKEN || 'test-token';
 const NO_TOOLS = process.env.NO_TOOLS === 'true';
 const NO_RESOURCES = process.env.NO_RESOURCES === 'true';
 const NO_PROMPTS = process.env.NO_PROMPTS === 'true';
@@ -638,10 +644,64 @@ async function main() {
       }
     }
 
+    // OAuth discovery endpoint (accessible without auth)
+    if (url.pathname === '/.well-known/oauth-authorization-server' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          issuer: `http://localhost:${PORT}`,
+          token_endpoint: `http://localhost:${PORT}/token`,
+          grant_types_supported: ['client_credentials'],
+          token_endpoint_auth_methods_supported: ['client_secret_post'],
+        })
+      );
+      return;
+    }
+
+    // OAuth token endpoint (accessible without auth)
+    if (url.pathname === '/token' && req.method === 'POST') {
+      // Read form-encoded body
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk as Buffer);
+      }
+      const body = Buffer.concat(chunks).toString();
+      const params = new URLSearchParams(body);
+
+      const grantType = params.get('grant_type');
+      const clientId = params.get('client_id');
+      const clientSecret = params.get('client_secret');
+
+      if (grantType !== 'client_credentials') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'unsupported_grant_type' }));
+        return;
+      }
+
+      if (clientId !== OAUTH_CLIENT_ID || clientSecret !== OAUTH_CLIENT_SECRET) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid_client' }));
+        return;
+      }
+
+      const tokenResponse: Record<string, unknown> = {
+        access_token: OAUTH_TOKEN,
+        token_type: 'Bearer',
+        expires_in: 3600,
+      };
+      const scope = params.get('scope');
+      if (scope) {
+        tokenResponse.scope = scope;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(tokenResponse));
+      return;
+    }
+
     // Auth check
     if (REQUIRE_AUTH) {
       const auth = req.headers.authorization;
-      if (!auth || !auth.startsWith('Bearer ')) {
+      if (!auth || auth !== `Bearer ${OAUTH_TOKEN}`) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
         return;
@@ -722,6 +782,10 @@ async function main() {
     );
     console.log(`  Latency: ${LATENCY_MS}ms`);
     console.log(`  Auth required: ${REQUIRE_AUTH}`);
+    if (REQUIRE_AUTH) {
+      console.log(`  OAuth client_id: ${OAUTH_CLIENT_ID}`);
+      console.log(`  OAuth token: ${OAUTH_TOKEN}`);
+    }
     if (NO_TOOLS) console.log(`  Tools: DISABLED`);
     if (NO_RESOURCES) console.log(`  Resources: DISABLED`);
     if (NO_PROMPTS) console.log(`  Prompts: DISABLED`);
