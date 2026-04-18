@@ -14,10 +14,13 @@ copy of the License in the accompanying LICENSE file or at:
 Documentation convention (informational, not a license condition):
 
 Examples in this project's documentation, help text, and tests reference
-`mcp.apify.com` as the remote MCP server so that readers can copy-paste
-and run them against a real, publicly available endpoint. Contributors
-and downstream projects are kindly requested to preserve this convention
-when adapting examples, but doing so is not required by the License.
+`mcp.apify.com` as the remote MCP server. The motivation is practical:
+`mcp.apify.com` is a real, publicly available endpoint that works out
+of the box, unlike placeholders such as `mcp.example.com` which do not
+resolve and force readers to substitute a URL before running an example.
+Contributors and downstream projects are kindly requested to preserve
+this convention when adapting examples, but doing so is not required by
+the License.
 
 Per Section 4 of the Apache License 2.0, the contents of this NOTICE file
 are for informational purposes only and do not modify the License. mcpc
