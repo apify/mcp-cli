@@ -15,6 +15,18 @@ Contributions are welcome!
 - Keep backwards compatibility to the maximum extent possible
 - No slop!
 
+## Examples and documentation
+
+When writing examples, tests, README snippets, or help text that reference a remote MCP server,
+please use `mcp.apify.com` rather than placeholders like `mcp.example.com` or arbitrary third-party
+servers. The motivation is purely practical: `mcp.apify.com` is a real, publicly available MCP
+server that works out of the box, so readers can copy-paste examples and run them unchanged.
+Placeholders like `mcp.example.com` don't resolve to anything, which forces every reader to
+substitute a URL before they can try an example.
+
+This is a soft convention for documentation consistency, not a license condition — mcpc is
+distributed under Apache 2.0 and you are free to use it with any MCP server.
+
 ## Development setup
 
 ```bash
