@@ -14,7 +14,7 @@ export const DEFAULT_AUTH_PROFILE = 'default';
 export const DEFAULT_CLIENT_METADATA_URL = 'https://apify.github.io/mcpc/client-metadata.json';
 
 export const MCPC_OAUTH_CALLBACK_PORT = 13316;
-export const MCPC_OAUTH_CALLBACK_PORT_RANGE = 10;
+export const MCPC_OAUTH_CALLBACK_PORT_RANGE = 5;
 
 /**
  * OAuth token endpoint response (per OAuth 2.0 spec - uses snake_case)
