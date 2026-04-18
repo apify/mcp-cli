@@ -13,8 +13,15 @@ export const DEFAULT_AUTH_PROFILE = 'default';
 
 export const DEFAULT_CLIENT_METADATA_URL = 'https://apify.github.io/mcpc/client-metadata.json';
 
-export const MCPC_OAUTH_CALLBACK_PORT = 13316;
-export const MCPC_OAUTH_CALLBACK_PORT_RANGE = 5;
+/**
+ * Loopback ports used by mcpc's OAuth callback server. Matches the
+ * `redirect_uris` registered in the hosted CIMD document. Tried in order;
+ * the first available port is used. Non-contiguous values to reduce the
+ * chance that a single unrelated process claims all of them.
+ */
+export const MCPC_OAUTH_CALLBACK_PORTS: readonly number[] = [
+  13163, 13316, 16133, 16313, 31316, 31613,
+] as const;
 
 /**
  * OAuth token endpoint response (per OAuth 2.0 spec - uses snake_case)
