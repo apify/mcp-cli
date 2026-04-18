@@ -381,10 +381,15 @@ export async function consolidateSessions(
       }
 
       // Identify crashed or unauthorized sessions eligible for automatic reconnection.
-      // Unauthorized sessions are included because another session sharing the same OAuth
-      // profile may have refreshed the tokens — the bridge reads from keychain on startup.
+      // Unauthorized sessions are only included when the session has an OAuth profile —
+      // another session sharing the same profile may have refreshed the tokens, so a
+      // retry can succeed as the bridge re-reads from keychain on startup. Sessions
+      // without a profile (e.g. static bearer token via --header) cannot self-heal, so
+      // retrying would just flip the status back to 'connecting' on every `mcpc` call
+      // and hide the real state from the user.
       for (const [name, session] of Object.entries(storage.sessions)) {
-        if ((session?.status === 'crashed' || session?.status === 'unauthorized') && !session.pid) {
+        const isRetryableUnauthorized = session?.status === 'unauthorized' && !!session.profileName;
+        if ((session?.status === 'crashed' || isRetryableUnauthorized) && !session.pid) {
           // Skip if a connection was already attempted within the cooldown window
           const lastAttempt = session.lastConnectionAttemptAt
             ? new Date(session.lastConnectionAttemptAt).getTime()

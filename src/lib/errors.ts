@@ -97,12 +97,11 @@ export function isAuthenticationError(errorMessage: string): boolean {
  * Create an AuthError with helpful login guidance for server auth failures
  *
  * @param target - Server URL or target for login command
- * @param options - Optional session name for session-specific guidance
- * @param originalError - Original error for debugging
+ * @param options - Optional session name for session-specific guidance and log path for debugging
  */
 export function createServerAuthError(
   target: string,
-  options?: { sessionName?: string; originalError?: Error }
+  options?: { sessionName?: string; logPath?: string; originalError?: Error }
 ): AuthError {
   let hint: string;
   if (options?.sessionName) {
@@ -115,6 +114,10 @@ export function createServerAuthError(
   } else {
     hint =
       `To authenticate, run:\n` + `  mcpc login ${target}\n\n` + `Then run your command again.`;
+  }
+
+  if (options?.logPath) {
+    hint += `\n\nFor details, check logs at ${options.logPath}`;
   }
 
   return new AuthError(
