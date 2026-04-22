@@ -15,11 +15,7 @@ import { ClientError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import { removeKeychainOAuthClientInfo, storeKeychainOAuthClientInfo } from './keychain.js';
 import type { AuthProfile } from '../types.js';
-import {
-  MCPC_OAUTH_CALLBACK_PORT,
-  MCPC_OAUTH_CALLBACK_PORT_RANGE,
-  validateClientMetadataUrl,
-} from './oauth-utils.js';
+import { MCPC_OAUTH_CALLBACK_PORTS, validateClientMetadataUrl } from './oauth-utils.js';
 
 const logger = createLogger('oauth-flow');
 
@@ -257,11 +253,11 @@ function startCallbackServer(port: number): {
 
 /**
  * Find an available port for the OAuth callback server.
- * Tries `range` consecutive ports starting at `startPort` and returns the
- * first free one. Throws if all ports in the range are occupied.
+ * Tries each port in `ports` in order and returns the first free one.
+ * Throws if all ports are occupied.
  */
-async function findAvailablePort(startPort: number, range: number): Promise<number> {
-  for (let port = startPort; port < startPort + range; port++) {
+async function findAvailablePort(ports: readonly number[]): Promise<number> {
+  for (const port of ports) {
     try {
       await new Promise<void>((resolve, reject) => {
         const testServer = createServer();
@@ -277,7 +273,7 @@ async function findAvailablePort(startPort: number, range: number): Promise<numb
     }
   }
   throw new ClientError(
-    `Could not find available port for OAuth callback server (tried ports ${startPort}–${startPort + range - 1}). ` +
+    `Could not find available port for OAuth callback server (tried ports ${ports.join(', ')}). ` +
       'Another mcpc login may be in progress — wait for it to finish and try again.'
   );
 }
@@ -434,10 +430,8 @@ export async function performOAuthFlow(
   }
 
   // When --callback-port is set, use that exact port. Otherwise try the
-  // fixed mcpc range (13316–13325) that matches the hosted CIMD's redirect_uris.
-  const port = callbackPort
-    ? await findAvailablePort(callbackPort, 1)
-    : await findAvailablePort(MCPC_OAUTH_CALLBACK_PORT, MCPC_OAUTH_CALLBACK_PORT_RANGE);
+  // fixed mcpc port list that matches the hosted CIMD's redirect_uris.
+  const port = await findAvailablePort(callbackPort ? [callbackPort] : MCPC_OAUTH_CALLBACK_PORTS);
   const redirectUrl = `http://127.0.0.1:${port}/callback`;
 
   logger.debug(`Using redirect URL: ${redirectUrl}`);
