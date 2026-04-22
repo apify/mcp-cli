@@ -1,74 +1,152 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="mcpc logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="mcpc logo">
   <title>mcpc</title>
 
   <defs>
-    <linearGradient id="handleGradient" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#e63946"/>
-      <stop offset="100%" stop-color="#a4161a"/>
+    <linearGradient id="bodyGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff1b2d"/>
+      <stop offset="100%" stop-color="#c8001a"/>
     </linearGradient>
-    <linearGradient id="bladeGradient" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#f1f5f9"/>
-      <stop offset="50%" stop-color="#cbd5e1"/>
-      <stop offset="100%" stop-color="#94a3b8"/>
+    <linearGradient id="steelGradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f5f7fa"/>
+      <stop offset="55%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#8a95a5"/>
+    </linearGradient>
+    <linearGradient id="steelDark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d1d5db"/>
+      <stop offset="100%" stop-color="#6b7280"/>
     </linearGradient>
   </defs>
 
-  <!-- Knife blade (pointing up-right) -->
-  <g transform="translate(256,256) rotate(-35)">
-    <path d="M -20 -10 L 220 -18 L 240 0 L 220 18 L -20 10 Z"
-          fill="url(#bladeGradient)"
-          stroke="#475569"
-          stroke-width="3"
-          stroke-linejoin="round"/>
-    <path d="M -20 -10 L 220 -18 L 240 0"
-          fill="none"
-          stroke="#f8fafc"
-          stroke-width="1.5"
-          opacity="0.6"/>
-    <!-- Pivot pin -->
-    <circle cx="-20" cy="0" r="7" fill="#64748b" stroke="#334155" stroke-width="2"/>
-  </g>
+  <g stroke="#111827" stroke-linejoin="round" stroke-linecap="round">
 
-  <!-- Handle (red body) -->
-  <g>
-    <rect x="56" y="196" width="320" height="120" rx="36" ry="36"
-          fill="url(#handleGradient)"
-          stroke="#6a040f"
-          stroke-width="4"/>
+    <!-- ================== TOOLS BEHIND BODY ================== -->
 
-    <!-- Subtle inner highlight -->
-    <rect x="66" y="206" width="300" height="14" rx="7" ry="7"
-          fill="#ffffff" opacity="0.18"/>
-
-    <!-- Rivets -->
-    <circle cx="96" cy="256" r="6" fill="#e2e8f0" stroke="#475569" stroke-width="1.5"/>
-    <circle cx="336" cy="256" r="6" fill="#e2e8f0" stroke="#475569" stroke-width="1.5"/>
-
-    <!-- MCP hexagon emblem centered on the handle -->
-    <g transform="translate(216,256)">
-      <polygon points="0,-46 40,-23 40,23 0,46 -40,23 -40,-23"
-               fill="#ffffff"
-               stroke="#6a040f"
-               stroke-width="3"/>
-      <!-- Stylized MCP mark: three linked nodes -->
-      <g stroke="#a4161a" stroke-width="4" fill="#a4161a" stroke-linecap="round">
-        <line x1="-18" y1="10" x2="0" y2="-16"/>
-        <line x1="0" y1="-16" x2="18" y2="10"/>
-        <line x1="-18" y1="10" x2="18" y2="10"/>
-        <circle cx="-18" cy="10" r="6" fill="#ffffff"/>
-        <circle cx="0" cy="-16" r="6" fill="#ffffff"/>
-        <circle cx="18" cy="10" r="6" fill="#ffffff"/>
-      </g>
+    <!-- Main knife blade (upper-left, pointing up) -->
+    <g transform="translate(380,470) rotate(-22)">
+      <path d="M 0 0
+               C -10 -60 -30 -140 -40 -260
+               C -44 -320 -60 -360 -90 -380
+               C -120 -360 -132 -320 -130 -260
+               C -124 -140 -120 -60 -110 0 Z"
+            fill="url(#steelGradient)" stroke-width="14"/>
+      <!-- blade fuller highlight -->
+      <path d="M -70 -40 C -78 -140 -88 -240 -96 -340"
+            fill="none" stroke="#94a3b8" stroke-width="6" opacity="0.8"/>
+      <!-- pivot rivet -->
+      <circle cx="-55" cy="-10" r="10" fill="#111827" stroke="none"/>
     </g>
 
-    <!-- "mcpc" wordmark on the right portion of the handle -->
-    <text x="300" y="268"
-          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
-          font-size="34"
-          font-weight="700"
-          fill="#ffffff"
-          text-anchor="middle"
-          letter-spacing="2">mcpc</text>
+    <!-- Can opener with hook (top, rising up-right) -->
+    <g transform="translate(560,420) rotate(-8)">
+      <path d="M 0 0
+               L 0 -90
+               L 70 -90
+               L 70 -200
+               L 140 -200
+               L 140 -150
+               L 180 -150
+               L 180 -230
+               L 230 -230
+               L 230 -110
+               L 170 -110
+               L 170 -60
+               L 90 -60
+               L 90 0 Z"
+            fill="url(#steelGradient)" stroke-width="14"/>
+    </g>
+
+    <!-- Flat screwdriver (extending right) -->
+    <g transform="translate(720,600)">
+      <path d="M 0 -28 L 240 -28 L 260 -18 L 260 18 L 240 28 L 0 28 Z"
+            fill="url(#steelGradient)" stroke-width="14"/>
+    </g>
+
+    <!-- Small awl blade (bottom, pointing down) -->
+    <g transform="translate(520,810) rotate(12)">
+      <path d="M -30 -20
+               C -20 60 0 180 10 230
+               C 14 250 26 250 30 230
+               C 40 180 30 60 30 -20 Z"
+            fill="url(#steelGradient)" stroke-width="14"/>
+      <circle cx="0" cy="-5" r="9" fill="#111827" stroke="none"/>
+    </g>
+
+    <!-- Corkscrew (bottom-right, spiraling down) -->
+    <g transform="translate(690,700) rotate(18)">
+      <!-- shaft into body -->
+      <path d="M -10 -40 L 10 -40 L 10 10 L -10 10 Z"
+            fill="url(#steelGradient)" stroke-width="10"/>
+      <!-- spiral: draw as a single path, outline heavy, then lighter inside -->
+      <path d="M 0 10
+               C 48 40 -40 60 0 90
+               C 48 120 -40 140 0 170
+               C 48 200 -40 220 0 250
+               C 30 270 10 290 0 300"
+            fill="none" stroke="#111827" stroke-width="26" stroke-linecap="round"/>
+      <path d="M 0 10
+               C 48 40 -40 60 0 90
+               C 48 120 -40 140 0 170
+               C 48 200 -40 220 0 250
+               C 30 270 10 290 0 300"
+            fill="none" stroke="url(#steelDark)" stroke-width="14" stroke-linecap="round"/>
+    </g>
+
+    <!-- ================== RED BODY ================== -->
+
+    <g transform="translate(512,560) rotate(-4)">
+      <!-- outer red shell -->
+      <rect x="-190" y="-260" width="380" height="520" rx="100" ry="100"
+            fill="url(#bodyGradient)" stroke-width="18"/>
+
+      <!-- subtle top highlight stripe -->
+      <rect x="-170" y="-238" width="340" height="26" rx="13" ry="13"
+            fill="#ffffff" opacity="0.22" stroke="none"/>
+
+      <!-- stylized "m" emblem (inspired by reference) -->
+      <g fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M -70 -150
+                 C -70 -195 -15 -195 -15 -150
+                 L -15 -60
+                 M -15 -150
+                 C -15 -195 40 -195 40 -150
+                 L 40 -60
+                 M 40 -150
+                 C 40 -195 95 -195 95 -150
+                 L 95 -60"/>
+        <!-- thin outline for contrast -->
+      </g>
+      <g fill="none" stroke="#c8001a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+        <path d="M -70 -150
+                 C -70 -195 -15 -195 -15 -150
+                 L -15 -60
+                 M -15 -150
+                 C -15 -195 40 -195 40 -150
+                 L 40 -60
+                 M 40 -150
+                 C 40 -195 95 -195 95 -150
+                 L 95 -60"/>
+      </g>
+
+      <!-- wordmark -->
+      <text x="0" y="130"
+            font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+            font-size="68" font-weight="700"
+            fill="#ffffff" text-anchor="middle" letter-spacing="6"
+            stroke="none">mcpc</text>
+    </g>
+
+    <!-- ================== KEYRING (bottom-left) ================== -->
+    <g transform="translate(330,880)">
+      <!-- attachment nub on body -->
+      <rect x="-10" y="-40" width="20" height="40"
+            fill="url(#steelGradient)" stroke-width="10"/>
+      <!-- ring -->
+      <circle cx="0" cy="30" r="32"
+              fill="none" stroke="#111827" stroke-width="14"/>
+      <circle cx="0" cy="30" r="32"
+              fill="none" stroke="url(#steelGradient)" stroke-width="6"/>
+    </g>
+
   </g>
 </svg>
