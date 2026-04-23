@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New `npm run test:conformance` script (and on-demand `Conformance` GitHub Actions workflow) that runs the `@modelcontextprotocol/conformance` framework against mcpc to verify adherence to the MCP specification. Starts with the `initialize` scenario; additional scenarios can be added to `test/conformance/client.mjs` as coverage grows.
+- New `npm run test:conformance` script (and on-demand `Conformance` GitHub Actions workflow) that runs the `@modelcontextprotocol/conformance` framework against mcpc to verify adherence to the MCP specification. The conformance adapter now covers the `initialize`, `tools_call`, and `sse-retry` client scenarios and exercises a broader set of mcpc sub-commands (`tools-list`, `tools-get`, `tools-call` with and without `--task`, `ping`, `logging-set-level`, `resources-list`, `resources-templates-list`, `prompts-list`) against the conformance test server.
 
 ### Changed
 
