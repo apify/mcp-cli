@@ -72,8 +72,10 @@ async function classifyAndThrowSessionError(
       logger.warn(`Failed to mark session ${sessionName} as unauthorized:`, e)
     );
     const target = session.server.url || session.server.command || sessionName;
+    const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
     throw createServerAuthError(target, {
       sessionName,
+      logPath,
       ...(originalError && { originalError }),
     });
   }
@@ -598,7 +600,8 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
 
   if (session.status === 'unauthorized') {
     const target = session.server.url || session.server.command || sessionName;
-    throw createServerAuthError(target, { sessionName });
+    const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
+    throw createServerAuthError(target, { sessionName, logPath });
   }
 
   if (session.status === 'expired') {

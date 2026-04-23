@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tools-call --task` now prints the task ID and recovery commands when interrupted with Ctrl+C, so you can fetch or cancel the server-side task later
 - `tasks-get` no longer suggests `tasks-cancel` when the task has already reached a terminal state (completed, failed, or cancelled)
 
+### Fixed
+
+- Sessions using a static bearer token (via `--header "Authorization: ..."`) no longer flip between `unauthorized` and `connecting` on every `mcpc` invocation — they stay `unauthorized` since retrying the same rejected token cannot succeed without `mcpc login` or reconnecting. OAuth-profile sessions still auto-retry because tokens may have been refreshed by another session
+- Server authentication errors now include the path to the bridge log file, so you can inspect it for more detail when investigating why a session was rejected
+
 ### Removed
 
 - Removed `tools`, `resources`, and `prompts` shorthand commands — use the full names (`tools-list`, `resources-list`, `prompts-list`) instead
