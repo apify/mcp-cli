@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New `npm run test:conformance` script (and on-demand `Conformance` GitHub Actions workflow) that runs the `@modelcontextprotocol/conformance` framework against mcpc to verify adherence to the MCP specification. Starts with the `initialize` scenario; additional scenarios can be added to `test/conformance/client.mjs` as coverage grows.
+
 ### Changed
 
 - OAuth callback ports for the hosted CIMD changed from the contiguous range 13316–13325 to 6 non-contiguous ports (13316, 13163, 31316, 31613, 16133, 16313) so one unrelated process is less likely to claim all of them. `localhost` variants dropped from the CIMD's `redirect_uris` in favor of `127.0.0.1` only (per RFC 8252 §8.3, which recommends the IP literal to avoid DNS resolution ambiguity).
