@@ -16,6 +16,9 @@ test/coverage/unit
 test/coverage/merged
 test/runs/
 
+# Conformance test output (written to CWD by @modelcontextprotocol/conformance)
+results/
+
 # Logs
 *.log
 logs/

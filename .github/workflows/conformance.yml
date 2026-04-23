@@ -1,0 +1,60 @@
+name: Conformance
+
+# Runs the @modelcontextprotocol/conformance suite against mcpc to check
+# adherence to the MCP specification.  Triggered on-demand only; it is not
+# part of the default CI pipeline because the conformance framework is still
+# evolving and test coverage via the mcpc adapter is a work in progress.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: "Scenario name to run (e.g. 'initialize', 'tools-call'). Leave blank to use the default configured in package.json."
+        required: false
+        type: string
+      verbose:
+        description: "Enable verbose output from the conformance framework"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  conformance:
+    name: MCP conformance
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run conformance tests
+        run: |
+          CMD=(npx -y @modelcontextprotocol/conformance client
+            --command "node test/conformance/client.mjs"
+            --scenario "${SCENARIO:-initialize}")
+          if [ "${VERBOSE}" = "true" ]; then
+            CMD+=(--verbose)
+          fi
+          "${CMD[@]}"
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+          VERBOSE: ${{ inputs.verbose }}
+
+      - name: Upload conformance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-results
+          path: results/
+          if-no-files-found: ignore
