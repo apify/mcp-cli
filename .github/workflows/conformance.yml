@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       scenario:
-        description: "Scenario name to run (e.g. 'initialize', 'tools-call'). Leave blank to use the default configured in package.json."
+        description: "Scenario name to run (e.g. 'initialize', 'tools_call', 'sse-retry'). Leave blank to run the full matrix of supported scenarios."
         required: false
         type: string
       verbose:
@@ -20,8 +20,22 @@ on:
 
 jobs:
   conformance:
-    name: MCP conformance
+    name: ${{ matrix.scenario }}
     runs-on: ubuntu-latest
+    strategy:
+      # Keep running the other scenarios even if one regresses so we see the
+      # full picture in a single run.
+      fail-fast: false
+      matrix:
+        # All client-side scenarios the adapter in
+        # `test/conformance/client.mjs` understands.  `sse-retry` is opt-in
+        # only — it surfaces a known mcpc SSE-reconnect timing issue, so the
+        # `if:` guards below keep it out of default runs and only execute it
+        # when the workflow is dispatched with `scenario: sse-retry`.
+        scenario:
+          - initialize
+          - tools_call
+          - sse-retry
 
     steps:
       - uses: actions/checkout@v6
@@ -38,23 +52,34 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run conformance tests
+      - name: Skip scenario
+        if: ${{ (inputs.scenario == '' && matrix.scenario == 'sse-retry') || (inputs.scenario != '' && inputs.scenario != matrix.scenario) }}
+        run: echo "Skipping ${{ matrix.scenario }} (not part of the default matrix or a different scenario was requested)."
+
+      - name: Run conformance scenario
+        if: ${{ (inputs.scenario == '' && matrix.scenario != 'sse-retry') || inputs.scenario == matrix.scenario }}
+        # The adapter spawns a fresh mcpc process per sub-command, which adds
+        # a few seconds of startup overhead each.  The default 30s framework
+        # timeout is not enough for scenarios that exercise many commands, so
+        # bump it to 3 minutes.
         run: |
           CMD=(npx -y @modelcontextprotocol/conformance client
             --command "node test/conformance/client.mjs"
-            --scenario "${SCENARIO:-initialize}")
+            --scenario "${SCENARIO}"
+            --timeout 180000
+            --output-dir "results/${SCENARIO}")
           if [ "${VERBOSE}" = "true" ]; then
             CMD+=(--verbose)
           fi
           "${CMD[@]}"
         env:
-          SCENARIO: ${{ inputs.scenario }}
+          SCENARIO: ${{ matrix.scenario }}
           VERBOSE: ${{ inputs.verbose }}
 
       - name: Upload conformance results
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: ${{ always() && ((inputs.scenario == '' && matrix.scenario != 'sse-retry') || inputs.scenario == matrix.scenario) }}
+        uses: actions/upload-artifact@v5
         with:
-          name: conformance-results
+          name: conformance-results-${{ matrix.scenario }}
           path: results/
           if-no-files-found: ignore

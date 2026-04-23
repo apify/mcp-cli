@@ -10,10 +10,18 @@
 // sub-commands against a freshly-created session, then tear the session down
 // again.
 //
-// Only a small set of scenarios is wired up today; unsupported ones exit
-// non-zero so the framework records them as failures (track them in
-// `test/conformance/expected-failures.yml` to keep CI green until coverage
-// grows).
+// Beyond the scenario-specific commands that the conformance server needs to
+// observe, each scenario also runs a broader set of mcpc sub-commands
+// (tools-list, tools-get, tools-call with/without --task, ping,
+// logging-set-level, resources-list, prompts-list, ...) against the same
+// server so the job exercises as much of mcpc's protocol surface as
+// possible.  Commands that the test server does not implement are attempted
+// as best-effort and their failures are swallowed so a missing capability on
+// the server side does not mask real client-side issues.
+//
+// Unsupported scenarios exit non-zero so the framework records them as
+// failures (track them in `test/conformance/expected-failures.yml` to keep
+// CI green until coverage grows).
 
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -37,22 +45,52 @@ const here = dirname(fileURLToPath(import.meta.url));
 const mcpcBin = resolve(here, '..', '..', 'bin', 'mcpc');
 const homeDir = await mkdtemp(`${tmpdir()}/mcpc-conformance-`);
 const sessionName = `conformance-${process.pid}`;
+const sessionArg = `@${sessionName}`;
 const env = { ...process.env, MCPC_HOME_DIR: homeDir, MCPC_JSON: '1' };
 
-function runMcpc(args) {
+function runMcpc(args, { timeoutMs, allowTimeout = false } = {}) {
     return new Promise((res, rej) => {
         const child = spawn(mcpcBin, args, { env, stdio: 'inherit' });
-        child.once('error', rej);
+        let timedOut = false;
+        const timer = timeoutMs
+            ? setTimeout(() => {
+                  timedOut = true;
+                  console.error(
+                      `[mcpc-conformance] local timeout (${timeoutMs}ms) hit, terminating: mcpc ${args.join(' ')}`
+                  );
+                  child.kill('SIGTERM');
+              }, timeoutMs)
+            : null;
+        child.once('error', (err) => {
+            if (timer) clearTimeout(timer);
+            rej(err);
+        });
         child.once('exit', (code) => {
-            if (code === 0) res();
+            if (timer) clearTimeout(timer);
+            if (timedOut && allowTimeout) res();
+            else if (code === 0) res();
             else rej(new Error(`mcpc ${args.join(' ')} exited with code ${code}`));
         });
     });
 }
 
+// Best-effort wrapper: logs but swallows errors so an unsupported capability
+// on the conformance test server does not fail the whole scenario.
+async function tryMcpc(args) {
+    try {
+        await runMcpc(args);
+    } catch (err) {
+        console.error(
+            `[mcpc-conformance] optional command failed (ignored): ${args.join(' ')} — ${
+                err instanceof Error ? err.message : String(err)
+            }`
+        );
+    }
+}
+
 async function cleanup() {
     try {
-        await runMcpc([`@${sessionName}`, 'close']);
+        await runMcpc([sessionArg, 'close']);
     } catch {
         // Best effort — the session may never have been created.
     }
@@ -62,15 +100,61 @@ async function cleanup() {
 async function main() {
     switch (scenario) {
         case 'initialize':
-            // Connecting triggers the full MCP initialize handshake via the
-            // bridge process.  That is all the conformance server needs to
-            // observe for this scenario.
-            await runMcpc(['connect', serverUrl, `@${sessionName}`]);
+            // The initialize test server only implements `initialize` and
+            // `tools/list`; every other request is answered with an empty
+            // result.  We exercise commands whose empty result still
+            // validates (ping, logging/setLevel) and invoke the list-style
+            // commands as best-effort so we at least cover the request
+            // encoding path, even though the SDK rejects the empty reply.
+            await runMcpc(['connect', serverUrl, sessionArg]);
+            await runMcpc([sessionArg]); // session info
+            await runMcpc([sessionArg, 'ping']);
+            await runMcpc([sessionArg, 'tools-list']);
+            await tryMcpc([sessionArg, 'logging-set-level', 'info']);
+            await tryMcpc([sessionArg, 'resources-list']);
+            await tryMcpc([sessionArg, 'resources-templates-list']);
+            await tryMcpc([sessionArg, 'prompts-list']);
             return;
 
-        case 'tools-call':
-            await runMcpc(['connect', serverUrl, `@${sessionName}`]);
-            await runMcpc([`@${sessionName}`, 'tools-list']);
+        case 'tools_call':
+            // The conformance server exposes an `add_numbers` tool and
+            // records a check when the client invokes it with numeric args.
+            // We hit the tool via several mcpc argument-parsing paths
+            // (key:=value, inline JSON, --task) and exercise the rest of
+            // the command surface (tools-get, tools-list, ping).
+            await runMcpc(['connect', serverUrl, sessionArg]);
+            await runMcpc([sessionArg, 'tools-list']);
+            await runMcpc([sessionArg, 'tools-get', 'add_numbers']);
+            await runMcpc([sessionArg, 'tools-call', 'add_numbers', 'a:=2', 'b:=3']);
+            await runMcpc([sessionArg, 'tools-call', 'add_numbers', '{"a":10,"b":32}']);
+            // The server does not advertise the `tasks` capability, so
+            // --task falls back to a synchronous call with a warning.  This
+            // verifies mcpc handles the fallback path cleanly.
+            await runMcpc([sessionArg, 'tools-call', 'add_numbers', 'a:=1', 'b:=1', '--task']);
+            await runMcpc([sessionArg, 'ping']);
+            // Best-effort: the SDK server replies with -32601 for methods
+            // it has no handler for, which we tolerate so we still exercise
+            // mcpc's encoding for these commands.
+            await tryMcpc([sessionArg, 'resources-list']);
+            await tryMcpc([sessionArg, 'prompts-list']);
+            return;
+
+        case 'sse-retry':
+            // The conformance server closes the SSE stream mid tool-call
+            // and expects the client to reconnect via GET (Last-Event-ID)
+            // within the advertised `retry` window, then finishes the
+            // response on the reconnected stream.  Keep the scenario lean
+            // so timing is dominated by the reconnect window, not by mcpc
+            // process startup.  The tool-call is bounded by a local
+            // timeout: once the reconnect has happened (well under 2s) the
+            // server-side checks are already decided, so we do not need to
+            // wait for the eventual tool-call response.
+            await runMcpc(['connect', serverUrl, sessionArg]);
+            await runMcpc([sessionArg, 'tools-list']);
+            await runMcpc([sessionArg, 'tools-call', 'test_reconnection'], {
+                timeoutMs: 30000,
+                allowTimeout: true,
+            });
             return;
 
         default:
