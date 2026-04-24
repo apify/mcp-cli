@@ -441,6 +441,7 @@ Full docs: ${docsUrl}`
     .option('--no-profile', 'Skip OAuth profile (connect anonymously)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
+    .option('--stdio', 'Include stdio (command-based) servers when connecting from config files')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
     .addHelpText(
       'after',
@@ -462,6 +463,10 @@ ${chalk.bold('Stdio servers:')}
   servers inherit a minimal env whitelist; forward extras (e.g.
   NODE_EXTRA_CA_CERTS, HTTPS_PROXY) via the "env" block. Server stderr is
   logged to ~/.mcpc/logs/bridge-<session>.log.
+
+  When connecting from a config file (\`mcpc connect <config-file>\`), stdio
+  entries are skipped by default — pass --stdio to include them. Single-entry
+  connects (\`mcpc connect file:entry\`) are not affected.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
@@ -500,6 +505,7 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
           ...(headers && { headers }),
           ...(opts.proxy && { proxy: opts.proxy as string }),
           ...(opts.proxyBearerToken && { proxyBearerToken: opts.proxyBearerToken as string }),
+          ...(opts.stdio && { stdio: true }),
           ...(opts.x402 && { x402: opts.x402 as boolean }),
           ...(globalOpts.insecure && { insecure: true }),
         });
