@@ -1147,39 +1147,11 @@ For **stdio servers:**
 - `args` (optional) - Array of command arguments
 - `env` (optional) - Environment variables for the process
 
-> **Note: stdio servers inherit a minimal environment.**
-> For security reasons (see the
-> [MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/src/client/stdio.ts)),
-> spawned stdio servers receive only a small whitelist of vars from the shell:
-> `HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER` on Unix, and the equivalent
-> user/system vars on Windows. Everything else — proxy settings, TLS CA bundles,
-> language-specific options — must be forwarded explicitly via the config `env`
-> block using `${VAR_NAME}` substitution.
->
-> This matters most in TLS-intercepting proxy environments, where the child
-> process needs `NODE_EXTRA_CA_CERTS` (Node), `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE`
-> (Python) or `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` to trust the proxy's CA
-> and reach the upstream API:
->
-> ```json
-> {
->   "mcpServers": {
->     "apify": {
->       "command": "node",
->       "args": ["/path/to/server.js"],
->       "env": {
->         "APIFY_TOKEN": "${APIFY_TOKEN}",
->         "NODE_EXTRA_CA_CERTS": "${NODE_EXTRA_CA_CERTS}",
->         "HTTPS_PROXY": "${HTTPS_PROXY}"
->       }
->     }
->   }
-> }
-> ```
->
-> If `mcpc connect <config>:<entry>` hangs with no output, re-run it with
-> `--verbose` to surface the child server's stderr — that almost always reveals
-> the real error (missing CA trust, missing credentials, unresolved dependency, …).
+> **Note:** Stdio servers inherit only a minimal env whitelist from the shell
+> (`PATH`, `HOME`, `SHELL`, …). Other vars — `NODE_EXTRA_CA_CERTS`, `HTTPS_PROXY`,
+> `SSL_CERT_FILE`, etc. — must be forwarded explicitly via the `env` block using
+> `${VAR_NAME}`. If `mcpc connect` hangs silently on a stdio server, re-run with
+> `--verbose` to see its stderr.
 
 **Using servers from config file:**
 
