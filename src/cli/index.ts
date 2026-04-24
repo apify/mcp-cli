@@ -457,7 +457,7 @@ ${chalk.bold('Auto-discovery locations:')}
            .kiro/settings/mcp.json
   Global:  ~/.claude.json, ~/.cursor/mcp.json, ~/.vscode/mcp.json,
            ~/.codeium/windsurf/mcp_config.json, ~/.kiro/settings/mcp.json,
-           Claude Desktop (platform-specific path)
+           VS Code app config, Claude Desktop (platform-specific paths)
   Env var:  APIFY_API_TOKEN → auto-connects to mcp.apify.com as @apify
 
 ${chalk.bold('Session name:')}

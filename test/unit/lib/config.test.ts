@@ -338,29 +338,31 @@ describe('getStandardMcpConfigPaths', () => {
     expect(globalPaths).toContain('/home/alice/.claude.json');
   });
 
-  it('uses macOS-specific Claude Desktop path on darwin', () => {
+  it('uses macOS-specific VS Code and Claude Desktop paths on darwin', () => {
     const paths = getStandardMcpConfigPaths({
       homeDir: '/Users/alice',
       cwd: '/work',
       platform: 'darwin',
     });
     const paths_ = paths.map((p) => p.path);
+    expect(paths_).toContain('/Users/alice/Library/Application Support/Code/User/mcp.json');
     expect(paths_).toContain(
       '/Users/alice/Library/Application Support/Claude/claude_desktop_config.json'
     );
   });
 
-  it('uses Linux XDG-style Claude Desktop path', () => {
+  it('uses Linux XDG-style VS Code and Claude Desktop paths', () => {
     const paths = getStandardMcpConfigPaths({
       homeDir: '/home/alice',
       cwd: '/work',
       platform: 'linux',
     });
     const paths_ = paths.map((p) => p.path);
+    expect(paths_).toContain('/home/alice/.config/Code/User/mcp.json');
     expect(paths_).toContain('/home/alice/.config/Claude/claude_desktop_config.json');
   });
 
-  it('uses APPDATA-based Claude Desktop path on win32', () => {
+  it('uses APPDATA-based VS Code and Claude Desktop paths on win32', () => {
     const paths = getStandardMcpConfigPaths({
       homeDir: 'C:\\Users\\alice',
       cwd: 'C:\\work',
@@ -368,12 +370,13 @@ describe('getStandardMcpConfigPaths', () => {
       appData: 'C:\\Users\\alice\\AppData\\Roaming',
     });
     const paths_ = paths.map((p) => p.path);
+    expect(paths_.some((p) => p.includes('Code') && p.endsWith('mcp.json'))).toBe(true);
     expect(
       paths_.some((p) => p.includes('Claude') && p.endsWith('claude_desktop_config.json'))
     ).toBe(true);
   });
 
-  it('omits Claude Desktop entry on win32 when APPDATA is missing', () => {
+  it('omits VS Code and Claude Desktop entries on win32 when APPDATA is missing', () => {
     const paths = getStandardMcpConfigPaths({
       homeDir: 'C:\\Users\\alice',
       cwd: 'C:\\work',
@@ -474,6 +477,31 @@ describe('discoverMcpConfigFiles', () => {
     expect(discovered[0]?.scope).toBe('project');
     expect(discovered[0]?.label).toBe('mcp.json (project)');
     expect(discovered[0]?.serverCount).toBe(1);
+  });
+
+  it('discovers a config using VS Code "servers" key (normalized to mcpServers)', () => {
+    const home = join(DISCOVERY_TMP, 'home-vscode');
+    const cwd = join(DISCOVERY_TMP, 'cwd-vscode');
+    mkdirSync(home, { recursive: true });
+    mkdirSync(join(cwd, '.vscode'), { recursive: true });
+
+    writeFileSync(
+      join(cwd, '.vscode/mcp.json'),
+      JSON.stringify({
+        servers: {
+          myserver: { url: 'https://myserver.example.com', type: 'http' },
+        },
+      })
+    );
+
+    const discovered = discoverMcpConfigFiles({
+      homeDir: home,
+      cwd,
+      platform: 'linux',
+    });
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0]?.serverCount).toBe(1);
+    expect(Object.keys(discovered[0]?.config.mcpServers ?? {})).toEqual(['myserver']);
   });
 
   it('discovers a global ~/.cursor/mcp.json', () => {

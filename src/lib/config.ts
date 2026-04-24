@@ -317,26 +317,47 @@ export function getStandardMcpConfigPaths(options?: {
 
   // Claude Desktop — platform-specific path
   if (os === 'darwin') {
-    candidates.push({
-      path: join(home, 'Library/Application Support/Claude/claude_desktop_config.json'),
-      label: 'Claude Desktop',
-      scope: 'global',
-    });
-  } else if (os === 'win32') {
-    if (appData) {
-      candidates.push({
-        path: join(appData, 'Claude/claude_desktop_config.json'),
+    candidates.push(
+      {
+        path: join(home, 'Library/Application Support/Code/User/mcp.json'),
+        label: 'VS Code',
+        scope: 'global',
+      },
+      {
+        path: join(home, 'Library/Application Support/Claude/claude_desktop_config.json'),
         label: 'Claude Desktop',
         scope: 'global',
-      });
+      }
+    );
+  } else if (os === 'win32') {
+    if (appData) {
+      candidates.push(
+        {
+          path: join(appData, 'Code/User/mcp.json'),
+          label: 'VS Code',
+          scope: 'global',
+        },
+        {
+          path: join(appData, 'Claude/claude_desktop_config.json'),
+          label: 'Claude Desktop',
+          scope: 'global',
+        }
+      );
     }
   } else {
     // Linux / other — XDG-style
-    candidates.push({
-      path: join(home, '.config/Claude/claude_desktop_config.json'),
-      label: 'Claude Desktop',
-      scope: 'global',
-    });
+    candidates.push(
+      {
+        path: join(home, '.config/Code/User/mcp.json'),
+        label: 'VS Code',
+        scope: 'global',
+      },
+      {
+        path: join(home, '.config/Claude/claude_desktop_config.json'),
+        label: 'Claude Desktop',
+        scope: 'global',
+      }
+    );
   }
 
   // Dedup by resolved absolute path (preserve order — first occurrence wins)
@@ -355,9 +376,8 @@ export function getStandardMcpConfigPaths(options?: {
 /**
  * Leniently parse a JSON file that may or may not be an MCP config.
  * Returns the parsed `McpConfig` if the file exists, is valid JSON, and has a non-empty
- * `mcpServers` object. Returns `null` for missing files or files without `mcpServers`
- * (some config files like `~/.claude.json` are shared with other features and may
- * legitimately have no MCP servers). Invalid JSON is still logged and skipped.
+ * `mcpServers` (or `servers` — the VS Code variant) object. Returns `null` for missing
+ * files or files without server entries. Invalid JSON is logged and skipped.
  */
 function tryReadMcpConfig(configPath: string): McpConfig | null {
   let content: string;
@@ -379,15 +399,19 @@ function tryReadMcpConfig(configPath: string): McpConfig | null {
   }
 
   if (!parsed || typeof parsed !== 'object') return null;
-  const maybeConfig = parsed as { mcpServers?: unknown };
-  if (
-    !maybeConfig.mcpServers ||
-    typeof maybeConfig.mcpServers !== 'object' ||
-    Array.isArray(maybeConfig.mcpServers)
-  ) {
-    return null;
+  const obj = parsed as Record<string, unknown>;
+
+  // Standard MCP format: { mcpServers: { ... } }
+  if (obj.mcpServers && typeof obj.mcpServers === 'object' && !Array.isArray(obj.mcpServers)) {
+    return parsed as McpConfig;
   }
-  return parsed as McpConfig;
+
+  // VS Code format: { servers: { ... } } — normalize to mcpServers
+  if (obj.servers && typeof obj.servers === 'object' && !Array.isArray(obj.servers)) {
+    return { mcpServers: obj.servers as Record<string, ServerConfig> };
+  }
+
+  return null;
 }
 
 /**
