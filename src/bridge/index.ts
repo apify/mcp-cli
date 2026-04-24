@@ -499,13 +499,20 @@ class BridgeProcess {
    * with a prefix, and keep a bounded tail for surfacing in connect failures.
    */
   private recordServerStderr(line: string): void {
-    logger.info(`[server stderr] ${line}`);
+    // Cap per-line length so a single huge line (stack trace, etc.) can't push
+    // every other line out of the bounded tail or get itself fully evicted.
+    const trimmed =
+      line.length > BridgeProcess.STDERR_TAIL_MAX_CHARS
+        ? line.slice(0, BridgeProcess.STDERR_TAIL_MAX_CHARS) + '…'
+        : line;
 
-    this.stderrTail.push(line);
-    this.stderrTailChars += line.length + 1;
+    logger.info(`[server stderr] ${trimmed}`);
+
+    this.stderrTail.push(trimmed);
+    this.stderrTailChars += trimmed.length + 1;
     while (
       this.stderrTail.length > BridgeProcess.STDERR_TAIL_MAX_LINES ||
-      this.stderrTailChars > BridgeProcess.STDERR_TAIL_MAX_CHARS
+      (this.stderrTail.length > 1 && this.stderrTailChars > BridgeProcess.STDERR_TAIL_MAX_CHARS)
     ) {
       const removed = this.stderrTail.shift();
       if (removed === undefined) break;

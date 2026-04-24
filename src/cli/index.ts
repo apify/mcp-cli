@@ -461,11 +461,9 @@ ${chalk.bold('Security:')}
   even if the MCP handshake later fails. Only connect to configs you trust.
 
 ${chalk.bold('Stdio environment:')}
-  Stdio servers inherit only a minimal env whitelist (PATH, HOME, SHELL, …).
-  Forward other vars (NODE_EXTRA_CA_CERTS, HTTPS_PROXY, SSL_CERT_FILE, …)
-  via the config "env" block using \${VAR_NAME}. Server stderr is captured
-  to ~/.mcpc/logs/bridge-<session>.log, and the tail is appended to connect
-  errors so you can see why a stdio server failed to start.
+  Stdio servers inherit a minimal env whitelist; forward extras (e.g.
+  NODE_EXTRA_CA_CERTS, HTTPS_PROXY) via the "env" block. Server stderr
+  is logged to ~/.mcpc/logs/bridge-<session>.log.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {

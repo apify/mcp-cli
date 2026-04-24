@@ -40,6 +40,8 @@ import { createLogger, getVerbose } from '../lib/logger.js';
 import type { ServerConfig } from '../lib/types.js';
 import { ClientError } from '../lib/errors.js';
 import { proxyFetch } from '../lib/proxy.js';
+import { createInterface } from 'node:readline';
+import type { Readable } from 'node:stream';
 
 /**
  * Options for createStdioTransport
@@ -80,31 +82,17 @@ export function createStdioTransport(
     // With stderr: 'pipe', the SDK exposes a PassThrough stream on
     // `transport.stderr` from construction time onwards, so we can attach the
     // reader before `start()` is called without losing any output.
-    const stream = transport.stderr;
+    // SDK types stderr as the abstract Stream class; the runtime value is
+    // always a PassThrough (Readable) when stderr === 'pipe'.
+    const stream = transport.stderr as Readable | null;
     if (stream) {
-      let buffer = '';
-      stream.on('data', (chunk: Buffer | string) => {
-        buffer += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-        let newlineIndex: number;
-        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-          const line = buffer.slice(0, newlineIndex).replace(/\r$/, '');
-          buffer = buffer.slice(newlineIndex + 1);
-          if (line.length > 0) {
-            try {
-              handler(line);
-            } catch (err) {
-              logger.debug('onStderrLine handler threw:', err);
-            }
-          }
-        }
-      });
-      stream.on('end', () => {
-        if (buffer.length > 0) {
-          try {
-            handler(buffer.replace(/\r$/, ''));
-          } catch (err) {
-            logger.debug('onStderrLine handler threw:', err);
-          }
+      const rl = createInterface({ input: stream, crlfDelay: Infinity });
+      rl.on('line', (line) => {
+        if (line.length === 0) return;
+        try {
+          handler(line);
+        } catch (err) {
+          logger.debug('onStderrLine handler threw:', err);
         }
       });
     }
