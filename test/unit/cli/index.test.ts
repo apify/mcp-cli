@@ -223,6 +223,261 @@ describe('parseServerArg', () => {
       entry: 'server',
     });
   });
+
+  it('should return null for empty or whitespace-only input', () => {
+    expect(parseServerArg('')).toBeNull();
+    expect(parseServerArg(' ')).toBeNull();
+    expect(parseServerArg('   ')).toBeNull();
+  });
+
+  it('should parse IPv6 URLs', () => {
+    expect(parseServerArg('http://[::1]:8080/mcp')).toEqual({
+      type: 'url',
+      url: 'http://[::1]:8080/mcp',
+    });
+    expect(parseServerArg('https://[2001:db8::1]:8443')).toEqual({
+      type: 'url',
+      url: 'https://[2001:db8::1]:8443',
+    });
+    // Bare bracketed IPv6 with port (no scheme) — treated as URL via https:// prefix
+    expect(parseServerArg('[::1]:8080')).toEqual({ type: 'url', url: '[::1]:8080' });
+  });
+
+  it('should parse localhost variants as URL', () => {
+    expect(parseServerArg('localhost')).toEqual({ type: 'url', url: 'localhost' });
+    expect(parseServerArg('localhost:3000')).toEqual({ type: 'url', url: 'localhost:3000' });
+    expect(parseServerArg('localhost:3000/mcp')).toEqual({
+      type: 'url',
+      url: 'localhost:3000/mcp',
+    });
+    expect(parseServerArg('http://localhost')).toEqual({ type: 'url', url: 'http://localhost' });
+    expect(parseServerArg('127.0.0.1')).toEqual({ type: 'url', url: '127.0.0.1' });
+  });
+
+  it('should parse URLs with query strings and fragments as URL', () => {
+    expect(parseServerArg('mcp.apify.com?query=foo')).toEqual({
+      type: 'url',
+      url: 'mcp.apify.com?query=foo',
+    });
+    expect(parseServerArg('mcp.apify.com#frag')).toEqual({
+      type: 'url',
+      url: 'mcp.apify.com#frag',
+    });
+    expect(parseServerArg('https://mcp.apify.com/path?q=1&r=2#frag')).toEqual({
+      type: 'url',
+      url: 'https://mcp.apify.com/path?q=1&r=2#frag',
+    });
+  });
+
+  it('should parse URLs with userinfo as URL', () => {
+    expect(parseServerArg('https://user:pass@mcp.example.com')).toEqual({
+      type: 'url',
+      url: 'https://user:pass@mcp.example.com',
+    });
+    // Bare user:pass@host — ambiguous but currently routed through the https:// probe
+    expect(parseServerArg('user:pass@example.com')).toEqual({
+      type: 'url',
+      url: 'user:pass@example.com',
+    });
+  });
+
+  it('should parse URLs with various schemes', () => {
+    expect(parseServerArg('ws://example.com')).toEqual({ type: 'url', url: 'ws://example.com' });
+    expect(parseServerArg('wss://example.com/mcp')).toEqual({
+      type: 'url',
+      url: 'wss://example.com/mcp',
+    });
+    expect(parseServerArg('ftp://example.com/file')).toEqual({
+      type: 'url',
+      url: 'ftp://example.com/file',
+    });
+    expect(parseServerArg('git+ssh://example.com/repo')).toEqual({
+      type: 'url',
+      url: 'git+ssh://example.com/repo',
+    });
+  });
+
+  it('should parse URLs with mixed-case schemes', () => {
+    expect(parseServerArg('HTTPS://example.com')).toEqual({
+      type: 'url',
+      url: 'HTTPS://example.com',
+    });
+    expect(parseServerArg('Http://Example.Com')).toEqual({
+      type: 'url',
+      url: 'Http://Example.Com',
+    });
+  });
+
+  it('should return null for ://-containing arg with empty host (e.g. file:///)', () => {
+    // `file:///path` has a valid scheme but no host; since we only support HTTP transports,
+    // step 1b rejects any `://` arg that fails URL-with-host validation.
+    expect(parseServerArg('file:///path/to/config')).toBeNull();
+    expect(parseServerArg('https://')).toBeNull();
+  });
+
+  it('should parse uppercase config extensions as config', () => {
+    expect(parseServerArg('./config.JSON:entry')).toEqual({
+      type: 'config',
+      file: './config.JSON',
+      entry: 'entry',
+    });
+    expect(parseServerArg('./config.YAML:entry')).toEqual({
+      type: 'config',
+      file: './config.YAML',
+      entry: 'entry',
+    });
+    expect(parseServerArg('./Config.Yml:entry')).toEqual({
+      type: 'config',
+      file: './Config.Yml',
+      entry: 'entry',
+    });
+    expect(parseServerArg('CONFIG.JSON:entry')).toEqual({
+      type: 'config',
+      file: 'CONFIG.JSON',
+      entry: 'entry',
+    });
+    expect(parseServerArg('CONFIG.JSON')).toEqual({ type: 'config-file', file: 'CONFIG.JSON' });
+  });
+
+  it('should split on the first colon (entry may contain further colons)', () => {
+    expect(parseServerArg('./config.json:entry:subentry')).toEqual({
+      type: 'config',
+      file: './config.json',
+      entry: 'entry:subentry',
+    });
+    expect(parseServerArg('/abs/path.json:a:b:c')).toEqual({
+      type: 'config',
+      file: '/abs/path.json',
+      entry: 'a:b:c',
+    });
+  });
+
+  it('should parse entry names with numbers, dashes, and underscores', () => {
+    expect(parseServerArg('./config.json:my-entry_v2')).toEqual({
+      type: 'config',
+      file: './config.json',
+      entry: 'my-entry_v2',
+    });
+    // Entry name that looks like a port number — still config because left side is a file path
+    expect(parseServerArg('./config.json:8080')).toEqual({
+      type: 'config',
+      file: './config.json',
+      entry: '8080',
+    });
+    expect(parseServerArg('./config.json:123')).toEqual({
+      type: 'config',
+      file: './config.json',
+      entry: '123',
+    });
+  });
+
+  it('should parse paths with spaces as config', () => {
+    expect(parseServerArg('/path with spaces/config.json:entry')).toEqual({
+      type: 'config',
+      file: '/path with spaces/config.json',
+      entry: 'entry',
+    });
+    expect(parseServerArg('/path with spaces/config.json')).toEqual({
+      type: 'config-file',
+      file: '/path with spaces/config.json',
+    });
+  });
+
+  it('should parse relative config path without extension + :entry as config', () => {
+    // The left side contains a `/` so it counts as a file path even without .json/.yaml/.yml
+    expect(parseServerArg('./no_ext_file:entry')).toEqual({
+      type: 'config',
+      file: './no_ext_file',
+      entry: 'entry',
+    });
+    expect(parseServerArg('subdir/no_ext:entry')).toEqual({
+      type: 'config',
+      file: 'subdir/no_ext',
+      entry: 'entry',
+    });
+  });
+
+  it('should parse URL with port 0 or high port as URL', () => {
+    expect(parseServerArg('example.com:0')).toEqual({ type: 'url', url: 'example.com:0' });
+    expect(parseServerArg('example.com:65535')).toEqual({
+      type: 'url',
+      url: 'example.com:65535',
+    });
+  });
+
+  it('should parse URL with trailing slash and FQDN dot', () => {
+    expect(parseServerArg('mcp.apify.com/')).toEqual({ type: 'url', url: 'mcp.apify.com/' });
+    expect(parseServerArg('https://example.com/')).toEqual({
+      type: 'url',
+      url: 'https://example.com/',
+    });
+    expect(parseServerArg('app.example.com.:8080')).toEqual({
+      type: 'url',
+      url: 'app.example.com.:8080',
+    });
+  });
+
+  it('should return null for trailing colon on hostname (dangling port)', () => {
+    expect(parseServerArg('config.yml:')).toBeNull();
+    expect(parseServerArg('mcp.apify.com:')).toBeNull();
+  });
+
+  it('should return null for bare IPv6 without brackets or scheme', () => {
+    // `::1` has a leading colon which fails the `colonIndex > 0` check and is not a valid URL.
+    expect(parseServerArg('::1')).toBeNull();
+  });
+
+  it('should return null for single-token arg that parses as URL with empty host', () => {
+    // `A:foo` parses with scheme=a, path=foo, no host. Also fails `https://A:foo` (bad port).
+    expect(parseServerArg('A:foo')).toBeNull();
+    expect(parseServerArg('foo:bar:baz')).toBeNull();
+  });
+
+  it('should parse deeply-nested subdomains as URL', () => {
+    expect(parseServerArg('a.b.c.d.e.example.com')).toEqual({
+      type: 'url',
+      url: 'a.b.c.d.e.example.com',
+    });
+  });
+
+  it('should parse path-like arg with colon-in-path as config when left side has a slash', () => {
+    // `host/path:v1` — left side has a `/` so it triggers the config branch. Users wanting
+    // a URL with `:` in the path should pass a full `https://` URL.
+    expect(parseServerArg('mcp.apify.com/api:v1')).toEqual({
+      type: 'config',
+      file: 'mcp.apify.com/api',
+      entry: 'v1',
+    });
+    // Fully-qualified URL form bypasses the config heuristic.
+    expect(parseServerArg('https://mcp.apify.com/api:v1')).toEqual({
+      type: 'url',
+      url: 'https://mcp.apify.com/api:v1',
+    });
+  });
+
+  it('should parse relative path with .. (parent directory) as config', () => {
+    expect(parseServerArg('../../config.json:entry')).toEqual({
+      type: 'config',
+      file: '../../config.json',
+      entry: 'entry',
+    });
+    expect(parseServerArg('../sibling/mcp.json:fs')).toEqual({
+      type: 'config',
+      file: '../sibling/mcp.json',
+      entry: 'fs',
+    });
+  });
+
+  it('should parse Windows drive-letter bare extension without :entry as config-file', () => {
+    expect(parseServerArg('C:\\configs\\mcp.json')).toEqual({
+      type: 'config-file',
+      file: 'C:\\configs\\mcp.json',
+    });
+    expect(parseServerArg('D:/configs/mcp.yml')).toEqual({
+      type: 'config-file',
+      file: 'D:/configs/mcp.yml',
+    });
+  });
 });
 
 describe('extractOptions', () => {
