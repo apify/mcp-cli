@@ -17,6 +17,17 @@ on:
         required: false
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      scenario:
+        description: "Scenario name to run. Leave blank to run the full matrix of supported scenarios."
+        required: false
+        type: string
+      verbose:
+        description: "Enable verbose output from the conformance framework"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   conformance:
