@@ -38,16 +38,22 @@ jobs:
     if: ${{ !inputs.skip-windows-e2e }}
     uses: ./.github/workflows/e2e-windows.yml
 
+  conformance:
+    # Gate releases on MCP spec conformance so we never publish a version
+    # that regresses against the reference conformance suite.
+    uses: ./.github/workflows/conformance.yml
+
   release:
     name: Publish ${{ inputs.type }}
     runs-on: ubuntu-latest
-    needs: [e2e-windows]
+    needs: [e2e-windows, conformance]
     # Release must be from main; pre-release can be from any branch.
     # Allow the e2e-windows dependency to be either successful or skipped
-    # (when the user opts out via skip-windows-e2e).
+    # (when the user opts out via skip-windows-e2e). Conformance must pass.
     if: |
       always() &&
       (needs.e2e-windows.result == 'success' || needs.e2e-windows.result == 'skipped') &&
+      needs.conformance.result == 'success' &&
       (inputs.type == 'pre-release' || github.ref == 'refs/heads/main')
 
     steps:
