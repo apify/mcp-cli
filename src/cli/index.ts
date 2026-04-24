@@ -459,6 +459,12 @@ ${chalk.bold('Session name:')}
 ${chalk.bold('Security:')}
   Stdio config entries execute the configured command locally on connect,
   even if the MCP handshake later fails. Only connect to configs you trust.
+
+${chalk.bold('Stdio environment:')}
+  Stdio servers inherit only a minimal env whitelist (PATH, HOME, SHELL, …).
+  Forward other vars (NODE_EXTRA_CA_CERTS, HTTPS_PROXY, SSL_CERT_FILE, …)
+  via the config "env" block using \${VAR_NAME}. If a stdio connect hangs
+  with no output, re-run with --verbose to surface the server's stderr.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
