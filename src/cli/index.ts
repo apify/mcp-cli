@@ -427,6 +427,7 @@ ${chalk.bold('MCP session commands (after connecting):')}
   <@session> ${chalk.cyan('ping')}
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
+Run "mcpc --json" to get the same data as \`{ sessions: [...], profiles: [...] }\`.
 
 Full docs: ${docsUrl}`
   );
