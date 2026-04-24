@@ -153,6 +153,7 @@ MCP session commands (after connecting):
   <@session> ping
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
+Run "mcpc --json" to get the same data as `{ sessions: [...], profiles: [...] }`.
 ```
 
 ### General actions
