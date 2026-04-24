@@ -299,6 +299,7 @@ export function getStandardMcpConfigPaths(options?: {
   // Project-level configs (CWD) — highest priority, most specific
   candidates.push(
     { path: join(cwd, '.mcp.json'), label: 'Claude Code (project)', scope: 'project' },
+    { path: join(cwd, 'mcp.json'), label: 'mcp.json (project)', scope: 'project' },
     { path: join(cwd, '.cursor/mcp.json'), label: 'Cursor (project)', scope: 'project' },
     { path: join(cwd, '.vscode/mcp.json'), label: 'VS Code (project)', scope: 'project' },
     { path: join(cwd, '.kiro/settings/mcp.json'), label: 'Kiro (project)', scope: 'project' }

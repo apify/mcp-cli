@@ -317,6 +317,7 @@ describe('getStandardMcpConfigPaths', () => {
     });
     const projectPaths = paths.filter((p) => p.scope === 'project').map((p) => p.path);
     expect(projectPaths).toContain('/work/project/.mcp.json');
+    expect(projectPaths).toContain('/work/project/mcp.json');
     expect(projectPaths).toContain('/work/project/.cursor/mcp.json');
     expect(projectPaths).toContain('/work/project/.vscode/mcp.json');
     expect(projectPaths).toContain('/work/project/.kiro/settings/mcp.json');
@@ -446,6 +447,32 @@ describe('discoverMcpConfigFiles', () => {
     expect(discovered[0]?.label).toBe('Claude Code (project)');
     expect(discovered[0]?.serverCount).toBe(1);
     expect(Object.keys(discovered[0]?.config.mcpServers ?? {})).toEqual(['foo']);
+  });
+
+  it('discovers a project-scope mcp.json (without dot prefix)', () => {
+    const home = join(DISCOVERY_TMP, 'home-a2');
+    const cwd = join(DISCOVERY_TMP, 'cwd-a2');
+    mkdirSync(home, { recursive: true });
+    mkdirSync(cwd, { recursive: true });
+
+    writeFileSync(
+      join(cwd, 'mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          bar: { url: 'https://bar.example.com' },
+        },
+      })
+    );
+
+    const discovered = discoverMcpConfigFiles({
+      homeDir: home,
+      cwd,
+      platform: 'linux',
+    });
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0]?.scope).toBe('project');
+    expect(discovered[0]?.label).toBe('mcp.json (project)');
+    expect(discovered[0]?.serverCount).toBe(1);
   });
 
   it('discovers a global ~/.cursor/mcp.json', () => {

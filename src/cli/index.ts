@@ -453,7 +453,7 @@ ${chalk.bold('Server formats:')}
   ${chalk.dim('(no server)')}                  Discover standard MCP config files and connect every server
 
 ${chalk.bold('Auto-discovery locations:')}
-  Project: .mcp.json, .cursor/mcp.json, .vscode/mcp.json, .kiro/settings/mcp.json
+  Project: .mcp.json, mcp.json, .cursor/mcp.json, .vscode/mcp.json, .kiro/settings/mcp.json
   Global:  ~/.claude.json, ~/.cursor/mcp.json, ~/.vscode/mcp.json,
            ~/.codeium/windsurf/mcp_config.json, ~/.kiro/settings/mcp.json,
            Claude Desktop (platform-specific path)
