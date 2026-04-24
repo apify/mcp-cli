@@ -207,6 +207,22 @@ describe('parseServerArg', () => {
     expect(parseServerArg('example.com')).toEqual({ type: 'url', url: 'example.com' });
     expect(parseServerArg('mcp.apify.com')).toEqual({ type: 'url', url: 'mcp.apify.com' });
   });
+
+  it('should parse relative config path with :entry as config', () => {
+    // Regression: `docs/examples/mcp-config.json:fs` was parsed as URL because
+    // `https://docs/examples/mcp-config.json:fs` parses as a URL with host=docs.
+    expect(parseServerArg('docs/examples/mcp-config.json:fs')).toEqual({
+      type: 'config',
+      file: 'docs/examples/mcp-config.json',
+      entry: 'fs',
+    });
+
+    expect(parseServerArg('subdir/config.yaml:server')).toEqual({
+      type: 'config',
+      file: 'subdir/config.yaml',
+      entry: 'server',
+    });
+  });
 });
 
 describe('extractOptions', () => {

@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Sessions using a static bearer token (via `--header "Authorization: ..."`) no longer flip between `unauthorized` and `connecting` on every `mcpc` invocation — they stay `unauthorized` since retrying the same rejected token cannot succeed without `mcpc login` or reconnecting. OAuth-profile sessions still auto-retry because tokens may have been refreshed by another session
 - Server authentication errors now include the path to the bridge log file, so you can inspect it for more detail when investigating why a session was rejected
+- `mcpc connect` now recognizes relative config-file paths with a `:entry` suffix (e.g. `docs/examples/mcp-config.json:fs`). Previously these were misinterpreted as HTTP URLs because `https://` + the path parses as a URL with the first segment as the host
 
 ### Removed
 
