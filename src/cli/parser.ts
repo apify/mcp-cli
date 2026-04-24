@@ -391,28 +391,34 @@ export function parseServerArg(
   // Skip if arg starts with a path character — those are file paths, not hostnames.
   // Skip if arg ends with a config file extension (e.g., config.json) — clearly a file, not a hostname.
   // Skip if arg ends with ':' — dangling colon is not a valid hostname.
+  // Skip if arg matches the config-entry pattern (e.g. `relative/path.json:entry`) — the
+  // `https://` prefix would otherwise parse it as a URL with host=first-segment and mask the
+  // file:entry intent.
   const isWindowsDrive = /^[A-Za-z]:[/\\]/.test(arg);
   const startsWithPathChar =
     arg.startsWith('/') || arg.startsWith('~') || arg.startsWith('.') || isWindowsDrive;
   const hasConfigExtension = /\.(json|yaml|yml)$/i.test(arg);
-  if (!startsWithPathChar && !hasConfigExtension && !arg.endsWith(':')) {
-    if (isValidUrlWithHost('https://' + arg)) {
-      return { type: 'url', url: arg };
-    }
-  }
 
   // Step 3: config file entry — colon separates file path from entry name.
   // The left side must look like a file path (not a bare hostname).
   // Special case: Windows drive-letter paths (C:\...) have a colon at position 1;
   // use lastIndexOf(':') so we skip that drive colon and find the entry separator.
   const colonIndex = isWindowsDrive ? arg.lastIndexOf(':') : arg.indexOf(':');
+  const hasConfigEntryShape =
+    colonIndex > 0 &&
+    colonIndex < arg.length - 1 &&
+    looksLikeFilePath(arg.substring(0, colonIndex));
 
-  if (colonIndex > 0 && colonIndex < arg.length - 1) {
+  if (!startsWithPathChar && !hasConfigExtension && !hasConfigEntryShape && !arg.endsWith(':')) {
+    if (isValidUrlWithHost('https://' + arg)) {
+      return { type: 'url', url: arg };
+    }
+  }
+
+  if (hasConfigEntryShape) {
     const file = arg.substring(0, colonIndex);
     const entry = arg.substring(colonIndex + 1);
-    if (looksLikeFilePath(file)) {
-      return { type: 'config', file, entry };
-    }
+    return { type: 'config', file, entry };
   }
 
   // Step 4: bare config file path (no :entry suffix) — connect all servers from the file.
