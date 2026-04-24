@@ -464,9 +464,9 @@ ${chalk.bold('Stdio servers:')}
   NODE_EXTRA_CA_CERTS, HTTPS_PROXY) via the "env" block. Server stderr is
   logged to ~/.mcpc/logs/bridge-<session>.log.
 
-  When connecting from a config file (\`mcpc connect <config-file>\`), stdio
-  entries are skipped by default — pass --stdio to include them. Single-entry
-  connects (\`mcpc connect file:entry\`) are not affected.
+  Bulk connects (\`mcpc connect <config-file>\`) skip stdio entries by
+  default; pass --stdio to include them. Single-entry connects are
+  unaffected.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
