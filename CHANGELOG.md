@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Sessions using a static bearer token (via `--header "Authorization: ..."`) no longer flip between `unauthorized` and `connecting` on every `mcpc` invocation — they stay `unauthorized` since retrying the same rejected token cannot succeed without `mcpc login` or reconnecting. OAuth-profile sessions still auto-retry because tokens may have been refreshed by another session
 - Server authentication errors now include the path to the bridge log file, so you can inspect it for more detail when investigating why a session was rejected
+- Stdio servers no longer fail silently: the bridge now captures the child's stderr, writes each line to `~/.mcpc/logs/bridge-<session>.log` with a `[server stderr]` prefix, and appends a tail of the most recent lines to `mcpc connect` errors. This makes it obvious when a stdio server crashes on startup due to e.g. missing TLS trust (`NODE_EXTRA_CA_CERTS`), missing proxy vars, or missing credentials, rather than "hanging silently" (#195)
 
 ### Removed
 

@@ -123,6 +123,14 @@ class BridgeProcess {
   private mcpClientReadyResolver!: () => void;
   private mcpClientReadyRejecter!: (error: Error) => void;
 
+  // Bounded tail of stderr lines emitted by a stdio server, surfaced in the
+  // connect-failure error so the CLI can show users why startup failed
+  // (e.g. TLS errors when NODE_EXTRA_CA_CERTS is not forwarded — see #195).
+  private stderrTail: string[] = [];
+  private stderrTailChars = 0;
+  private static readonly STDERR_TAIL_MAX_LINES = 50;
+  private static readonly STDERR_TAIL_MAX_CHARS = 8_000;
+
   constructor(options: BridgeOptions) {
     this.options = options;
     // Each bridge instance gets a unique socket path based on its PID, so that
@@ -429,6 +437,12 @@ class BridgeProcess {
         if (isAuthenticationError(errorMsg) && !(error instanceof AuthError)) {
           classifiedError = new AuthError(errorMsg);
         }
+        // Append recent stdio server stderr so the CLI can show the user why
+        // startup failed (common case: missing NODE_EXTRA_CA_CERTS etc.).
+        if (this.stderrTail.length > 0) {
+          const tail = this.stderrTail.map((l) => `  ${l}`).join('\n');
+          classifiedError.message = `${classifiedError.message}\n\nRecent server stderr:\n${tail}`;
+        }
         this.mcpClientReadyRejecter(classifiedError);
 
         // If the error was due to session ID rejection or auth failure, mark session status
@@ -477,6 +491,25 @@ class BridgeProcess {
       logger.error('Failed to start bridge:', error);
       await this.cleanup();
       throw error;
+    }
+  }
+
+  /**
+   * Record a stderr line from a stdio server: write it to the bridge log file
+   * with a prefix, and keep a bounded tail for surfacing in connect failures.
+   */
+  private recordServerStderr(line: string): void {
+    logger.info(`[server stderr] ${line}`);
+
+    this.stderrTail.push(line);
+    this.stderrTailChars += line.length + 1;
+    while (
+      this.stderrTail.length > BridgeProcess.STDERR_TAIL_MAX_LINES ||
+      this.stderrTailChars > BridgeProcess.STDERR_TAIL_MAX_CHARS
+    ) {
+      const removed = this.stderrTail.shift();
+      if (removed === undefined) break;
+      this.stderrTailChars -= removed.length + 1;
     }
   }
 
@@ -593,6 +626,8 @@ class BridgeProcess {
       ...(this.options.mcpSessionId && { mcpSessionId: this.options.mcpSessionId }),
       // Pass x402 fetch middleware (HTTP transport only)
       ...(customFetch && { customFetch }),
+      // Route stdio server stderr into the bridge log + tail buffer
+      onStderrLine: (line: string) => this.recordServerStderr(line),
       listChanged: {
         tools: {
           // We handle refresh ourselves to fetch ALL pages (SDK only fetches the first page).

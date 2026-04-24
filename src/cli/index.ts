@@ -463,8 +463,9 @@ ${chalk.bold('Security:')}
 ${chalk.bold('Stdio environment:')}
   Stdio servers inherit only a minimal env whitelist (PATH, HOME, SHELL, …).
   Forward other vars (NODE_EXTRA_CA_CERTS, HTTPS_PROXY, SSL_CERT_FILE, …)
-  via the config "env" block using \${VAR_NAME}. If a stdio connect hangs
-  with no output, re-run with --verbose to surface the server's stderr.
+  via the config "env" block using \${VAR_NAME}. Server stderr is captured
+  to ~/.mcpc/logs/bridge-<session>.log, and the tail is appended to connect
+  errors so you can see why a stdio server failed to start.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
