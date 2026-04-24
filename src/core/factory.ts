@@ -59,6 +59,12 @@ export interface CreateMcpClientOptions {
   customFetch?: FetchLike;
 
   /**
+   * Callback for lines written to stderr by the child (stdio transport only).
+   * Ignored for HTTP transports.
+   */
+  onStderrLine?: (line: string) => void;
+
+  /**
    * Whether to automatically connect after creation
    * @default true
    */
@@ -132,6 +138,7 @@ export async function createMcpClient(options: CreateMcpClientOptions): Promise<
       authProvider?: OAuthClientProvider;
       mcpSessionId?: string;
       customFetch?: FetchLike;
+      onStderrLine?: (line: string) => void;
     } = {};
     if (options.authProvider) {
       transportOptions.authProvider = options.authProvider;
@@ -141,6 +148,9 @@ export async function createMcpClient(options: CreateMcpClientOptions): Promise<
     }
     if (options.customFetch) {
       transportOptions.customFetch = options.customFetch;
+    }
+    if (options.onStderrLine) {
+      transportOptions.onStderrLine = options.onStderrLine;
     }
     const transport = createTransportFromConfig(options.serverConfig, transportOptions);
     await client.connect(transport);

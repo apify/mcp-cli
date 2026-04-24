@@ -1147,6 +1147,14 @@ For **stdio servers:**
 - `args` (optional) - Array of command arguments
 - `env` (optional) - Environment variables for the process
 
+> **Note:** Stdio servers inherit only a minimal env whitelist from the shell
+> (`PATH`, `HOME`, `SHELL`, …). Other vars — `NODE_EXTRA_CA_CERTS`, `HTTPS_PROXY`,
+> `SSL_CERT_FILE`, etc. — must be forwarded explicitly via the `env` block using
+> `${VAR_NAME}`. Anything the server writes to stderr is captured to
+> `~/.mcpc/logs/bridge-<session>.log` with a `[server stderr]` prefix, and the
+> tail is appended to the error message if `mcpc connect` fails, so you can see
+> why a stdio server failed to start.
+
 **Using servers from config file:**
 
 Reference servers by their name using the `file:entry` syntax:

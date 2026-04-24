@@ -40,22 +40,65 @@ import { createLogger, getVerbose } from '../lib/logger.js';
 import type { ServerConfig } from '../lib/types.js';
 import { ClientError } from '../lib/errors.js';
 import { proxyFetch } from '../lib/proxy.js';
+import { createInterface } from 'node:readline';
+import type { Readable } from 'node:stream';
+
+/**
+ * Options for createStdioTransport
+ */
+export interface CreateStdioTransportOptions {
+  /**
+   * Callback invoked for each newline-delimited line written by the child
+   * server to stderr. When provided, stderr is piped and consumed; when not,
+   * it is inherited in verbose mode and discarded otherwise.
+   */
+  onStderrLine?: (line: string) => void;
+}
 
 /**
  * Create a stdio transport for a local MCP server
  */
-export function createStdioTransport(config: StdioServerParameters): Transport {
+export function createStdioTransport(
+  config: StdioServerParameters,
+  options: CreateStdioTransportOptions = {}
+): Transport {
   const logger = createLogger('StdioTransport');
   logger.debug('Creating stdio transport', { command: config.command, args: config.args });
 
-  // Suppress server stderr unless in verbose mode
-  // Server stderr typically contains startup messages that clutter output
+  // Pipe stderr when a handler is provided so the caller (bridge) can log it
+  // to the session log and surface it on connect failures. Otherwise fall back
+  // to inheriting in verbose mode or dropping it — stdio servers often print
+  // noisy startup banners that would clutter normal CLI output.
+  const shouldPipe = !!options.onStderrLine;
   const params: StdioServerParameters = {
     ...config,
-    stderr: getVerbose() ? 'inherit' : 'ignore',
+    stderr: shouldPipe ? 'pipe' : getVerbose() ? 'inherit' : 'ignore',
   };
 
-  return new StdioClientTransport(params);
+  const transport = new StdioClientTransport(params);
+
+  if (options.onStderrLine) {
+    const handler = options.onStderrLine;
+    // With stderr: 'pipe', the SDK exposes a PassThrough stream on
+    // `transport.stderr` from construction time onwards, so we can attach the
+    // reader before `start()` is called without losing any output.
+    // SDK types stderr as the abstract Stream class; the runtime value is
+    // always a PassThrough (Readable) when stderr === 'pipe'.
+    const stream = transport.stderr as Readable | null;
+    if (stream) {
+      const rl = createInterface({ input: stream, crlfDelay: Infinity });
+      rl.on('line', (line) => {
+        if (line.length === 0) return;
+        try {
+          handler(line);
+        } catch (err) {
+          logger.debug('onStderrLine handler threw:', err);
+        }
+      });
+    }
+  }
+
+  return transport;
 }
 
 /**
@@ -133,6 +176,12 @@ export interface CreateTransportOptions {
    * Used by x402 middleware to intercept and modify requests
    */
   customFetch?: FetchLike;
+
+  /**
+   * Callback for lines written to stderr by the child (stdio transport only).
+   * Ignored for HTTP transports.
+   */
+  onStderrLine?: (line: string) => void;
 }
 
 /**
@@ -155,7 +204,9 @@ export function createTransportFromConfig(
       stdioConfig.env = config.env;
     }
 
-    return createStdioTransport(stdioConfig);
+    return createStdioTransport(stdioConfig, {
+      ...(options.onStderrLine && { onStderrLine: options.onStderrLine }),
+    });
   }
 
   // HTTP transport

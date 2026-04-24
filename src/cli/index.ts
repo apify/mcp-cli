@@ -456,9 +456,12 @@ ${chalk.bold('Session name:')}
   names) is reused, and restarted if not live. Cannot be set when connecting
   all servers from a config file.
 
-${chalk.bold('Security:')}
-  Stdio config entries execute the configured command locally on connect,
-  even if the MCP handshake later fails. Only connect to configs you trust.
+${chalk.bold('Stdio servers:')}
+  Config entries execute the configured command locally on connect, even if
+  the MCP handshake later fails — only connect to configs you trust. Stdio
+  servers inherit a minimal env whitelist; forward extras (e.g.
+  NODE_EXTRA_CA_CERTS, HTTPS_PROXY) via the "env" block. Server stderr is
+  logged to ~/.mcpc/logs/bridge-<session>.log.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
