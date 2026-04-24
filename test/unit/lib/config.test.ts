@@ -9,6 +9,7 @@ import {
   getServerConfig,
   validateServerConfig,
   listServers,
+  isStdioEntry,
 } from '../../../src/lib/config.js';
 import { ClientError } from '../../../src/lib/errors.js';
 
@@ -167,6 +168,46 @@ describe('validateServerConfig', () => {
     const config = { command: '' };
     expect(() => validateServerConfig(config)).toThrow(ClientError);
     expect(() => validateServerConfig(config)).toThrow('must be a non-empty string');
+  });
+});
+
+describe('isStdioEntry', () => {
+  it('returns true for entries with a command field', () => {
+    const config = {
+      mcpServers: {
+        local: { command: 'node', args: ['server.js'] },
+      },
+    };
+    expect(isStdioEntry(config, 'local')).toBe(true);
+  });
+
+  it('returns false for entries with a url field', () => {
+    const config = {
+      mcpServers: {
+        remote: { url: 'https://example.com' },
+      },
+    };
+    expect(isStdioEntry(config, 'remote')).toBe(false);
+  });
+
+  it('returns false for non-existent entries', () => {
+    const config = {
+      mcpServers: {
+        remote: { url: 'https://example.com' },
+      },
+    };
+    expect(isStdioEntry(config, 'missing')).toBe(false);
+  });
+
+  it('correctly distinguishes entries in a mixed config', () => {
+    const config = {
+      mcpServers: {
+        http: { url: 'https://example.com' },
+        stdio: { command: 'npx', args: ['-y', 'mcp-server'] },
+      },
+    };
+    expect(isStdioEntry(config, 'http')).toBe(false);
+    expect(isStdioEntry(config, 'stdio')).toBe(true);
   });
 });
 

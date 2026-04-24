@@ -55,7 +55,7 @@ import { getWallet } from '../../lib/wallets.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
 import { parseProxyArg } from '../parser.js';
-import { loadConfig, listServers } from '../../lib/config.js';
+import { loadConfig, listServers, isStdioEntry } from '../../lib/config.js';
 
 const logger = createLogger('sessions');
 
@@ -911,15 +911,53 @@ export async function connectAllFromConfig(
     noProfile?: boolean;
     proxy?: string;
     proxyBearerToken?: string;
+    stdio?: boolean;
     x402?: boolean;
     insecure?: boolean;
   }
 ): Promise<void> {
   const config = loadConfig(configFile);
-  const serverNames = listServers(config);
+  const allNames = listServers(config);
+
+  if (allNames.length === 0) {
+    throw new ClientError(`No servers found in config file: ${configFile}`);
+  }
+
+  // Filter out stdio entries unless --stdio is passed. Stdio entries execute
+  // arbitrary local commands via child_process.spawn(), so bulk-connect
+  // operations default to skipping them to mitigate supply-chain risk from
+  // malicious config files.
+  const stdioSkipped: string[] = [];
+  const serverNames = allNames.filter((name) => {
+    if (!options.stdio && isStdioEntry(config, name)) {
+      stdioSkipped.push(name);
+      return false;
+    }
+    return true;
+  });
 
   if (serverNames.length === 0) {
-    throw new ClientError(`No servers found in config file: ${configFile}`);
+    if (options.outputMode === 'json') {
+      console.log(
+        formatOutput(
+          {
+            configFile,
+            results: [],
+            skipped: stdioSkipped.map((entry) => ({
+              entry,
+              sessionName: generateSessionName({ type: 'config', file: configFile, entry }),
+              reason: 'stdio',
+            })),
+          },
+          'json'
+        )
+      );
+      return;
+    }
+    throw new ClientError(
+      `All ${allNames.length} server${allNames.length === 1 ? '' : 's'} in ${configFile} use stdio transport.\n` +
+        `Pass --stdio to include them: mcpc connect ${configFile} --stdio`
+    );
   }
 
   if (options.outputMode === 'human') {
@@ -928,6 +966,14 @@ export async function connectAllFromConfig(
         `Connecting ${serverNames.length} server${serverNames.length === 1 ? '' : 's'} from ${configFile}...`
       )
     );
+    if (stdioSkipped.length > 0) {
+      console.log(
+        chalk.dim(
+          `  skipping ${stdioSkipped.length} stdio server${stdioSkipped.length === 1 ? '' : 's'} ` +
+            `(${stdioSkipped.join(', ')}), pass --stdio to include`
+        )
+      );
+    }
   }
 
   // Prepare entries with deterministic session names derived from entry names.
@@ -1019,6 +1065,13 @@ export async function connectAllFromConfig(
             status: r.status,
             ...(r.error && { error: r.error }),
           })),
+          ...(stdioSkipped.length > 0 && {
+            skipped: stdioSkipped.map((entry) => ({
+              entry,
+              sessionName: generateSessionName({ type: 'config', file: configFile, entry }),
+              reason: 'stdio',
+            })),
+          }),
         },
         'json'
       )

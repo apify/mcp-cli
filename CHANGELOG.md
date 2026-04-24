@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - OAuth callback ports for the hosted CIMD changed from the contiguous range 13316–13325 to 6 non-contiguous ports (13316, 13163, 31316, 31613, 16133, 16313) so one unrelated process is less likely to claim all of them. `localhost` variants dropped from the CIMD's `redirect_uris` in favor of `127.0.0.1` only (per RFC 8252 §8.3, which recommends the IP literal to avoid DNS resolution ambiguity).
+- Stdio (command-based) config entries are now skipped by default when connecting from a config file (`mcpc connect <file>`). Pass `--stdio` to include them. Single-entry connects (`mcpc connect file:entry @session`) are not affected.
 - `restart` success message now notes that previous session state (resource subscriptions, pending notifications, async tasks) was lost, since explicit restart always creates a fresh MCP session
 - `tasks-list` now shows a hint on how to start a new task (`mcpc @session tools-call <name> [args] --task`) when there are no active tasks
 - `mcpc help <command>` now shows a "Did you mean?" suggestion when the command is unknown (e.g., `mcpc help tasks-gfet` → suggests `tasks-get`)

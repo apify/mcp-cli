@@ -228,3 +228,11 @@ export function validateServerConfig(config: ServerConfig): boolean {
 
   return true;
 }
+
+/**
+ * Check whether a named entry in an MCP config uses the stdio transport
+ * (i.e. has a `command` field rather than a `url`).
+ */
+export function isStdioEntry(config: McpConfig, entryName: string): boolean {
+  return config.mcpServers[entryName]?.command !== undefined;
+}
