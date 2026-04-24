@@ -502,6 +502,7 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
           ...(headers && { headers }),
           ...(opts.proxy && { proxy: opts.proxy as string }),
           ...(opts.proxyBearerToken && { proxyBearerToken: opts.proxyBearerToken as string }),
+          ...(opts.stdio && { stdio: true }),
           ...(opts.x402 && { x402: opts.x402 as boolean }),
           ...(globalOpts.insecure && { insecure: true }),
         });
