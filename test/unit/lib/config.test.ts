@@ -318,6 +318,7 @@ describe('getStandardMcpConfigPaths', () => {
     const projectPaths = paths.filter((p) => p.scope === 'project').map((p) => p.path);
     expect(projectPaths).toContain('/work/project/.mcp.json');
     expect(projectPaths).toContain('/work/project/mcp.json');
+    expect(projectPaths).toContain('/work/project/mcp_config.json');
     expect(projectPaths).toContain('/work/project/.cursor/mcp.json');
     expect(projectPaths).toContain('/work/project/.vscode/mcp.json');
     expect(projectPaths).toContain('/work/project/.kiro/settings/mcp.json');
