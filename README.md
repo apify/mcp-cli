@@ -1,9 +1,10 @@
 # `mcpc`: Universal MCP command-line client
 
-`mcpc` is a CLI for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-that maps MCP operations to intuitive commands for interactive shell use, scripts, and AI coding agents.
 
 ![mcpc logo](https://apify.github.io/mcpc/client-logo.svg?v=2)
+
+`mcpc` is a CLI for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
+that maps MCP operations to intuitive commands for interactive shell use, scripts, and AI coding agents.
 
 `mcpc` is a Swiss Army knife for MCP. It is useful for inspecting servers, scripting,
 and enabling AI coding agents to use MCP ["code mode"](#ai-agents) in shell.
