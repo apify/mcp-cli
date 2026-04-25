@@ -67,7 +67,7 @@ describe('loadConfig', () => {
     writeFileSync(configPath, JSON.stringify({ other: 'field' }));
 
     expect(() => loadConfig(configPath)).toThrow(ClientError);
-    expect(() => loadConfig(configPath)).toThrow('missing or invalid "mcpServers" field');
+    expect(() => loadConfig(configPath)).toThrow('missing or invalid "mcpServers"');
   });
 });
 
@@ -448,7 +448,6 @@ describe('discoverMcpConfigFiles', () => {
     });
     expect(discovered).toHaveLength(1);
     expect(discovered[0]?.scope).toBe('project');
-    expect(discovered[0]?.label).toBe('Claude Code (project)');
     expect(discovered[0]?.serverCount).toBe(1);
     expect(Object.keys(discovered[0]?.config.mcpServers ?? {})).toEqual(['foo']);
   });
@@ -475,7 +474,6 @@ describe('discoverMcpConfigFiles', () => {
     });
     expect(discovered).toHaveLength(1);
     expect(discovered[0]?.scope).toBe('project');
-    expect(discovered[0]?.label).toBe('mcp.json (project)');
     expect(discovered[0]?.serverCount).toBe(1);
   });
 
@@ -524,7 +522,7 @@ describe('discoverMcpConfigFiles', () => {
       cwd,
       platform: 'linux',
     });
-    expect(discovered.map((d) => d.label)).toContain('Cursor');
+    expect(discovered.some((d) => d.path.includes('.cursor/mcp.json'))).toBe(true);
   });
 
   it('returns project configs before global configs', () => {
@@ -631,7 +629,11 @@ describe('discoverMcpConfigFiles', () => {
       cwd,
       platform: 'linux',
     });
-    const labels = discovered.map((d) => d.label);
-    expect(labels).toEqual(['Claude Code (project)', 'VS Code (project)', 'Cursor', 'VS Code']);
+    const paths = discovered.map((d) => d.path);
+    expect(paths).toHaveLength(4);
+    expect(paths[0]).toContain('.mcp.json');
+    expect(paths[1]).toContain('.vscode/mcp.json');
+    expect(paths[2]).toContain('.cursor/mcp.json');
+    expect(paths[3]).toContain('.vscode/mcp.json');
   });
 });

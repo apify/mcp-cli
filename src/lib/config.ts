@@ -28,12 +28,24 @@ export function loadConfig(configPath: string): McpConfig {
     const content = readFileSync(absolutePath, 'utf-8');
 
     // Parse JSON
-    const config = JSON.parse(content) as McpConfig;
+    const raw = JSON.parse(content) as Record<string, unknown>;
+
+    // Normalize VS Code format: "servers" → "mcpServers"
+    if (
+      !raw.mcpServers &&
+      raw.servers &&
+      typeof raw.servers === 'object' &&
+      !Array.isArray(raw.servers)
+    ) {
+      raw.mcpServers = raw.servers;
+    }
+
+    const config = raw as unknown as McpConfig;
 
     // Validate structure
     if (!config.mcpServers || typeof config.mcpServers !== 'object') {
       throw new ClientError(
-        `Invalid config file format: missing or invalid "mcpServers" field.\n` +
+        `Invalid config file format: missing or invalid "mcpServers" (or "servers") field.\n` +
           `Expected: { "mcpServers": { "server-name": {...} } }`
       );
     }
@@ -243,13 +255,11 @@ export function isStdioEntry(config: McpConfig, entryName: string): boolean {
 // ----------------------------------------------------------------------------
 
 /**
- * A well-known config file location with a friendly label.
+ * A well-known config file location.
  */
 export interface ConfigCandidate {
   /** Absolute path to the config file. */
   path: string;
-  /** Friendly label for display (e.g., "VS Code", "Cursor"). */
-  label: string;
   /** Scope: 'project' (CWD-relative) or 'global' (home-relative). */
   scope: 'project' | 'global';
 }
@@ -298,65 +308,44 @@ export function getStandardMcpConfigPaths(options?: {
 
   // Project-level configs (CWD) — highest priority, most specific
   candidates.push(
-    { path: join(cwd, '.mcp.json'), label: 'Claude Code (project)', scope: 'project' },
-    { path: join(cwd, 'mcp.json'), label: 'mcp.json (project)', scope: 'project' },
-    { path: join(cwd, 'mcp_config.json'), label: 'mcp_config.json (project)', scope: 'project' },
-    { path: join(cwd, '.cursor/mcp.json'), label: 'Cursor (project)', scope: 'project' },
-    { path: join(cwd, '.vscode/mcp.json'), label: 'VS Code (project)', scope: 'project' },
-    { path: join(cwd, '.kiro/settings/mcp.json'), label: 'Kiro (project)', scope: 'project' }
+    { path: join(cwd, '.mcp.json'), scope: 'project' },
+    { path: join(cwd, 'mcp.json'), scope: 'project' },
+    { path: join(cwd, 'mcp_config.json'), scope: 'project' },
+    { path: join(cwd, '.cursor/mcp.json'), scope: 'project' },
+    { path: join(cwd, '.vscode/mcp.json'), scope: 'project' },
+    { path: join(cwd, '.kiro/settings/mcp.json'), scope: 'project' }
   );
 
   // Global / user-level configs
   candidates.push(
-    { path: join(home, '.cursor/mcp.json'), label: 'Cursor', scope: 'global' },
-    { path: join(home, '.vscode/mcp.json'), label: 'VS Code', scope: 'global' },
-    { path: join(home, '.codeium/windsurf/mcp_config.json'), label: 'Windsurf', scope: 'global' },
-    { path: join(home, '.kiro/settings/mcp.json'), label: 'Kiro', scope: 'global' },
-    { path: join(home, '.claude.json'), label: 'Claude Code', scope: 'global' }
+    { path: join(home, '.cursor/mcp.json'), scope: 'global' },
+    { path: join(home, '.vscode/mcp.json'), scope: 'global' },
+    { path: join(home, '.codeium/windsurf/mcp_config.json'), scope: 'global' },
+    { path: join(home, '.kiro/settings/mcp.json'), scope: 'global' },
+    { path: join(home, '.claude.json'), scope: 'global' }
   );
 
-  // Claude Desktop — platform-specific path
+  // VS Code app config and Claude Desktop — platform-specific paths
   if (os === 'darwin') {
     candidates.push(
-      {
-        path: join(home, 'Library/Application Support/Code/User/mcp.json'),
-        label: 'VS Code',
-        scope: 'global',
-      },
+      { path: join(home, 'Library/Application Support/Code/User/mcp.json'), scope: 'global' },
       {
         path: join(home, 'Library/Application Support/Claude/claude_desktop_config.json'),
-        label: 'Claude Desktop',
         scope: 'global',
       }
     );
   } else if (os === 'win32') {
     if (appData) {
       candidates.push(
-        {
-          path: join(appData, 'Code/User/mcp.json'),
-          label: 'VS Code',
-          scope: 'global',
-        },
-        {
-          path: join(appData, 'Claude/claude_desktop_config.json'),
-          label: 'Claude Desktop',
-          scope: 'global',
-        }
+        { path: join(appData, 'Code/User/mcp.json'), scope: 'global' },
+        { path: join(appData, 'Claude/claude_desktop_config.json'), scope: 'global' }
       );
     }
   } else {
     // Linux / other — XDG-style
     candidates.push(
-      {
-        path: join(home, '.config/Code/User/mcp.json'),
-        label: 'VS Code',
-        scope: 'global',
-      },
-      {
-        path: join(home, '.config/Claude/claude_desktop_config.json'),
-        label: 'Claude Desktop',
-        scope: 'global',
-      }
+      { path: join(home, '.config/Code/User/mcp.json'), scope: 'global' },
+      { path: join(home, '.config/Claude/claude_desktop_config.json'), scope: 'global' }
     );
   }
 

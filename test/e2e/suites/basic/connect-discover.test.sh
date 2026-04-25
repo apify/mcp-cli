@@ -85,7 +85,7 @@ _SESSIONS_CREATED+=("@discover-project")
 run_mcpc_discover connect
 assert_success "connect with project-scope config should succeed"
 assert_contains "$STDOUT" "Found 1 MCP config file"
-assert_contains "$STDOUT" "Claude Code (project)"
+assert_contains "$STDOUT" ".mcp.json"
 assert_contains "$STDOUT" "@discover-project"
 assert_contains "$STDOUT" "connecting"
 test_pass
@@ -114,7 +114,7 @@ _SESSIONS_CREATED+=("@discover-global")
 
 run_mcpc_discover connect
 assert_success "connect with global-scope config should succeed"
-assert_contains "$STDOUT" "Cursor"
+assert_contains "$STDOUT" ".cursor/mcp.json"
 assert_contains "$STDOUT" "@discover-global"
 test_pass
 

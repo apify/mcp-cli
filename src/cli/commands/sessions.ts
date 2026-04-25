@@ -926,8 +926,6 @@ type BulkConnectOptions = {
 type BulkConnectEntry = {
   /** Config file path that defines this entry. */
   configFile: string;
-  /** Friendly label for the source config (for display, e.g. "VS Code"). */
-  configLabel?: string;
   /** Entry name inside the config's `mcpServers` object. */
   entry: string;
   /** Resolved session name (with @ prefix). */
@@ -945,7 +943,7 @@ type BulkConnectResult = BulkConnectEntry & {
  */
 async function bulkConnectEntries(
   entries: BulkConnectEntry[],
-  options: BulkConnectOptions & { showSource?: boolean }
+  options: BulkConnectOptions
 ): Promise<BulkConnectResult[]> {
   // Pre-check which sessions are already live (for accurate status badges)
   const liveSet = new Set<string>();
@@ -981,17 +979,16 @@ async function bulkConnectEntries(
   if (options.outputMode === 'human') {
     for (const r of results) {
       const name = chalk.cyan(r.sessionName);
-      const suffix = options.showSource && r.configLabel ? chalk.dim(` from ${r.configLabel}`) : '';
       switch (r.status) {
         case 'created':
-          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('connecting')}${suffix}`);
+          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('connecting')}`);
           break;
         case 'active':
-          console.log(`  ${chalk.green('●')} ${name} ${chalk.dim('already active')}${suffix}`);
+          console.log(`  ${chalk.green('●')} ${name} ${chalk.dim('already active')}`);
           break;
         case 'failed':
           console.log(
-            `  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}${suffix}`
+            `  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}`
           );
           break;
       }
@@ -1141,7 +1138,7 @@ export async function connectAllFromConfig(
   }
 }
 
-type SkippedEntry = { configFile: string; configLabel: string; entry: string; sessionName: string };
+type SkippedEntry = { configFile: string; entry: string; sessionName: string };
 
 /**
  * Aggregate config entries from multiple discovered config files into a flat list of
@@ -1166,17 +1163,16 @@ function aggregateDiscoveredEntries(
     for (const entry of Object.keys(d.config.mcpServers)) {
       const sessionName = generateSessionName({ type: 'config', file: d.path, entry });
       if (!options.stdio && isStdioEntry(d.config, entry)) {
-        skippedStdio.push({ configFile: d.path, configLabel: d.label, entry, sessionName });
+        skippedStdio.push({ configFile: d.path, entry, sessionName });
         continue;
       }
       if (seenNames.has(sessionName)) {
-        skippedDuplicates.push({ configFile: d.path, configLabel: d.label, entry, sessionName });
+        skippedDuplicates.push({ configFile: d.path, entry, sessionName });
         continue;
       }
       seenNames.add(sessionName);
       entries.push({
         configFile: d.path,
-        configLabel: d.label,
         entry,
         sessionName,
       });
@@ -1245,36 +1241,57 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
           `with ${totalEntries} server${totalEntries === 1 ? '' : 's'}:`
       )
     );
+
+    // Group all entries (connected + skipped) by config file for display
     for (const d of discovered) {
       console.log(
-        `  ${chalk.dim('-')} ${d.path} ${chalk.dim(`(${d.label}, ${d.serverCount} server${d.serverCount === 1 ? '' : 's'})`)}`
+        `  ${d.path} ${chalk.dim(`(${d.serverCount} server${d.serverCount === 1 ? '' : 's'})`)}`
       );
+      for (const entryName of Object.keys(d.config.mcpServers)) {
+        const sessionName = generateSessionName({ type: 'config', file: d.path, entry: entryName });
+        const serverCfg = d.config.mcpServers[entryName];
+        const target = serverCfg?.url ?? [serverCfg?.command, ...(serverCfg?.args ?? [])].join(' ');
+        const truncated = target && target.length > 72 ? target.slice(0, 72) + '…' : target;
+
+        const isStdio = skippedStdio.some((s) => s.configFile === d.path && s.entry === entryName);
+        const isDuplicate = skippedDuplicates.some(
+          (s) => s.configFile === d.path && s.entry === entryName
+        );
+
+        if (isStdio) {
+          console.log(
+            `    ${chalk.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)} ${chalk.yellow('○ skipped (stdio)')}`
+          );
+        } else if (isDuplicate) {
+          console.log(
+            `    ${chalk.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)} ${chalk.dim('○ skipped (duplicate)')}`
+          );
+        } else {
+          console.log(`    ${chalk.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)}`);
+        }
+      }
     }
-    if (skippedStdio.length > 0) {
-      console.log(
-        chalk.dim(
-          `  skipping ${skippedStdio.length} stdio server${skippedStdio.length === 1 ? '' : 's'} ` +
-            `(${skippedStdio.map((s) => s.entry).join(', ')}), pass --stdio to include`
-        )
-      );
-    }
-    if (skippedDuplicates.length > 0) {
-      console.log(
-        chalk.dim(
-          `  skipping ${skippedDuplicates.length} duplicate${skippedDuplicates.length === 1 ? '' : 's'}: ` +
-            skippedDuplicates.map((s) => `${s.sessionName} from ${s.configLabel}`).join(', ')
-        )
-      );
-    }
+
     if (entries.length === 0 && !hasApifyToken) {
       throw new ClientError(
         `All servers in discovered config files use stdio transport.\n` +
           `Pass --stdio to include them: mcpc connect --stdio`
       );
     }
-    console.log(
-      chalk.cyan(`\nConnecting ${entries.length} server${entries.length === 1 ? '' : 's'}...`)
-    );
+
+    // Summary line
+    const parts: string[] = [];
+    if (entries.length > 0) {
+      parts.push(`Connecting ${entries.length} server${entries.length === 1 ? '' : 's'}`);
+    }
+    if (skippedStdio.length > 0) {
+      parts.push(
+        `skipped ${skippedStdio.length} stdio server${skippedStdio.length === 1 ? '' : 's'}, pass --stdio to include`
+      );
+    }
+    if (parts.length > 0) {
+      console.log(chalk.cyan(`\n${parts.join('. ')}.`));
+    }
   }
 
   const allSkipped = [
@@ -1282,14 +1299,12 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
       entry: s.entry,
       sessionName: s.sessionName,
       configFile: s.configFile,
-      configLabel: s.configLabel,
       reason: 'stdio' as const,
     })),
     ...skippedDuplicates.map((s) => ({
       entry: s.entry,
       sessionName: s.sessionName,
       configFile: s.configFile,
-      configLabel: s.configLabel,
       reason: 'duplicate' as const,
     })),
   ];
@@ -1303,7 +1318,6 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
           {
             discovered: discovered.map((d) => ({
               path: d.path,
-              label: d.label,
               scope: d.scope,
               serverCount: d.serverCount,
             })),
@@ -1319,7 +1333,7 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
     return;
   }
 
-  const results = await bulkConnectEntries(entries, { ...options, showSource: true });
+  const results = await bulkConnectEntries(entries, options);
 
   if (options.outputMode === 'json') {
     console.log(
@@ -1327,7 +1341,6 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
         {
           discovered: discovered.map((d) => ({
             path: d.path,
-            label: d.label,
             scope: d.scope,
             serverCount: d.serverCount,
           })),
@@ -1335,7 +1348,6 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
             entry: r.entry,
             sessionName: r.sessionName,
             configFile: r.configFile,
-            configLabel: r.configLabel,
             status: r.status,
             ...(r.error && { error: r.error }),
           })),
