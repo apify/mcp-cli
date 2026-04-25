@@ -5,21 +5,22 @@
 `mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 that maps MCP operations to intuitive commands for interactive shell use, scripts, and AI coding agents.
 
-`mcpc` is a Swiss Army knife for MCP. It is useful for inspecting servers, scripting,
+`mcpc` is your Swiss Army knife for MCP. It is useful for inspecting servers, scripting,
 and enabling AI coding agents to use MCP ["code mode"](#ai-agents) in shell.
-After all, UNIX-compatible shell script is THE most universal coding language.
- 
-![mcpc screenshot](https://raw.githubusercontent.com/apify/mcpc/main/docs/images/mcpc-demo.gif)
+After all, UNIX-style shell script is THE most universal coding language.
 
 **Key features:**
 
 - 🔧 **Full MCP support** - HTTP/stdio, instructions, tools, resources, prompts, async tasks, dynamic discovery, ...
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
 - 🔌 **Code mode** - JSON output enables integration with CLI tools like `jq` and scripting.
+- 🗺️ **Progressive tool discovery** - Let AI agents find MCP tools on the fly to save tokens and increase accuracy.
 - 🤖 **AI sandboxing** - MCP proxy server to securely access authenticated sessions from AI-generated code.
 - 🔒 **Secure** - Full OAuth 2.1 support, OS keychain for credentials storage.
 - 🪶 **Lightweight** - Minimal dependencies, works on Mac/Win/Linux, doesn't use LLMs on its own.
 - 💸 **Agentic payments** - Experimental support for the [x402](https://www.x402.org/) agentic payments protocol on [Base](https://www.base.org/).
+ 
+![mcpc screenshot](https://raw.githubusercontent.com/apify/mcpc/main/docs/images/mcpc-demo.gif)
 
 ## Table of contents
 
