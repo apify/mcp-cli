@@ -1,4 +1,4 @@
-# `mcpc`: Universal MCP command-line client
+# mcpc: a universal MCP command-line client
 
 
 ![mcpc logo](https://apify.github.io/mcpc/client-logo.svg?v=2)
