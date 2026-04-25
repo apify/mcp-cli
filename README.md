@@ -1,4 +1,4 @@
-# mcpc: a universal MCP CLI client
+# mcpc — a universal MCP CLI client
 
 ![mcpc logo](https://apify.github.io/mcpc/client-logo.svg?v=2)
 
