@@ -155,7 +155,7 @@ run_mcpc_discover connect
 assert_success "discovery with collision should succeed"
 # Must show two config files discovered, one duplicate skipped
 assert_contains "$STDOUT" "Found 2 MCP config files"
-assert_contains "$STDOUT" "skipping"
+assert_contains "$STDOUT" "skipped (duplicate)"
 assert_contains "$STDOUT" "@shared"
 test_pass
 
