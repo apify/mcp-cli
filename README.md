@@ -3,23 +3,23 @@
 ![mcpc logo](https://apify.github.io/mcpc/client-logo.svg?v=2)
 
 `mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-that maps MCP operations to intuitive commands for interactive shell use, scripts, and AI coding agents.
+that maps MCP operations to intuitive commands for interactive shell use, scripting, and AI agents.
 
-`mcpc` is your Swiss Army knife for MCP. It is useful for inspecting servers, scripting,
-and enabling AI coding agents to use MCP ["code mode"](#ai-agents) in shell.
-After all, UNIX-style shell script is THE most universal coding language.
+`mcpc` is your new Swiss Army knife for MCP. It's great for manual inspection and debugging of MCP servers,
+as well as for agents to leverage all modern MCP capabilities through the most universal
+coding interface: the UNIX shell.
 
 **Key features:**
 
-- 🔧 **Full MCP support** - HTTP/stdio, instructions, tools, resources, prompts, async tasks, dynamic discovery, ...
-- 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
-- 🔌 **Code mode** - JSON output enables integration with CLI tools like `jq` and scripting.
-- 🗺️ **Progressive tool discovery** - Let AI agents find MCP tools on the fly to save tokens and increase accuracy.
-- 🤖 **AI sandboxing** - MCP proxy server to securely access authenticated sessions from AI-generated code.
-- 🔒 **Secure** - Full OAuth 2.1 support, OS keychain for credentials storage.
+- 🔧 **Full MCP support** - HTTP/stdio transports, instructions, tools, async tasks, resources, prompts, ...
+- 🔄 **Persistent sessions** - Keep multiple stateful connections alive simultaneously.
+- 🗺️ **Progressive tool discovery** - Find relevant MCP tools on the fly to save tokens and increase accuracy.
+- 🔌 **Code mode** - JSON output composes with `jq`, `xargs`, and shell pipelines for MCP workflows as shell scripts.
+- 🔒 **Secure** - Full OAuth 2.1 support with CMID and DCR, uses OS keychain for credentials storage.
+- 🤖 **AI sandboxing** - Proxy MCP server connections to protect credentials from AI-generated code. 
 - 🪶 **Lightweight** - Minimal dependencies, works on Mac/Win/Linux, doesn't use LLMs on its own.
-- 💸 **Agentic payments** - Experimental support for the [x402](https://www.x402.org/) agentic payments protocol on [Base](https://www.base.org/).
- 
+- 💸 **Agentic payments** - Experimental support for the [x402](https://www.x402.org/) protocol on [Base](https://www.base.org/).
+
 ![mcpc screenshot](https://raw.githubusercontent.com/apify/mcpc/main/docs/images/mcpc-demo.gif)
 
 ## Table of contents
