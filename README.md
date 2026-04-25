@@ -8,19 +8,18 @@ that maps MCP operations to intuitive commands for interactive shell use, script
 `mcpc` is a Swiss Army knife for MCP. It is useful for inspecting servers, scripting,
 and enabling AI coding agents to use MCP ["code mode"](#ai-agents) in shell.
 After all, UNIX-compatible shell script is THE most universal coding language.
-
+ 
 ![mcpc screenshot](https://raw.githubusercontent.com/apify/mcpc/main/docs/images/mcpc-demo.gif)
 
 **Key features:**
 
-- 🌎 **Compatible** - Works with any MCP server over Streamable HTTP or stdio.
+- 🔧 **Full MCP support** - HTTP/stdio, instructions, tools, resources, prompts, async tasks, dynamic discovery, ...
 - 🔄 **Persistent sessions** - Keep multiple server connections alive simultaneously.
-- 🔧 **Strong MCP support** - Instructions, tools, resources, prompts, async tasks, dynamic discovery.
 - 🔌 **Code mode** - JSON output enables integration with CLI tools like `jq` and scripting.
 - 🤖 **AI sandboxing** - MCP proxy server to securely access authenticated sessions from AI-generated code.
 - 🔒 **Secure** - Full OAuth 2.1 support, OS keychain for credentials storage.
 - 🪶 **Lightweight** - Minimal dependencies, works on Mac/Win/Linux, doesn't use LLMs on its own.
-- 💸 **[Agentic payments (x402)](#agentic-payments-x402)** - Experimental support for the [x402](https://www.x402.org/) payment protocol, enabling AI agents to pay for MCP tool calls with USDC on [Base](https://www.base.org/).
+- 💸 **Agentic payments** - Experimental support for the [x402](https://www.x402.org/) agentic payments protocol on [Base](https://www.base.org/).
 
 ## Table of contents
 
