@@ -1,3 +1,5 @@
+<img src="https://apify.github.io/mcpc/client-logo.svg" alt="mcpc logo" width="128" height="128" align="right">
+
 # `mcpc`: Universal MCP command-line client
 
 `mcpc` is a CLI for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
