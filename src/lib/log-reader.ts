@@ -204,6 +204,19 @@ export function resolveSince(input: string): Date | null {
   return null;
 }
 
+export interface FollowOptions {
+  /**
+   * Poll interval in ms. Backstop for filesystems where fs.watch is unreliable
+   * (NFS, some network mounts). Defaults to 1000ms; tests can lower it.
+   */
+  pollIntervalMs?: number;
+  /**
+   * Start streaming from the beginning of the file instead of the end.
+   * Default false — backlog is normally the caller's responsibility.
+   */
+  startAtBeginning?: boolean;
+}
+
 /**
  * Live-follow the current log file for a session (tail -f style).
  *
@@ -213,9 +226,11 @@ export function resolveSince(input: string): Date | null {
  */
 export function followLog(
   sessionName: string,
-  onLine: (line: string) => void
+  onLine: (line: string) => void,
+  options: FollowOptions = {}
 ): { stop: () => Promise<void> } {
   const path = getBridgeLogPath(sessionName);
+  const pollIntervalMs = options.pollIntervalMs ?? 1000;
   let position = 0;
   let inode: number | null = null;
   let watcher: FSWatcher | null = null;
@@ -285,12 +300,16 @@ export function followLog(
     }
   };
 
-  // Start at end of file so backlog is the caller's responsibility.
+  // Start at end of file so backlog is the caller's responsibility, unless the
+  // caller explicitly opts into replaying from the beginning (used by tests).
   void (async () => {
     try {
       const st = await stat(path);
-      position = st.size;
+      position = options.startAtBeginning ? 0 : st.size;
       inode = st.ino;
+      if (options.startAtBeginning) {
+        await drainPending();
+      }
     } catch {
       position = 0;
     }
@@ -309,7 +328,7 @@ export function followLog(
   // (NFS, network mounts) still get picked up.
   const poll = setInterval(() => {
     void drainPending();
-  }, 1000);
+  }, pollIntervalMs);
 
   return {
     stop: async (): Promise<void> => {
