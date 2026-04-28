@@ -15,7 +15,7 @@ import {
   redactHeaders,
 } from '../../lib/index.js';
 import { DISCONNECTED_THRESHOLD_MS } from '../../lib/types.js';
-import type { ServerConfig, ProxyConfig } from '../../lib/types.js';
+import type { ServerConfig, ProxyConfig, ServerDetails } from '../../lib/types.js';
 import {
   formatOutput,
   formatSuccess,
@@ -202,6 +202,86 @@ export async function resolveSessionName(
 }
 
 /**
+ * One entry in the unified JSON array returned by `mcpc connect`.
+ * Mirrors MCP `InitializeResult` (protocolVersion/capabilities/serverInfo/instructions),
+ * extended with `toolNames` and an `_mcpc` metadata block. The same shape is used for
+ * both single-server and multi-server connects so consumers can always treat the output
+ * as an array.
+ *
+ * For failed/skipped entries only the `_mcpc` block is populated.
+ */
+export type ConnectResultEntry = {
+  _mcpc: {
+    sessionName: string;
+    profileName?: string;
+    server?: ServerConfig;
+    configFile?: string;
+    entry?: string;
+    status: 'created' | 'active' | 'failed' | 'skipped';
+    skipReason?: 'stdio' | 'duplicate';
+    error?: string;
+  };
+} & Partial<
+  Pick<ServerDetails, 'protocolVersion' | 'capabilities' | 'serverInfo' | 'instructions'>
+> & {
+    toolNames?: string[];
+  };
+
+/**
+ * Connect to a session via the bridge and build a populated ConnectResultEntry from
+ * its InitializeResult and tools list. The entry's `_mcpc.server` headers are redacted.
+ */
+async function buildConnectResultEntry(
+  sessionName: string,
+  status: 'created' | 'active',
+  options: {
+    verbose?: boolean;
+    timeout?: number;
+    configFile?: string;
+    entry?: string;
+  }
+): Promise<ConnectResultEntry> {
+  return await withMcpClient(
+    sessionName,
+    {
+      outputMode: 'json',
+      hideTarget: true,
+      ...(options.verbose && { verbose: options.verbose }),
+      ...(options.timeout !== undefined && { timeout: options.timeout }),
+    },
+    async (client, context) => {
+      const serverDetails = await client.getServerDetails();
+      const tools = (await client.listAllTools()).tools;
+
+      const server: ServerConfig | undefined = context.serverConfig
+        ? {
+            ...context.serverConfig,
+            ...(context.serverConfig.headers && {
+              headers: redactHeaders(context.serverConfig.headers),
+            }),
+          }
+        : undefined;
+
+      return {
+        _mcpc: {
+          sessionName: context.sessionName ?? sessionName,
+          ...(context.profileName && { profileName: context.profileName }),
+          ...(server && { server }),
+          ...(options.configFile && { configFile: options.configFile }),
+          ...(options.entry && { entry: options.entry }),
+          status,
+        },
+        ...(serverDetails.protocolVersion && { protocolVersion: serverDetails.protocolVersion }),
+        ...(serverDetails.capabilities && { capabilities: serverDetails.capabilities }),
+        ...(serverDetails.serverInfo && { serverInfo: serverDetails.serverInfo }),
+        ...(serverDetails.instructions && { instructions: serverDetails.instructions }),
+        ...(tools.length > 0 && { toolNames: tools.map((t) => t.name) }),
+      };
+    }
+  );
+}
+
+/**
  * Creates a new session, starts a bridge process, and instructs it to connect an MCP server.
  * If session already exists with crashed bridge, reconnects it automatically
  */
@@ -269,7 +349,15 @@ export async function connectSession(
         console.log(formatSuccess(`Session ${name} is already active`));
       }
       if (!options.skipDetails) {
-        await showServerDetails(name, { ...options, hideTarget: false });
+        if (options.outputMode === 'json') {
+          const entry = await buildConnectResultEntry(name, 'active', {
+            ...(options.verbose && { verbose: options.verbose }),
+            ...(options.timeout !== undefined && { timeout: options.timeout }),
+          });
+          console.log(formatOutput([entry], 'json'));
+        } else {
+          await showServerDetails(name, { ...options, hideTarget: false });
+        }
       }
       return;
     }
@@ -444,18 +532,24 @@ export async function connectSession(
     return;
   }
 
-  // Verify the connection works by fetching server details.
-  // showServerDetails blocks until the bridge is connected (via health check),
-  // so by the time it returns or throws, we have definitive bridge status.
-  // Only print success after the server actually responds.
+  // Verify the connection works by fetching server details. Both the human-mode
+  // showServerDetails() call and the JSON-mode buildConnectResultEntry() call below
+  // block until the bridge is connected (via the same health check), so by the time
+  // they return or throw we have definitive bridge status.
   try {
-    await showServerDetails(name, {
-      ...options,
-      hideTarget: false, // Show session info prefix
-    });
+    if (options.outputMode === 'json') {
+      const entry = await buildConnectResultEntry(name, 'created', {
+        ...(options.verbose && { verbose: options.verbose }),
+        ...(options.timeout !== undefined && { timeout: options.timeout }),
+      });
+      console.log(formatOutput([entry], 'json'));
+    } else {
+      await showServerDetails(name, {
+        ...options,
+        hideTarget: false, // Show session info prefix
+      });
 
-    // Server responded — now we can print success
-    if (options.outputMode === 'human') {
+      // Server responded — now we can print success
       console.log(formatSuccess(`Session ${name} ${isReconnect ? 'reconnected' : 'created'}`));
     }
   } catch (detailsError) {
@@ -470,9 +564,19 @@ export async function connectSession(
     }
 
     // Non-auth failure: session was created but server didn't respond properly.
-    // Show a warning instead of silent success, so the user knows something is wrong.
-    if (options.outputMode === 'human') {
-      const errorMsg = detailsError instanceof Error ? detailsError.message : String(detailsError);
+    // Show a warning (human mode) or emit a `failed` entry (json mode) so the user
+    // knows something is wrong while keeping the JSON shape uniform.
+    const errorMsg = detailsError instanceof Error ? detailsError.message : String(detailsError);
+    if (options.outputMode === 'json') {
+      const failed: ConnectResultEntry = {
+        _mcpc: {
+          sessionName: name,
+          status: 'failed',
+          error: errorMsg,
+        },
+      };
+      console.log(formatOutput([failed], 'json'));
+    } else {
       console.log(
         formatWarning(
           `Session ${name} created but server is not responding: ${errorMsg}\n` +
@@ -481,9 +585,7 @@ export async function connectSession(
         )
       );
     }
-    logger.debug(
-      `showServerDetails failed for new session ${name}: ${(detailsError as Error).message}`
-    );
+    logger.debug(`showServerDetails failed for new session ${name}: ${errorMsg}`);
   }
 }
 
@@ -1056,20 +1158,16 @@ export async function connectAllFromConfig(
 
   if (serverNames.length === 0) {
     if (options.outputMode === 'json') {
-      console.log(
-        formatOutput(
-          {
-            configFile,
-            results: [],
-            skipped: stdioSkipped.map((entry) => ({
-              entry,
-              sessionName: generateSessionName({ type: 'config', file: configFile, entry }),
-              reason: 'stdio',
-            })),
-          },
-          'json'
-        )
-      );
+      const skippedEntries: ConnectResultEntry[] = stdioSkipped.map((entry) => ({
+        _mcpc: {
+          sessionName: generateSessionName({ type: 'config', file: configFile, entry }),
+          configFile,
+          entry,
+          status: 'skipped',
+          skipReason: 'stdio',
+        },
+      }));
+      console.log(formatOutput(skippedEntries, 'json'));
       return;
     }
     throw new ClientError(
@@ -1106,27 +1204,17 @@ export async function connectAllFromConfig(
   const results = await bulkConnectEntries(entries, options);
 
   if (options.outputMode === 'json') {
-    console.log(
-      formatOutput(
-        {
-          configFile,
-          results: results.map((r) => ({
-            entry: r.entry,
-            sessionName: r.sessionName,
-            status: r.status,
-            ...(r.error && { error: r.error }),
-          })),
-          ...(stdioSkipped.length > 0 && {
-            skipped: stdioSkipped.map((entry) => ({
-              entry,
-              sessionName: generateSessionName({ type: 'config', file: configFile, entry }),
-              reason: 'stdio',
-            })),
-          }),
-        },
-        'json'
-      )
-    );
+    const resultEntries = await buildBulkConnectEntries(results, options);
+    const skippedEntries: ConnectResultEntry[] = stdioSkipped.map((entry) => ({
+      _mcpc: {
+        sessionName: generateSessionName({ type: 'config', file: configFile, entry }),
+        configFile,
+        entry,
+        status: 'skipped',
+        skipReason: 'stdio',
+      },
+    }));
+    console.log(formatOutput([...resultEntries, ...skippedEntries], 'json'));
     return;
   }
 
@@ -1136,6 +1224,51 @@ export async function connectAllFromConfig(
   if (active + connecting === 0 && failed > 0) {
     throw new ClientError(`Failed to connect any servers from ${configFile}`);
   }
+}
+
+/**
+ * For each bulk-connect result, build a ConnectResultEntry. Successful entries
+ * fetch the InitializeResult via the bridge in parallel; failed entries get a
+ * minimal `_mcpc`-only entry. If a successful entry's bridge isn't responsive
+ * yet, it's downgraded to `failed`.
+ */
+async function buildBulkConnectEntries(
+  results: BulkConnectResult[],
+  options: { verbose?: boolean; timeout?: number }
+): Promise<ConnectResultEntry[]> {
+  return await Promise.all(
+    results.map(async (r): Promise<ConnectResultEntry> => {
+      if (r.status === 'failed') {
+        return {
+          _mcpc: {
+            sessionName: r.sessionName,
+            configFile: r.configFile,
+            entry: r.entry,
+            status: 'failed',
+            ...(r.error && { error: r.error }),
+          },
+        };
+      }
+      try {
+        return await buildConnectResultEntry(r.sessionName, r.status, {
+          ...(options.verbose && { verbose: options.verbose }),
+          ...(options.timeout !== undefined && { timeout: options.timeout }),
+          configFile: r.configFile,
+          entry: r.entry,
+        });
+      } catch (err) {
+        return {
+          _mcpc: {
+            sessionName: r.sessionName,
+            configFile: r.configFile,
+            entry: r.entry,
+            status: 'failed',
+            error: err instanceof Error ? err.message : String(err),
+          },
+        };
+      }
+    })
+  );
 }
 
 type SkippedEntry = { configFile: string; entry: string; sessionName: string };
@@ -1200,16 +1333,7 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
 
   if (discovered.length === 0 && !hasApifyToken) {
     if (options.outputMode === 'json') {
-      console.log(
-        formatOutput(
-          {
-            discovered: [],
-            results: [],
-            searchPaths: getStandardMcpConfigPaths().map((c) => c.path),
-          },
-          'json'
-        )
-      );
+      console.log(formatOutput([] as ConnectResultEntry[], 'json'));
       return;
     }
     const searchPaths = getStandardMcpConfigPaths()
@@ -1294,39 +1418,36 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
     }
   }
 
-  const allSkipped = [
-    ...skippedStdio.map((s) => ({
-      entry: s.entry,
-      sessionName: s.sessionName,
-      configFile: s.configFile,
-      reason: 'stdio' as const,
-    })),
-    ...skippedDuplicates.map((s) => ({
-      entry: s.entry,
-      sessionName: s.sessionName,
-      configFile: s.configFile,
-      reason: 'duplicate' as const,
-    })),
+  const skippedJsonEntries: ConnectResultEntry[] = [
+    ...skippedStdio.map(
+      (s): ConnectResultEntry => ({
+        _mcpc: {
+          sessionName: s.sessionName,
+          configFile: s.configFile,
+          entry: s.entry,
+          status: 'skipped',
+          skipReason: 'stdio',
+        },
+      })
+    ),
+    ...skippedDuplicates.map(
+      (s): ConnectResultEntry => ({
+        _mcpc: {
+          sessionName: s.sessionName,
+          configFile: s.configFile,
+          entry: s.entry,
+          status: 'skipped',
+          skipReason: 'duplicate',
+        },
+      })
+    ),
   ];
 
   if (entries.length === 0) {
     // No connectable entries from config files. If APIFY_API_TOKEN is set,
     // maybeConnectApify will still run below; otherwise we already threw above.
     if (!hasApifyToken && options.outputMode === 'json') {
-      console.log(
-        formatOutput(
-          {
-            discovered: discovered.map((d) => ({
-              path: d.path,
-              scope: d.scope,
-              serverCount: d.serverCount,
-            })),
-            results: [],
-            skipped: allSkipped,
-          },
-          'json'
-        )
-      );
+      console.log(formatOutput(skippedJsonEntries, 'json'));
       return;
     }
     await maybeConnectApify([], [], options);
@@ -1336,26 +1457,8 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
   const results = await bulkConnectEntries(entries, options);
 
   if (options.outputMode === 'json') {
-    console.log(
-      formatOutput(
-        {
-          discovered: discovered.map((d) => ({
-            path: d.path,
-            scope: d.scope,
-            serverCount: d.serverCount,
-          })),
-          results: results.map((r) => ({
-            entry: r.entry,
-            sessionName: r.sessionName,
-            configFile: r.configFile,
-            status: r.status,
-            ...(r.error && { error: r.error }),
-          })),
-          ...(allSkipped.length > 0 && { skipped: allSkipped }),
-        },
-        'json'
-      )
-    );
+    const resultEntries = await buildBulkConnectEntries(results, options);
+    console.log(formatOutput([...resultEntries, ...skippedJsonEntries], 'json'));
     return;
   }
 

@@ -450,37 +450,35 @@ Full docs: ${docsUrl}`
 ${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
-  ~/.vscode/mcp.json            Config file — connect all servers in the file
-  ${chalk.dim('(no server)')}                  Discover standard MCP config files and connect every server
+  ~/.vscode/mcp.json            Config file — connect every entry in the file
+  ${chalk.dim('(no server)')}                  Auto-discover MCP config files and connect everything
 
 ${chalk.bold('Auto-discovery locations:')}
-  Project: .mcp.json, mcp.json, mcp_config.json, .cursor/mcp.json, .vscode/mcp.json,
-           .kiro/settings/mcp.json
-  Global:  ~/.claude.json, ~/.cursor/mcp.json, ~/.vscode/mcp.json,
-           ~/.codeium/windsurf/mcp_config.json, ~/.kiro/settings/mcp.json,
-           VS Code app config, Claude Desktop (platform-specific paths)
-  Env var:  APIFY_API_TOKEN → auto-connects to mcp.apify.com as @apify
+  Project (cwd): .mcp.json, mcp.json, mcp_config.json, .cursor/mcp.json,
+                 .vscode/mcp.json, .kiro/settings/mcp.json
+  Global (~):    .claude.json, .cursor/mcp.json, .vscode/mcp.json,
+                 .codeium/windsurf/mcp_config.json, .kiro/settings/mcp.json
+  System:        VS Code app config, Claude Desktop config (platform-specific)
+  Env var:       APIFY_API_TOKEN → auto-connects to mcp.apify.com as @apify
 
 ${chalk.bold('Session name:')}
-  If @session is omitted, a name is auto-generated from the server hostname
-  (e.g. mcp.apify.com → @apify) or config entry name. If a matching session
-  already exists (same server URL, OAuth profile, and HTTP header names), it
-  is reused (restarted if not live). Header values are not compared — they
-  are stored securely in OS keychain.
-  When connecting all servers from a config file or via auto-discovery,
-  @session cannot be specified.
+  If @session is omitted, a name is auto-generated from the server (e.g.
+  mcp.apify.com → @apify) or config entry name. Existing sessions matching
+  the same server, OAuth profile, and header names are reused.
+  Cannot be specified for bulk connects (config file or auto-discovery).
 
-${chalk.bold('Stdio servers:')}
-  Config entries execute the configured command locally on connect, even if
-  the MCP handshake later fails — only connect to configs you trust. Stdio
-  servers inherit a minimal env whitelist; forward extras (e.g.
-  NODE_EXTRA_CA_CERTS, HTTPS_PROXY) via the "env" block. Server stderr is
-  logged to ~/.mcpc/logs/bridge-<session>.log.
+${chalk.bold('Stdio servers (command-based, run locally):')}
+  ⚠ Config entries spawn the configured command on connect, even if the MCP
+  handshake later fails — only connect to configs you trust. Server stderr
+  is logged to ~/.mcpc/logs/bridge-<session>.log; forward extra env vars
+  (e.g. NODE_EXTRA_CA_CERTS, HTTPS_PROXY) via the entry's "env" block.
 
-  Bulk connects (\`mcpc connect <config-file>\` and \`mcpc connect\`) skip
-  stdio entries by default; pass --stdio to include them. Single-entry
-  connects are unaffected.
-${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
+  Bulk connects skip stdio entries by default; pass --stdio to include them.
+${jsonHelp(
+  'Array of `InitializeResult` objects extended with `toolNames` and `_mcpc` metadata (one per session)',
+  '`[{ protocolVersion?, capabilities?, serverInfo?, instructions?, toolNames?, _mcpc: { sessionName, profileName?, server?, configFile?, entry?, status, skipReason?, error? } }]`',
+  `${SCHEMA_BASE}#initializeresult`
+)}`
     )
     .action(async (server, sessionName, opts, command) => {
       const globalOpts = getOptionsFromCommand(command);
