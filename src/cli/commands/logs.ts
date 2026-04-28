@@ -18,7 +18,7 @@ import {
 import { formatJson } from '../output.js';
 import type { CommandOptions } from '../../lib/types.js';
 
-const DEFAULT_TAIL = 100;
+const DEFAULT_TAIL = 50;
 
 export interface LogsCommandOptions extends CommandOptions {
   tail?: number;
@@ -61,7 +61,7 @@ export async function showLogs(target: string, options: LogsCommandOptions): Pro
     since = resolved;
   }
 
-  // Default tail: 100 in non-follow mode, also used as the backlog size when --follow is set.
+  // Default tail: 50 in non-follow mode, also used as the backlog size when --follow is set.
   const tail = options.tail ?? DEFAULT_TAIL;
 
   const emitOpts: EmitOpts = {

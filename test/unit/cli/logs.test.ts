@@ -193,10 +193,10 @@ describe('showLogs (CLI command)', () => {
     expect(out.stderr).toContain('rotated');
   });
 
-  it('default tail is 100 (advertised in header)', async () => {
+  it('default tail is 50 (advertised in header)', async () => {
     await seedSession('@x');
     await writeFile(join(homeDir, 'logs', 'bridge-@x.log'), 'one\n');
     const out = await capture(() => showLogs('@x', { outputMode: 'human' as OutputMode }));
-    expect(out.stderr).toContain('last 100 lines');
+    expect(out.stderr).toContain('last 50 lines');
   });
 });

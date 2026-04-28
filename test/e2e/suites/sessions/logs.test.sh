@@ -3,7 +3,7 @@
 #
 # Covers:
 #   - error when session does not exist
-#   - default output (last 100 lines, header on stderr, lines on stdout)
+#   - default output (last 50 lines, header on stderr, lines on stdout)
 #   - --json produces parsed records, banners become {raw}
 #   - -n / --tail caps output
 #   - --since filters by timestamp; invalid value rejected
@@ -59,7 +59,7 @@ run_mcpc "$SESSION" logs
 assert_success
 # Header (path + tail label) goes to stderr
 assert_contains "$STDERR" "$LOG_FILE"
-assert_contains "$STDERR" "last 100 lines"
+assert_contains "$STDERR" "last 50 lines"
 # At least one log line on stdout (bridge writes a startup banner + version line)
 if [[ -z "$STDOUT" ]]; then
   test_fail "expected at least one log line on stdout, got empty"

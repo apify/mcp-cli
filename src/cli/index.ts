@@ -1250,7 +1250,7 @@ ${jsonHelp('`GetPromptResult` object', '`{ description?, messages: [{ role, cont
   program
     .command('logs')
     .description('Show or follow the bridge log file for this session.')
-    .option('-n, --tail <n>', 'Number of recent lines to show (default: 100)')
+    .option('-n, --tail <n>', 'Number of recent lines to show (default: 50)')
     .option('--follow', 'Stream new log lines as they are written')
     .option(
       '--since <value>',
@@ -1260,7 +1260,7 @@ ${jsonHelp('`GetPromptResult` object', '`{ description?, messages: [{ role, cont
       'after',
       `
 ${chalk.bold('Examples:')}
-  mcpc ${session} logs                  Last 100 lines
+  mcpc ${session} logs                  Last 50 lines
   mcpc ${session} logs -n 200           Last 200 lines
   mcpc ${session} logs --follow         Stream new lines (Ctrl+C to stop)
   mcpc ${session} logs --since 1h       Lines from the last hour
