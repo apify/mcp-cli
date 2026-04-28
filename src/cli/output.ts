@@ -1463,15 +1463,19 @@ export function formatServerDetails(
     commands.push(`${bullet} ${bt}mcpc ${target} logging-set-level <lvl>${bt}`);
   }
 
+  if (target.startsWith('@')) {
+    commands.push(`${bullet} ${bt}mcpc ${target} logs${bt}`);
+  }
   commands.push(`${bullet} ${bt}mcpc ${target} shell${bt}`);
 
   lines.push(commands.join('\n'));
   lines.push('');
 
-  // Debugging hint: bridge log file path (only shown for sessions, i.e. @name targets)
+  // Debugging hint: how to view logs (only shown for sessions, i.e. @name targets)
   if (target.startsWith('@')) {
     const logPath = join(getLogsDir(), `bridge-${target}.log`);
-    lines.push(chalk.dim(`Session log for debugging: ${logPath}`));
+    lines.push(chalk.dim(`For session logs, run: mcpc ${target} logs`));
+    lines.push(chalk.dim(`Log file: ${logPath}`));
     lines.push('');
   }
 

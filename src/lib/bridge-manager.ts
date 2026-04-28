@@ -60,11 +60,10 @@ async function classifyAndThrowSessionError(
     await updateSession(sessionName, { status: 'expired' }).catch((e) =>
       logger.warn(`Failed to mark session ${sessionName} as expired:`, e)
     );
-    const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
     throw new ClientError(
       `Session ${sessionName} expired (server rejected session ID). ` +
         `Use "mcpc ${sessionName} restart" to start a new session. ` +
-        `For details, check logs at ${logPath}`
+        `For details, run: mcpc ${sessionName} logs`
     );
   }
   if (isAuthenticationError(errorMessage)) {
@@ -668,11 +667,10 @@ export async function ensureBridgeReady(sessionName: string): Promise<string> {
   const errorMsg = result.error?.message || 'unknown error';
   await classifyAndThrowSessionError(sessionName, session, errorMsg, result.error);
 
-  // Other errors - provide enriched error with log path
+  // Other errors - provide enriched error with hint to view logs
   const serverUrl = session.server.url;
-  const logPath = `${getLogsDir()}/bridge-${sessionName}.log`;
   throw new ClientError(
-    `${enrichErrorMessage(errorMsg, serverUrl)}\n` + `For details, check logs at ${logPath}`
+    `${enrichErrorMessage(errorMsg, serverUrl)}\n` + `For details, run: mcpc ${sessionName} logs`
   );
 }
 

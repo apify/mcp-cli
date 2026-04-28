@@ -117,7 +117,11 @@ export function createServerAuthError(
   }
 
   if (options?.logPath) {
-    hint += `\n\nFor details, check logs at ${options.logPath}`;
+    if (options.sessionName) {
+      hint += `\n\nFor details, run: mcpc ${options.sessionName} logs`;
+    } else {
+      hint += `\n\nFor details, check logs at ${options.logPath}`;
+    }
   }
 
   return new AuthError(
