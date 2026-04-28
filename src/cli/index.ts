@@ -451,12 +451,24 @@ ${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
   ~/.vscode/mcp.json            Config file — connect all servers in the file
+  ${chalk.dim('(no server)')}                  Discover standard MCP config files and connect every server
+
+${chalk.bold('Auto-discovery locations:')}
+  Project: .mcp.json, mcp.json, mcp_config.json, .cursor/mcp.json, .vscode/mcp.json,
+           .kiro/settings/mcp.json
+  Global:  ~/.claude.json, ~/.cursor/mcp.json, ~/.vscode/mcp.json,
+           ~/.codeium/windsurf/mcp_config.json, ~/.kiro/settings/mcp.json,
+           VS Code app config, Claude Desktop (platform-specific paths)
+  Env var:  APIFY_API_TOKEN → auto-connects to mcp.apify.com as @apify
 
 ${chalk.bold('Session name:')}
-  If @session is omitted, it is derived from the server hostname or config
-  entry name. A matching existing session (same URL, profile, and header
-  names) is reused, and restarted if not live. Cannot be set when connecting
-  all servers from a config file.
+  If @session is omitted, a name is auto-generated from the server hostname
+  (e.g. mcp.apify.com → @apify) or config entry name. If a matching session
+  already exists (same server URL, OAuth profile, and HTTP header names), it
+  is reused (restarted if not live). Header values are not compared — they
+  are stored securely in OS keychain.
+  When connecting all servers from a config file or via auto-discovery,
+  @session cannot be specified.
 
 ${chalk.bold('Stdio servers:')}
   Config entries execute the configured command locally on connect, even if
@@ -465,19 +477,13 @@ ${chalk.bold('Stdio servers:')}
   NODE_EXTRA_CA_CERTS, HTTPS_PROXY) via the "env" block. Server stderr is
   logged to ~/.mcpc/logs/bridge-<session>.log.
 
-  Bulk connects (\`mcpc connect <config-file>\`) skip stdio entries by
-  default; pass --stdio to include them. Single-entry connects are
-  unaffected.
+  Bulk connects (\`mcpc connect <config-file>\` and \`mcpc connect\`) skip
+  stdio entries by default; pass --stdio to include them. Single-entry
+  connects are unaffected.
 ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
     )
     .action(async (server, sessionName, opts, command) => {
-      if (!server) {
-        throw new ClientError(
-          'Missing required argument: server\n\nExample: mcpc connect mcp.apify.com @myapp'
-        );
-      }
       const globalOpts = getOptionsFromCommand(command);
-      const parsed = parseServerArg(server);
 
       // Extract --header from connect-specific opts
       const headers: string[] | undefined = opts.header
@@ -485,6 +491,28 @@ ${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` meta
           ? (opts.header as string[])
           : [opts.header as string]
         : undefined;
+
+      // No server argument — discover standard MCP config files and connect all
+      if (!server) {
+        if (sessionName) {
+          throw new ClientError(
+            `Cannot specify @session name when discovering and connecting all servers.\n` +
+              `To connect a specific server, pass a URL or config entry: mcpc connect <server> ${sessionName}`
+          );
+        }
+        await sessions.connectAllFromStandardConfigs({
+          ...globalOpts,
+          ...(headers && { headers }),
+          ...(opts.proxy && { proxy: opts.proxy as string }),
+          ...(opts.proxyBearerToken && { proxyBearerToken: opts.proxyBearerToken as string }),
+          ...(opts.stdio && { stdio: true }),
+          ...(opts.x402 && { x402: opts.x402 as boolean }),
+          ...(globalOpts.insecure && { insecure: true }),
+        });
+        return;
+      }
+
+      const parsed = parseServerArg(server);
 
       if (!parsed) {
         throw new ClientError(

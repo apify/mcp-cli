@@ -55,7 +55,14 @@ import { getWallet } from '../../lib/wallets.js';
 import chalk from 'chalk';
 import { createLogger } from '../../lib/logger.js';
 import { parseProxyArg } from '../parser.js';
-import { loadConfig, listServers, isStdioEntry } from '../../lib/config.js';
+import {
+  loadConfig,
+  listServers,
+  isStdioEntry,
+  discoverMcpConfigFiles,
+  getStandardMcpConfigPaths,
+  type DiscoveredConfig,
+} from '../../lib/config.js';
 
 const logger = createLogger('sessions');
 
@@ -897,24 +904,135 @@ export async function restartSession(
 }
 
 /**
+ * Shared options for bulk connect commands.
+ */
+type BulkConnectOptions = {
+  outputMode: OutputMode;
+  verbose?: boolean;
+  headers?: string[];
+  timeout?: number;
+  profile?: string;
+  noProfile?: boolean;
+  proxy?: string;
+  proxyBearerToken?: string;
+  stdio?: boolean;
+  x402?: boolean;
+  insecure?: boolean;
+};
+
+/**
+ * A single entry to connect in a bulk operation.
+ */
+type BulkConnectEntry = {
+  /** Config file path that defines this entry. */
+  configFile: string;
+  /** Entry name inside the config's `mcpServers` object. */
+  entry: string;
+  /** Resolved session name (with @ prefix). */
+  sessionName: string;
+};
+
+type BulkConnectResult = BulkConnectEntry & {
+  status: 'created' | 'active' | 'failed';
+  error?: string;
+};
+
+/**
+ * Connect a list of entries in parallel, printing compact status badges when done.
+ * Returns the per-entry results so callers can build summaries and exit codes.
+ */
+async function bulkConnectEntries(
+  entries: BulkConnectEntry[],
+  options: BulkConnectOptions
+): Promise<BulkConnectResult[]> {
+  // Pre-check which sessions are already live (for accurate status badges)
+  const liveSet = new Set<string>();
+  for (const { sessionName } of entries) {
+    const session = await getSession(sessionName);
+    if (session && getBridgeStatus(session) === 'live') {
+      liveSet.add(sessionName);
+    }
+  }
+
+  // Launch all connections in parallel (quiet mode — we display results below)
+  const settled = await Promise.allSettled(
+    entries.map(async ({ entry, sessionName, configFile }) =>
+      connectSession(entry, sessionName, {
+        ...options,
+        config: configFile,
+        skipDetails: true,
+        quiet: true,
+      })
+    )
+  );
+
+  const results: BulkConnectResult[] = settled.map((outcome, i) => {
+    const base = entries[i]!;
+    if (outcome.status === 'fulfilled') {
+      return { ...base, status: liveSet.has(base.sessionName) ? 'active' : 'created' };
+    }
+    const error = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+    return { ...base, status: 'failed', error };
+  });
+
+  // Display badges in human mode
+  if (options.outputMode === 'human') {
+    for (const r of results) {
+      const name = chalk.cyan(r.sessionName);
+      switch (r.status) {
+        case 'created':
+          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('connecting')}`);
+          break;
+        case 'active':
+          console.log(`  ${chalk.green('●')} ${name} ${chalk.dim('already active')}`);
+          break;
+        case 'failed':
+          console.log(
+            `  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}`
+          );
+          break;
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Build a summary string and print it in human mode.
+ */
+function printBulkConnectSummary(
+  results: BulkConnectResult[],
+  options: { outputMode: OutputMode }
+): { active: number; connecting: number; failed: number } {
+  const active = results.filter((r) => r.status === 'active').length;
+  const connecting = results.filter((r) => r.status === 'created').length;
+  const failed = results.filter((r) => r.status === 'failed').length;
+
+  if (options.outputMode === 'human' && results.length > 1) {
+    const parts: string[] = [];
+    if (active > 0) parts.push(`${active} already active`);
+    if (connecting > 0) parts.push(`${connecting} connecting`);
+    if (failed > 0) parts.push(`${failed} failed`);
+    const summary = parts.join(', ');
+
+    if (failed === 0) {
+      console.log(formatSuccess(summary));
+    } else if (active + connecting > 0) {
+      console.log(formatWarning(summary));
+    }
+  }
+
+  return { active, connecting, failed };
+}
+
+/**
  * Connect all servers defined in a config file, auto-generating session names from entry names.
  * Launches all bridge processes in parallel and displays status badges when done.
  */
 export async function connectAllFromConfig(
   configFile: string,
-  options: {
-    outputMode: OutputMode;
-    verbose?: boolean;
-    headers?: string[];
-    timeout?: number;
-    profile?: string;
-    noProfile?: boolean;
-    proxy?: string;
-    proxyBearerToken?: string;
-    stdio?: boolean;
-    x402?: boolean;
-    insecure?: boolean;
-  }
+  options: BulkConnectOptions
 ): Promise<void> {
   const config = loadConfig(configFile);
   const allNames = listServers(config);
@@ -979,80 +1097,13 @@ export async function connectAllFromConfig(
   // Prepare entries with deterministic session names derived from entry names.
   // Re-running `mcpc connect <file>` reuses existing sessions via connectSession's
   // "already active" path instead of creating @entry-2 duplicates.
-  const entries = serverNames.map((entry) => ({
+  const entries: BulkConnectEntry[] = serverNames.map((entry) => ({
+    configFile,
     entry,
     sessionName: generateSessionName({ type: 'config', file: configFile, entry }),
   }));
 
-  // Pre-check which sessions are already live (for accurate status badges)
-  const liveSet = new Set<string>();
-  for (const { sessionName } of entries) {
-    const session = await getSession(sessionName);
-    if (session && getBridgeStatus(session) === 'live') {
-      liveSet.add(sessionName);
-    }
-  }
-
-  // Launch all connections in parallel (quiet mode — we display results below)
-  const settled = await Promise.allSettled(
-    entries.map(async ({ entry, sessionName }) =>
-      connectSession(entry, sessionName, {
-        ...options,
-        config: configFile,
-        skipDetails: true,
-        quiet: true,
-      })
-    )
-  );
-
-  // Build results with status badges
-  type ConnectResult = {
-    entry: string;
-    sessionName: string;
-    status: 'created' | 'active' | 'reconnected' | 'failed';
-    error?: string;
-  };
-  const results: ConnectResult[] = settled.map((outcome, i) => {
-    const { entry, sessionName } = entries[i]!;
-    if (outcome.status === 'fulfilled') {
-      if (liveSet.has(sessionName)) {
-        return { entry, sessionName, status: 'active' };
-      }
-      return { entry, sessionName, status: 'created' };
-    }
-    const error = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
-    return { entry, sessionName, status: 'failed', error };
-  });
-
-  // Display badges
-  if (options.outputMode === 'human') {
-    for (const r of results) {
-      const name = chalk.cyan(r.sessionName);
-      switch (r.status) {
-        case 'created':
-          // Bridge started but MCP handshake not yet verified
-          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('connecting')}`);
-          break;
-        case 'active':
-          console.log(`  ${chalk.green('●')} ${name} ${chalk.dim('already active')}`);
-          break;
-        case 'reconnected':
-          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('reconnecting')}`);
-          break;
-        case 'failed':
-          console.log(
-            `  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}`
-          );
-          break;
-      }
-    }
-  }
-
-  const active = results.filter((r) => r.status === 'active').length;
-  const connecting = results.filter(
-    (r) => r.status === 'created' || r.status === 'reconnected'
-  ).length;
-  const failed = results.filter((r) => r.status === 'failed').length;
+  const results = await bulkConnectEntries(entries, options);
 
   if (options.outputMode === 'json') {
     console.log(
@@ -1076,23 +1127,306 @@ export async function connectAllFromConfig(
         'json'
       )
     );
-  } else if (results.length > 1) {
-    const parts: string[] = [];
-    if (active > 0) parts.push(`${active} already active`);
-    if (connecting > 0) parts.push(`${connecting} connecting`);
-    if (failed > 0) parts.push(`${failed} failed`);
-    const summary = parts.join(', ');
+    return;
+  }
 
-    if (failed === 0) {
-      console.log(formatSuccess(summary));
-    } else if (active + connecting > 0) {
-      console.log(formatWarning(summary));
+  const { active, connecting, failed } = printBulkConnectSummary(results, options);
+
+  // If ALL servers failed, exit with error
+  if (active + connecting === 0 && failed > 0) {
+    throw new ClientError(`Failed to connect any servers from ${configFile}`);
+  }
+}
+
+type SkippedEntry = { configFile: string; entry: string; sessionName: string };
+
+/**
+ * Aggregate config entries from multiple discovered config files into a flat list of
+ * bulk-connect entries. Resolves session-name collisions by taking the first occurrence
+ * (project-scoped configs win over global ones due to discovery order).
+ * When `stdio` is false/omitted, entries with a `command` field are filtered out.
+ */
+function aggregateDiscoveredEntries(
+  discovered: DiscoveredConfig[],
+  options: { stdio?: boolean }
+): {
+  entries: BulkConnectEntry[];
+  skippedDuplicates: SkippedEntry[];
+  skippedStdio: SkippedEntry[];
+} {
+  const entries: BulkConnectEntry[] = [];
+  const skippedDuplicates: SkippedEntry[] = [];
+  const skippedStdio: SkippedEntry[] = [];
+  const seenNames = new Set<string>();
+
+  for (const d of discovered) {
+    for (const entry of Object.keys(d.config.mcpServers)) {
+      const sessionName = generateSessionName({ type: 'config', file: d.path, entry });
+      if (!options.stdio && isStdioEntry(d.config, entry)) {
+        skippedStdio.push({ configFile: d.path, entry, sessionName });
+        continue;
+      }
+      if (seenNames.has(sessionName)) {
+        skippedDuplicates.push({ configFile: d.path, entry, sessionName });
+        continue;
+      }
+      seenNames.add(sessionName);
+      entries.push({
+        configFile: d.path,
+        entry,
+        sessionName,
+      });
     }
   }
 
-  // If ALL servers failed, exit with error
-  if (active + connecting === 0) {
-    throw new ClientError(`Failed to connect any servers from ${configFile}`);
+  return { entries, skippedDuplicates, skippedStdio };
+}
+
+/**
+ * Discover MCP config files in standard locations and connect all servers defined in them.
+ *
+ * Locations searched (in priority order):
+ *   1. Project-level files in the current directory (.mcp.json, .cursor/mcp.json, ...)
+ *   2. Global files in the user's home dir (~/.claude.json, ~/.cursor/mcp.json, ...)
+ *   3. Platform-specific Claude Desktop config
+ *
+ * Entries with the same auto-generated session name across multiple configs are deduplicated —
+ * the first occurrence wins. Re-running the command reuses existing sessions.
+ */
+export async function connectAllFromStandardConfigs(options: BulkConnectOptions): Promise<void> {
+  const discovered = discoverMcpConfigFiles();
+
+  const hasApifyToken = !!process.env.APIFY_API_TOKEN;
+
+  if (discovered.length === 0 && !hasApifyToken) {
+    if (options.outputMode === 'json') {
+      console.log(
+        formatOutput(
+          {
+            discovered: [],
+            results: [],
+            searchPaths: getStandardMcpConfigPaths().map((c) => c.path),
+          },
+          'json'
+        )
+      );
+      return;
+    }
+    const searchPaths = getStandardMcpConfigPaths()
+      .map((c) => `  ${c.path}`)
+      .join('\n');
+    throw new ClientError(
+      `No MCP config files found in standard locations.\n\n` +
+        `Searched:\n${searchPaths}\n\n` +
+        `Connect a specific server:    mcpc connect mcp.example.com\n` +
+        `Connect from a specific file: mcpc connect /path/to/mcp.json`
+    );
+  }
+
+  // No config files but APIFY_API_TOKEN present — connect to Apify only
+  if (discovered.length === 0) {
+    await maybeConnectApify([], [], options);
+    return;
+  }
+
+  const { entries, skippedDuplicates, skippedStdio } = aggregateDiscoveredEntries(discovered, {
+    ...(options.stdio && { stdio: true }),
+  });
+
+  if (options.outputMode === 'human') {
+    const totalEntries = entries.length + skippedDuplicates.length + skippedStdio.length;
+    console.log(
+      chalk.cyan(
+        `Found ${discovered.length} MCP config file${discovered.length === 1 ? '' : 's'} ` +
+          `with ${totalEntries} server${totalEntries === 1 ? '' : 's'}:`
+      )
+    );
+
+    // Group all entries (connected + skipped) by config file for display
+    for (const d of discovered) {
+      console.log(
+        `  ${d.path} ${chalk.dim(`(${d.serverCount} server${d.serverCount === 1 ? '' : 's'})`)}`
+      );
+      for (const entryName of Object.keys(d.config.mcpServers)) {
+        const sessionName = generateSessionName({ type: 'config', file: d.path, entry: entryName });
+        const serverCfg = d.config.mcpServers[entryName];
+        const target = serverCfg?.url ?? [serverCfg?.command, ...(serverCfg?.args ?? [])].join(' ');
+        const truncated = target && target.length > 72 ? target.slice(0, 72) + '…' : target;
+
+        const isStdio = skippedStdio.some((s) => s.configFile === d.path && s.entry === entryName);
+        const isDuplicate = skippedDuplicates.some(
+          (s) => s.configFile === d.path && s.entry === entryName
+        );
+
+        if (isStdio) {
+          console.log(
+            `    ${chalk.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)} ${chalk.yellow('○ skipped (stdio)')}`
+          );
+        } else if (isDuplicate) {
+          console.log(
+            `    ${chalk.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)} ${chalk.dim('○ skipped (duplicate)')}`
+          );
+        } else {
+          console.log(`    ${chalk.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)}`);
+        }
+      }
+    }
+
+    if (entries.length === 0 && !hasApifyToken) {
+      throw new ClientError(
+        `All servers in discovered config files use stdio transport.\n` +
+          `Pass --stdio to include them: mcpc connect --stdio`
+      );
+    }
+
+    // Summary line
+    const parts: string[] = [];
+    if (entries.length > 0) {
+      parts.push(`Connecting ${entries.length} server${entries.length === 1 ? '' : 's'}`);
+    }
+    if (skippedStdio.length > 0) {
+      parts.push(
+        `skipped ${skippedStdio.length} stdio server${skippedStdio.length === 1 ? '' : 's'}, pass --stdio to include`
+      );
+    }
+    if (parts.length > 0) {
+      console.log(chalk.cyan(`\n${parts.join('. ')}.`));
+    }
+  }
+
+  const allSkipped = [
+    ...skippedStdio.map((s) => ({
+      entry: s.entry,
+      sessionName: s.sessionName,
+      configFile: s.configFile,
+      reason: 'stdio' as const,
+    })),
+    ...skippedDuplicates.map((s) => ({
+      entry: s.entry,
+      sessionName: s.sessionName,
+      configFile: s.configFile,
+      reason: 'duplicate' as const,
+    })),
+  ];
+
+  if (entries.length === 0) {
+    // No connectable entries from config files. If APIFY_API_TOKEN is set,
+    // maybeConnectApify will still run below; otherwise we already threw above.
+    if (!hasApifyToken && options.outputMode === 'json') {
+      console.log(
+        formatOutput(
+          {
+            discovered: discovered.map((d) => ({
+              path: d.path,
+              scope: d.scope,
+              serverCount: d.serverCount,
+            })),
+            results: [],
+            skipped: allSkipped,
+          },
+          'json'
+        )
+      );
+      return;
+    }
+    await maybeConnectApify([], [], options);
+    return;
+  }
+
+  const results = await bulkConnectEntries(entries, options);
+
+  if (options.outputMode === 'json') {
+    console.log(
+      formatOutput(
+        {
+          discovered: discovered.map((d) => ({
+            path: d.path,
+            scope: d.scope,
+            serverCount: d.serverCount,
+          })),
+          results: results.map((r) => ({
+            entry: r.entry,
+            sessionName: r.sessionName,
+            configFile: r.configFile,
+            status: r.status,
+            ...(r.error && { error: r.error }),
+          })),
+          ...(allSkipped.length > 0 && { skipped: allSkipped }),
+        },
+        'json'
+      )
+    );
+    return;
+  }
+
+  const { active, connecting, failed } = printBulkConnectSummary(results, options);
+
+  // Auto-connect to mcp.apify.com when APIFY_API_TOKEN is set
+  await maybeConnectApify(entries, results, options);
+
+  // If ALL servers failed (excluding Apify), exit with error
+  if (active + connecting === 0 && failed > 0) {
+    throw new ClientError(`Failed to connect any servers from discovered config files`);
+  }
+}
+
+const APIFY_MCP_URL = 'https://mcp.apify.com';
+const APIFY_SESSION_NAME = '@apify';
+
+/**
+ * If APIFY_API_TOKEN is set and no @apify session was already handled by config discovery,
+ * auto-connect to mcp.apify.com with the token as a Bearer header.
+ */
+async function maybeConnectApify(
+  configEntries: BulkConnectEntry[],
+  configResults: BulkConnectResult[],
+  options: BulkConnectOptions
+): Promise<void> {
+  const token = process.env.APIFY_API_TOKEN;
+  if (!token) return;
+
+  // Skip if config discovery already produced an @apify session
+  if (configEntries.some((e) => e.sessionName === APIFY_SESSION_NAME)) return;
+  if (configResults.some((r) => r.sessionName === APIFY_SESSION_NAME)) return;
+
+  // Check if session is already live
+  const existing = await getSession(APIFY_SESSION_NAME);
+  const isLive = existing && getBridgeStatus(existing) === 'live';
+
+  if (options.outputMode === 'human') {
+    console.log(chalk.cyan(`\nAPIFY_API_TOKEN detected, connecting to ${APIFY_MCP_URL}...`));
+  }
+
+  if (isLive) {
+    if (options.outputMode === 'human') {
+      console.log(
+        `  ${chalk.green('●')} ${chalk.cyan(APIFY_SESSION_NAME)} ${chalk.dim('already active')}`
+      );
+    }
+    return;
+  }
+
+  try {
+    await connectSession(APIFY_MCP_URL, APIFY_SESSION_NAME, {
+      outputMode: options.outputMode,
+      ...(options.verbose && { verbose: true }),
+      headers: [`Authorization: Bearer ${token}`],
+      skipDetails: true,
+      quiet: true,
+      noProfile: true,
+    });
+    if (options.outputMode === 'human') {
+      console.log(
+        `  ${chalk.yellow('●')} ${chalk.cyan(APIFY_SESSION_NAME)} ${chalk.yellow('connecting')}`
+      );
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (options.outputMode === 'human') {
+      console.log(
+        `  ${chalk.red('●')} ${chalk.cyan(APIFY_SESSION_NAME)} ${chalk.red('failed')}${chalk.dim(` — ${msg}`)}`
+      );
+    }
   }
 }
 

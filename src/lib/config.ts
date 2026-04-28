@@ -3,8 +3,9 @@
  * Loads and parses MCP server configuration files (Claude Desktop format)
  */
 
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync, statSync } from 'fs';
+import { homedir, platform } from 'os';
+import { join, resolve } from 'path';
 import type { McpConfig, ServerConfig } from './types.js';
 import { ClientError } from './errors.js';
 import { createLogger } from './logger.js';
@@ -27,12 +28,24 @@ export function loadConfig(configPath: string): McpConfig {
     const content = readFileSync(absolutePath, 'utf-8');
 
     // Parse JSON
-    const config = JSON.parse(content) as McpConfig;
+    const raw = JSON.parse(content) as Record<string, unknown>;
+
+    // Normalize VS Code format: "servers" → "mcpServers"
+    if (
+      !raw.mcpServers &&
+      raw.servers &&
+      typeof raw.servers === 'object' &&
+      !Array.isArray(raw.servers)
+    ) {
+      raw.mcpServers = raw.servers;
+    }
+
+    const config = raw as unknown as McpConfig;
 
     // Validate structure
     if (!config.mcpServers || typeof config.mcpServers !== 'object') {
       throw new ClientError(
-        `Invalid config file format: missing or invalid "mcpServers" field.\n` +
+        `Invalid config file format: missing or invalid "mcpServers" (or "servers") field.\n` +
           `Expected: { "mcpServers": { "server-name": {...} } }`
       );
     }
@@ -235,4 +248,192 @@ export function validateServerConfig(config: ServerConfig): boolean {
  */
 export function isStdioEntry(config: McpConfig, entryName: string): boolean {
   return config.mcpServers[entryName]?.command !== undefined;
+}
+
+// ----------------------------------------------------------------------------
+// Standard MCP config discovery
+// ----------------------------------------------------------------------------
+
+/**
+ * A well-known config file location.
+ */
+export interface ConfigCandidate {
+  /** Absolute path to the config file. */
+  path: string;
+  /** Scope: 'project' (CWD-relative) or 'global' (home-relative). */
+  scope: 'project' | 'global';
+}
+
+/**
+ * A discovered config file — candidate metadata plus the parsed content.
+ */
+export interface DiscoveredConfig extends ConfigCandidate {
+  /** Parsed MCP configuration. */
+  config: McpConfig;
+  /** Number of servers defined in the config. */
+  serverCount: number;
+}
+
+/**
+ * Return the list of standard MCP config file paths to search.
+ *
+ * Paths are returned in priority order: project-level first (CWD), then global (home).
+ * This determines which entry wins in case of session-name collisions across configs.
+ *
+ * Supported locations (inspired by https://www.withone.ai/docs/cli#mcp-server-installation):
+ *  - Claude Code (global):     ~/.claude.json
+ *  - Claude Code (project):    .mcp.json
+ *  - Claude Desktop:           platform-specific app-support directory
+ *  - Cursor:                   ~/.cursor/mcp.json, .cursor/mcp.json
+ *  - VS Code:                  ~/.vscode/mcp.json, .vscode/mcp.json
+ *  - Windsurf:                 ~/.codeium/windsurf/mcp_config.json
+ *  - Kiro:                     ~/.kiro/settings/mcp.json, .kiro/settings/mcp.json
+ *
+ * TOML-based configs (e.g. Codex's `~/.codex/config.toml`) are not supported.
+ *
+ * @param options - Optional overrides for home dir, cwd, and platform (useful for testing)
+ */
+export function getStandardMcpConfigPaths(options?: {
+  homeDir?: string;
+  cwd?: string;
+  platform?: NodeJS.Platform;
+  appData?: string;
+}): ConfigCandidate[] {
+  const home = options?.homeDir ?? homedir();
+  const cwd = options?.cwd ?? process.cwd();
+  const os = options?.platform ?? platform();
+  const appData = options?.appData ?? process.env.APPDATA;
+
+  const candidates: ConfigCandidate[] = [];
+
+  // Project-level configs (CWD) — highest priority, most specific
+  candidates.push(
+    { path: join(cwd, '.mcp.json'), scope: 'project' },
+    { path: join(cwd, 'mcp.json'), scope: 'project' },
+    { path: join(cwd, 'mcp_config.json'), scope: 'project' },
+    { path: join(cwd, '.cursor/mcp.json'), scope: 'project' },
+    { path: join(cwd, '.vscode/mcp.json'), scope: 'project' },
+    { path: join(cwd, '.kiro/settings/mcp.json'), scope: 'project' }
+  );
+
+  // Global / user-level configs
+  candidates.push(
+    { path: join(home, '.cursor/mcp.json'), scope: 'global' },
+    { path: join(home, '.vscode/mcp.json'), scope: 'global' },
+    { path: join(home, '.codeium/windsurf/mcp_config.json'), scope: 'global' },
+    { path: join(home, '.kiro/settings/mcp.json'), scope: 'global' },
+    { path: join(home, '.claude.json'), scope: 'global' }
+  );
+
+  // VS Code app config and Claude Desktop — platform-specific paths
+  if (os === 'darwin') {
+    candidates.push(
+      { path: join(home, 'Library/Application Support/Code/User/mcp.json'), scope: 'global' },
+      {
+        path: join(home, 'Library/Application Support/Claude/claude_desktop_config.json'),
+        scope: 'global',
+      }
+    );
+  } else if (os === 'win32') {
+    if (appData) {
+      candidates.push(
+        { path: join(appData, 'Code/User/mcp.json'), scope: 'global' },
+        { path: join(appData, 'Claude/claude_desktop_config.json'), scope: 'global' }
+      );
+    }
+  } else {
+    // Linux / other — XDG-style
+    candidates.push(
+      { path: join(home, '.config/Code/User/mcp.json'), scope: 'global' },
+      { path: join(home, '.config/Claude/claude_desktop_config.json'), scope: 'global' }
+    );
+  }
+
+  // Dedup by resolved absolute path (preserve order — first occurrence wins)
+  const seen = new Set<string>();
+  const deduped: ConfigCandidate[] = [];
+  for (const candidate of candidates) {
+    const absolute = resolve(candidate.path);
+    if (seen.has(absolute)) continue;
+    seen.add(absolute);
+    deduped.push({ ...candidate, path: absolute });
+  }
+
+  return deduped;
+}
+
+/**
+ * Leniently parse a JSON file that may or may not be an MCP config.
+ * Returns the parsed `McpConfig` if the file exists, is valid JSON, and has a non-empty
+ * `mcpServers` (or `servers` — the VS Code variant) object. Returns `null` for missing
+ * files or files without server entries. Invalid JSON is logged and skipped.
+ */
+function tryReadMcpConfig(configPath: string): McpConfig | null {
+  let content: string;
+  try {
+    const stat = statSync(configPath);
+    if (!stat.isFile()) return null;
+    content = readFileSync(configPath, 'utf-8');
+  } catch {
+    // File missing or unreadable — silently skip
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (error) {
+    logger.warn(`Skipping invalid JSON in ${configPath}: ${(error as Error).message}`);
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== 'object') return null;
+  const obj = parsed as Record<string, unknown>;
+
+  // Standard MCP format: { mcpServers: { ... } }
+  if (obj.mcpServers && typeof obj.mcpServers === 'object' && !Array.isArray(obj.mcpServers)) {
+    return parsed as McpConfig;
+  }
+
+  // VS Code format: { servers: { ... } } — normalize to mcpServers
+  if (obj.servers && typeof obj.servers === 'object' && !Array.isArray(obj.servers)) {
+    return { mcpServers: obj.servers as Record<string, ServerConfig> };
+  }
+
+  return null;
+}
+
+/**
+ * Discover MCP config files from standard locations.
+ * Only returns files that exist and contain at least one server.
+ * Files with parse errors are logged and skipped — discovery does not fail.
+ *
+ * Results are returned in priority order (project-level first, then global),
+ * so callers can deterministically resolve collisions by taking the first occurrence.
+ *
+ * @param options - Optional overrides for home dir, cwd, and platform (useful for testing)
+ */
+export function discoverMcpConfigFiles(options?: {
+  homeDir?: string;
+  cwd?: string;
+  platform?: NodeJS.Platform;
+  appData?: string;
+}): DiscoveredConfig[] {
+  const candidates = getStandardMcpConfigPaths(options);
+  const discovered: DiscoveredConfig[] = [];
+
+  for (const candidate of candidates) {
+    const config = tryReadMcpConfig(candidate.path);
+    if (!config) continue;
+
+    const serverCount = Object.keys(config.mcpServers).length;
+    if (serverCount === 0) {
+      logger.debug(`Skipping ${candidate.path} — no servers defined`);
+      continue;
+    }
+
+    discovered.push({ ...candidate, config, serverCount });
+  }
+
+  return discovered;
 }
