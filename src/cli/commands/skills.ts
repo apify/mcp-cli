@@ -66,8 +66,10 @@ interface RawIndex {
 /**
  * Extract the readable text from a `ReadResourceResult`. Skills resources are
  * always text (`text/markdown` or `application/json`), so we ignore blobs.
+ *
+ * @internal exported for tests
  */
-function extractTextContent(result: ReadResourceResult): string | undefined {
+export function extractTextContent(result: ReadResourceResult): string | undefined {
   for (const item of result.contents) {
     if ('text' in item && typeof item.text === 'string') {
       return item.text;
@@ -80,8 +82,10 @@ function extractTextContent(result: ReadResourceResult): string | undefined {
  * Parse and validate a discovery index into a list of `Skill` objects. Drops
  * malformed entries silently rather than failing — the spec instructs hosts
  * to be permissive about what they accept.
+ *
+ * @internal exported for tests
  */
-function parseIndex(text: string): Skill[] {
+export function parseIndex(text: string): Skill[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -122,8 +126,10 @@ function parseIndex(text: string): Skill[] {
 /**
  * Fallback discovery: scan the server's resource list for SKILL.md files
  * under any `skill://...` prefix. Used when the well-known index is absent.
+ *
+ * @internal exported for tests
  */
-function skillsFromResources(resources: Resource[]): Skill[] {
+export function skillsFromResources(resources: Resource[]): Skill[] {
   // Match `skill://<one-or-more-segments>/SKILL.md`
   const pattern = /^skill:\/\/((?:[^/]+\/)*[^/]+)\/SKILL\.md$/;
 
@@ -156,8 +162,10 @@ function skillsFromResources(resources: Resource[]): Skill[] {
  *
  * The spec requires that hosts MUST NOT treat an absent index as proof a
  * server has no skills, hence the fallback.
+ *
+ * @internal exported for tests
  */
-async function discoverSkills(client: IMcpClient): Promise<Skill[]> {
+export async function discoverSkills(client: IMcpClient): Promise<Skill[]> {
   try {
     const indexResult = await client.readResource(SKILLS_INDEX_URI);
     const text = extractTextContent(indexResult);

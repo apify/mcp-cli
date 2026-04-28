@@ -1500,13 +1500,21 @@ export function formatServerDetails(
     capabilityList.push(`${bullet} tasks${featureStr}`);
   }
 
-  // Experimental extension: io.modelcontextprotocol/skills
-  // Reported under capabilities.extensions; SDK types it as a passthrough object.
-  const extensions = (capabilities as { extensions?: Record<string, unknown> } | undefined)
-    ?.extensions;
+  // Experimental extension: io.modelcontextprotocol/skills (SEP-2640).
+  // The spec advertises under `capabilities.extensions`, but the current MCP
+  // SDK strips unknown capability fields. The SDK does preserve
+  // `capabilities.experimental` — the long-standing escape hatch for
+  // non-standard capabilities — so we check both locations to support
+  // today's servers and forward-compatible SDKs.
+  const capsAny = capabilities as
+    | { extensions?: Record<string, unknown>; experimental?: Record<string, unknown> }
+    | undefined;
+  const SKILLS_KEY = 'io.modelcontextprotocol/skills';
   const hasSkillsExtension =
-    !!extensions &&
-    Object.prototype.hasOwnProperty.call(extensions, 'io.modelcontextprotocol/skills');
+    (!!capsAny?.extensions &&
+      Object.prototype.hasOwnProperty.call(capsAny.extensions, SKILLS_KEY)) ||
+    (!!capsAny?.experimental &&
+      Object.prototype.hasOwnProperty.call(capsAny.experimental, SKILLS_KEY));
   if (hasSkillsExtension) {
     capabilityList.push(`${bullet} skills ${chalk.gray('(experimental extension)')}`);
   }
