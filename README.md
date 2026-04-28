@@ -147,6 +147,8 @@ MCP session commands (after connecting):
   <@session> resources-subscribe <uri>
   <@session> resources-unsubscribe <uri>
   <@session> resources-templates-list
+  <@session> skills-list
+  <@session> skills-get <name> [--raw]
   <@session> tasks-list
   <@session> tasks-get <taskId>
   <@session> tasks-result <taskId>
