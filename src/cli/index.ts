@@ -383,10 +383,7 @@ function createTopLevelProgram(): Command {
     },
   });
 
-  // Use raw Markdown URL for pipes (AI agents), GitHub UI for TTY (humans)
-  const docsUrl = process.stdout.isTTY
-    ? `https://github.com/apify/mcpc/tree/v${mcpcVersion}`
-    : `https://raw.githubusercontent.com/apify/mcpc/v${mcpcVersion}/README.md`;
+  const docsUrl = `https://github.com/apify/mcpc/raw/refs/tags/v${mcpcVersion}/README.md`;
 
   program
     .name('mcpc')
