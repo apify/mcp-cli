@@ -331,6 +331,25 @@ and enables long-term stateful sessions.
 The sessions are given names prefixed with `@` (e.g. `@apify`),
 which then serve as unique reference in commands.
 
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                          Session architecture                               │
+│                                                                             │
+│  Terminal / Script                  Bridge process             MCP server   │
+│  ┌─────────────┐               ┌──────────────────┐       ┌─────────────┐  │
+│  │ mcpc @apify │──Unix socket──│  mcpc-bridge      │──HTTP─│ mcp.apify.  │  │
+│  │ tools-list  │   ~/.mcpc/    │  (persistent)     │  or   │ com         │  │
+│  └─────────────┘  bridges/     │  - MCP session    │ stdio └─────────────┘  │
+│                   apify.sock   │  - Auth tokens    │                        │
+│  ┌─────────────┐               │  - Notifications  │       ┌─────────────┐  │
+│  │ mcpc @apify │──Unix socket──│  - Caching        │──HTTP─│ another     │  │
+│  │ tools-call  │               └──────────────────┘│  or   │ server      │  │
+│  └─────────────┘                                   │ stdio └─────────────┘  │
+│                                                                             │
+│  Multiple CLI calls share the same bridge process and MCP session.          │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
 ```bash
 # Create a persistent session
 mcpc connect mcp.apify.com @apify
@@ -357,6 +376,25 @@ The sessions are persistent: metadata is saved in `~/.mcpc/sessions.json` file,
 [authentication tokens](#authentication) in OS keychain.
 The `mcpc` bridge process keeps the session alive by sending periodic [ping messages](#ping) to the MCP server.
 Still, sessions can fail due to network disconnects, bridge process crash, or server dropping it.
+
+```
+  mcpc connect             mcpc @apify             mcpc @apify close
+  mcp.apify.com @apify     tools-list              (or: mcpc close @apify)
+        │                      │                          │
+        ▼                      ▼                          ▼
+  ┌───────────┐          ┌───────────┐              ┌───────────┐
+  │  Spawn    │          │  Connect  │              │  Kill     │
+  │  bridge   │─────────▶│  to sock  │              │  bridge   │
+  │  process  │          │  Send req │              │  Remove   │
+  └───────────┘          └───────────┘              │  session  │
+        │                      │                    └───────────┘
+        ▼                      ▼
+  Bridge creates         Bridge forwards
+  Unix socket &          request to MCP
+  MCP session            server, returns
+  (initialize →          response via
+   initialized)          socket
+```
 
 **Session states:**
 
@@ -447,6 +485,53 @@ refresh-token rotation.
 
 The OAuth authentication **always** needs to be initiated by the user calling the `login` command,
 which opens a web browser with login screen. `mcpc` never opens the web browser on its own.
+
+```
+                        OAuth 2.1 login flow
+                        ────────────────────
+
+  mcpc login                                       Auth server
+  mcp.apify.com          Browser                  (e.g. auth.apify.com)
+       │                    │                            │
+       │  1. Discover OAuth metadata (WWW-Authenticate)  │
+       │────────────────────────────────────────────────▶│
+       │◀────────────────────────────────────────────────│
+       │                    │                            │
+       │  2. Open login URL │                            │
+       │───────────────────▶│  3. User logs in           │
+       │                    │───────────────────────────▶│
+       │                    │◀───────────────────────────│
+       │                    │  4. Redirect to localhost   │
+       │◀───────────────────│     with auth code         │
+       │                    │                            │
+       │  5. Exchange code for tokens (PKCE)             │
+       │────────────────────────────────────────────────▶│
+       │◀────────────────────────────────────────────────│
+       │                                                 │
+       ▼
+  Save to OS keychain
+  + profiles.json
+```
+
+```
+               Profiles and sessions relationship
+               ───────────────────────────────────
+
+  ┌──────────────────┐     ┌──────────────────────────────────────┐
+  │ profiles.json    │     │ sessions.json                        │
+  │                  │     │                                      │
+  │  mcp.apify.com:  │◀────│  @apify-personal  (profile: default) │
+  │    default: {...}│     │  @apify-work      (profile: work)    │
+  │    work:    {...}│◀────│                                      │
+  └──────────────────┘     └──────────────────────────────────────┘
+           │
+           ▼
+  ┌──────────────────┐
+  │   OS keychain    │
+  │  (OAuth tokens,  │
+  │   refresh tokens)│
+  └──────────────────┘
+```
 
 The OAuth credentials to specific servers are securely stored as **authentication profiles** - reusable
 credentials that allow you to:
@@ -606,6 +691,24 @@ The proxy forwards all MCP requests to the upstream server but **never exposes t
 This is useful when you want to give someone or something MCP access without revealing your credentials.
 See also [AI sandboxes](#ai-sandboxes).
 
+```
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │                        MCP proxy setup                              │
+  │                                                                     │
+  │  Human sets up:                                                     │
+  │    mcpc login mcp.apify.com                                         │
+  │    mcpc connect mcp.apify.com @relay --proxy 8080                   │
+  │                                                                     │
+  │                   ┌────────────────┐                                 │
+  │  AI sandbox ──────│ Proxy server   │──── mcp.apify.com              │
+  │  (localhost:8080) │ (bridge)       │     (with OAuth tokens)        │
+  │                   └────────────────┘                                 │
+  │                                                                     │
+  │  The AI only sees localhost:8080.                                    │
+  │  Original OAuth tokens and HTTP headers are never exposed.          │
+  └──────────────────────────────────────────────────────────────────────┘
+```
+
 ```bash
 # Human authenticates to a remote server
 mcpc login mcp.apify.com
@@ -667,6 +770,29 @@ interactive **tool calling** and **[code mode](https://www.anthropic.com/enginee
 **Tool calling mode** - Agents call `mcpc` commands to dynamically explore and interact with MCP servers,
 using the default text output. This is similar to how MCP connectors in ChatGPT or Claude work,
 but CLI gives you more flexibility and longer operation timeouts.
+
+```
+           AI agent tool calling flow
+           ──────────────────────────
+
+  AI Agent                  mcpc CLI                 MCP Server
+     │                         │                         │
+     │  1. tools-list          │                         │
+     │────────────────────────▶│  tools/list              │
+     │  (discover tools)       │────────────────────────▶│
+     │◀────────────────────────│◀────────────────────────│
+     │                         │                         │
+     │  2. tools-get search    │                         │
+     │────────────────────────▶│  tools/list (cached)     │
+     │  (read schema)          │────────────────────────▶│
+     │◀────────────────────────│◀────────────────────────│
+     │                         │                         │
+     │  3. tools-call search   │  tools/call              │
+     │     query:="hello"      │                         │
+     │────────────────────────▶│────────────────────────▶│
+     │◀────────────────────────│◀────────────────────────│
+     │  (result)               │                         │
+```
 
 ```bash
 # Discover available tools
@@ -777,6 +903,23 @@ on the [Base](https://base.org/) blockchain and retries the request — no human
 This is entirely **opt-in**: existing functionality is unaffected unless you explicitly pass the `--x402` flag.
 
 ### How it works
+
+```
+  mcpc                            MCP Server               Blockchain
+    │  1. tools/call                   │                       │
+    │─────────────────────────────────▶│                       │
+    │  HTTP 402 + PAYMENT-REQUIRED     │                       │
+    │◀─────────────────────────────────│                       │
+    │                                  │                       │
+    │  2. Sign USDC payment locally    │                       │
+    │  (EIP-3009 TransferWithAuth)     │                       │
+    │                                  │                       │
+    │  3. Retry + PAYMENT-SIGNATURE    │                       │
+    │─────────────────────────────────▶│  4. Verify & settle   │
+    │                                  │──────────────────────▶│
+    │  5. Tool result                  │◀──────────────────────│
+    │◀─────────────────────────────────│                       │
+```
 
 1. **Server returns HTTP 402** with a `PAYMENT-REQUIRED` header describing the price and payment details.
 2. `mcpc` parses the header, signs an [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009) `TransferWithAuthorization` using your local wallet.
