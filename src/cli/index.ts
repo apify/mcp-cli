@@ -18,6 +18,7 @@ import chalk from 'chalk';
 import { formatJson, formatJsonError, rainbow } from './output.js';
 import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
+import * as skills from './commands/skills.js';
 import * as prompts from './commands/prompts.js';
 import * as sessions from './commands/sessions.js';
 import * as logging from './commands/logging.js';
@@ -416,6 +417,8 @@ ${chalk.bold('MCP session commands (after connecting):')}
   <@session> ${chalk.cyan('resources-subscribe')} <uri>
   <@session> ${chalk.cyan('resources-unsubscribe')} <uri>
   <@session> ${chalk.cyan('resources-templates-list')}
+  <@session> ${chalk.cyan('skills-list')}
+  <@session> ${chalk.cyan('skills-get')} <name> [--raw]
   <@session> ${chalk.cyan('tasks-list')}
   <@session> ${chalk.cyan('tasks-get')} <taskId>
   <@session> ${chalk.cyan('tasks-result')} <taskId>
@@ -1183,6 +1186,69 @@ ${toolsCallCombinedJsonHelp}`
     )
     .action(async (_options, command) => {
       await resources.listResourceTemplates(session, getOptionsFromCommand(command));
+    });
+
+  // Skills commands (experimental MCP extension: io.modelcontextprotocol/skills)
+  // Sugar over resources-read using the `skill://` URI convention.
+  // Spec: https://github.com/modelcontextprotocol/experimental-ext-skills
+  program
+    .command('skills-list')
+    .description('List Agent Skills exposed by the server (experimental MCP extension).')
+    .addHelpText(
+      'after',
+      `
+${chalk.bold('How discovery works:')}
+  Skills are not a new MCP primitive — they are markdown documents (SKILL.md
+  with YAML frontmatter) served as resources under \`skill://\` URIs. mcpc
+  first tries to read \`skill://index.json\`; if absent, it scans the server's
+  resources for \`skill://*/SKILL.md\` entries.
+
+${chalk.bold('Examples:')}
+  mcpc ${session} skills-list
+  mcpc ${session} skills-list --json | jq '.[].name'
+${jsonHelp(
+  'Array of `Skill` objects',
+  '`[{ name: string, description: string, type?: "skill-md" | "mcp-resource-template", url: string }, ...]`',
+  'https://github.com/modelcontextprotocol/experimental-ext-skills/blob/main/docs/sep-draft-skills-extension.md'
+)}`
+    )
+    .action(async (_options, command) => {
+      await skills.listSkills(session, getOptionsFromCommand(command));
+    });
+
+  program
+    .command('skills-get <name>')
+    .description('Read an Agent Skill (SKILL.md) by name (experimental MCP extension).')
+    .option('--raw', 'Print only the SKILL.md text (markdown), suitable for piping')
+    .addHelpText(
+      'after',
+      `
+${chalk.bold('Name forms:')}
+  bare name           mcpc ${session} skills-get git-workflow
+                      → reads \`skill://git-workflow/SKILL.md\`
+  nested path         mcpc ${session} skills-get acme/billing/refunds
+                      → reads \`skill://acme/billing/refunds/SKILL.md\`
+  full URI            mcpc ${session} skills-get skill://git-workflow/SKILL.md
+
+${chalk.bold('--raw mode:')}
+  Prints just the SKILL.md text content with no header or fences. Useful for
+  loading skill content into an LLM context (e.g. cat-style piping):
+    mcpc ${session} skills-get git-workflow --raw > /tmp/skill.md
+
+${jsonHelp(
+  '`ReadResourceResult` object',
+  '`{ contents: [{ uri, mimeType?, text? | blob? }] }`',
+  `${SCHEMA_BASE}#readresourceresult`
+)}  In --json mode, --raw is ignored; the full \`ReadResourceResult\` is emitted
+  so callers can inspect mimeType and metadata. Pull the markdown via:
+    mcpc ${session} skills-get <name> --json | jq -r '.contents[0].text'
+`
+    )
+    .action(async (name, options, command) => {
+      await skills.getSkill(session, name, {
+        ...(options.raw && { raw: true }),
+        ...getOptionsFromCommand(command),
+      });
     });
 
   // Prompts commands
