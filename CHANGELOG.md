@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mcpc help <command>` now shows a "Did you mean?" suggestion when the command is unknown (e.g., `mcpc help tasks-gfet` → suggests `tasks-get`)
 - `tools-call --task` now prints the task ID and recovery commands when interrupted with Ctrl+C, so you can fetch or cancel the server-side task later
 - `tasks-get` no longer suggests `tasks-cancel` when the task has already reached a terminal state (completed, failed, or cancelled)
+- `tools-list` no longer prints the `task:forbidden` hint on tools whose servers don't support task-augmented execution. The `task:` annotation is now only shown when the feature is available (`task:required` or `task:optional`)
 
 ### Fixed
 

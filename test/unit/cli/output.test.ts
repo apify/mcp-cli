@@ -615,7 +615,7 @@ describe('formatTools', () => {
       const output = formatTools(tools);
       expect(output).toContain('`optional_tool ()` [task:optional]');
       expect(output).toContain('`required_tool ()` [task:required]');
-      expect(output).toContain('`forbidden_tool ()` [task:forbidden]');
+      expect(output).not.toContain('`forbidden_tool ()` [');
       expect(output).not.toContain('`sync_tool ()` [');
     });
 
