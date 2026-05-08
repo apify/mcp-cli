@@ -95,7 +95,7 @@ export function renderAuthPage(options: AuthPageOptions): string {
     line-height: 1.5;
   }
   main { max-width: 640px; }
-  .logo { width: 112px; height: 112px; margin-bottom: 24px; }
+  .logo { width: 200px; height: 200px; margin-top: 48px; }
   .logo svg { width: 100%; height: 100%; display: block; }
   h1 {
     margin: 0 0 12px;
@@ -147,7 +147,6 @@ export function renderAuthPage(options: AuthPageOptions): string {
 </head>
 <body>
   <main>
-    ${logoBlock}
     <h1><span class="emoji" aria-hidden="true">${emoji}</span>${safeTitle}</h1>
     <p>${safeMessage}</p>
     ${infoBlock}
@@ -157,6 +156,7 @@ export function renderAuthPage(options: AuthPageOptions): string {
       <code>mcpc</code> — universal command-line client for the Model Context Protocol<br>
       <a href="${GITHUB_URL}" target="_blank" rel="noopener noreferrer">${GITHUB_URL}</a>
     </div>
+    ${logoBlock}
   </main>
 </body>
 </html>`;
