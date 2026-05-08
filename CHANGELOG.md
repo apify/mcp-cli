@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The local "Authentication successful" / "Authentication failed" pages shown in the browser after `mcpc login` now have a polished dark-themed design with the mcpc logo, a one-line description of the project, and a link to the GitHub repository. The pages are fully self-contained (inline CSS and SVG) so they work without network access.
 - OAuth callback ports for the hosted CIMD changed from the contiguous range 13316–13325 to 6 non-contiguous ports (13316, 13163, 31316, 31613, 16133, 16313) so one unrelated process is less likely to claim all of them. `localhost` variants dropped from the CIMD's `redirect_uris` in favor of `127.0.0.1` only (per RFC 8252 §8.3, which recommends the IP literal to avoid DNS resolution ambiguity).
 - Stdio (command-based) config entries are now skipped by default when connecting from a config file (`mcpc connect <file>`). Pass `--stdio` to include them. Single-entry connects (`mcpc connect file:entry @session`) are not affected.
 - `restart` success message now notes that previous session state (resource subscriptions, pending notifications, async tasks) was lost, since explicit restart always creates a fresh MCP session

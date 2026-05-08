@@ -17,22 +17,9 @@ import { createLogger } from '../logger.js';
 import { removeKeychainOAuthClientInfo, storeKeychainOAuthClientInfo } from './keychain.js';
 import type { AuthProfile } from '../types.js';
 import { MCPC_OAUTH_CALLBACK_PORTS, validateClientMetadataUrl } from './oauth-utils.js';
+import { renderAuthPage } from './auth-page.js';
 
 const logger = createLogger('oauth-flow');
-
-/**
- * Escape HTML special characters to prevent XSS in OAuth callback responses.
- * The callback server renders error messages from query parameters (error_description)
- * directly into HTML, so they must be escaped.
- */
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
 
 // Special key codes
 const ESCAPE_KEY = '\x1b';
@@ -181,47 +168,40 @@ function startCallbackServer(port: number): {
 
       if (error) {
         const message = errorDescription || error;
-        res.writeHead(400, { 'Content-Type': 'text/html' });
-        res.end(`
-          <html>
-            <head><title>Authentication failed</title></head>
-            <body>
-              <h1>Authentication failed</h1>
-              <p>Error: ${escapeHtml(message)}</p>
-              <p>You can close this window.</p>
-            </body>
-          </html>
-        `);
+        res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(
+          renderAuthPage({
+            success: false,
+            title: 'Authentication failed',
+            message: 'The authorization server returned an error.',
+            detail: message,
+          })
+        );
         rejectCode(new ClientError(`OAuth error: ${message}`));
         return;
       }
 
       if (!code) {
-        res.writeHead(400, { 'Content-Type': 'text/html' });
-        res.end(`
-          <html>
-            <head><title>Authentication failed</title></head>
-            <body>
-              <h1>Authentication failed</h1>
-              <p>No authorization code received</p>
-              <p>You can close this window.</p>
-            </body>
-          </html>
-        `);
+        res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(
+          renderAuthPage({
+            success: false,
+            title: 'Authentication failed',
+            message: 'No authorization code was received from the server.',
+          })
+        );
         rejectCode(new ClientError('No authorization code in callback'));
         return;
       }
 
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`
-        <html>
-          <head><title>Authentication successful</title></head>
-          <body>
-            <h1>Authentication successful!</h1>
-            <p>You can close this window and return to the terminal.</p>
-          </body>
-        </html>
-      `);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(
+        renderAuthPage({
+          success: true,
+          title: 'Authentication successful',
+          message: 'You are now signed in. mcpc has securely stored your credentials.',
+        })
+      );
       const result: { code: string; state?: string } = { code };
       if (state !== undefined) {
         result.state = state;
