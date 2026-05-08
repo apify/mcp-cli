@@ -48,14 +48,14 @@ coding interface: the UNIX shell.
 
 ## Motivation
 
-Most AI agents misuse MCP, treating tools as prompt-time function calls: tool definitions and results
-are repeatedly injected into the agent's context, tokens are wasted, and context rots.
-The result is slower, less reliable agents — and the misleading conclusion that
-*"MCP sucks, CLIs are better"*.
+Most AI agents misuse MCP. They treat tools as prompt-time function calls, repeatedly injecting
+tool definitions and results into the agent's context. Tokens get wasted, context rots, and the
+agent gets slower and less reliable. Hence the popular conclusion: *"MCP sucks, CLIs are better"*.
 
 `mcpc` challenges that narrative. It maps every MCP operation to an intuitive CLI command that
-agents pick up from `--help` alone. Any agent with shell access gets full MCP support — no MCP SDK
-integration, no dozens of client functions to wire up — just one `Bash()` tool, and `mcpc` does the rest:
+agents pick up from `--help` alone. Any agent with shell access gets full MCP support without
+integrating an MCP SDK or wiring up dozens of client functions. Just one `Bash()` tool, and
+`mcpc` does the rest:
 
 ```
                                                  ┌───────────────────────────┐
@@ -73,7 +73,7 @@ integration, no dozens of client functions to wire up — just one `Bash()` tool
 
 CLI turns out to be the perfect *local* interface between agents and MCP, while MCP remains the
 standard *remote* interface for server discovery, authentication, payments, and access control.
-The two aren't exclusive — they're complementary.
+The two aren't exclusive. They're complementary.
 
 ## Install
 
