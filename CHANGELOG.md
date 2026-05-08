@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The local "Authentication successful" / "Authentication failed" pages shown in the browser after `mcpc login` now have a polished dark-themed design with the mcpc logo, a one-line description of the project, and a link to the GitHub repository. The pages are fully self-contained (inline CSS and SVG) so they work without network access.
-- OAuth callback ports for the hosted CIMD changed from the contiguous range 13316–13325 to 6 non-contiguous ports (13316, 13163, 31316, 31613, 16133, 16313) so one unrelated process is less likely to claim all of them. `localhost` variants dropped from the CIMD's `redirect_uris` in favor of `127.0.0.1` only (per RFC 8252 §8.3, which recommends the IP literal to avoid DNS resolution ambiguity).
+- The local "Authentication successful" / "Authentication failed" pages shown in the browser after `mcpc login` now have a polished design with the mcpc logo, a one-line description of the project, and a link to the GitHub repository. The pages are fully self-contained (inline CSS and SVG) so they work without network access.
+- OAuth callback ports for the hosted CIMD changed from the contiguous range 13316–13325 to 3 non-contiguous ports (13316, 31613, 16133) so one unrelated process is less likely to claim all of them. `localhost` variants dropped from the CIMD's `redirect_uris` in favor of `127.0.0.1` only (per RFC 8252 §8.3, which recommends the IP literal to avoid DNS resolution ambiguity).
 - Stdio (command-based) config entries are now skipped by default when connecting from a config file (`mcpc connect <file>`). Pass `--stdio` to include them. Single-entry connects (`mcpc connect file:entry @session`) are not affected.
 - `restart` success message now notes that previous session state (resource subscriptions, pending notifications, async tasks) was lost, since explicit restart always creates a fresh MCP session
 - `tasks-list` now shows a hint on how to start a new task (`mcpc @session tools-call <name> [args] --task`) when there are no active tasks
@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Bridge processes started by `mcpc`'s background auto-reconnect now correctly mark sessions as `unauthorized` when the server returns 401/403. Previously the bridge crashed (unhandled promise rejection) before persisting the failure status, so `mcpc` listings kept showing the session as `connecting` until the user explicitly accessed it
 - Sessions using a static bearer token (via `--header "Authorization: ..."`) no longer flip between `unauthorized` and `connecting` on every `mcpc` invocation — they stay `unauthorized` since retrying the same rejected token cannot succeed without `mcpc login` or reconnecting. OAuth-profile sessions still auto-retry because tokens may have been refreshed by another session
 - Server authentication errors now include the path to the bridge log file, so you can inspect it for more detail when investigating why a session was rejected
 - Stdio servers no longer fail silently: the bridge now captures the child's stderr, writes each line to `~/.mcpc/logs/bridge-<session>.log` with a `[server stderr]` prefix, and appends a tail of the most recent lines to `mcpc connect` errors. This makes it obvious when a stdio server crashes on startup due to e.g. missing TLS trust (`NODE_EXTRA_CA_CERTS`), missing proxy vars, or missing credentials, rather than "hanging silently" (#195)

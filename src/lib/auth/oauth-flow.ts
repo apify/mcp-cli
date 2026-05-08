@@ -11,7 +11,7 @@ import { createInterface } from 'readline';
 import { randomBytes } from 'crypto';
 import { auth as sdkAuth } from '@modelcontextprotocol/sdk/client/auth.js';
 import { OAuthProvider, type OAuthProviderOptions } from './oauth-provider.js';
-import { normalizeServerUrl } from '../utils.js';
+import { getServerHost, normalizeServerUrl } from '../utils.js';
 import { ClientError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import { removeKeychainOAuthClientInfo, storeKeychainOAuthClientInfo } from './keychain.js';
@@ -170,7 +170,7 @@ function startCallbackServer(
       const state = url.searchParams.get('state') || undefined;
 
       const info = [
-        { label: 'Server', value: context.serverUrl },
+        { label: 'Server', value: getServerHost(context.serverUrl) },
         { label: 'Profile', value: context.profileName },
         { label: 'Scopes', value: context.scope },
       ];
