@@ -54,19 +54,21 @@ The result is slower, less reliable agents — and the misleading conclusion tha
 *"MCP sucks, CLIs are better"*.
 
 `mcpc` challenges that narrative. It maps every MCP operation to an intuitive CLI command that
-agents pick up from `--help` alone, exposing the entire protocol through a single `Bash()` tool call:
+agents pick up from `--help` alone. Any agent with shell access gets full MCP support — no MCP SDK
+integration, no dozens of client functions to wire up — just one `Bash()` tool, and `mcpc` does the rest:
 
 ```
                                                  ┌───────────────────────────┐
                                                  │  • Tools                  │
-   ┌──────────┐                  ┌──────┐        │  • Resources              │
-   │ AI agent │      Bash()      │      │  MCP   │  • Prompts                │
-   │  Claude  │   ───────────►   │ mcpc │ ─────► │  • Sessions               │
-   │  Code,   │                  │      │        │  • Async tasks            │
-   │  Codex,  │                  │      │        │  • OAuth 2.1 / x402       │
-   │  ...     │                  └──────┘        │  • Notifications          │
+   ┌──────────┐                                  │  • Resources              │
+   │ AI agent │      Bash()       ┌──────┐  MCP  │  • Prompts                │
+   │  Claude  │   ────────────►   │ mcpc │ ────► │  • Sessions               │
+   │  Code,   │                   │      │       │  • Async tasks            │
+   │  Codex,  │                   │      │       │  • OAuth 2.1 / x402       │
+   │  ...     │                   └──────┘       │  • Notifications          │
    └──────────┘                                  └───────────────────────────┘
-                                                   any MCP server (HTTP/stdio)
+    one tool                  full MCP SDK         any MCP server (HTTP/stdio)
+                              handled by mcpc
 ```
 
 CLI turns out to be the perfect *local* interface between agents and MCP, while MCP remains the
