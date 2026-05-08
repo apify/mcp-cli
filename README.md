@@ -27,6 +27,7 @@ coding interface: the UNIX shell.
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+- [Motivation](#motivation)
 - [Install](#install)
 - [Quickstart](#quickstart)
 - [Usage](#usage)
@@ -44,6 +45,38 @@ coding interface: the UNIX shell.
 - [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Motivation
+
+Most AI agents misuse MCP and treat tools as prompt-time function calls: tool definitions and results
+are repeatedly injected into the agent's context, tokens are wasted, and context rots.
+The result is slower, less reliable agents — and the misleading conclusion that
+*"MCP sucks, CLIs are better"*.
+
+`mcpc` challenges that narrative. It maps every MCP operation to an intuitive CLI command that
+agents pick up through `--help` alone, with no external skills, prompts, or documentation required.
+The agent reaches the entire MCP protocol — tools, resources, prompts, async tasks, OAuth,
+notifications, code mode, progressive tool discovery — through a single `Bash()` tool call:
+
+```
+                                                ┌───────────────────────────┐
+                                                │  • Tools                  │
+   ┌──────────┐                  ┌──────┐       │  • Resources              │
+   │ AI agent │  ── Bash() ───►  │      │ ─MCP─►│  • Prompts                │
+   │  Claude  │                  │      │       │  • Async tasks            │
+   │  Code,   │                  │ mcpc │       │  • OAuth 2.1 / x402       │
+   │  Codex,  │                  │      │       │  • Notifications          │
+   │  ...     │  ◄── stdout ───  │      │ ◄MCP─ │  • Progressive discovery  │
+   └──────────┘                  └──────┘       │  • Code mode              │
+                                                └───────────────────────────┘
+                                                  any MCP server (HTTP/stdio)
+```
+
+It turns out CLI is the perfect *local* interface for agents to interact with MCP: full protocol
+coverage and modern features through a single `Bash()` call, while still leveraging MCP's standard
+*remote* interface for server discovery, authentication, payments, and access control.
+
+CLI and MCP aren't exclusive — they're complementary.
 
 ## Install
 
