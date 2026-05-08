@@ -503,6 +503,16 @@ export async function performOAuthFlow(
 
     // Override redirectToAuthorization to open browser
     provider.redirectToAuthorization = async (authorizationUrl: URL) => {
+      // Workaround: the MCP SDK does not append a `state` parameter, but some
+      // OAuth servers (e.g., Ubersuggest's `app.neilpatel.com`) reject the
+      // authorization request without one and return `{"error":"missing_state"}`.
+      // CSRF protection is already provided by PKCE on this flow, so a random
+      // state is sufficient for server compatibility.
+      if (!authorizationUrl.searchParams.has('state')) {
+        const { randomBytes } = await import('node:crypto');
+        authorizationUrl.searchParams.set('state', randomBytes(16).toString('hex'));
+      }
+
       logger.debug('Opening browser for authorization...');
       // Interactive chatter goes to stderr so stdout stays clean for --json output.
       console.error(`\nAuthorization URL: ${authorizationUrl.toString()}`);
