@@ -69,6 +69,9 @@ export function renderAuthPage(options: AuthPageOptions): string {
   const logoSvg = loadLogoSvg();
   const logoBlock = logoSvg ? `<div class="logo">${logoSvg}</div>` : '';
 
+  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="26" font-size="28">${emoji}</text></svg>`;
+  const faviconHref = `data:image/svg+xml,${encodeURIComponent(faviconSvg)}`;
+
   const infoRows = (info ?? [])
     .filter((row): row is { label: string; value: string } => Boolean(row.value))
     .map(
@@ -83,6 +86,7 @@ export function renderAuthPage(options: AuthPageOptions): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="${faviconHref}">
 <title>${safeTitle}</title>
 <style>
   html, body { margin: 0; padding: 0; }
