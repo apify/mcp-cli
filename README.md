@@ -2,6 +2,11 @@
 
 ![mcpc logo](https://apify.github.io/mcpc/client-logo.svg?v=2)
 
+[![npm version](https://img.shields.io/npm/v/@apify/mcpc.svg)](https://www.npmjs.com/package/@apify/mcpc)
+[![npm downloads](https://img.shields.io/npm/dm/@apify/mcpc.svg)](https://www.npmjs.com/package/@apify/mcpc)
+[![CI](https://github.com/apify/mcpc/actions/workflows/ci.yml/badge.svg)](https://github.com/apify/mcpc/actions/workflows/ci.yml)
+[![License](https://img.shields.io/npm/l/@apify/mcpc.svg)](https://github.com/apify/mcpc/blob/main/LICENSE)
+
 `mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 that maps MCP operations to intuitive commands for interactive shell use, scripting, and AI agents.
 
