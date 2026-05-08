@@ -8,6 +8,7 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import type { Socket } from 'net';
 import { URL } from 'url';
 import { createInterface } from 'readline';
+import { randomBytes } from 'crypto';
 import { auth as sdkAuth } from '@modelcontextprotocol/sdk/client/auth.js';
 import { OAuthProvider, type OAuthProviderOptions } from './oauth-provider.js';
 import { normalizeServerUrl } from '../utils.js';
@@ -503,6 +504,14 @@ export async function performOAuthFlow(
 
     // Override redirectToAuthorization to open browser
     provider.redirectToAuthorization = async (authorizationUrl: URL) => {
+      // Inject a random `state` parameter if the SDK didn't add one. OAuth 2.1 treats
+      // `state` as RECOMMENDED rather than REQUIRED, but RFC 6749 §4.1.1 allows servers
+      // to require it, and some production MCP servers do (e.g. Ubersuggest). PKCE
+      // already provides CSRF protection on this flow, so the value need not be verified.
+      if (!authorizationUrl.searchParams.has('state')) {
+        authorizationUrl.searchParams.set('state', randomBytes(16).toString('hex'));
+      }
+
       logger.debug('Opening browser for authorization...');
       // Interactive chatter goes to stderr so stdout stays clean for --json output.
       console.error(`\nAuthorization URL: ${authorizationUrl.toString()}`);

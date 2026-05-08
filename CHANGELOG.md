@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Server authentication errors now include the path to the bridge log file, so you can inspect it for more detail when investigating why a session was rejected
 - Stdio servers no longer fail silently: the bridge now captures the child's stderr, writes each line to `~/.mcpc/logs/bridge-<session>.log` with a `[server stderr]` prefix, and appends a tail of the most recent lines to `mcpc connect` errors. This makes it obvious when a stdio server crashes on startup due to e.g. missing TLS trust (`NODE_EXTRA_CA_CERTS`), missing proxy vars, or missing credentials, rather than "hanging silently" (#195)
 - `mcpc connect` now recognizes relative config-file paths with a `:entry` suffix (e.g. `docs/examples/mcp-config.json:fs`). Previously these were misinterpreted as HTTP URLs because `https://` + the path parses as a URL with the first segment as the host
+- `mcpc login` now sends a random `state` parameter on the OAuth authorization URL. Some authorization servers (e.g. Ubersuggest) reject requests without `state` with a `missing_state` error, which previously made `login` fail before reaching the consent screen (#214)
 
 ### Removed
 
