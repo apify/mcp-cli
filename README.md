@@ -59,16 +59,16 @@ The agent reaches the entire MCP protocol — tools, resources, prompts, async t
 notifications, code mode, progressive tool discovery — through a single `Bash()` tool call:
 
 ```
-                                                ┌───────────────────────────┐
-                                                │  • Tools                  │
-   ┌──────────┐                  ┌──────┐       │  • Resources              │
-   │ AI agent │                  │      │       │  • Prompts                │
-   │  Claude  │  ── Bash() ───►  │ mcpc │ ─MCP─►│  • Sessions               │
-   │  Code,   │                  │      │       │  • Async tasks            │
-   │  Codex,  │                  │      │       │  • OAuth 2.1 / x402       │
-   │  ...     │                  └──────┘       │  • Notifications          │
-   └──────────┘                                 └───────────────────────────┘
-                                                  any MCP server (HTTP/stdio)
+                                                 ┌───────────────────────────┐
+                                                 │  • Tools                  │
+   ┌──────────┐                  ┌──────┐        │  • Resources              │
+   │ AI agent │      Bash()      │      │  MCP   │  • Prompts                │
+   │  Claude  │   ───────────►   │ mcpc │ ─────► │  • Sessions               │
+   │  Code,   │                  │      │        │  • Async tasks            │
+   │  Codex,  │                  │      │        │  • OAuth 2.1 / x402       │
+   │  ...     │                  └──────┘        │  • Notifications          │
+   └──────────┘                                  └───────────────────────────┘
+                                                   any MCP server (HTTP/stdio)
 ```
 
 It turns out CLI is the perfect *local* interface for agents to interact with MCP: full protocol
