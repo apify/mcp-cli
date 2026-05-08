@@ -181,7 +181,7 @@ function startCallbackServer(
         res.end(
           renderAuthPage({
             success: false,
-            title: 'Authentication failed',
+            title: 'mcpc login failed',
             message: 'The authorization server returned an error.',
             detail: message,
             info,
@@ -196,7 +196,7 @@ function startCallbackServer(
         res.end(
           renderAuthPage({
             success: false,
-            title: 'Authentication failed',
+            title: 'mcpc login failed',
             message: 'No authorization code was received from the server.',
             info,
           })
@@ -209,8 +209,8 @@ function startCallbackServer(
       res.end(
         renderAuthPage({
           success: true,
-          title: 'Authentication successful',
-          message: 'You are now signed in. mcpc has securely stored your credentials.',
+          title: 'mcpc login succeeded',
+          message: 'Your authentication profile has been securely saved. You can now use it in your mcpc sessions.',
           info,
         })
       );
