@@ -130,7 +130,10 @@ export interface OAuthFlowResult {
  * Start a local HTTP server for OAuth callback
  * Returns the server, a promise that resolves with the authorization code, and a destroy function
  */
-function startCallbackServer(port: number): {
+function startCallbackServer(
+  port: number,
+  context: { serverUrl: string; profileName: string; scope?: string }
+): {
   server: Server;
   codePromise: Promise<{ code: string; state?: string }>;
   destroyConnections: () => void;
@@ -166,6 +169,12 @@ function startCallbackServer(port: number): {
       const errorDescription = url.searchParams.get('error_description');
       const state = url.searchParams.get('state') || undefined;
 
+      const info = [
+        { label: 'Server', value: context.serverUrl },
+        { label: 'Profile', value: context.profileName },
+        { label: 'Scopes', value: context.scope },
+      ];
+
       if (error) {
         const message = errorDescription || error;
         res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -175,6 +184,7 @@ function startCallbackServer(port: number): {
             title: 'Authentication failed',
             message: 'The authorization server returned an error.',
             detail: message,
+            info,
           })
         );
         rejectCode(new ClientError(`OAuth error: ${message}`));
@@ -188,6 +198,7 @@ function startCallbackServer(port: number): {
             success: false,
             title: 'Authentication failed',
             message: 'No authorization code was received from the server.',
+            info,
           })
         );
         rejectCode(new ClientError('No authorization code in callback'));
@@ -200,6 +211,7 @@ function startCallbackServer(port: number): {
           success: true,
           title: 'Authentication successful',
           message: 'You are now signed in. mcpc has securely stored your credentials.',
+          info,
         })
       );
       const result: { code: string; state?: string } = { code };
@@ -459,7 +471,14 @@ export async function performOAuthFlow(
   const provider = new OAuthProvider(providerOptions);
 
   // Start callback server
-  const { server, codePromise, destroyConnections } = startCallbackServer(port);
+  const callbackContext: { serverUrl: string; profileName: string; scope?: string } = {
+    serverUrl: normalizedServerUrl,
+    profileName,
+  };
+  if (scope !== undefined) {
+    callbackContext.scope = scope;
+  }
+  const { server, codePromise, destroyConnections } = startCallbackServer(port, callbackContext);
 
   // Track whether browser failed so we can fall back to URL paste
   let browserFailed = false;

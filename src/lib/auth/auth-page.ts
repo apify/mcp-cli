@@ -51,6 +51,8 @@ export interface AuthPageOptions {
   title: string;
   message: string;
   detail?: string;
+  /** Connection details to render as a key/value list. Falsy values are skipped. */
+  info?: Array<{ label: string; value: string | undefined }>;
 }
 
 /**
@@ -58,7 +60,7 @@ export interface AuthPageOptions {
  * (inline CSS and SVG) so it works without any network access.
  */
 export function renderAuthPage(options: AuthPageOptions): string {
-  const { success, title, message, detail } = options;
+  const { success, title, message, detail, info } = options;
   const safeTitle = escapeHtml(title);
   const safeMessage = escapeHtml(message);
   const safeDetail = detail ? escapeHtml(detail) : '';
@@ -66,6 +68,15 @@ export function renderAuthPage(options: AuthPageOptions): string {
 
   const logoSvg = loadLogoSvg();
   const logoBlock = logoSvg ? `<div class="logo">${logoSvg}</div>` : '';
+
+  const infoRows = (info ?? [])
+    .filter((row): row is { label: string; value: string } => Boolean(row.value))
+    .map(
+      (row) =>
+        `<div class="row"><dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.value)}</dd></div>`
+    )
+    .join('');
+  const infoBlock = infoRows ? `<dl class="info">${infoRows}</dl>` : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -79,46 +90,52 @@ export function renderAuthPage(options: AuthPageOptions): string {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
     color: #1a1a1a;
     background: #ffffff;
-    display: flex;
-    min-height: 100vh;
-    align-items: center;
-    justify-content: center;
-    padding: 32px 16px;
+    padding: 48px 48px;
     -webkit-font-smoothing: antialiased;
     line-height: 1.5;
   }
-  main {
-    max-width: 520px;
-    width: 100%;
-    text-align: center;
-  }
-  .logo { width: 72px; height: 72px; margin: 0 auto 20px; }
+  main { max-width: 640px; }
+  .logo { width: 112px; height: 112px; margin-bottom: 24px; }
   .logo svg { width: 100%; height: 100%; display: block; }
-  .emoji { font-size: 32px; line-height: 1; margin-bottom: 12px; }
   h1 {
     margin: 0 0 12px;
     font-size: 22px;
     font-weight: 600;
     letter-spacing: -0.2px;
   }
+  h1 .emoji { margin-right: 6px; }
   p { margin: 0 0 8px; font-size: 15px; }
+  .info {
+    margin: 18px 0 0;
+    padding: 14px 16px;
+    background: #f7f7f7;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .info .row { display: flex; gap: 12px; padding: 3px 0; }
+  .info dt { flex: 0 0 90px; color: #666; margin: 0; }
+  .info dd {
+    margin: 0;
+    flex: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    word-break: break-word;
+  }
   .detail {
-    margin: 16px auto 0;
+    margin: 18px 0 0;
     padding: 10px 12px;
-    max-width: 100%;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 13px;
     color: #444;
     background: #f5f5f5;
     border-radius: 6px;
     word-break: break-word;
-    text-align: left;
   }
-  .hint { color: #666; margin-top: 14px; font-size: 14px; }
+  .hint { color: #666; margin-top: 18px; font-size: 14px; }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .footer {
-    margin-top: 32px;
-    padding-top: 20px;
+    margin-top: 36px;
+    padding-top: 18px;
     border-top: 1px solid #eee;
     font-size: 13px;
     color: #666;
@@ -131,9 +148,9 @@ export function renderAuthPage(options: AuthPageOptions): string {
 <body>
   <main>
     ${logoBlock}
-    <div class="emoji" aria-hidden="true">${emoji}</div>
-    <h1>${safeTitle}</h1>
+    <h1><span class="emoji" aria-hidden="true">${emoji}</span>${safeTitle}</h1>
     <p>${safeMessage}</p>
+    ${infoBlock}
     ${safeDetail ? `<p class="detail">${safeDetail}</p>` : ''}
     <p class="hint">You can close this window and return to your terminal.</p>
     <div class="footer">
