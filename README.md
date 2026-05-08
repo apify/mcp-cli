@@ -62,13 +62,12 @@ notifications, code mode, progressive tool discovery — through a single `Bash(
                                                 ┌───────────────────────────┐
                                                 │  • Tools                  │
    ┌──────────┐                  ┌──────┐       │  • Resources              │
-   │ AI agent │  ── Bash() ───►  │      │ ─MCP─►│  • Prompts                │
-   │  Claude  │                  │      │       │  • Async tasks            │
-   │  Code,   │                  │ mcpc │       │  • OAuth 2.1 / x402       │
-   │  Codex,  │                  │      │       │  • Notifications          │
-   │  ...     │  ◄── stdout ───  │      │ ◄MCP─ │  • Progressive discovery  │
-   └──────────┘                  └──────┘       │  • Code mode              │
-                                                └───────────────────────────┘
+   │ AI agent │                  │      │       │  • Prompts                │
+   │  Claude  │  ── Bash() ───►  │ mcpc │ ─MCP─►│  • Sessions               │
+   │  Code,   │                  │      │       │  • Async tasks            │
+   │  Codex,  │                  │      │       │  • OAuth 2.1 / x402       │
+   │  ...     │                  └──────┘       │  • Notifications          │
+   └──────────┘                                 └───────────────────────────┘
                                                   any MCP server (HTTP/stdio)
 ```
 
