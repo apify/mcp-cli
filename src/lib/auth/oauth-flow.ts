@@ -210,7 +210,8 @@ function startCallbackServer(
         renderAuthPage({
           success: true,
           title: 'mcpc login succeeded',
-          message: 'Your authentication profile has been securely saved. You can now use it in your mcpc sessions.',
+          message:
+            'Your authentication profile has been securely saved. You can now use it in your mcpc sessions.',
           info,
         })
       );
