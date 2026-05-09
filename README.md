@@ -58,17 +58,12 @@ integrating an MCP SDK or wiring up dozens of client functions. Just one `Bash()
 `mcpc` does the rest:
 
 ```
-                                                 ┌───────────────────────────┐
-                                                 │  • Tools                  │
-   ┌──────────┐                                  │  • Resources              │
-   │ AI agent │      Bash()       ┌──────┐  MCP  │  • Prompts                │
-   │  Claude  │   ────────────►   │ mcpc │ ────► │  • Sessions               │
-   │  Code,   │                   │      │       │  • Async tasks            │
-   │  Codex,  │                   │      │       │  • OAuth 2.1 / x402       │
-   │  ...     │                   └──────┘       │  • Notifications          │
-   └──────────┘                                  └───────────────────────────┘
-    one tool                  full MCP SDK         any MCP server (HTTP/stdio)
-                              handled by mcpc
+                              MCP                               MCP
+   ┌──────────┐                                  ┌──────┐                  ┌────────────┐
+   │ AI agent │  ─────────────────────────────►  │ mcpc │  ──────────────► │ MCP server │
+   └──────────┘                                  └──────┘                  └────────────┘
+                    Tools + Tasks, Resources, Prompts,
+                    Sessions, OAuth, Notifications
 ```
 
 CLI turns out to be the perfect *local* interface between agents and MCP, while MCP remains the
