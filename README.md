@@ -32,6 +32,7 @@ coding interface: the UNIX shell.
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+- [Motivation](#motivation)
 - [Install](#install)
 - [Quickstart](#quickstart)
 - [Usage](#usage)
@@ -49,6 +50,32 @@ coding interface: the UNIX shell.
 - [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Motivation
+
+Many AI agents misuse MCP. They treat tools as prompt-time function calls, repeatedly injecting
+tool definitions and results into the context. Tokens get wasted, context rots, and the
+agent gets slower and less reliable. Hence the popular conclusion: *"MCP sucks, CLIs are better"*.
+
+`mcpc` challenges that narrative. It maps every MCP operation to an intuitive CLI command that
+agents pick up from `--help` alone. Any agent with shell access gets full MCP support without
+wiring up dozens of MCP functions. Just one `Bash()` tool, and `mcpc` does the rest:
+
+```                                                           
+   ┌──────────┐     Bash()    ┌────────┐          MCP         ┌────────────┐
+   │ AI agent │  ───────────► │  mcpc  │  ──────────────────► │ MCP server │
+   └──────────┘               └────────┘   Sessions, OAuth,   └────────────┘
+                                           Tools, Resources,
+                                           Prompts, Tasks,
+                                           x402, ...
+```
+
+CLI turns out to be the perfect *local* interface between agents and MCP, while MCP remains the
+standard *remote* interface for server discovery, authentication, payments, and access control.
+The two aren't exclusive. They're complementary.
+
+As a bonus, the same `mcpc` configuration, OAuth profiles, and live sessions can be shared across
+many AI agents on the same machine. Authenticate once, reuse everywhere.
 
 ## Install
 
