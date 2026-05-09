@@ -3,6 +3,7 @@
  */
 
 import { createServer } from 'net';
+import { stat } from 'fs/promises';
 import {
   OutputMode,
   isValidSessionName,
@@ -759,6 +760,21 @@ export async function showServerDetails(
         }),
       };
 
+      // Bridge log path/size are useful debug context for callers — only meaningful
+      // for session targets (those starting with "@"); ad-hoc URL/config targets
+      // have no persistent bridge log.
+      let logPath: string | undefined;
+      let logSize: number | undefined;
+      if (target.startsWith('@')) {
+        logPath = `${getLogsDir()}/bridge-${target}.log`;
+        try {
+          const st = await stat(logPath);
+          logSize = st.size;
+        } catch {
+          // log file doesn't exist yet — leave logSize undefined
+        }
+      }
+
       console.log(
         formatOutput(
           {
@@ -766,6 +782,8 @@ export async function showServerDetails(
               sessionName: context.sessionName,
               profileName: context.profileName,
               server,
+              ...(logPath && { logPath }),
+              ...(logSize !== undefined && { logSize }),
             },
             protocolVersion,
             capabilities,
