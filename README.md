@@ -72,7 +72,7 @@ wiring up dozens of MCP functions. Just one `Bash()` tool, and `mcpc` does the r
 
 CLI turns out to be the perfect *local* interface between agents and MCP, while MCP remains the
 standard *remote* interface for server discovery, authentication, payments, and access control.
-The two aren't exclusive. They're complementary.
+The two aren't exclusive – they're complementary.
 
 As a bonus, the same `mcpc` configuration, OAuth profiles, and live sessions can be shared across
 many AI agents on the same machine. Authenticate once, reuse everywhere.

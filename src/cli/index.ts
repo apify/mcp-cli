@@ -439,7 +439,7 @@ Full docs: ${docsUrl}`
     .option('--no-profile', 'Skip OAuth profile (connect anonymously)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
-    .option('--stdio', 'Include stdio (command-based) servers when connecting from config files')
+    .option('--stdio', 'Include local stdio servers when connecting from config files')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
     .addHelpText(
       'after',
@@ -448,7 +448,7 @@ ${chalk.bold('Server formats:')}
   mcp.apify.com                 Remote HTTP server (https:// added automatically)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
   ~/.vscode/mcp.json            Config file — connect every entry in the file
-  ${chalk.dim('(no server)')}                  Auto-discover MCP config files and connect everything
+  ${chalk.dim('(no server)')}                   Auto-discover MCP config files and connect everything
 
 ${chalk.bold('Auto-discovery locations:')}
   Project (cwd): .mcp.json, mcp.json, mcp_config.json, .cursor/mcp.json,
