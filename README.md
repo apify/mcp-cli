@@ -69,6 +69,9 @@ CLI turns out to be the perfect *local* interface between agents and MCP, while 
 standard *remote* interface for server discovery, authentication, payments, and access control.
 The two aren't exclusive. They're complementary.
 
+As a bonus, the same `mcpc` configuration, OAuth profiles, and live sessions can be shared across
+many AI agents on the same machine. Authenticate once, reuse everywhere.
+
 ## Install
 
 ```bash
