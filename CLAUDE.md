@@ -78,6 +78,7 @@ mcpc @fs tools-list
 - Avoid unnecessary interaction loops, provide sufficient context, yet be concise (save tokens)
 - One clear way to do things (orthogonal commands, no surprises)
 - Do not ask for user input (except `shell` and `login`, no unexpected OAuth flows)
+- AI agents must be able to use mcpc without any external agent skills, prompts, or documentation: `--help` output and error messages must provide all the context an agent needs to discover commands, understand arguments, and recover from mistakes
 - Be forgiving, always help users make progress (great errors + guidance)
 - Be consistent with the [MCP specification](https://modelcontextprotocol.io/specification/latest), with `--json` strictly
 - Minimal and portable (few deps, cross-platform)

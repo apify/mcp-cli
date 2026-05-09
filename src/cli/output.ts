@@ -266,7 +266,7 @@ export function formatToolHints(tool: Tool): string | null {
   if (annotationsStr) parts.push(annotationsStr);
 
   const taskSupport = getToolTaskSupport(tool);
-  if (taskSupport) parts.push(`task:${taskSupport}`);
+  if (taskSupport && taskSupport !== 'forbidden') parts.push(`task:${taskSupport}`);
 
   return parts.length > 0 ? parts.join(', ') : null;
 }
