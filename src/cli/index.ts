@@ -445,34 +445,29 @@ Full docs: ${docsUrl}`
       'after',
       `
 ${chalk.bold('Server formats:')}
-  mcp.apify.com                 Remote HTTP server (https:// added automatically)
+  mcp.apify.com                 Remote HTTP server (https:// auto-added)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
-  ~/.vscode/mcp.json            Config file — connect every entry in the file
-  ${chalk.dim('(no server)')}                   Auto-discover MCP config files and connect everything
+  ~/.vscode/mcp.json            Config file — connect every entry
+  ${chalk.dim('(no server)')}                  Auto-discover configs and connect everything
 
-${chalk.bold('Auto-discovery locations:')}
-  Project (cwd): .mcp.json, mcp.json, mcp_config.json, .cursor/mcp.json,
-                 .vscode/mcp.json, .kiro/settings/mcp.json
-  Global (~):    .claude.json, .cursor/mcp.json, .vscode/mcp.json,
-                 .codeium/windsurf/mcp_config.json, .kiro/settings/mcp.json
-  System:        VS Code app config, Claude Desktop config (platform-specific)
-  Env var:       APIFY_API_TOKEN → auto-connects to mcp.apify.com as @apify
+${chalk.bold('Auto-discovery (no server arg):')}
+  Scans ./ and ~ for .mcp.json, mcp.json, mcp_config.json, .cursor/mcp.json,
+  .vscode/mcp.json, .kiro/settings/mcp.json, ~/.claude.json,
+  ~/.codeium/windsurf/mcp_config.json, plus VS Code & Claude Desktop configs.
+  Set APIFY_API_TOKEN to auto-connect mcp.apify.com as @apify.
 
 ${chalk.bold('Session name:')}
-  If @session is omitted, a name is auto-generated from the server (e.g.
-  mcp.apify.com → @apify) or config entry name. Existing sessions matching
-  the same server, OAuth profile, and header names are reused.
-  Cannot be specified for bulk connects (config file or auto-discovery).
+  Omit @session to auto-generate from the server (mcp.apify.com → @apify)
+  or config entry. Matching sessions (same server, profile, header keys)
+  are reused. Bulk connects don't accept @session.
 
 ${chalk.bold('Stdio servers (command-based, run locally):')}
-  ⚠ Config entries spawn the configured command on connect, even if the MCP
-  handshake later fails — only connect to configs you trust. Server stderr
-  is logged to ~/.mcpc/logs/bridge-<session>.log; forward extra env vars
-  (e.g. NODE_EXTRA_CA_CERTS, HTTPS_PROXY) via the entry's "env" block.
-
-  Bulk connects skip stdio entries by default; pass --stdio to include them.
+  ⚠ Config entries spawn the command on connect, even if the handshake
+  later fails — only connect to configs you trust. Stderr is logged to
+  ~/.mcpc/logs/bridge-<session>.log. Bulk connects skip stdio by default;
+  pass --stdio to include them.
 ${jsonHelp(
-  'Array of `InitializeResult` objects extended with `toolNames` and `_mcpc` metadata (one per session)',
+  'Array of `InitializeResult` objects (one per session), extended with `toolNames` and `_mcpc` metadata',
   '`[{ protocolVersion?, capabilities?, serverInfo?, instructions?, toolNames?, _mcpc: { sessionName, profileName?, server?, configFile?, entry?, status, skipReason?, error? } }]`',
   `${SCHEMA_BASE}#initializeresult`
 )}`
