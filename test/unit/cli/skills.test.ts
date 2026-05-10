@@ -3,33 +3,29 @@
  * MCP skills extension (SEP-2640).
  */
 
-// Mock chalk to return plain strings (Jest can't handle chalk's ESM imports)
-jest.mock('chalk', () => ({
-  default: {
-    cyan: (s: string) => s,
-    yellow: (s: string) => s,
-    red: (s: string) => s,
-    dim: (s: string) => s,
-    gray: (s: string) => s,
-    bold: (s: string) => s,
-    green: (s: string) => s,
-    greenBright: (s: string) => s,
-    blue: (s: string) => s,
-    magenta: (s: string) => s,
-    white: (s: string) => s,
-  },
-  cyan: (s: string) => s,
-  yellow: (s: string) => s,
-  red: (s: string) => s,
-  dim: (s: string) => s,
-  gray: (s: string) => s,
-  bold: (s: string) => s,
-  green: (s: string) => s,
-  greenBright: (s: string) => s,
-  blue: (s: string) => s,
-  magenta: (s: string) => s,
-  white: (s: string) => s,
-}));
+// Mock chalk to return plain strings (Jest can't handle chalk's ESM imports).
+// Matches the mock shape used in output.test.ts — the `theme` object in
+// src/cli/output.ts calls chalk.hex(...) at module load, so hex must return
+// a function that yields a string-passthrough callable.
+jest.mock('chalk', () => {
+  const identity = (s: string): string => s;
+  const hex = (): ((s: string) => string) => identity;
+  const palette = {
+    cyan: identity,
+    yellow: identity,
+    red: identity,
+    dim: identity,
+    gray: identity,
+    bold: identity,
+    green: identity,
+    greenBright: identity,
+    blue: identity,
+    magenta: identity,
+    white: identity,
+    hex,
+  };
+  return { default: palette, ...palette };
+});
 
 // Mock sessions module to avoid loading session state during import
 jest.mock('../../../src/lib/sessions.js', () => ({

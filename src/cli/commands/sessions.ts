@@ -23,6 +23,7 @@ import {
   formatError,
   formatSessionLine,
   formatServerDetails,
+  theme,
 } from '../output.js';
 import { withMcpClient, resolveTarget, resolveAuthProfile } from '../helpers.js';
 import { listAuthProfiles } from '../../lib/auth/profiles.js';
@@ -179,7 +180,7 @@ export async function resolveSessionName(
   const storage = await loadSessions();
   if (!(candidateName in storage.sessions)) {
     if (options.outputMode === 'human') {
-      console.log(chalk.cyan(`Using session name: ${candidateName}`));
+      console.log(theme.cyan(`Using session name: ${candidateName}`));
     }
     return candidateName;
   }
@@ -189,7 +190,7 @@ export async function resolveSessionName(
     const suffixed = `${candidateName}-${i}`;
     if (isValidSessionName(suffixed) && !(suffixed in storage.sessions)) {
       if (options.outputMode === 'human') {
-        console.log(chalk.cyan(`Using session name: ${suffixed}`));
+        console.log(theme.cyan(`Using session name: ${suffixed}`));
       }
       return suffixed;
     }
@@ -365,7 +366,7 @@ export async function connectSession(
     // Bridge has crashed or expired - reconnect with warning
     if (options.outputMode === 'human' && !options.quiet) {
       console.log(
-        chalk.yellow(`Session ${name} exists but bridge is ${bridgeStatus}, reconnecting...`)
+        theme.yellow(`Session ${name} exists but bridge is ${bridgeStatus}, reconnecting...`)
       );
     }
 
@@ -637,19 +638,19 @@ export function getBridgeStatus(session: {
 export function formatBridgeStatus(status: DisplayStatus): { dot: string; text: string } {
   switch (status) {
     case 'live':
-      return { dot: chalk.green('●'), text: chalk.green('live') };
+      return { dot: theme.green('●'), text: theme.green('live') };
     case 'connecting':
-      return { dot: chalk.yellow('●'), text: chalk.yellow('connecting') };
+      return { dot: theme.yellow('●'), text: theme.yellow('connecting') };
     case 'reconnecting':
-      return { dot: chalk.yellow('●'), text: chalk.yellow('reconnecting') };
+      return { dot: theme.yellow('●'), text: theme.yellow('reconnecting') };
     case 'disconnected':
-      return { dot: chalk.yellow('●'), text: chalk.yellow('disconnected') };
+      return { dot: theme.yellow('●'), text: theme.yellow('disconnected') };
     case 'crashed':
-      return { dot: chalk.yellow('○'), text: chalk.yellow('crashed') };
+      return { dot: theme.yellow('○'), text: theme.yellow('crashed') };
     case 'unauthorized':
-      return { dot: chalk.red('○'), text: chalk.red('unauthorized') };
+      return { dot: theme.red('○'), text: theme.red('unauthorized') };
     case 'expired':
-      return { dot: chalk.red('○'), text: chalk.red('expired') };
+      return { dot: theme.red('○'), text: theme.red('expired') };
   }
 }
 
@@ -754,7 +755,7 @@ export async function listSessionsAndAuthProfiles(options: {
       console.log(chalk.bold('Saved OAuth profiles:'));
       for (const profile of profiles) {
         const hostStr = getServerHost(profile.serverUrl);
-        const nameStr = chalk.magenta(profile.name);
+        const nameStr = theme.magenta(profile.name);
         const userStr = profile.userEmail || profile.userName || '';
         // Show refreshedAt if available, otherwise createdAt
         const timeAgo = formatTimeAgo(profile.refreshedAt || profile.createdAt);
@@ -898,7 +899,7 @@ export async function restartSession(
     }
 
     if (options.outputMode === 'human') {
-      console.log(chalk.yellow(`Restarting session ${name}...`));
+      console.log(theme.yellow(`Restarting session ${name}...`));
     }
 
     // Stop the bridge (even if it's alive)
@@ -1080,17 +1081,17 @@ async function bulkConnectEntries(
   // Display badges in human mode
   if (options.outputMode === 'human') {
     for (const r of results) {
-      const name = chalk.cyan(r.sessionName);
+      const name = theme.cyan(r.sessionName);
       switch (r.status) {
         case 'created':
-          console.log(`  ${chalk.yellow('●')} ${name} ${chalk.yellow('connecting')}`);
+          console.log(`  ${theme.yellow('●')} ${name} ${theme.yellow('connecting')}`);
           break;
         case 'active':
-          console.log(`  ${chalk.green('●')} ${name} ${chalk.dim('already active')}`);
+          console.log(`  ${theme.green('●')} ${name} ${chalk.dim('already active')}`);
           break;
         case 'failed':
           console.log(
-            `  ${chalk.red('●')} ${name} ${chalk.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}`
+            `  ${theme.red('●')} ${name} ${theme.red('failed')}${r.error ? chalk.dim(` — ${r.error}`) : ''}`
           );
           break;
       }
@@ -1178,7 +1179,7 @@ export async function connectAllFromConfig(
 
   if (options.outputMode === 'human') {
     console.log(
-      chalk.cyan(
+      theme.cyan(
         `Connecting ${serverNames.length} server${serverNames.length === 1 ? '' : 's'} from ${configFile}...`
       )
     );
@@ -1360,7 +1361,7 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
   if (options.outputMode === 'human') {
     const totalEntries = entries.length + skippedDuplicates.length + skippedStdio.length;
     console.log(
-      chalk.cyan(
+      theme.cyan(
         `Found ${discovered.length} MCP config file${discovered.length === 1 ? '' : 's'} ` +
           `with ${totalEntries} server${totalEntries === 1 ? '' : 's'}:`
       )
@@ -1384,14 +1385,14 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
 
         if (isStdio) {
           console.log(
-            `    ${chalk.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)} ${chalk.yellow('○ skipped (stdio)')}`
+            `    ${theme.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)} ${theme.yellow('○ skipped (stdio)')}`
           );
         } else if (isDuplicate) {
           console.log(
-            `    ${chalk.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)} ${chalk.dim('○ skipped (duplicate)')}`
+            `    ${theme.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)} ${chalk.dim('○ skipped (duplicate)')}`
           );
         } else {
-          console.log(`    ${chalk.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)}`);
+          console.log(`    ${theme.cyan(sessionName)} → ${chalk.dim(truncated ?? entryName)}`);
         }
       }
     }
@@ -1414,7 +1415,7 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
       );
     }
     if (parts.length > 0) {
-      console.log(chalk.cyan(`\n${parts.join('. ')}.`));
+      console.log(theme.cyan(`\n${parts.join('. ')}.`));
     }
   }
 
@@ -1497,13 +1498,13 @@ async function maybeConnectApify(
   const isLive = existing && getBridgeStatus(existing) === 'live';
 
   if (options.outputMode === 'human') {
-    console.log(chalk.cyan(`\nAPIFY_API_TOKEN detected, connecting to ${APIFY_MCP_URL}...`));
+    console.log(theme.cyan(`\nAPIFY_API_TOKEN detected, connecting to ${APIFY_MCP_URL}...`));
   }
 
   if (isLive) {
     if (options.outputMode === 'human') {
       console.log(
-        `  ${chalk.green('●')} ${chalk.cyan(APIFY_SESSION_NAME)} ${chalk.dim('already active')}`
+        `  ${theme.green('●')} ${theme.cyan(APIFY_SESSION_NAME)} ${chalk.dim('already active')}`
       );
     }
     return;
@@ -1520,14 +1521,14 @@ async function maybeConnectApify(
     });
     if (options.outputMode === 'human') {
       console.log(
-        `  ${chalk.yellow('●')} ${chalk.cyan(APIFY_SESSION_NAME)} ${chalk.yellow('connecting')}`
+        `  ${theme.yellow('●')} ${theme.cyan(APIFY_SESSION_NAME)} ${theme.yellow('connecting')}`
       );
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (options.outputMode === 'human') {
       console.log(
-        `  ${chalk.red('●')} ${chalk.cyan(APIFY_SESSION_NAME)} ${chalk.red('failed')}${chalk.dim(` — ${msg}`)}`
+        `  ${theme.red('●')} ${theme.cyan(APIFY_SESSION_NAME)} ${theme.red('failed')}${chalk.dim(` — ${msg}`)}`
       );
     }
   }

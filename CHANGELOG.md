@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Removed `tools`, `resources`, and `prompts` shorthand commands — use the full names (`tools-list`, `resources-list`, `prompts-list`) instead
+- **Breaking:** Removed `tools`, `resources`, and `prompts` shorthand commands — use the full names (`tools-list`, `resources-list`, `prompts-list`) instead
 
 ## [0.2.6] - 2026-04-15
 

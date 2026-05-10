@@ -7,7 +7,7 @@ import * as readline from 'readline';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { fileExists, getMcpcHome } from '../lib/utils.js';
-import { formatError, logTarget } from './output.js';
+import { formatError, logTarget, theme } from './output.js';
 import chalk from 'chalk';
 import type { OutputMode, CommandOptions, NotificationData } from '../lib/types.js';
 import * as tools from './commands/tools.js';
@@ -92,19 +92,19 @@ function displayNotification(notification: NotificationData): void {
 
   switch (notification.method) {
     case 'tools/list_changed':
-      message = chalk.yellow(`[${timestamp}] Server tools list changed`);
+      message = theme.yellow(`[${timestamp}] Server tools list changed`);
       break;
     case 'resources/list_changed':
-      message = chalk.yellow(`[${timestamp}] Server resources list changed`);
+      message = theme.yellow(`[${timestamp}] Server resources list changed`);
       break;
     case 'prompts/list_changed':
-      message = chalk.yellow(`[${timestamp}] Server prompts list changed`);
+      message = theme.yellow(`[${timestamp}] Server prompts list changed`);
       break;
     case 'resources/updated':
-      message = chalk.yellow(`[${timestamp}] Resource updated`);
+      message = theme.yellow(`[${timestamp}] Resource updated`);
       break;
     case 'progress':
-      message = chalk.cyan(`[${timestamp}] Progress: ${JSON.stringify(notification.params)}`);
+      message = theme.cyan(`[${timestamp}] Progress: ${JSON.stringify(notification.params)}`);
       break;
     case 'logging/message':
       message = chalk.gray(`[${timestamp}] Server log: ${JSON.stringify(notification.params)}`);
@@ -146,7 +146,7 @@ async function setupNotificationListener(ctx: ShellContext): Promise<void> {
 function showShellHelp(): void {
   console.log(chalk.bold('\nAvailable commands:'));
   console.log('');
-  console.log(chalk.cyan('  MCP commands:'));
+  console.log(theme.cyan('  MCP commands:'));
   console.log('    tools-list');
   console.log('    tools-get <name>');
   console.log('    tools-call <name> [key:=value ...]');
@@ -158,7 +158,7 @@ function showShellHelp(): void {
   console.log('    logging-set-level <level>');
   console.log('    ping');
   console.log('');
-  console.log(chalk.cyan('  Shell commands:'));
+  console.log(theme.cyan('  Shell commands:'));
   console.log('    help              Show this help message');
   console.log('    exit, quit        Exit the shell');
   console.log('    clear             Clear the screen');
@@ -211,7 +211,7 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
 
       case 'tools-get': {
         if (args.length === 0) {
-          console.log(chalk.red('Error: tools-get requires a tool name'));
+          console.log(theme.red('Error: tools-get requires a tool name'));
           console.log('Usage: tools-get <name>');
           return;
         }
@@ -221,7 +221,7 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
 
       case 'tools-call': {
         if (args.length === 0) {
-          console.log(chalk.red('Error: tools-call requires a tool name'));
+          console.log(theme.red('Error: tools-call requires a tool name'));
           console.log('Usage: tools-call <name> [--task] [--detach] [key:=value ...]');
           return;
         }
@@ -261,7 +261,7 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
 
       case 'resources-read': {
         if (args.length === 0) {
-          console.log(chalk.red('Error: resources-read requires a URI'));
+          console.log(theme.red('Error: resources-read requires a URI'));
           console.log('Usage: resources-read <uri>');
           return;
         }
@@ -280,7 +280,7 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
 
       case 'prompts-get': {
         if (args.length === 0) {
-          console.log(chalk.red('Error: prompts-get requires a prompt name'));
+          console.log(theme.red('Error: prompts-get requires a prompt name'));
           console.log('Usage: prompts-get <name> [key:=value ...]');
           return;
         }
@@ -298,7 +298,7 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
 
       case 'logging-set-level': {
         if (args.length === 0) {
-          console.log(chalk.red('Error: logging-set-level requires a level'));
+          console.log(theme.red('Error: logging-set-level requires a level'));
           console.log('Usage: logging-set-level <level>');
           return;
         }
@@ -312,7 +312,7 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
 
       case 'tasks-get': {
         if (args.length === 0) {
-          console.log(chalk.red('Error: tasks-get requires a task ID'));
+          console.log(theme.red('Error: tasks-get requires a task ID'));
           console.log('Usage: tasks-get <taskId>');
           return;
         }
@@ -322,7 +322,7 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
 
       case 'tasks-result': {
         if (args.length === 0) {
-          console.log(chalk.red('Error: tasks-result requires a task ID'));
+          console.log(theme.red('Error: tasks-result requires a task ID'));
           console.log('Usage: tasks-result <taskId>');
           return;
         }
@@ -332,7 +332,7 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
 
       case 'tasks-cancel': {
         if (args.length === 0) {
-          console.log(chalk.red('Error: tasks-cancel requires a task ID'));
+          console.log(theme.red('Error: tasks-cancel requires a task ID'));
           console.log('Usage: tasks-cancel <taskId>');
           return;
         }
@@ -353,12 +353,12 @@ async function executeCommand(ctx: ShellContext, line: string): Promise<void> {
           '🪞 *shell stares back at you*',
         ];
         const message = shellMessages[Math.floor(Math.random() * shellMessages.length)];
-        console.log(chalk.yellow(message));
+        console.log(theme.yellow(message));
         break;
       }
 
       default: {
-        console.log(chalk.red(`Unknown command: ${command}`));
+        console.log(theme.red(`Unknown command: ${command}`));
         const suggestion = suggestCommand(command, KNOWN_SESSION_COMMANDS);
         if (suggestion) {
           console.log(chalk.dim(`Did you mean: ${suggestion}`));
@@ -386,7 +386,7 @@ async function shellLoop(ctx: ShellContext): Promise<void> {
     output: process.stdout,
     history: historyReversed,
     historySize: HISTORY_MAX_COMMANDS,
-    prompt: chalk.cyan(`mcpc(${ctx.target})> `),
+    prompt: theme.cyan(`mcpc(${ctx.target})> `),
     terminal: true,
   });
 

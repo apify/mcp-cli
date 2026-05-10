@@ -15,7 +15,7 @@ import { Command, CommanderError, Help } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatHumanError, ClientError } from '../lib/index.js';
 import chalk from 'chalk';
-import { formatJson, formatJsonError, rainbow } from './output.js';
+import { formatJson, formatJsonError, rainbow, theme } from './output.js';
 import * as tools from './commands/tools.js';
 import * as resources from './commands/resources.js';
 import * as skills from './commands/skills.js';
@@ -210,7 +210,7 @@ async function main(): Promise<void> {
     validateOptions(args);
     validateArgValues(args);
   } catch (error) {
-    console.error(chalk.red(formatHumanError(error as Error, false)));
+    console.error(theme.red(formatHumanError(error as Error, false)));
     process.exit(1);
   }
 
@@ -261,7 +261,7 @@ async function main(): Promise<void> {
         if (outputMode === 'json') {
           console.error(formatJsonError(error, error.code));
         } else {
-          console.error(chalk.red(formatHumanError(error, opts.verbose)));
+          console.error(theme.red(formatHumanError(error, opts.verbose)));
         }
         process.exit(error.code);
       }
@@ -295,7 +295,7 @@ async function main(): Promise<void> {
         if (outputMode === 'json') {
           console.error(formatJsonError(error, error.code));
         } else {
-          console.error(chalk.red(formatHumanError(error, opts.verbose)));
+          console.error(theme.red(formatHumanError(error, opts.verbose)));
         }
         process.exit(error.code);
       }
@@ -363,7 +363,7 @@ function createTopLevelProgram(): Command {
     subcommandTerm: (cmd) =>
       `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
     styleTitle: (str) => chalk.bold(str),
-    styleSubcommandText: (str) => chalk.cyan(str),
+    styleSubcommandText: (str) => theme.cyan(str),
     formatHelp: (cmd, helper) => {
       const output = Help.prototype.formatHelp.call(helper, cmd, helper);
       // Swap Options and Commands sections (separated by blank lines)
@@ -406,25 +406,25 @@ function createTopLevelProgram(): Command {
     `
 ${chalk.bold('MCP session commands (after connecting):')}
   <@session>                   Show MCP server info, capabilities, and tools overview
-  <@session> ${chalk.cyan('grep')} <pattern>    Search tools and instructions
-  <@session> ${chalk.cyan('tools-list')}        List all server tools
-  <@session> ${chalk.cyan('tools-get')} <name>  Get tool details and schema
-  <@session> ${chalk.cyan('tools-call')} <name> [arg:=val ... | <json> | <stdin]
-  <@session> ${chalk.cyan('prompts-list')}
-  <@session> ${chalk.cyan('prompts-get')} <name> [arg:=val ... | <json> | <stdin]
-  <@session> ${chalk.cyan('resources-list')}
-  <@session> ${chalk.cyan('resources-read')} <uri>
-  <@session> ${chalk.cyan('resources-subscribe')} <uri>
-  <@session> ${chalk.cyan('resources-unsubscribe')} <uri>
-  <@session> ${chalk.cyan('resources-templates-list')}
-  <@session> ${chalk.cyan('skills-list')}
-  <@session> ${chalk.cyan('skills-get')} <name> [--raw]
-  <@session> ${chalk.cyan('tasks-list')}
-  <@session> ${chalk.cyan('tasks-get')} <taskId>
-  <@session> ${chalk.cyan('tasks-result')} <taskId>
-  <@session> ${chalk.cyan('tasks-cancel')} <taskId>
-  <@session> ${chalk.cyan('logging-set-level')} <level>
-  <@session> ${chalk.cyan('ping')}
+  <@session> ${theme.cyan('grep')} <pattern>    Search tools and instructions
+  <@session> ${theme.cyan('tools-list')}        List all server tools
+  <@session> ${theme.cyan('tools-get')} <name>  Get tool details and schema
+  <@session> ${theme.cyan('tools-call')} <name> [arg:=val ... | <json> | <stdin]
+  <@session> ${theme.cyan('prompts-list')}
+  <@session> ${theme.cyan('prompts-get')} <name> [arg:=val ... | <json> | <stdin]
+  <@session> ${theme.cyan('resources-list')}
+  <@session> ${theme.cyan('resources-read')} <uri>
+  <@session> ${theme.cyan('resources-subscribe')} <uri>
+  <@session> ${theme.cyan('resources-unsubscribe')} <uri>
+  <@session> ${theme.cyan('resources-templates-list')}
+  <@session> ${theme.cyan('skills-list')}
+  <@session> ${theme.cyan('skills-get')} <name> [--raw]
+  <@session> ${theme.cyan('tasks-list')}
+  <@session> ${theme.cyan('tasks-get')} <taskId>
+  <@session> ${theme.cyan('tasks-result')} <taskId>
+  <@session> ${theme.cyan('tasks-cancel')} <taskId>
+  <@session> ${theme.cyan('logging-set-level')} <level>
+  <@session> ${theme.cyan('ping')}
 
 Run "mcpc" without arguments to show active sessions and OAuth profiles.
 Run "mcpc --json" to get the same data as \`{ sessions: [...], profiles: [...] }\`.
@@ -1320,7 +1320,7 @@ function createSessionProgram(): Command {
     subcommandTerm: (cmd) =>
       `${cmd.name()} ${cmd.usage()}`.replace(/^\[options\]\s*|\s*\[options\]/g, '').trim(),
     styleTitle: (str) => chalk.bold(str),
-    styleSubcommandText: (str) => chalk.cyan(str),
+    styleSubcommandText: (str) => theme.cyan(str),
   });
 
   program
@@ -1412,7 +1412,7 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
       if (outputMode === 'json') {
         console.error(formatJsonError(error, error.code));
       } else {
-        console.error(chalk.red(formatHumanError(error, opts.verbose)));
+        console.error(theme.red(formatHumanError(error, opts.verbose)));
       }
       process.exit(error.code);
     }
@@ -1421,7 +1421,7 @@ async function handleSessionCommands(session: string, args: string[]): Promise<v
     console.error(
       outputMode === 'json'
         ? formatJsonError(error as Error, 1)
-        : chalk.red(formatHumanError(error as Error, opts.verbose))
+        : theme.red(formatHumanError(error as Error, opts.verbose))
     );
     process.exit(1);
   }

@@ -5,32 +5,25 @@
 import { extractAllTextContent } from '../../../src/cli/tool-result.js';
 
 // Mock chalk to return plain strings (required because Jest can't handle chalk's ESM imports)
-jest.mock('chalk', () => ({
-  default: {
-    cyan: (s: string) => s,
-    yellow: (s: string) => s,
-    red: (s: string) => s,
-    dim: (s: string) => s,
-    gray: (s: string) => s,
-    bold: (s: string) => s,
-    green: (s: string) => s,
-    greenBright: (s: string) => s,
-    blue: (s: string) => s,
-    magenta: (s: string) => s,
-    white: (s: string) => s,
-  },
-  cyan: (s: string) => s,
-  yellow: (s: string) => s,
-  red: (s: string) => s,
-  dim: (s: string) => s,
-  gray: (s: string) => s,
-  bold: (s: string) => s,
-  green: (s: string) => s,
-  greenBright: (s: string) => s,
-  blue: (s: string) => s,
-  magenta: (s: string) => s,
-  white: (s: string) => s,
-}));
+jest.mock('chalk', () => {
+  const identity = (s: string): string => s;
+  const hex = (): ((s: string) => string) => identity;
+  const palette = {
+    cyan: identity,
+    yellow: identity,
+    red: identity,
+    dim: identity,
+    gray: identity,
+    bold: identity,
+    green: identity,
+    greenBright: identity,
+    blue: identity,
+    magenta: identity,
+    white: identity,
+    hex,
+  };
+  return { default: palette, ...palette };
+});
 
 // Mock sessions module before importing output
 jest.mock('../../../src/lib/sessions.js', () => ({
