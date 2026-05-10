@@ -348,15 +348,15 @@ and auto-reconnects on network failures or its own crashes (10s cooldown on fail
 
 **Session states:**
 
-| State                | Meaning                                                                                         |
-| -------------------- | ----------------------------------------------------------------------------------------------- |
-| 🟢**`live`**         | Bridge process running and server responding                                                    |
-| 🟡**`connecting`**   | Initial bridge startup in progress (`mcpc connect`)                                             |
-| 🟡**`reconnecting`** | Bridge crashed or lost auth; auto-reconnecting in the background                                |
-| 🟡**`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds               |
-| 🟡**`crashed`**      | Bridge process crashed or was killed; auto-reconnects in the background                         |
-| 🔴**`unauthorized`** | Server rejected authentication (401/403) or token refresh failed; re-run `login` then `restart` |
-| 🔴**`expired`**      | Server rejected session ID (404); requires `restart`                                            |
+| State             | Meaning                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------- |
+| 🟢 `live`         | Bridge process running and server responding                                                    |
+| 🟡 `connecting`   | Initial bridge startup in progress (`mcpc connect`)                                             |
+| 🟡 `reconnecting` | Bridge crashed or lost auth; auto-reconnecting in the background                                |
+| 🟡 `disconnected` | Bridge process running but server unreachable; auto-recovers when server responds               |
+| 🟡 `crashed`      | Bridge process crashed or was killed; auto-reconnects in the background                         |
+| 🔴 `unauthorized` | Server rejected authentication (401/403) or token refresh failed; re-run `login` then `restart` |
+| 🔴 `expired`      | Server rejected session ID (404); requires `restart`                                            |
 
 `mcpc` never removes sessions automatically — failed ones stay flagged with a recovery hint
 in the error message. Use `mcpc @apify restart` to kill the bridge and open a fresh
