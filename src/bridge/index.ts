@@ -406,9 +406,9 @@ class BridgeProcess {
       }
 
       if (ipcWaiters.length > 0) {
-        // Wait with timeout (5 seconds should be plenty for local IPC)
+        // Wait with timeout (60 seconds to allow for interactive macOS Keychain prompts)
         const timeout = new Promise<void>((_, reject) => {
-          setTimeout(() => reject(new Error('Timeout waiting for IPC credentials')), 5000);
+          setTimeout(() => reject(new Error('Timeout waiting for IPC credentials')), 60000);
         });
         await Promise.race([Promise.all(ipcWaiters), timeout]);
         logger.debug('IPC credentials received, proceeding with MCP connection');
