@@ -62,6 +62,7 @@ agents pick up from `--help` alone. Any agent with shell access gets full MCP su
 wiring up dozens of MCP functions. Just one `Bash()` tool, and `mcpc` handles the rest:
 
 ```
+
   ┌──────────┐         Bash()         ┌──────────┐           MCP          ┌────────────┐
   │ AI agent │  ────────────────────► │   mcpc   │  ────────────────────► │ MCP server │
   └──────────┘                        └──────────┘    Sessions, OAuth,    └────────────┘
