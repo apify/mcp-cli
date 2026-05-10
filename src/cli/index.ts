@@ -433,13 +433,13 @@ Full docs: ${docsUrl}`
   program
     .command('connect [server] [@session]')
     .usage('<server> [@session]')
-    .description('Connect to an MCP server and start a named @session') // keep this short
+    .description('Connect to an MCP server and start a new named @session') // keep this short
     .option('-H, --header <header>', 'HTTP header (can be repeated)')
     .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
     .option('--no-profile', 'Skip OAuth profile (connect anonymously)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
-    .option('--stdio', 'Include local stdio servers when connecting from config files')
+    .option('--stdio', 'Launch all local stdio servers from selected config files')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
     .addHelpText(
       'after',
@@ -462,13 +462,13 @@ ${chalk.bold('Session name:')}
   are reused. Bulk connects don't accept @session.
 
 ${chalk.bold('Stdio servers (command-based, run locally):')}
-  ⚠ Config entries spawn the command on connect, even if the handshake
+  Config entries spawn the command on connect, even if the handshake
   later fails — only connect to configs you trust. Stderr is logged to
   ~/.mcpc/logs/bridge-<session>.log. Bulk connects skip stdio by default;
   pass --stdio to include them.
 ${jsonHelp(
   'Array of `InitializeResult` objects (one per session), extended with `toolNames` and `_mcpc` metadata',
-  '`[{ protocolVersion?, capabilities?, serverInfo?, instructions?, toolNames?, _mcpc: { sessionName, profileName?, server?, configFile?, entry?, status, skipReason?, error? } }]`',
+  '`[{ protocolVersion?, capabilities?, serverInfo?, instructions?, toolNames?, _mcpc: { sessionName, server?, ... }]`',
   `${SCHEMA_BASE}#initializeresult`
 )}`
     )
