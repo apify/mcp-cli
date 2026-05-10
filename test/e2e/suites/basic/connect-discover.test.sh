@@ -114,7 +114,10 @@ _SESSIONS_CREATED+=("@discover-global")
 
 run_mcpc_discover connect
 assert_success "connect with global-scope config should succeed"
-assert_contains "$STDOUT" ".cursor/mcp.json"
+# On Windows the printed path uses backslashes (.cursor\mcp.json); normalize
+# both directions so the assertion works on POSIX and Git Bash.
+normalized_stdout="${STDOUT//\\//}"
+assert_contains "$normalized_stdout" ".cursor/mcp.json"
 assert_contains "$STDOUT" "@discover-global"
 test_pass
 
