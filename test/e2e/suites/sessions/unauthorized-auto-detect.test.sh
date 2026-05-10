@@ -52,9 +52,13 @@ tmp_file="$TEST_TMP/sessions.json.$$"
 
 # Save bad headers to the keychain used by restartBridge on auto-reconnect
 # (headers are loaded from the keychain, not sessions.json, on restart).
+# Use a native path for require() — on Windows Node treats a leading "/" as the
+# current drive root, so "/d/a/.../keychain.js" resolves to "D:\d\a\..." (wrong).
+NATIVE_PROJECT_ROOT="$(to_native_path "$PROJECT_ROOT")"
+NATIVE_MCPC_HOME="$(to_native_path "$MCPC_HOME_DIR")"
 node -e "
-  process.env.MCPC_HOME_DIR = '$MCPC_HOME_DIR';
-  const { storeKeychainSessionHeaders } = require('$PROJECT_ROOT/dist/lib/auth/keychain.js');
+  process.env.MCPC_HOME_DIR = '$NATIVE_MCPC_HOME';
+  const { storeKeychainSessionHeaders } = require('$NATIVE_PROJECT_ROOT/dist/lib/auth/keychain.js');
   storeKeychainSessionHeaders('$SESSION', {
     'X-Test': 'true',
     'Authorization': 'InvalidScheme not-a-bearer-token'
