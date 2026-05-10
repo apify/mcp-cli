@@ -64,7 +64,8 @@ const themeHex = (hue: number): string => hslToHex(hue, RAINBOW_SATURATION, RAIN
 export const theme = {
   red: chalk.hex(themeHex(12)), // vermillion (rainbow start)
   yellow: chalk.hex(themeHex(60)),
-  green: chalk.hex(themeHex(140)),
+  // Green is bumped past the rainbow's pastel S/L so "● live" actually feels alive.
+  green: chalk.hex(hslToHex(135, 65, 52)),
   cyan: chalk.hex(themeHex(190)),
   blue: chalk.hex(themeHex(230)),
   magenta: chalk.hex(themeHex(282)), // violet (rainbow end)
