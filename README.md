@@ -2,6 +2,11 @@
 
 ![mcpc logo](https://apify.github.io/mcpc/client-logo.svg?v=2)
 
+[![npm version](https://img.shields.io/npm/v/@apify/mcpc.svg)](https://www.npmjs.com/package/@apify/mcpc)
+[![npm downloads](https://img.shields.io/npm/dm/@apify/mcpc.svg)](https://www.npmjs.com/package/@apify/mcpc)
+[![CI](https://github.com/apify/mcpc/actions/workflows/ci.yml/badge.svg)](https://github.com/apify/mcpc/actions/workflows/ci.yml)
+[![License](https://img.shields.io/npm/l/@apify/mcpc.svg)](https://github.com/apify/mcpc/blob/main/LICENSE)
+
 `mcpc` is a command-line client for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 that maps MCP operations to intuitive commands for interactive shell use, scripting, and AI agents.
 
@@ -16,7 +21,7 @@ coding interface: the UNIX shell.
 - 🗺️ **Progressive tool discovery** - Find relevant MCP tools on the fly to save tokens and increase accuracy.
 - 🔌 **Code mode** - JSON output composes with `jq`, `xargs`, and shell pipelines for MCP workflows as shell scripts.
 - 🔒 **Secure** - Full OAuth 2.1 support with CMID and DCR, uses OS keychain for credentials storage.
-- 🤖 **AI sandboxing** - Proxy MCP server connections to protect credentials from AI-generated code. 
+- 🤖 **AI sandboxing** - Proxy MCP server connections to protect credentials from AI-generated code.
 - 🪶 **Lightweight** - Minimal dependencies, works on Mac/Win/Linux, doesn't use LLMs on its own.
 - 💸 **Agentic payments** - Experimental support for the [x402](https://www.x402.org/) protocol on [Base](https://www.base.org/).
 
@@ -27,6 +32,7 @@ coding interface: the UNIX shell.
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+- [Motivation](#motivation)
 - [Install](#install)
 - [Quickstart](#quickstart)
 - [Usage](#usage)
@@ -45,6 +51,32 @@ coding interface: the UNIX shell.
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
+## Motivation
+
+Many AI agents misuse MCP. They treat tools as prompt-time function calls, repeatedly injecting
+tool definitions and results into the context. Tokens get wasted, context rots, the
+agent gets slower and less reliable, and popular conclusion that: _"MCP sucks, CLIs are better"_.
+
+`mcpc` challenges that narrative. It maps every MCP operation to an intuitive CLI command that
+agents pick up from `--help` alone. Any agent with shell access gets full MCP support without
+wiring up dozens of MCP functions. Just one `Bash()` tool, and `mcpc` handles the rest:
+
+```
+  ┌──────────┐         Bash()         ┌──────────┐           MCP          ┌────────────┐
+  │ AI agent │  ────────────────────► │   mcpc   │  ────────────────────► │ MCP server │
+  └──────────┘                        └──────────┘    Sessions, OAuth,    └────────────┘
+                                                      Tools, Resources,
+                                                      Prompts, Tasks,
+                                                      x402, ...
+```
+
+CLI is the perfect _local_ interface between agents and MCP, while MCP remains the
+standard _remote_ interface for server discovery, authentication, payments, and access control.
+The two aren't exclusive – they're complementary.
+
+As a bonus, the same `mcpc` configuration, OAuth profiles, and live sessions can be shared across
+many AI agents on the same machine. Authenticate once, reuse everywhere.
+
 ## Install
 
 ```bash
@@ -54,28 +86,14 @@ npm install -g @apify/mcpc
 bun install -g @apify/mcpc
 ```
 
-**Linux users:** `mcpc` uses the OS keychain for secure credential storage via the
-[Secret Service API](https://specifications.freedesktop.org/secret-service/).
-On desktop systems (GNOME, KDE) this works out of the box. On headless/server/CI environments
-without a keyring daemon, `mcpc` automatically falls back to a file-based credential store
-(`~/.mcpc/credentials`, mode `0600`).
+**Linux:** credentials use the OS keychain via the [Secret Service API](https://specifications.freedesktop.org/secret-service/).
+GNOME/KDE desktops work out of the box. On headless/CI systems, `mcpc` falls back to a
+file-based store (`~/.mcpc/credentials`, mode `0600`).
 
-To use the OS keychain on a headless system, install `libsecret` and a secret service daemon:
+To force the keychain on headless systems, install `libsecret` + `gnome-keyring`
+(via `apt-get`, `dnf`, or `pacman`) and run:
 
 ```bash
-# Debian/Ubuntu
-sudo apt-get install libsecret-1-0 gnome-keyring
-
-# Fedora/RHEL/CentOS
-sudo dnf install libsecret gnome-keyring
-
-# Arch Linux
-sudo pacman -S libsecret gnome-keyring
-```
-
-And then run `mcpc` as follows:
-
-```
 dbus-run-session -- bash -c "echo -n 'password' | gnome-keyring-daemon --unlock && mcpc ..."
 ```
 
@@ -113,7 +131,7 @@ Usage: mcpc [<@session>] [<command>] [options]
 Universal command-line client for the Model Context Protocol (MCP).
 
 Commands:
-  connect <server> [@session]  Connect to an MCP server and start a named @session
+  connect <server> [@session]  Connect to an MCP server and start a new named @session
   close <@session>             Close a session
   restart <@session>           Restart a session (losing all state)
   shell <@session>             Open interactive shell for a session
@@ -222,44 +240,15 @@ echo '{"greeting":"hello","count":10}' | mcpc @session tools-call <tool-name>
 cat args.json | mcpc @session tools-call <tool-name>
 ```
 
-**Rules:**
+**Auto-parsing rules** for `key:=value`: valid JSON keeps its type
+(`count:=10` → number, `enabled:=true` → boolean, `cfg:='{"k":"v"}'` → object); anything
+else is a string (`greeting:=hello` → `"hello"`). Force a string literal with JSON quotes:
+`id:='"123"'`. Inline JSON is detected when the first arg starts with `{` or `[`. Stdin is
+read when no positional args are given and input is piped.
 
-- All arguments use `:=` syntax: `key:=value`
-- Values are auto-parsed: valid JSON becomes that type, otherwise treated as string
-  - `count:=10` → number `10`
-  - `enabled:=true` → boolean `true`
-  - `greeting:=hello` → string `"hello"` (not valid JSON, so string)
-  - `id:='"123"'` → string `"123"` (JSON string literal)
-- Inline JSON: If first argument starts with `{` or `[`, it's parsed as a JSON object/array
-- Stdin: When no positional args are provided and input is piped, reads JSON from stdin
-
-**Using shell variables:**
-
-When using shell variables that may contain spaces, use double quotes around the entire argument:
-
-```bash
-# Variable with spaces - use double quotes
-QUERY="hello world"
-mcpc @server tools-call search "query:=${QUERY}"
-
-# Multiple variables
-CITY="New York"
-TYPE="restaurants"
-mcpc @server tools-call search "query:=${CITY} ${TYPE}"
-
-# For complex inputs, consider using JSON via stdin
-echo "{\"query\": \"${QUERY}\", \"limit\": 10}" | mcpc @server tools-call search
-```
-
-**Common pitfall:** Don't put spaces around `:=` - it won't work:
-
-```bash
-# Wrong - spaces around :=
-mcpc @server tools-call search query := "hello world"
-
-# Correct - no spaces around :=
-mcpc @server tools-call search "query:=hello world"
-```
+**Pitfalls:** no spaces around `:=` (use `query:=hello world`, not `query := ...`); quote
+the whole argument when it contains shell expansions (`"query:=${VAR}"`). For complex
+inputs, prefer piping JSON via stdin.
 
 ### Interactive shell
 
@@ -355,59 +344,25 @@ mcpc @apify close      # or: mcpc close @apify
 
 ### Session lifecycle
 
-The sessions are persistent: metadata is saved in `~/.mcpc/sessions.json` file,
-[authentication tokens](#authentication) in OS keychain.
-The `mcpc` bridge process keeps the session alive by sending periodic [ping messages](#ping) to the MCP server.
-Still, sessions can fail due to network disconnects, bridge process crash, or server dropping it.
+Session metadata is saved in `~/.mcpc/sessions.json`, [authentication tokens](#authentication)
+in the OS keychain. The bridge process keeps the session alive with periodic [pings](#ping)
+and auto-reconnects on network failures or its own crashes (10s cooldown on failed retries).
 
 **Session states:**
 
-| State                | Meaning                                                                                            |
-| -------------------- | -------------------------------------------------------------------------------------------------- |
-| 🟢**`live`**         | Bridge process running and server responding                                                       |
-| 🟡**`connecting`**   | Initial bridge startup in progress (`mcpc connect`)                                                |
-| 🟡**`reconnecting`** | Bridge crashed or lost auth; auto-reconnecting in the background                                   |
-| 🟡**`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds                  |
-| 🟡**`crashed`**      | Bridge process crashed or was killed; auto-reconnects in the background                            |
-| 🔴**`unauthorized`** | Server rejected authentication (401/403) or token refresh failed; auto-reconnects or needs `login` |
-| 🔴**`expired`**      | Server rejected session ID (404); requires `restart`                                               |
+| State                | Meaning                                                                                         |
+| -------------------- | ----------------------------------------------------------------------------------------------- |
+| 🟢**`live`**         | Bridge process running and server responding                                                    |
+| 🟡**`connecting`**   | Initial bridge startup in progress (`mcpc connect`)                                             |
+| 🟡**`reconnecting`** | Bridge crashed or lost auth; auto-reconnecting in the background                                |
+| 🟡**`disconnected`** | Bridge process running but server unreachable; auto-recovers when server responds               |
+| 🟡**`crashed`**      | Bridge process crashed or was killed; auto-reconnects in the background                         |
+| 🔴**`unauthorized`** | Server rejected authentication (401/403) or token refresh failed; re-run `login` then `restart` |
+| 🔴**`expired`**      | Server rejected session ID (404); requires `restart`                                            |
 
-Here's how `mcpc` handles various bridge process and server connection states:
-
-- While the **bridge process is running**:
-  - If **server positively responds** to pings, the session is marked 🟢 **`live`**, and everything is fine.
-  - If **server stops responding**, the session is marked 🟡 **`disconnected`**.
-    The bridge will keep trying to reconnect in the background and will return to 🟢 **`live`** once the server responds again.
-  - If **server rejects authentication** (HTTP 401 or 403) or token refresh fails,
-    the session is marked 🔴 **`unauthorized`**.
-    `mcpc` will auto-reconnect in the background if another session sharing the same OAuth profile has refreshed the tokens.
-    Otherwise, re-authenticate with `mcpc login <server>` and then `mcpc @my-session restart`.
-  - If **server rejects the session ID** (HTTP 404), indicating the MCP session is no longer valid,
-    the session is marked 🔴 **`expired`**.
-    You need to restart the session with `mcpc @my-session restart` to establish a new connection.
-- If the **bridge process crashes**, `mcpc` will mark the session as 🟡 **`crashed`**
-  and auto-reconnect the bridge in the background. You can also trigger reconnection manually
-  by running any `mcpc @my-session ...` command.
-  - If reconnection **succeeds** and the server resumes the MCP session, the session returns to 🟢 **`live`**.
-  - If the server issues a **new session ID** instead of resuming, the session is marked 🔴 **`expired`**.
-  - If reconnection **fails**, the session remains 🟡 **`crashed`** and retries after a 10-second cooldown.
-
-Note that `mcpc` never automatically removes sessions from the list.
-Instead, it keeps them flagged as 🟡 **`crashed`**, 🔴 **`unauthorized`**, or 🔴 **`expired`**,
-and any future attempts to use them will show the appropriate error with recovery instructions.
-
-To **remove the session from the list**, you need to explicitly close it:
-
-```bash
-mcpc @apify close    # or: mcpc close @apify
-```
-
-You can restart a session anytime, which kills the bridge process
-and opens new connection with new `MCP-Session-Id`, by running:
-
-```bash
-mcpc @apify restart  # or: mcpc restart @apify
-```
+`mcpc` never removes sessions automatically — failed ones stay flagged with a recovery hint
+in the error message. Use `mcpc @apify restart` to kill the bridge and open a fresh
+`MCP-Session-Id`, or `mcpc @apify close` to remove the session entirely.
 
 ## Authentication
 
@@ -494,10 +449,10 @@ When logging in, `mcpc` supports all three OAuth client registration approaches 
 [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#client-registration-approaches),
 picking the one the authorization server advertises in its OAuth metadata:
 
-| **Approach**                            | **`mcpc login` flags**                         |
-|:----------------------------------------| :--------------------------------------------- |
-| **Pre-registration**                    | `--client-id` (and optional `--client-secret`) |
-| **Client ID Metadata Documents (CIMD)** | default (or `--client-metadata-url <url>`)     |
+| **Approach**                            | **`mcpc login` flags**                              |
+| :-------------------------------------- | :-------------------------------------------------- |
+| **Pre-registration**                    | `--client-id` (and optional `--client-secret`)      |
+| **Client ID Metadata Documents (CIMD)** | default (or `--client-metadata-url <url>`)          |
 | **Dynamic Client Registration (DCR)**   | fallback (or force with `--no-client-metadata-url`) |
 
 `mcpc` ships with a hosted [Client ID Metadata Document](https://apify.github.io/mcpc/client-metadata.json)
@@ -524,81 +479,36 @@ for details on each approach and the format of Client ID Metadata Documents.
 
 ### Authentication precedence
 
-When multiple authentication methods are available, `mcpc` uses this precedence order:
+When connecting, `mcpc` picks one auth source based on the flags you pass — explicit flags
+always win over stored profiles, and credentials are never silently downgraded. If a profile
+is missing, expired, or invalid, `mcpc` fails with an error that includes the right
+`mcpc login` command to recover.
 
-1. **Command-line `--header` flag** (highest priority) - Always used if provided
-2. **Saved authentication profiles** - OAuth tokens from saved profile
-3. **Config file headers** - Headers from `--config` file for the server
-4. **No authentication** - Attempts unauthenticated connection
+| Flag                            | Behavior                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------- |
+| `--header "Authorization: ..."` | Use explicit header; skip OAuth auto-detection. Cannot combine with `--profile`.            |
+| `--profile <name>`              | Require the named profile to exist.                                                         |
+| `--no-profile`                  | Connect anonymously even if a `default` profile exists.                                     |
+| `--x402`                        | Skip OAuth auto-detection; use x402 payments instead. Combine with `--profile` to use both. |
+| _(none)_                        | Use `default` profile if it exists; otherwise connect anonymously.                          |
 
-**Note:** `--profile` and `--header "Authorization: ..."` cannot be combined — they are mutually
-exclusive. Providing both will result in a clear error. Use one or the other.
-
-`mcpc` automatically handles authentication based on what you specify:
-
-**When `--header "Authorization: ..."` is provided:**
-
-- The explicit header is always used, and OAuth profile auto-detection is skipped entirely
-- This works even if a `default` profile exists for the server
-- Cannot be combined with `--profile` (returns an error)
-
-**When `--profile <name>` is specified:**
-
-1. **Profile exists for the server**: Use its stored credentials
-   - If authentication succeeds → Continue with command/session
-   - If authentication fails (expired/invalid) → Fail with an error
-2. **Profile doesn't exist**: Fail with an error
-
-**When `--x402` is specified (without `--profile`):**
-
-- OAuth profile auto-detection is skipped, since x402 serves as the payment/auth mechanism
-- If you also pass `--profile`, the specified profile is still used alongside x402
-
-**When `--no-profile` is specified:**
-
-- Skip all OAuth profile detection and connect anonymously
-- Useful when a `default` profile exists but you want an unauthenticated session
-- Can be combined with `--header "Authorization: ..."` for explicit bearer token without profile
-
-**When no flags are specified (default):**
-
-1. **`default` profile exists for the server**: Use its stored credentials
-   - If authentication succeeds → Continue with command/session
-   - If authentication fails (expired/invalid) → Fail with an error
-2. **`default` profile doesn't exist**: Attempt unauthenticated connection
-   - If server accepts (no auth required) → Continue without creating profile
-   - If server rejects with 401 + `WWW-Authenticate` → Fail with an error
-
-On failure, the error message includes instructions on how to login and save the profile, so you know what to do.
-
-This flow ensures:
-
-- Explicit CLI flags always take precedence over stored profiles
-- Credentials are never silently mixed up (personal → work) or downgraded (authenticated → unauthenticated)
-- You can mix authenticated sessions (with named profiles) and public access on the same server
-
-**Examples:**
+Config file headers (from `--config`) apply to servers loaded from that file.
 
 ```bash
-# With specific profile - always authenticated:
-# - Uses 'work' if it exists
-# - Fails if it doesn't exist
-mcpc connect mcp.apify.com @apify-work --profile work
-
-# Without profile - opportunistic authentication:
-# - Uses 'default' if it exists
-# - Tries unauthenticated if 'default' doesn't exist
-# - Fails if the server requires authentication
+# Default: 'default' profile if it exists, else anonymous
 mcpc connect mcp.apify.com @apify-personal
 
-# Explicit bearer token - skips profile auto-detection:
+# Specific profile (fails if missing)
+mcpc connect mcp.apify.com @apify-work --profile work
+
+# Explicit bearer token (no profile)
 mcpc connect mcp.apify.com @apify --header "Authorization: Bearer ${APIFY_TOKEN}"
 
-# x402 payment - skips default profile auto-detection:
-mcpc connect mcp.apify.com @apify --x402
-
-# Anonymous - skips default profile even if it exists:
+# Skip default profile, connect anonymously
 mcpc connect mcp.apify.com @apify-anon --no-profile
+
+# x402 micropayments instead of OAuth
+mcpc connect mcp.apify.com @apify --x402
 ```
 
 ## MCP proxy
@@ -681,22 +591,12 @@ mcpc @server tools-get search
 mcpc @server tools-call search query:="hello world"
 ```
 
-**Code mode** - Once agents understand the server's capabilities, they can write shell scripts
-that compose multiple `mcpc` commands with `--json` output. This can be
-[more accurate](https://www.anthropic.com/engineering/code-execution-with-mcp)
-and use fewer tokens than tool calling for complex workflows.
-
-```bash
-# AI-generated script using --json for structured data
-mcpc --json @apify tools-call search-actors keywords:="scraper" \
-  | jq '.content[0].text | fromjson | .items[0].id' \
-  | xargs -I {} mcpc @apify tools-call get-actor actorId:="{}"
-```
-
-With [schema validation](#schema-validation), agents can ensure stability of integrations and faster failure recovery.
-Agents, make no harm!
-
-See an [example](./docs/examples/company-lookup.sh) of an AI-generated shell script.
+**Code mode** - Once agents understand the server's capabilities, they can write shell
+scripts that compose multiple `mcpc` commands with `--json` output — see
+[Scripting](#scripting) below. This can be
+[more accurate](https://www.anthropic.com/engineering/code-execution-with-mcp) and use
+fewer tokens than tool calling for complex workflows. Pair with
+[schema validation](#schema-validation) to catch breaking changes early.
 
 ### Scripting
 
@@ -1159,17 +1059,6 @@ For **stdio servers:**
 > `~/.mcpc/logs/bridge-<session>.log` with a `[server stderr]` prefix, and the
 > tail is appended to the error message if `mcpc connect` fails, so you can see
 > why a stdio server failed to start.
-
-**Using servers from config file:**
-
-Reference servers by their name using the `file:entry` syntax:
-
-```bash
-# Create a named session from a server in the config
-mcpc connect .vscode/mcp.json:filesystem @fs
-mcpc @fs tools-list
-mcpc @fs tools-call search
-```
 
 **Environment variable substitution:**
 

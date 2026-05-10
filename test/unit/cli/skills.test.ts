@@ -164,20 +164,63 @@ describe('parseIndex', () => {
     expect(skills[0]?.description).toBe('');
   });
 
-  it('drops entries missing required name or url', () => {
+  it('drops entries missing url, or skill-md entries missing name', () => {
     const text = JSON.stringify({
       skills: [
-        { name: 'good', description: 'ok', url: 'skill://good/SKILL.md' },
-        { description: 'no name', url: 'skill://x/SKILL.md' },
+        // valid skill-md
+        {
+          name: 'good',
+          type: 'skill-md',
+          description: 'ok',
+          url: 'skill://good/SKILL.md',
+        },
+        // skill-md without name → dropped per spec
+        { type: 'skill-md', description: 'no name', url: 'skill://x/SKILL.md' },
+        // entry without url → dropped regardless of type
         { name: 'no-url', description: 'no url' },
         null,
         'not-an-object',
-        { name: 123, url: 'skill://x/SKILL.md' }, // wrong type for name
+        // wrong type for name → treated as missing (and no type means skill-md)
+        { name: 123, url: 'skill://x/SKILL.md' },
       ],
     });
     const skills = parseIndex(text);
     expect(skills).toHaveLength(1);
     expect(skills[0]?.name).toBe('good');
+  });
+
+  it('keeps mcp-resource-template entries without a name (spec allows it)', () => {
+    // Per SEP-2640, `name` is required for `skill-md` entries but optional
+    // for `mcp-resource-template` namespaces. mcpc derives a display name
+    // from the URL for nameless templates.
+    const text = JSON.stringify({
+      skills: [
+        {
+          type: 'mcp-resource-template',
+          description: 'Per-product docs',
+          url: 'skill://docs/{product}/SKILL.md',
+        },
+        {
+          type: 'mcp-resource-template',
+          description: 'No SKILL.md suffix',
+          url: 'skill://templates/{kind}',
+        },
+      ],
+    });
+    const skills = parseIndex(text);
+    expect(skills).toHaveLength(2);
+    // For URLs ending in SKILL.md, name = segment before SKILL.md
+    expect(skills[0]?.name).toBe('{product}');
+    expect(skills[0]?.type).toBe('mcp-resource-template');
+    // For URLs not ending in SKILL.md, name = last path segment
+    expect(skills[1]?.name).toBe('{kind}');
+  });
+
+  it('treats an empty `name` on skill-md as missing', () => {
+    const text = JSON.stringify({
+      skills: [{ name: '', type: 'skill-md', description: 'x', url: 'skill://x/SKILL.md' }],
+    });
+    expect(parseIndex(text)).toEqual([]);
   });
 
   it('returns empty list when skills field is absent or non-array', () => {

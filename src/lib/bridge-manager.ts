@@ -138,6 +138,21 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
 
   logger.debug(`Launching bridge for session: ${sessionName}`);
 
+  // Read all keychain values BEFORE spawning the bridge.
+  // The bridge starts a 5s timer for IPC credentials as soon as it boots, and on
+  // macOS the Keychain access dialog can block a CLI for far longer than that.
+  // Loading credentials here ensures the bridge timer does not race a foreground
+  // password prompt — see https://github.com/apify/mcpc/issues/55.
+  const authCredentials =
+    profileName || headers
+      ? await loadAuthCredentials(
+          serverConfig.url || serverConfig.command || '',
+          profileName,
+          headers
+        )
+      : null;
+  const x402Credentials = x402 ? await loadX402WalletCredentials() : null;
+
   // Create a sanitized transport config without any headers
   // Headers will be sent to the bridge via IPC instead
   const sanitizedTarget: ServerConfig = { ...serverConfig };
@@ -233,19 +248,14 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
   }
 
   // Send auth credentials to bridge via IPC (secure, not via command line)
-  // This handles both OAuth profiles (refresh token) and HTTP headers
-  if (profileName || headers) {
-    await sendAuthCredentialsToBridge(
-      socketPath,
-      serverConfig.url || serverConfig.command || '',
-      profileName,
-      headers
-    );
+  // Credentials were loaded from the keychain before spawn() — see comment above.
+  if (authCredentials) {
+    await sendAuthCredentialsToBridge(socketPath, authCredentials);
   }
 
   // Send x402 wallet credentials to bridge via IPC
-  if (x402) {
-    await sendX402WalletToBridge(socketPath);
+  if (x402Credentials) {
+    await sendX402WalletToBridge(socketPath, x402Credentials);
   }
 
   logger.debug(`Bridge started successfully for session: ${sessionName}`);
@@ -435,20 +445,16 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
 }
 
 /**
- * Send auth credentials to a bridge process via IPC
- * Handles both OAuth profiles (refresh token) and HTTP headers
- *
- * @param socketPath - Path to bridge's Unix socket
- * @param serverUrl - Server URL for the session
- * @param profileName - Optional OAuth profile name
- * @param headers - Optional HTTP headers (from --header flags)
+ * Read auth credentials from disk/keychain. Must be called BEFORE the bridge
+ * is spawned: on macOS, Keychain access can block on a user dialog for longer
+ * than the bridge's IPC startup timeout, so doing this read after spawn()
+ * races the bridge timer (see https://github.com/apify/mcpc/issues/55).
  */
-async function sendAuthCredentialsToBridge(
-  socketPath: string,
+async function loadAuthCredentials(
   serverUrl: string,
   profileName?: string,
   headers?: Record<string, string>
-): Promise<void> {
+): Promise<AuthCredentials> {
   // Build credentials object
   const credentials: AuthCredentials = {
     serverUrl,
@@ -491,6 +497,17 @@ async function sendAuthCredentialsToBridge(
     logger.debug(`Including ${Object.keys(headers).length} headers in credentials`);
   }
 
+  return credentials;
+}
+
+/**
+ * Send pre-loaded auth credentials to a bridge process via IPC.
+ * Credentials must be loaded with loadAuthCredentials() before the bridge spawns.
+ */
+async function sendAuthCredentialsToBridge(
+  socketPath: string,
+  credentials: AuthCredentials
+): Promise<void> {
   // Always send credentials to the bridge (even if minimal)
   // The bridge waits for this message before connecting to MCP server
   logger.debug(
@@ -503,7 +520,6 @@ async function sendAuthCredentialsToBridge(
         : '')
   );
 
-  // Connect to bridge and send credentials
   const client = new BridgeClient(socketPath);
   try {
     await client.connect();
@@ -515,24 +531,30 @@ async function sendAuthCredentialsToBridge(
 }
 
 /**
- * Send x402 wallet credentials to a bridge process via IPC
- * Loads wallet data from wallets.json and sends it to bridge
- *
- * @param socketPath - Path to bridge's Unix socket
+ * Read x402 wallet credentials. Must be called BEFORE the bridge is spawned
+ * for the same reason as loadAuthCredentials().
  */
-async function sendX402WalletToBridge(socketPath: string): Promise<void> {
+async function loadX402WalletCredentials(): Promise<X402WalletCredentials> {
   const wallet = await getWallet();
 
   if (!wallet) {
     throw new ClientError('x402 wallet not found. Create one with: mcpc x402 init');
   }
 
-  logger.debug(`Sending x402 wallet (${wallet.address}) to bridge`);
-
-  const credentials: X402WalletCredentials = {
+  return {
     address: wallet.address,
     privateKey: wallet.privateKey,
   };
+}
+
+/**
+ * Send pre-loaded x402 wallet credentials to a bridge process via IPC.
+ */
+async function sendX402WalletToBridge(
+  socketPath: string,
+  credentials: X402WalletCredentials
+): Promise<void> {
+  logger.debug(`Sending x402 wallet (${credentials.address}) to bridge`);
 
   const client = new BridgeClient(socketPath);
   try {

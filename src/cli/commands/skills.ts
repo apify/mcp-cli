@@ -37,9 +37,14 @@ export const SKILLS_EXTENSION_KEY = 'io.modelcontextprotocol/skills';
 /**
  * Single entry in the skills discovery index. Mirrors the Agent Skills
  * discovery schema with mcpc-relevant fields kept.
+ *
+ * Per SEP-2640, `name` is required for `type: "skill-md"` entries but
+ * optional for `type: "mcp-resource-template"` (parameterized namespaces
+ * may not have a single concrete name). When `name` is absent, mcpc
+ * derives a display name from the URL.
  */
 export interface Skill {
-  /** Skill name (matches the final segment of the skill path). */
+  /** Skill name. Derived from URL for nameless `mcp-resource-template` entries. */
   name: string;
   /** Human-readable description. */
   description: string;
@@ -48,7 +53,7 @@ export interface Skill {
    * `"mcp-resource-template"` (parameterized namespace).
    */
   type?: string;
-  /** MCP resource URI of the skill's `SKILL.md` (or template). */
+  /** MCP resource URI of the skill's `SKILL.md`, or an RFC 6570 URI template. */
   url: string;
 }
 
@@ -110,17 +115,50 @@ export function parseIndex(text: string): Skill[] {
   for (const entry of raw) {
     if (!entry || typeof entry !== 'object') continue;
     const e = entry as RawIndexEntry;
-    if (typeof e.name !== 'string' || typeof e.url !== 'string') continue;
+    if (typeof e.url !== 'string') continue;
+
+    // SEP-2640: `name` is required for `skill-md` but optional for
+    // `mcp-resource-template` (parameterized namespaces).
+    const type = typeof e.type === 'string' ? e.type : undefined;
+    const isTemplate = type === 'mcp-resource-template';
+    let name: string;
+    if (typeof e.name === 'string' && e.name.length > 0) {
+      name = e.name;
+    } else if (isTemplate) {
+      // Derive a display name from the template URL for nameless templates.
+      name = displayNameFromUrl(e.url);
+    } else {
+      // skill-md without a name violates the spec — drop silently.
+      continue;
+    }
 
     skills.push({
-      name: e.name,
+      name,
       description: typeof e.description === 'string' ? e.description : '',
-      ...(typeof e.type === 'string' && { type: e.type }),
+      ...(type !== undefined && { type }),
       url: e.url,
     });
   }
 
   return skills;
+}
+
+/**
+ * Derive a display name from an index URL when the entry has no `name` field
+ * (e.g. an `mcp-resource-template` entry). Picks the last meaningful segment
+ * before `SKILL.md` or the last segment of the path.
+ */
+function displayNameFromUrl(url: string): string {
+  // Strip scheme + authority; we only care about the path.
+  const schemeEnd = url.indexOf('://');
+  const path = schemeEnd >= 0 ? url.slice(schemeEnd + 3) : url;
+  const parts = path.split('/').filter(Boolean);
+  if (parts.length === 0) return url;
+  // If the URL ends with SKILL.md, the segment before it is the skill name.
+  if (parts[parts.length - 1] === 'SKILL.md' && parts.length >= 2) {
+    return parts[parts.length - 2] as string;
+  }
+  return parts[parts.length - 1] as string;
 }
 
 /**

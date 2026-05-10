@@ -78,6 +78,7 @@ mcpc @fs tools-list
 - Avoid unnecessary interaction loops, provide sufficient context, yet be concise (save tokens)
 - One clear way to do things (orthogonal commands, no surprises)
 - Do not ask for user input (except `shell` and `login`, no unexpected OAuth flows)
+- AI agents must be able to use mcpc without any external agent skills, prompts, or documentation: `--help` output and error messages must provide all the context an agent needs to discover commands, understand arguments, and recover from mistakes
 - Be forgiving, always help users make progress (great errors + guidance)
 - Be consistent with the [MCP specification](https://modelcontextprotocol.io/specification/latest), with `--json` strictly
 - Minimal and portable (few deps, cross-platform)
@@ -298,6 +299,7 @@ When making changes, follow these rules to maintain the security posture:
 - Use `execFile()` (array args) instead of `exec()` (shell string) when spawning processes
 - Escape any user-controlled or server-controlled data before embedding in HTML responses
 - Send sensitive data (headers, tokens) via IPC socket, never via CLI arguments or environment variables
+- Read all keychain values needed to start a bridge in the CLI **before** `spawn()`. After spawn the bridge arms a short IPC-credential timeout; on macOS a Keychain password dialog can block longer than that timeout, so a post-spawn keychain read races the bridge timer and causes ENOENT (#55). The CLI is the only process attached to a TTY and can show the dialog without the user wondering why a background process is asking. Bridge-side keychain access is permitted only on the OAuth refresh path (`oauth-token-manager` callbacks in `src/bridge/index.ts`), where it is needed to persist rotated refresh tokens for long-running sessions
 - Validate and sanitize all external input (URLs, session names, profile names) before use
 - Default to HTTPS; only allow HTTP for localhost/127.0.0.1
 - When adding HTTP servers (even localhost-only), validate the Host header against expected values
@@ -604,6 +606,8 @@ After lint passes, run `npm run build` and fix any TypeScript compilation errors
 After build passes, run `npm run test:unit` and fix any failures before committing. If a test fails due to your changes, update the test or fix the code so all tests pass. Never commit code that fails unit tests.
 
 For any non-trivial change (new feature, bug fix, behaviour change, or notable refactor), add an entry to the `[Unreleased]` section of `CHANGELOG.md` before finishing. Use the appropriate category (`Added`, `Changed`, `Fixed`, `Removed`). Skip purely internal changes such as test-only edits, code style fixes, or minor cosmetic/styling tweaks (e.g. changing colors, adjusting whitespace, renaming labels). The changelog is for **users reading release notes** — only include entries that a user would care about. Do not add entries for: new warnings or deprecation notices on existing commands, minor help text changes, test infrastructure, CI/CD changes, or internal refactors. When in doubt, leave it out.
+
+When opening a pull request, always reference the originating issue or PR in the description (e.g. `Fixes #55`, `Refs #223`, `Supersedes #222`). This anchors the change to its motivation and lets reviewers see prior discussion, alternative fixes that were considered, and the failure mode being addressed. If the change is motivated by a Slack/email/internal thread with no GitHub artifact, open or link an issue first so future readers have a single source of truth. The same applies to commit messages for non-trivial changes: include `Fixes #N` / `Refs #N` in the body.
 
 When implementing features:
 

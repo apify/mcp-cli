@@ -6,7 +6,7 @@ import { formatSuccess, formatError, formatOutput, formatInfo, formatWarning } f
 import type { CommandOptions } from '../../lib/types.js';
 import { deleteAuthProfiles } from '../../lib/auth/profiles.js';
 import { performOAuthFlow } from '../../lib/auth/oauth-flow.js';
-import { normalizeServerUrl, validateProfileName } from '../../lib/utils.js';
+import { getServerHost, normalizeServerUrl, validateProfileName } from '../../lib/utils.js';
 import chalk from 'chalk';
 import { DEFAULT_AUTH_PROFILE, DEFAULT_CLIENT_METADATA_URL } from '../../lib/auth/oauth-utils.js';
 
@@ -149,13 +149,19 @@ export async function logout(
 
       // Warn about affected sessions
       if (result.affectedSessions.length > 0) {
+        const loginCmd =
+          profileName === DEFAULT_AUTH_PROFILE
+            ? `mcpc login ${getServerHost(normalizedUrl)}`
+            : `mcpc login ${getServerHost(normalizedUrl)} --profile ${profileName}`;
         console.log(
           formatWarning(
             `Warning: ${result.affectedSessions.length} session(s) were using this profile: ${result.affectedSessions.join(', ')}`
           )
         );
         console.log(
-          formatWarning('These sessions may fail to authenticate. Recreate them or login again.')
+          formatWarning(
+            `These sessions may fail to authenticate. Recreate them or login again by running: ${loginCmd}`
+          )
         );
       }
     } else {
