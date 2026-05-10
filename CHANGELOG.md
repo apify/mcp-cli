@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `mcpc connect` and `mcpc restart` no longer fail with `ENOENT` when the macOS Keychain prompts for a password. Credentials are now read from the keychain *before* the bridge process is spawned, so the bridge's IPC startup timer no longer races a foreground password dialog (#55)
 - Bridge processes started by `mcpc`'s background auto-reconnect now correctly mark sessions as `unauthorized` when the server returns 401/403. Previously the bridge crashed (unhandled promise rejection) before persisting the failure status, so `mcpc` listings kept showing the session as `connecting` until the user explicitly accessed it
 - Sessions using a static bearer token (via `--header "Authorization: ..."`) no longer flip between `unauthorized` and `connecting` on every `mcpc` invocation — they stay `unauthorized` since retrying the same rejected token cannot succeed without `mcpc login` or reconnecting. OAuth-profile sessions still auto-retry because tokens may have been refreshed by another session
 - Server authentication errors now include the path to the bridge log file, so you can inspect it for more detail when investigating why a session was rejected
