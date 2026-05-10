@@ -54,23 +54,23 @@ coding interface: the UNIX shell.
 ## Motivation
 
 Many AI agents misuse MCP. They treat tools as prompt-time function calls, repeatedly injecting
-tool definitions and results into the context. Tokens get wasted, context rots, and the
-agent gets slower and less reliable. Hence the popular conclusion: *"MCP sucks, CLIs are better"*.
+tool definitions and results into the context. Tokens get wasted, context rots, the
+agent gets slower and less reliable, and popular conclusion that: *"MCP sucks, CLIs are better"*.
 
 `mcpc` challenges that narrative. It maps every MCP operation to an intuitive CLI command that
 agents pick up from `--help` alone. Any agent with shell access gets full MCP support without
-wiring up dozens of MCP functions. Just one `Bash()` tool, and `mcpc` does the rest:
+wiring up dozens of MCP functions. Just one `Bash()` tool, and `mcpc` handles the rest:
 
 ```                                                           
-  ┌──────────┐     Bash()       ┌────────┐          MCP         ┌────────────┐
-  │ AI agent │  ──────────────► │  mcpc  │  ──────────────────► │ MCP server │
-  └──────────┘   Direct use,    └────────┘   Sessions, OAuth,   └────────────┘
-                 Progressive,                Tools, Resources,
-                 discovery,                  Prompts, Tasks, 
-                 Code mode, ...              x402, ...                                           
+  ┌──────────┐         Bash()         ┌──────────┐           MCP          ┌────────────┐
+  │ AI agent │  ────────────────────► │   mcpc   │  ────────────────────► │ MCP server │
+  └──────────┘                        └──────────┘    Sessions, OAuth,    └────────────┘
+                                                      Tools, Resources,
+                                                      Prompts, Tasks,
+                                                      x402, ... 
 ```
 
-CLI turns out to be the perfect *local* interface between agents and MCP, while MCP remains the
+CLI is the perfect *local* interface between agents and MCP, while MCP remains the
 standard *remote* interface for server discovery, authentication, payments, and access control.
 The two aren't exclusive – they're complementary.
 
