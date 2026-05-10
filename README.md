@@ -62,12 +62,11 @@ agents pick up from `--help` alone. Any agent with shell access gets full MCP su
 wiring up dozens of MCP functions. Just one `Bash()` tool, and `mcpc` does the rest:
 
 ```                                                           
-   ┌──────────┐     Bash()    ┌────────┐          MCP         ┌────────────┐
-   │ AI agent │  ───────────► │  mcpc  │  ──────────────────► │ MCP server │
-   └──────────┘               └────────┘   Sessions, OAuth,   └────────────┘
-                                           Tools, Resources,
-                                           Prompts, Tasks,
-                                           x402, ...
+   ┌──────────┐     Bash()       ┌────────┐          MCP         ┌────────────┐
+   │ AI agent │  ──────────────► │  mcpc  │  ──────────────────► │ MCP server │
+   └──────────┘   Direct use,    └────────┘   Sessions, OAuth,   └────────────┘
+                  Discovery,                  Tools, Resources,
+                  Code mode, ...              Prompts, Tasks, ...                                           
 ```
 
 CLI turns out to be the perfect *local* interface between agents and MCP, while MCP remains the
