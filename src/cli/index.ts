@@ -433,51 +433,44 @@ Full docs: ${docsUrl}`
   program
     .command('connect [server] [@session]')
     .usage('<server> [@session]')
-    .description('Connect to an MCP server and start a named @session') // keep this short
+    .description('Connect to an MCP server and start a new named @session') // keep this short
     .option('-H, --header <header>', 'HTTP header (can be repeated)')
     .option('--profile <name>', 'OAuth profile to use ("default" if skipped)')
     .option('--no-profile', 'Skip OAuth profile (connect anonymously)')
     .option('--proxy <[host:]port>', 'Start proxy MCP server for session')
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
-    .option('--stdio', 'Include stdio (command-based) servers when connecting from config files')
+    .option('--stdio', 'Launch all local stdio servers from selected config files')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
     .addHelpText(
       'after',
       `
 ${chalk.bold('Server formats:')}
-  mcp.apify.com                 Remote HTTP server (https:// added automatically)
+  mcp.apify.com                 Remote HTTP server (https:// auto-added)
   ~/.vscode/mcp.json:puppeteer  Config file entry (file:entry)
-  ~/.vscode/mcp.json            Config file — connect all servers in the file
-  ${chalk.dim('(no server)')}                  Discover standard MCP config files and connect every server
+  ~/.vscode/mcp.json            Config file — connect every entry
+  ${chalk.dim('(no server)')}                  Auto-discover configs and connect everything
 
-${chalk.bold('Auto-discovery locations:')}
-  Project: .mcp.json, mcp.json, mcp_config.json, .cursor/mcp.json, .vscode/mcp.json,
-           .kiro/settings/mcp.json
-  Global:  ~/.claude.json, ~/.cursor/mcp.json, ~/.vscode/mcp.json,
-           ~/.codeium/windsurf/mcp_config.json, ~/.kiro/settings/mcp.json,
-           VS Code app config, Claude Desktop (platform-specific paths)
-  Env var:  APIFY_API_TOKEN → auto-connects to mcp.apify.com as @apify
+${chalk.bold('Auto-discovery (no server arg):')}
+  Scans ./ and ~ for .mcp.json, mcp.json, mcp_config.json, .cursor/mcp.json,
+  .vscode/mcp.json, .kiro/settings/mcp.json, ~/.claude.json,
+  ~/.codeium/windsurf/mcp_config.json, plus VS Code & Claude Desktop configs.
+  Set APIFY_API_TOKEN to auto-connect mcp.apify.com as @apify.
 
 ${chalk.bold('Session name:')}
-  If @session is omitted, a name is auto-generated from the server hostname
-  (e.g. mcp.apify.com → @apify) or config entry name. If a matching session
-  already exists (same server URL, OAuth profile, and HTTP header names), it
-  is reused (restarted if not live). Header values are not compared — they
-  are stored securely in OS keychain.
-  When connecting all servers from a config file or via auto-discovery,
-  @session cannot be specified.
+  Omit @session to auto-generate from the server (mcp.apify.com → @apify)
+  or config entry. Matching sessions (same server, profile, header keys)
+  are reused. Bulk connects don't accept @session.
 
-${chalk.bold('Stdio servers:')}
-  Config entries execute the configured command locally on connect, even if
-  the MCP handshake later fails — only connect to configs you trust. Stdio
-  servers inherit a minimal env whitelist; forward extras (e.g.
-  NODE_EXTRA_CA_CERTS, HTTPS_PROXY) via the "env" block. Server stderr is
-  logged to ~/.mcpc/logs/bridge-<session>.log.
-
-  Bulk connects (\`mcpc connect <config-file>\` and \`mcpc connect\`) skip
-  stdio entries by default; pass --stdio to include them. Single-entry
-  connects are unaffected.
-${jsonHelp('`InitializeResult` object extended with `toolNames` and `_mcpc` metadata', '`{ protocolVersion, capabilities, serverInfo, instructions?, toolNames?, _mcpc }`', `${SCHEMA_BASE}#initializeresult`)}`
+${chalk.bold('Stdio servers (command-based, run locally):')}
+  Config entries spawn the command on connect, even if the handshake
+  later fails — only connect to configs you trust. Stderr is logged to
+  ~/.mcpc/logs/bridge-<session>.log. Bulk connects skip stdio by default;
+  pass --stdio to include them.
+${jsonHelp(
+  'Array of `InitializeResult` objects (one per session), extended with `toolNames` and `_mcpc` metadata',
+  '`[{ protocolVersion?, capabilities?, serverInfo?, instructions?, toolNames?, _mcpc: { sessionName, server?, ... }]`',
+  `${SCHEMA_BASE}#initializeresult`
+)}`
     )
     .action(async (server, sessionName, opts, command) => {
       const globalOpts = getOptionsFromCommand(command);
