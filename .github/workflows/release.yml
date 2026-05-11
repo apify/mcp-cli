@@ -76,24 +76,23 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
           registry-url: https://registry.npmjs.org
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install pnpm and dependencies
+        uses: apify/workflows/pnpm-install@v0.41.1
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Unit tests
-        run: npm run test:unit
+        run: pnpm run test:unit
 
       - name: Update README
         if: inputs.type == 'release'
-        run: npm run build:readme
+        run: pnpm run build:readme
 
       # ── Pre-release ────────────────────────────────────────────────
       - name: Bump pre-release version
@@ -147,12 +146,12 @@ jobs:
           if [[ -n "$LATEST_BETA" && "$LATEST_BETA" == ${NEXT_BASE}-beta.* ]]; then
             # Existing beta found — increment from it
             echo "Found existing beta on npm: $LATEST_BETA — incrementing"
-            npm version "$LATEST_BETA" --no-git-tag-version --allow-same-version
-            npm version prerelease --preid=beta --no-git-tag-version
+            pnpm version "$LATEST_BETA" --no-git-tag-version --allow-same-version
+            pnpm version prerelease --preid=beta --no-git-tag-version
           else
             # No beta yet — start at beta.0
             echo "No existing beta for ${NEXT_BASE} — creating ${NEXT_BASE}-beta.0"
-            npm version "${NEXT_BASE}-beta.0" --no-git-tag-version --allow-same-version
+            pnpm version "${NEXT_BASE}-beta.0" --no-git-tag-version --allow-same-version
           fi
 
           NEW_VERSION=$(node -p "require('./package.json').version")
@@ -171,7 +170,7 @@ jobs:
 
       - name: Publish pre-release to npm
         if: inputs.type == 'pre-release'
-        run: MCPC_RELEASE=1 npm publish --access public --tag beta --provenance
+        run: MCPC_RELEASE=1 pnpm publish --access public --tag beta --provenance --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -195,7 +194,7 @@ jobs:
           CURRENT=$(node -p "require('./package.json').version")
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
 
-          npm version "${{ inputs.version }}" --no-git-tag-version
+          pnpm version "${{ inputs.version }}" --no-git-tag-version
 
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
@@ -232,7 +231,7 @@ jobs:
           NEW_VERSION="${{ steps.release.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json CHANGELOG.md README.md
+          git add package.json pnpm-lock.yaml CHANGELOG.md README.md
           git commit -m "v${NEW_VERSION}"
           git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
           git push origin main
@@ -240,7 +239,7 @@ jobs:
 
       - name: Publish release to npm
         if: inputs.type == 'release'
-        run: MCPC_RELEASE=1 npm publish --access public --provenance
+        run: MCPC_RELEASE=1 pnpm publish --access public --provenance --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

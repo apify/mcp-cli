@@ -21,19 +21,18 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install pnpm and dependencies
+        uses: apify/workflows/pnpm-install@v0.41.1
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Unit tests
-        run: npm run test:unit
+        run: pnpm run test:unit
 
   e2e-node:
     name: E2E tests (Node.js)
@@ -46,13 +45,12 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install pnpm and dependencies
+        uses: apify/workflows/pnpm-install@v0.41.1
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: E2E tests
         # Run without gnome-keyring: @napi-rs/keyring fails fast when no D-Bus secret
@@ -73,16 +71,15 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install pnpm and dependencies
+        uses: apify/workflows/pnpm-install@v0.41.1
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: E2E tests
         run: ./test/e2e/run.sh --no-build --runtime bun --parallel 4
