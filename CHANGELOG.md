@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- Migrated the development and release toolchain from npm to pnpm 10, and enabled a 24-hour package quarantine (`minimumReleaseAge: 1440`) on all third-party dependencies to reduce the risk of supply-chain attacks via compromised npm packages (e.g. shai-hulud, nx self-replicator) that are typically detected and yanked within the first day. Installation of `@apify/mcpc` from npm is unaffected — end users can continue to install with npm, pnpm, or bun
+- Migrated the dev/release toolchain to pnpm 10 with a 24-hour package quarantine (`minimumReleaseAge: 1440`) to reduce supply-chain attack risk. End-user installs from npm are unaffected
 
 ## [0.2.6] - 2026-04-15
 
