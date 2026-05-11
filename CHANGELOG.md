@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking:** Removed `tools`, `resources`, and `prompts` shorthand commands — use the full names (`tools-list`, `resources-list`, `prompts-list`) instead
 
+### Security
+
+- Migrated the dev/release toolchain to pnpm 10 with a 24-hour package quarantine (`minimumReleaseAge: 1440`) to reduce supply-chain attack risk. End-user installs from npm are unaffected
+
 ## [0.2.6] - 2026-04-15
 
 ### Added
