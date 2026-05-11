@@ -1,0 +1,18 @@
+# Supply-chain protection: require packages to be at least 24h old before pnpm will install them.
+# Mitigates compromised npm packages discovered and yanked within the first day (shai-hulud worm,
+# nx self-replicator, etc.). 1440 minutes = 24 hours. Internal @apify/* and @crawlee/* are excluded
+# because we publish them ourselves.
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - "@apify/*"
+  - "@crawlee/*"
+  - "apify-client"
+  - "apify"
+  - "crawlee"
+  - "got-scraping"
+
+# @napi-rs/keyring ships a native node binding that needs to be built/copied
+# into place on install. Without this entry pnpm v10 refuses to run its
+# postinstall script and the keychain feature breaks at runtime.
+onlyBuiltDependencies:
+  - "@napi-rs/keyring"
