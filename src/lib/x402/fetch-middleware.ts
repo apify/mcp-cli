@@ -21,9 +21,11 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import {
   signPayment,
   parsePaymentRequired,
+  selectAcceptEntry,
   type SignerWallet,
   type PaymentRequiredAccept,
   type PaymentRequiredHeader,
+  type SchemePreference,
 } from './signer.js';
 import { createLogger } from '../logger.js';
 
@@ -79,6 +81,9 @@ export interface X402FetchMiddlewareOptions {
 
   /** Shared mutable cache for reusing payment signatures across tool calls */
   paymentCache: X402PaymentCache;
+
+  /** Payment scheme preference when multiple accepts are available (default: auto) */
+  schemePreference?: SchemePreference;
 }
 
 /**
@@ -93,7 +98,7 @@ export function createX402FetchMiddleware(
   baseFetch: FetchLike,
   options: X402FetchMiddlewareOptions
 ): FetchLike {
-  const { wallet, getToolByName, paymentCache } = options;
+  const { wallet, getToolByName, paymentCache, schemePreference } = options;
 
   return async (url: string | URL, init?: RequestInit): Promise<Response> => {
     // Try to get a payment signature (cached or freshly signed) for tools/call requests
@@ -110,7 +115,15 @@ export function createX402FetchMiddleware(
       // HTTP 402 — invalidate cache and fall through to fallback
       logger.debug('Payment rejected (HTTP 402), invalidating cache');
       paymentCache.signature = null;
-      return handle402Fallback(url, init, response, baseFetch, wallet, paymentCache);
+      return handle402Fallback(
+        url,
+        init,
+        response,
+        baseFetch,
+        wallet,
+        paymentCache,
+        schemePreference
+      );
     }
 
     // No payment needed — make request normally
@@ -118,7 +131,15 @@ export function createX402FetchMiddleware(
 
     // Check for HTTP 402 fallback
     if (response.status === 402) {
-      return handle402Fallback(url, init, response, baseFetch, wallet, paymentCache);
+      return handle402Fallback(
+        url,
+        init,
+        response,
+        baseFetch,
+        wallet,
+        paymentCache,
+        schemePreference
+      );
     }
 
     return response;
@@ -213,7 +234,8 @@ async function handle402Fallback(
   response402: Response,
   baseFetch: FetchLike,
   wallet: SignerWallet,
-  paymentCache: X402PaymentCache
+  paymentCache: X402PaymentCache,
+  schemePreference?: SchemePreference
 ): Promise<Response> {
   // Extract PAYMENT-REQUIRED header (case-insensitive)
   const paymentRequiredBase64 =
@@ -229,7 +251,7 @@ async function handle402Fallback(
   let header: PaymentRequiredHeader;
   let accept: PaymentRequiredAccept;
   try {
-    ({ header, accept } = parsePaymentRequired(paymentRequiredBase64));
+    ({ header, accept } = parsePaymentRequired(paymentRequiredBase64, schemePreference));
   } catch (error) {
     logger.warn('Failed to parse PAYMENT-REQUIRED header:', error);
     return response402;
@@ -295,7 +317,7 @@ function extractToolCallName(body: RequestInit['body'] | undefined): string | un
 
 /**
  * Extract `PaymentRequiredAccept` from a PaymentRequired object.
- * Returns the first "exact" scheme accept entry, or undefined if not found.
+ * Uses scheme selection logic: prefers valid `upto`, falls back to valid `exact`.
  *
  * The data is expected to have the shape: `{ x402Version, accepts: [...] }`
  */
@@ -310,8 +332,8 @@ export function extractAcceptFromPaymentRequired(data: unknown):
   const obj = data as Record<string, unknown>;
   if (!Array.isArray(obj.accepts) || obj.accepts.length === 0) return undefined;
 
-  const accept = (obj.accepts as PaymentRequiredAccept[]).find((a) => a.scheme === 'exact');
-  if (!accept || !accept.payTo || !accept.amount || !accept.network || !accept.asset) {
+  const accept = selectAcceptEntry(obj.accepts as PaymentRequiredAccept[], 'auto');
+  if (!accept) {
     return undefined;
   }
 
@@ -365,7 +387,7 @@ export function extractPaymentRequiredFromResult(
   const content = toolResult.content;
   if (!Array.isArray(content) || content.length === 0) return undefined;
 
-  const first = content[0] as ToolResultContent | undefined;
+  const first = content[0];
   if (!first || first.type !== 'text' || typeof first.text !== 'string') return undefined;
 
   try {
