@@ -2,10 +2,11 @@
  * Tests for CLI output formatting
  */
 
+import type { MockInstance } from 'vitest';
 import { extractAllTextContent } from '../../../src/cli/tool-result.js';
 
 // Mock chalk to return plain strings (required because Jest can't handle chalk's ESM imports)
-jest.mock('chalk', () => {
+vi.mock('chalk', () => {
   const identity = (s: string): string => s;
   const hex = (): ((s: string) => string) => identity;
   const palette = {
@@ -26,8 +27,8 @@ jest.mock('chalk', () => {
 });
 
 // Mock sessions module before importing output
-jest.mock('../../../src/lib/sessions.js', () => ({
-  getSession: jest.fn().mockResolvedValue(null),
+vi.mock('../../../src/lib/sessions.js', () => ({
+  getSession: vi.fn().mockResolvedValue(null),
 }));
 
 // Import after mock is set up
@@ -1676,10 +1677,10 @@ describe('formatSessionLine', () => {
 });
 
 describe('logTarget', () => {
-  let consoleSpy: jest.SpyInstance;
+  let consoleSpy: MockInstance;
 
   beforeEach(() => {
-    consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {
