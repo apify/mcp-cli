@@ -2,6 +2,7 @@
  * Unit tests for OAuth utility functions
  */
 
+import type { MockInstance } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import {
@@ -19,10 +20,10 @@ function mockResponse(body: object | null, ok = true): Response {
 }
 
 describe('discoverTokenEndpoint', () => {
-  let fetchSpy: jest.SpyInstance;
+  let fetchSpy: MockInstance;
 
   beforeEach(() => {
-    fetchSpy = jest.spyOn(proxyModule, 'proxyFetch');
+    fetchSpy = vi.spyOn(proxyModule, 'proxyFetch');
   });
 
   afterEach(() => {
