@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `mcpc completion <bash|zsh|fish>` prints a shell completion script; `mcpc completion install [shell]` auto-detects the user's shell and installs the script in the right place. Completion covers top-level commands, session subcommands, `@session` names (from `~/.mcpc/sessions.json`), saved auth servers, log levels, known flags (introspected from Commander at runtime so there is no static drift), and tool names / resource URIs / prompt names for connected sessions. Tool/resource/prompt names are cached on disk in `~/.mcpc/completion/<session>.json` whenever the user runs `tools-list` / `resources-list` / `prompts-list`, so TAB is fast and never triggers network calls or OAuth flows.
 - `mcpc connect` (with no arguments) now auto-discovers standard MCP config files (`.mcp.json`, `mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `~/.claude.json`, Claude Desktop, Windsurf, Kiro, etc.) in the current directory and home directory, and connects every server defined across them. Entries with duplicate session names are deduplicated (project-scoped files win over global ones). VS Code's `"servers"` key is also supported.
 - `mcpc connect` auto-connects to `mcp.apify.com` as `@apify` when the `APIFY_API_TOKEN` environment variable is set, using it as a Bearer token. Existing live sessions are reused without restart.
 

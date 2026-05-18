@@ -18,6 +18,7 @@ import {
 } from '../output.js';
 import { ClientError } from '../../lib/errors.js';
 import type { CallToolResult, CommandOptions, TaskUpdate } from '../../lib/types.js';
+import { writeCompletionCache } from '../../lib/completion-cache.js';
 import { withMcpClient } from '../helpers.js';
 import { parseCommandArgs, hasStdinData, readStdinArgs } from '../parser.js';
 import {
@@ -95,6 +96,12 @@ export async function listTools(
         ...(options.maxChars && { maxChars: options.maxChars }),
         sessionName: target,
       })
+    );
+    // Mirror names to the shell-completion cache so `tools-get <TAB>` / `tools-call <TAB>` work.
+    await writeCompletionCache(
+      target,
+      'tools',
+      result.tools.map((t) => t.name)
     );
   });
 }

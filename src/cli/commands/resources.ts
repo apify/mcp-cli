@@ -4,6 +4,7 @@
 
 import { formatOutput, formatSuccess } from '../output.js';
 import { withMcpClient } from '../helpers.js';
+import { writeCompletionCache } from '../../lib/completion-cache.js';
 import type { CommandOptions } from '../../lib/types.js';
 
 /**
@@ -26,6 +27,12 @@ export async function listResources(target: string, options: CommandOptions): Pr
       formatOutput(allResources, options.outputMode, {
         ...(options.maxChars && { maxChars: options.maxChars }),
       })
+    );
+    // Mirror URIs to the shell-completion cache so `resources-read <TAB>` works.
+    await writeCompletionCache(
+      target,
+      'resources',
+      allResources.map((r) => r.uri)
     );
   });
 }

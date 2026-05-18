@@ -11,6 +11,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { initProxy } from '../lib/proxy.js';
+import { fileURLToPath } from 'url';
 import { Command, CommanderError, Help } from 'commander';
 import { setVerbose, setJsonMode, closeFileLogger } from '../lib/index.js';
 import { isMcpError, formatHumanError, ClientError } from '../lib/index.js';
@@ -27,6 +28,13 @@ import * as tasks from './commands/tasks.js';
 import * as grepCmd from './commands/grep.js';
 import { handleX402Command } from './commands/x402.js';
 import { clean } from './commands/clean.js';
+import {
+  handleComplete,
+  installCompletion,
+  printCompletionScript,
+  SUPPORTED_SHELLS,
+  type Shell,
+} from './commands/completion.js';
 import type { OutputMode } from '../lib/index.js';
 import {
   extractOptions,
@@ -41,10 +49,11 @@ import {
   KNOWN_COMMANDS,
   KNOWN_SESSION_COMMANDS,
 } from './parser.js';
-import { createRequire } from 'module';
-const { version: mcpcVersion } = createRequire(import.meta.url)('../../package.json') as {
-  version: string;
-};
+// Direct JSON import keeps this file free of `import.meta`, which would
+// otherwise trip Jest's CommonJS transform when `commands/completion.ts`
+// loads us transitively for runtime flag introspection.
+import pkg from '../../package.json' with { type: 'json' };
+const mcpcVersion = pkg.version;
 
 // Set up HTTP proxy from environment variables (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, and lowercase variants)
 // Also handle --insecure flag to disable TLS certificate verification (for self-signed certs)
@@ -147,6 +156,26 @@ const SCHEMA_BASE = 'https://modelcontextprotocol.io/specification/2025-11-25/sc
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+
+  // Hidden completion entry point. Handled before *anything* else so the
+  // shell never sees log lines, banners, or auth side-effects on stdout —
+  // only completion candidates. Invoked by the shell script generated via
+  // `mcpc completion <shell>` on every TAB press.
+  if (args[0] === '__complete') {
+    // Convention: everything after `--` (or just everything after
+    // `__complete` if no `--`) is the COMP_WORDS-style payload.
+    const dashIdx = args.indexOf('--');
+    const payload = dashIdx >= 0 ? args.slice(dashIdx + 1) : args.slice(1);
+    try {
+      await handleComplete(payload);
+    } catch {
+      // Never fail loudly — a broken completion must not freeze the shell.
+    }
+    // Hard exit so the rest of main() (signal handlers, logger init, command
+    // dispatch) never runs. process.stdout.write() above is synchronous, so
+    // no IO flush is at risk here.
+    process.exit(0);
+  }
 
   // Set up cleanup handlers for graceful shutdown
   const handleExit = (): void => {
@@ -346,7 +375,7 @@ async function main(): Promise<void> {
  * Create the top-level Commander program with global commands
  * (login, logout, connect, clean, help)
  */
-function createTopLevelProgram(): Command {
+export function createTopLevelProgram(): Command {
   const program = new Command();
 
   // Configure help output width to avoid wrapping (default is 80)
@@ -780,6 +809,69 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     .action(() => {});
 
+  // completion command: mcpc completion <shell> | install [shell]
+  program
+    .command('completion [args...]')
+    .description('Print or install a shell completion script (bash, zsh, fish)')
+    .addHelpText(
+      'after',
+      `
+${chalk.bold('Usage:')}
+  mcpc completion bash             Print bash completion script to stdout
+  mcpc completion zsh              Print zsh completion script to stdout
+  mcpc completion fish             Print fish completion script to stdout
+  mcpc completion install          Auto-detect shell and install
+  mcpc completion install bash     Install for a specific shell
+
+${chalk.bold('One-liners:')}
+  # Always-fresh (re-evaluates on every shell start):
+  echo 'eval "$(mcpc completion bash)"' >> ~/.bashrc
+
+  # Or install once:
+  mcpc completion install
+
+Tab-completion covers top-level commands, session subcommands, ${theme.cyan('@session')}
+names (from sessions.json), saved auth servers, and known flags. It never
+triggers network calls or OAuth flows.`
+    )
+    .action(async (args: string[]) => {
+      const [first, second, ...rest] = args;
+      if (rest.length > 0) {
+        throw new ClientError(
+          `Too many arguments for 'completion'.\n\n` +
+            `Usage: mcpc completion <${SUPPORTED_SHELLS.join('|')}> | install [shell]`
+        );
+      }
+      // mcpc completion install [shell]
+      if (first === 'install') {
+        if (second && !SUPPORTED_SHELLS.includes(second as Shell)) {
+          throw new ClientError(
+            `Unsupported shell: ${second}. Supported: ${SUPPORTED_SHELLS.join(', ')}`
+          );
+        }
+        await installCompletion(second as Shell | undefined);
+        return;
+      }
+      if (second) {
+        throw new ClientError(
+          `Unexpected argument: ${second}\n\n` +
+            `Usage: mcpc completion <${SUPPORTED_SHELLS.join('|')}> | install [shell]`
+        );
+      }
+      if (!first) {
+        throw new ClientError(
+          `Missing shell argument.\n\n` +
+            `Usage: mcpc completion <${SUPPORTED_SHELLS.join('|')}> | install [shell]`
+        );
+      }
+      if (!SUPPORTED_SHELLS.includes(first as Shell)) {
+        throw new ClientError(
+          `Unsupported shell: ${first}. Supported: ${SUPPORTED_SHELLS.join(', ')}`
+        );
+      }
+      printCompletionScript(first as Shell);
+    });
+
   // help command: mcpc help [command] (supports "help x402 sign" etc.)
   program
     .command('help [command] [subcommand]')
@@ -873,7 +965,7 @@ function showSessionCommandHelp(cmdName: string): boolean {
  * Register all session subcommands on a Commander program
  * Extracted so it can be reused for both execution and help lookup
  */
-function registerSessionCommands(program: Command, session: string): void {
+export function registerSessionCommands(program: Command, session: string): void {
   // Help command — show same output as --help (hidden: already shown via --help)
   program
     .command('help', { hidden: true })
@@ -1239,7 +1331,7 @@ ${jsonHelp('`GetPromptResult` object', '`{ description?, messages: [{ role, cont
  * Create a Commander program for session subcommands
  * Separate from top-level program to avoid command name conflicts
  */
-function createSessionProgram(): Command {
+export function createSessionProgram(): Command {
   const program = new Command();
 
   program.configureOutput({
@@ -1375,9 +1467,27 @@ async function flushStdout(): Promise<void> {
   });
 }
 
-// Run main function
-main().catch(async (error) => {
-  console.error('Fatal error:', error);
-  await closeFileLogger();
-  process.exit(1);
-});
+/**
+ * Entry point invoked by `bin/mcpc` (compiled) and by `tsx src/cli/index.ts`
+ * (e.g. the README-help test). Exported rather than purely self-running so
+ * other modules — notably `commands/completion.ts`, which introspects the
+ * Commander tree at TAB time — can `import` from this file without triggering
+ * CLI execution.
+ */
+export async function run(): Promise<void> {
+  try {
+    await main();
+  } catch (error) {
+    console.error('Fatal error:', error);
+    await closeFileLogger();
+    process.exit(1);
+  }
+}
+
+// Auto-run when invoked directly (`tsx src/cli/index.ts ...` or
+// `node dist/cli/index.js ...`). When loaded via `bin/mcpc` or imported by
+// another module, `process.argv[1]` differs from this file's URL and we
+// leave invocation to the caller.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  void run();
+}
