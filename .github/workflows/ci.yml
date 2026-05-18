@@ -23,7 +23,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Install pnpm and dependencies
-        uses: apify/actions/pnpm-install@v1.0.0
+        uses: apify/actions/pnpm-install@v1.1.2
 
       - name: Lint
         run: pnpm run lint
@@ -47,7 +47,7 @@ jobs:
           node-version: 24
 
       - name: Install pnpm and dependencies
-        uses: apify/actions/pnpm-install@v1.0.0
+        uses: apify/actions/pnpm-install@v1.1.2
 
       - name: Build
         run: pnpm run build
@@ -76,7 +76,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install pnpm and dependencies
-        uses: apify/actions/pnpm-install@v1.0.0
+        uses: apify/actions/pnpm-install@v1.1.2
 
       - name: Build
         run: pnpm run build
