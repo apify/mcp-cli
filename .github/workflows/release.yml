@@ -79,7 +79,7 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Install pnpm and dependencies
-        uses: apify/actions/pnpm-install@v1.1.1
+        uses: apify/actions/pnpm-install@v1.1.2
 
       - name: Lint
         run: pnpm run lint

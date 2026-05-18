@@ -57,7 +57,7 @@ jobs:
           node-version: 24
 
       - name: Install pnpm and dependencies
-        uses: apify/actions/pnpm-install@v1.1.1
+        uses: apify/actions/pnpm-install@v1.1.2
 
       - name: Build
         run: pnpm run build
