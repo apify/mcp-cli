@@ -87,6 +87,12 @@ npm install -g @apify/mcpc
 bun install -g @apify/mcpc
 ```
 
+Optional: enable [shell tab-completion](#shell-completion) for bash/zsh/fish:
+
+```bash
+mcpc completion install
+```
+
 **Linux:** credentials use the OS keychain via the [Secret Service API](https://specifications.freedesktop.org/secret-service/).
 GNOME/KDE desktops work out of the box. On headless/CI systems, `mcpc` falls back to a
 file-based store (`~/.mcpc/credentials`, mode `0600`).
@@ -141,6 +147,7 @@ Commands:
   clean [resources...]         Clean up mcpc data (sessions, profiles, logs, all)
   grep <pattern>               Search tools and instructions across all active sessions
   x402 [subcommand] [args...]  Configure an x402 payment wallet (EXPERIMENTAL)
+  completion [args...]         Print or install a shell completion script (bash, zsh, fish)
   help [command] [subcommand]  Show help for a specific command
 
 Options:
@@ -259,6 +266,40 @@ mcpc @apify shell
 
 Shell commands: `help`, `exit`/`quit`/Ctrl+D, Ctrl+C to cancel.
 Arrow keys navigate history (saved to `~/.mcpc/history`).
+
+### Shell completion
+
+`mcpc` ships with tab-completion scripts for **bash**, **zsh**, and **fish**.
+Completion covers top-level commands, session subcommands, `@session` names
+(from `~/.mcpc/sessions.json`), saved auth servers (`mcpc login`/`logout`),
+known flags, plus **tool names, resource URIs, and prompt names** for
+connected sessions. Tool/resource/prompt names are cached in
+`~/.mcpc/completion/<session>.json` whenever you run `tools-list`,
+`resources-list`, or `prompts-list` — run those once to warm the cache.
+
+```bash
+# Auto-detect your shell and install
+mcpc completion install
+
+# Or install for a specific shell
+mcpc completion install bash
+mcpc completion install zsh
+mcpc completion install fish
+```
+
+Alternatively, print the script and pipe it wherever you want:
+
+```bash
+# Always-fresh: re-evaluates on every shell start
+echo 'eval "$(mcpc completion bash)"' >> ~/.bashrc
+
+# Or write the file yourself
+mcpc completion bash > ~/.local/share/bash-completion/completions/mcpc
+```
+
+Completion is **purely local** — it reads `~/.mcpc/sessions.json` and
+`~/.mcpc/profiles.json` and never triggers network calls or OAuth flows on
+TAB, so it stays fast even when sessions are offline.
 
 ### Grep (search across sessions)
 

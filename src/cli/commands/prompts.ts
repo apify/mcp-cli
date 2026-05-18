@@ -5,6 +5,7 @@
 import type { CommandOptions } from '../../lib/types.js';
 import { formatOutput } from '../output.js';
 import { withMcpClient } from '../helpers.js';
+import { writeCompletionCache } from '../../lib/completion-cache.js';
 import { parseCommandArgs, hasStdinData, readStdinArgs } from '../parser.js';
 
 /**
@@ -27,6 +28,12 @@ export async function listPrompts(target: string, options: CommandOptions): Prom
       formatOutput(allPrompts, options.outputMode, {
         ...(options.maxChars && { maxChars: options.maxChars }),
       })
+    );
+    // Mirror names to the shell-completion cache so `prompts-get <TAB>` works.
+    await writeCompletionCache(
+      target,
+      'prompts',
+      allPrompts.map((p) => p.name)
     );
   });
 }

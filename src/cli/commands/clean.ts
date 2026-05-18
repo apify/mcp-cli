@@ -16,6 +16,7 @@ import {
 } from '../../lib/index.js';
 import { formatOutput, formatSuccess, formatWarning } from '../output.js';
 import { loadSessions, deleteSession, consolidateSessions } from '../../lib/sessions.js';
+import { deleteCompletionCache } from '../../lib/completion-cache.js';
 import { stopBridge } from '../../lib/bridge-manager.js';
 import { createLogger } from '../../lib/logger.js';
 import { deleteAuthProfiles } from '../../lib/auth/profiles.js';
@@ -87,6 +88,8 @@ async function cleanSessions(): Promise<number> {
 
       // Delete session data
       await deleteSession(name);
+      // Drop the completion cache file so it doesn't linger as dead data.
+      await deleteCompletionCache(name);
 
       count++;
       logger.debug(`Cleaned session: ${name}`);

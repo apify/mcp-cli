@@ -80,7 +80,6 @@ Syntax errors: mcpc call linear_list_issues instead of mcpc @linear tools-call l
   just re-type it dynamically to make it work.
 - nit: Cooler OAuth flow finish web page with CSS animation, add Apify example there, show mcpc info. E.g. next step - check Apify rather than close
 - security: For auth profiles, fetch the detailed user info via http, save to profiles.json and show in 'mcpc', ensure the info is up-to-date
-- nit: Implement typing tab-completions (e.g. "mcpc @ap...") - not sure if that's even possible
 - Consider adding `--dry-run` https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/
   For tool call it could return synthetic resutls conforming the schema.
 - Show protocolVersion also for stdio in "mcpc --json" - but for that we need to update the SDK to save it! See setProtocolVersion

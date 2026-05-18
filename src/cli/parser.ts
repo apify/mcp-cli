@@ -86,6 +86,7 @@ export const KNOWN_COMMANDS = [
   'clean',
   'grep',
   'x402',
+  'completion',
 ];
 
 /**
