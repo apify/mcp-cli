@@ -744,6 +744,7 @@ export async function listSessionsAndAuthProfiles(options: {
           console.log(chalk.dim(`    ↳ run: mcpc ${session.name} restart`));
         }
       }
+      console.log(chalk.dim('  ↳ view a session: mcpc @sessionname'));
     }
 
     // Display auth profiles
@@ -1411,11 +1412,14 @@ export async function connectAllFromStandardConfigs(options: BulkConnectOptions)
     }
     if (skippedStdio.length > 0) {
       parts.push(
-        `skipped ${skippedStdio.length} stdio server${skippedStdio.length === 1 ? '' : 's'}, pass --stdio to include`
+        `skipped ${skippedStdio.length} stdio server${skippedStdio.length === 1 ? '' : 's'}`
       );
     }
     if (parts.length > 0) {
       console.log(theme.cyan(`\n${parts.join('. ')}.`));
+      if (skippedStdio.length > 0) {
+        console.log(chalk.dim('  ↳ run: mcpc connect --stdio'));
+      }
     }
   }
 
