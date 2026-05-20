@@ -1445,7 +1445,6 @@ export function formatServerDetails(
   }
 
   // Commands
-  lines.push(chalk.bold('Available commands:'));
   const commands: string[] = [];
 
   if (capabilities?.tools) {
@@ -1479,10 +1478,11 @@ export function formatServerDetails(
     commands.push(`${bullet} ${bt}mcpc ${target} logging-set-level <lvl>${bt}`);
   }
 
-  commands.push(`${bullet} ${bt}mcpc ${target} shell${bt}`);
-
-  lines.push(commands.join('\n'));
-  lines.push('');
+  if (commands.length > 0) {
+    lines.push(chalk.bold('Available commands:'));
+    lines.push(commands.join('\n'));
+    lines.push('');
+  }
 
   // Debugging hint: bridge log file path (only shown for sessions, i.e. @name targets)
   if (target.startsWith('@')) {
