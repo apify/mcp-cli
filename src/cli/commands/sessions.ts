@@ -15,7 +15,12 @@ import {
   redactHeaders,
 } from '../../lib/index.js';
 import { DISCONNECTED_THRESHOLD_MS } from '../../lib/types.js';
-import type { ServerConfig, ProxyConfig, ServerDetails } from '../../lib/types.js';
+import type {
+  ServerConfig,
+  ProxyConfig,
+  ServerDetails,
+  X402SchemePreference,
+} from '../../lib/types.js';
 import {
   formatOutput,
   formatSuccess,
@@ -300,6 +305,7 @@ export async function connectSession(
     proxy?: string;
     proxyBearerToken?: string;
     x402?: boolean;
+    x402Scheme?: X402SchemePreference;
     insecure?: boolean;
     skipDetails?: boolean;
     quiet?: boolean;
@@ -462,6 +468,7 @@ export async function connectSession(
     ...(profileName && { profileName }),
     ...(proxyConfig && { proxy: proxyConfig }),
     ...(options.x402 && { x402: true }),
+    ...(options.x402 && options.x402Scheme && { x402Scheme: options.x402Scheme }),
     ...(options.insecure && { insecure: true }),
     // Clear any previous error status (unauthorized, expired) when reconnecting
     ...(isReconnect && { status: 'active' }),
@@ -499,6 +506,9 @@ export async function connectSession(
     }
     if (options.x402) {
       bridgeOptions.x402 = true;
+    }
+    if (options.x402 && options.x402Scheme) {
+      bridgeOptions.x402Scheme = options.x402Scheme;
     }
     if (options.insecure) {
       bridgeOptions.insecure = true;
@@ -955,6 +965,10 @@ export async function restartSession(
 
     if (session.x402) {
       bridgeOptions.x402 = session.x402;
+    }
+
+    if (session.x402 && session.x402Scheme) {
+      bridgeOptions.x402Scheme = session.x402Scheme;
     }
 
     if (session.insecure) {

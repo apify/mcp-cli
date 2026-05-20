@@ -15,7 +15,13 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import type { ServerConfig, AuthCredentials, ProxyConfig, X402WalletCredentials } from './types.js';
+import type {
+  ServerConfig,
+  AuthCredentials,
+  ProxyConfig,
+  X402WalletCredentials,
+  X402SchemePreference,
+} from './types.js';
 import {
   getSocketPath,
   waitForFile,
@@ -101,6 +107,7 @@ export interface StartBridgeOptions {
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
   x402?: boolean; // Enable x402 auto-payment using the wallet
+  x402Scheme?: X402SchemePreference; // x402 scheme preference; only meaningful with x402: true
   insecure?: boolean; // Skip TLS certificate verification
 }
 
@@ -133,6 +140,7 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
     proxyConfig,
     mcpSessionId,
     x402,
+    x402Scheme,
     insecure,
   } = options;
 
@@ -192,6 +200,12 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
   if (x402) {
     args.push('--x402');
     logger.debug('Passing x402 flag to bridge');
+  }
+
+  // Pass x402 scheme preference (only meaningful when x402 is enabled)
+  if (x402 && x402Scheme) {
+    args.push('--x402-scheme', x402Scheme);
+    logger.debug(`Passing x402 scheme preference: ${x402Scheme}`);
   }
 
   // Pass insecure flag (if enabled)

@@ -10,8 +10,8 @@ import { createServer, type Server as NetServer, type Socket } from 'net';
 import { unlink } from 'fs/promises';
 import { createMcpClient, CreateMcpClientOptions } from '../core/index.js';
 import type { McpClient } from '../core/index.js';
-import type { ServerConfig, IpcMessage, LoggingLevel } from '../lib/index.js';
-import { KEEPALIVE_INTERVAL_MS } from '../lib/types.js';
+import type { ServerConfig, IpcMessage, LoggingLevel, X402SchemePreference } from '../lib/index.js';
+import { KEEPALIVE_INTERVAL_MS, X402_SCHEME_PREFERENCES } from '../lib/types.js';
 import { createLogger, setVerbose, initFileLogger, closeFileLogger } from '../lib/index.js';
 import {
   fileExists,
@@ -75,6 +75,7 @@ interface BridgeOptions {
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
   x402?: boolean; // Enable x402 auto-payment
+  x402Scheme?: X402SchemePreference; // x402 scheme preference (only with x402: true)
   insecure?: boolean; // Skip TLS certificate verification
 }
 
@@ -615,6 +616,7 @@ class BridgeProcess {
         wallet,
         getToolByName,
         paymentCache: this.x402PaymentCache,
+        ...(this.options.x402Scheme && { schemePreference: this.options.x402Scheme }),
       });
     }
 
@@ -1613,7 +1615,7 @@ async function main(): Promise<void> {
 
   if (args.length < 2) {
     console.error(
-      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--x402] [--insecure]'
+      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--x402] [--x402-scheme <auto|upto|exact>] [--insecure]'
     );
     process.exit(1);
   }
@@ -1651,6 +1653,18 @@ async function main(): Promise<void> {
   // Parse --x402 flag (for x402 payment signing)
   const x402 = args.includes('--x402');
 
+  // Parse --x402-scheme argument. Validated at the CLI layer; the bridge silently
+  // ignores invalid values to keep the spawn surface tolerant.
+  let x402Scheme: X402SchemePreference | undefined;
+  const x402SchemeIndex = args.indexOf('--x402-scheme');
+  const x402SchemeArg = x402SchemeIndex !== -1 ? args[x402SchemeIndex + 1] : undefined;
+  if (
+    x402SchemeArg !== undefined &&
+    (X402_SCHEME_PREFERENCES as readonly string[]).includes(x402SchemeArg)
+  ) {
+    x402Scheme = x402SchemeArg as X402SchemePreference;
+  }
+
   // Parse --insecure flag (skip TLS certificate verification)
   const insecure = args.includes('--insecure');
 
@@ -1675,6 +1689,9 @@ async function main(): Promise<void> {
     }
     if (x402) {
       bridgeOptions.x402 = true;
+    }
+    if (x402Scheme) {
+      bridgeOptions.x402Scheme = x402Scheme;
     }
     if (insecure) {
       bridgeOptions.insecure = true;

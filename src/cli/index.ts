@@ -27,7 +27,8 @@ import * as tasks from './commands/tasks.js';
 import * as grepCmd from './commands/grep.js';
 import { handleX402Command } from './commands/x402.js';
 import { clean } from './commands/clean.js';
-import type { OutputMode } from '../lib/index.js';
+import type { OutputMode, X402SchemePreference } from '../lib/index.js';
+import { X402_SCHEME_PREFERENCES } from '../lib/index.js';
 import {
   extractOptions,
   getVerboseFromEnv,
@@ -64,6 +65,7 @@ interface HandlerOptions {
   profile?: string;
   noProfile?: boolean;
   x402?: boolean;
+  x402Scheme?: X402SchemePreference;
   insecure?: boolean;
   schema?: string;
   schemaMode?: 'strict' | 'compatible' | 'ignore';
@@ -108,6 +110,18 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   }
   if (verbose) options.verbose = verbose;
   if (opts.x402) options.x402 = true;
+  if (opts.x402Scheme) {
+    const scheme = opts.x402Scheme as string;
+    if (!(X402_SCHEME_PREFERENCES as readonly string[]).includes(scheme)) {
+      throw new Error(
+        `Invalid --x402-scheme value: "${scheme}". Valid schemes are: ${X402_SCHEME_PREFERENCES.join(', ')}`
+      );
+    }
+    if (!options.x402) {
+      throw new Error('--x402-scheme requires --x402 to be set');
+    }
+    options.x402Scheme = scheme as X402SchemePreference;
+  }
   if (opts.insecure) options.insecure = true;
   if (opts.schema) options.schema = opts.schema;
   if (opts.schemaMode) {
@@ -441,6 +455,10 @@ Full docs: ${docsUrl}`
     .option('--proxy-bearer-token <token>', 'Require authentication for access to proxy server')
     .option('--stdio', 'Launch all local stdio servers from selected config files')
     .option('--x402', 'Enable x402 auto-payment using the configured wallet')
+    .option(
+      '--x402-scheme <auto|upto|exact>',
+      'x402 scheme preference (default: auto = prefer upto, fall back to exact)'
+    )
     .addHelpText(
       'after',
       `
@@ -550,6 +568,7 @@ ${jsonHelp(
           proxy: opts.proxy,
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
+          ...(opts.x402 && globalOpts.x402Scheme && { x402Scheme: globalOpts.x402Scheme }),
           ...(globalOpts.insecure && { insecure: true }),
         });
       } else {
@@ -559,6 +578,7 @@ ${jsonHelp(
           proxy: opts.proxy,
           proxyBearerToken: opts.proxyBearerToken,
           x402: opts.x402,
+          ...(opts.x402 && globalOpts.x402Scheme && { x402Scheme: globalOpts.x402Scheme }),
           ...(globalOpts.insecure && { insecure: true }),
         });
       }
