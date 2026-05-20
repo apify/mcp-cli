@@ -1136,7 +1136,10 @@ function findDuplicateTextBlocks(
  * Sections (each printed only when present):
  * 1. **Content:** — each content block rendered per its type (text blocks
  *    that duplicate `structuredContent` are omitted)
- * 2. **Structured content:** — `structuredContent` as syntax-highlighted JSON
+ * 2. **Structured content:** — `structuredContent` as syntax-highlighted JSON,
+ *    shown only when there is no visible Content (otherwise it duplicates
+ *    information already present and adds noise for LLM consumers; use
+ *    `--json` to always get the full payload)
  * 3. **Metadata:** — `_meta` as syntax-highlighted JSON
  */
 export function formatCallToolResultHuman(result: CallToolResult): string {
@@ -1151,20 +1154,20 @@ export function formatCallToolResultHuman(result: CallToolResult): string {
     skipIndices = findDuplicateTextBlocks(content, sc);
   }
 
+  const visibleContent = content?.filter((_, i) => !skipIndices.has(i)) ?? [];
+
   // Content section — skip duplicate text blocks
-  if (content && content.length > 0) {
-    const visible = content.filter((_, i) => !skipIndices.has(i));
-    if (visible.length > 0) {
-      lines.push(chalk.bold('Content:'));
-      for (let i = 0; i < visible.length; i++) {
-        if (i > 0) lines.push('');
-        formatContentBlock(visible[i] as ContentBlock, lines);
-      }
+  if (visibleContent.length > 0) {
+    lines.push(chalk.bold('Content:'));
+    for (let i = 0; i < visibleContent.length; i++) {
+      if (i > 0) lines.push('');
+      formatContentBlock(visibleContent[i] as ContentBlock, lines);
     }
   }
 
-  // Structured content section — syntax-highlighted JSON
-  if (hasStructuredContent) {
+  // Structured content section — only when Content is empty, to avoid
+  // redundant verbose output for LLMs. Available via `--json` if needed.
+  if (hasStructuredContent && visibleContent.length === 0) {
     if (lines.length > 0) lines.push('');
     lines.push(chalk.bold('Structured content:'));
     const scJson = JSON.stringify(sc, null, 2);
