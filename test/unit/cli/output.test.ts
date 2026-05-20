@@ -1048,7 +1048,8 @@ describe('formatServerDetails', () => {
     expect(output).toContain('mcpc @test resources-read');
     expect(output).toContain('mcpc @test prompts-list');
     expect(output).toContain('mcpc @test logging-set-level');
-    expect(output).toContain('mcpc @test shell');
+    // shell is deprecated and no longer listed
+    expect(output).not.toContain('mcpc @test shell');
 
     // Should contain instructions in code block
     expect(output).toContain('Instructions:');
@@ -1073,9 +1074,8 @@ describe('formatServerDetails', () => {
     expect(output).toContain('Capabilities:');
     expect(output).toContain('(none)');
 
-    // Should only show shell command
-    expect(output).toContain('Available commands:');
-    expect(output).toContain('mcpc https://example.com shell');
+    // With no capabilities, no commands are listed
+    expect(output).not.toContain('Available commands:');
     expect(output).not.toContain('tools-list');
     expect(output).not.toContain('resources-list');
     expect(output).not.toContain('prompts-list');
