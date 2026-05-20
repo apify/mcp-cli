@@ -11,10 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `mcpc connect` (with no arguments) now auto-discovers standard MCP config files (`.mcp.json`, `mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `~/.claude.json`, Claude Desktop, Windsurf, Kiro, etc.) in the current directory and home directory, and connects every server defined across them. Entries with duplicate session names are deduplicated (project-scoped files win over global ones). VS Code's `"servers"` key is also supported.
 - `mcpc connect` auto-connects to `mcp.apify.com` as `@apify` when the `APIFY_API_TOKEN` environment variable is set, using it as a Bearer token. Existing live sessions are reused without restart.
+- `mcpc x402 sign` supports the x402 `upto` scheme alongside `exact`. Use `--scheme <auto|upto|exact>` to pick a preference (default `auto` prefers `upto`, falls back to `exact`). The signer auto-grants a one-time `USDC.approve(PERMIT2, MAX_UINT256)` allowance on first upto sign; pass `--no-approve` to skip.
+- Sessions using x402 auto-payment now show a yellow `[x402]` marker in session listings, alongside the existing OAuth and proxy markers.
 
 ### Changed
 
 - Stdio (command-based) config entries are now skipped by default when connecting from a config file (`mcpc connect <file>`). Pass `--stdio` to include them. Single-entry connects (`mcpc connect file:entry @session`) are not affected.
+- x402 debug logs now announce the selected scheme (`scheme=upto` / `scheme=exact`) up front and print USD amounts with 6-decimal precision (USDC atomic unit). Enable with `--verbose` or `MCPC_VERBOSE=1`.
 - **Breaking:** `mcpc connect --json` now always returns an array of `InitializeResult` objects (extended with `toolNames` and `_mcpc` metadata), regardless of whether you connect a single server, a config file, or auto-discover all configs. Skipped/failed entries carry `_mcpc.status` (`created` | `active` | `failed` | `skipped`) and `_mcpc.skipReason` / `_mcpc.error`. The previous wrapper-object shapes (`{configFile, results, skipped}` and `{discovered, results, skipped}`) have been removed.
 - `tools-call --task` now prints the task ID and recovery commands when interrupted with Ctrl+C, so you can fetch or cancel the server-side task later
 
