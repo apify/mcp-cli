@@ -214,7 +214,7 @@ async function getOrSignPayment(
   try {
     const result = await signPayment({ wallet, accept });
     logger.debug(
-      `Fresh payment signed: $${result.amountUsd.toFixed(4)} to ${result.to} on ${result.networkLabel}`
+      `Fresh payment signed: scheme=${accept.scheme} amount=$${result.amountUsd.toFixed(6)} to=${result.to} network=${result.networkLabel}`
     );
     paymentCache.signature = result.paymentSignatureBase64;
     return result.paymentSignatureBase64;
@@ -266,7 +266,7 @@ async function handle402Fallback(
     });
 
     logger.debug(
-      `402 fallback payment signed: $${result.amountUsd.toFixed(4)} to ${result.to} on ${result.networkLabel}`
+      `402 fallback payment signed: scheme=${accept.scheme} amount=$${result.amountUsd.toFixed(6)} to=${result.to} network=${result.networkLabel}`
     );
 
     // Cache the freshly signed payment for subsequent calls

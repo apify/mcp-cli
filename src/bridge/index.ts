@@ -1129,7 +1129,7 @@ class BridgeProcess {
       });
       this.x402PaymentCache.signature = signed.paymentSignatureBase64;
       logger.debug(
-        `Fresh payment signed for retry: $${signed.amountUsd.toFixed(4)} to ${signed.to} on ${signed.networkLabel}`
+        `Fresh payment signed for retry: $${signed.amountUsd.toFixed(6)} to ${signed.to} on ${signed.networkLabel}`
       );
     } catch (signError) {
       logger.warn('Failed to sign fresh payment for 402 retry:', signError);

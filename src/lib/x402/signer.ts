@@ -311,6 +311,9 @@ export function parsePaymentRequired(
  */
 export async function signPayment(input: SignPaymentInput): Promise<SignPaymentResult> {
   const { accept } = input;
+  logger.debug(
+    `Signing x402 payment: scheme=${accept.scheme} network=${accept.network} amount=${accept.amount} asset=${accept.asset} payTo=${accept.payTo} facilitator=${accept.extra?.facilitatorAddress ?? '<n/a>'}`
+  );
   if (accept.scheme === 'upto') {
     return signUptoPayment(input);
   }
