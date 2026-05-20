@@ -21,7 +21,6 @@ a real shell session; VHS replays it, captures the output, and renders a GIF
 | [`mcpc-demo.tape`](./mcpc-demo.tape) | Flagship overview: discover → connect → tools → grep → call → JSON → close | Source for `docs/images/mcpc-demo.gif` |
 | [`quickstart.tape`](./quickstart.tape) | Minimal "connect, list, call" flow | Hero-sized GIF for README top |
 | [`tools.tape`](./tools.tape) | `tools-list`, `tools-get`, `tools-call`, inline JSON, stdin | |
-| [`shell.tape`](./shell.tape) | Interactive REPL (`mcpc @session shell`) | |
 | [`scripting.tape`](./scripting.tape) | `--json` piped through `jq` and `xargs` (code mode) | |
 | [`grep.tape`](./grep.tape) | Dynamic tool discovery with `mcpc grep` | |
 | [`proxy.tape`](./proxy.tape) | MCP proxy / AI sandboxing | |

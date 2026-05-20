@@ -15,8 +15,8 @@
 #
 # This is a template — adapt the commands below for your own server,
 # tools, and audience. Use the focused tapes in this folder
-# (quickstart.tape, tools.tape, shell.tape, scripting.tape, grep.tape,
-# proxy.tape) as a starting point for shorter, single-feature demos.
+# (quickstart.tape, tools.tape, scripting.tape, grep.tape, proxy.tape)
+# as a starting point for shorter, single-feature demos.
 
 Output mcpc-demo.gif
 
