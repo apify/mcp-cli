@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-20
+
 ### Added
 
 - `mcpc connect` (with no arguments) now auto-discovers standard MCP config files (`.mcp.json`, `mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `~/.claude.json`, Claude Desktop, Windsurf, Kiro, etc.) in the current directory and home directory, and connects every server defined across them. Entries with duplicate session names are deduplicated (project-scoped files win over global ones). VS Code's `"servers"` key is also supported.
@@ -269,7 +271,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive shell mode
 - JSON output mode for scripting
 
-[Unreleased]: https://github.com/apify/mcpc/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/apify/mcpc/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/apify/mcpc/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/apify/mcpc/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/apify/mcpc/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/apify/mcpc/compare/v0.2.3...v0.2.4
