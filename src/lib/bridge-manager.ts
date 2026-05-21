@@ -443,6 +443,10 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
     bridgeOptions.x402 = session.x402;
     logger.debug('Using saved x402 flag');
   }
+  if (session.x402 && session.x402Scheme) {
+    bridgeOptions.x402Scheme = session.x402Scheme;
+    logger.debug(`Using saved x402 scheme preference: ${session.x402Scheme}`);
+  }
   if (session.insecure) {
     bridgeOptions.insecure = session.insecure;
     logger.debug('Using saved insecure flag');
