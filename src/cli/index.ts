@@ -515,6 +515,7 @@ ${jsonHelp(
           ...(opts.proxyBearerToken && { proxyBearerToken: opts.proxyBearerToken as string }),
           ...(opts.stdio && { stdio: true }),
           ...(opts.x402 && { x402: opts.x402 as boolean }),
+          ...(opts.x402 && globalOpts.x402Scheme && { x402Scheme: globalOpts.x402Scheme }),
           ...(globalOpts.insecure && { insecure: true }),
         });
         return;
@@ -544,6 +545,7 @@ ${jsonHelp(
           ...(opts.proxyBearerToken && { proxyBearerToken: opts.proxyBearerToken as string }),
           ...(opts.stdio && { stdio: true }),
           ...(opts.x402 && { x402: opts.x402 as boolean }),
+          ...(opts.x402 && globalOpts.x402Scheme && { x402Scheme: globalOpts.x402Scheme }),
           ...(globalOpts.insecure && { insecure: true }),
         });
         return;

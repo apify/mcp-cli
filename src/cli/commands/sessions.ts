@@ -1034,6 +1034,7 @@ type BulkConnectOptions = {
   proxyBearerToken?: string;
   stdio?: boolean;
   x402?: boolean;
+  x402Scheme?: X402SchemePreference;
   insecure?: boolean;
 };
 

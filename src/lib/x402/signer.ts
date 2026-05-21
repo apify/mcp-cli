@@ -639,11 +639,9 @@ async function signUptoPayment(input: SignPaymentInput): Promise<SignPaymentResu
       amount: amountAtomicUnits.toString(),
       payTo: accept.payTo,
       maxTimeoutSeconds: expirySeconds,
-      extra: {
-        name: tokenName,
-        version: tokenVersion,
-        ...(facilitatorAddress ? { facilitatorAddress } : {}),
-      },
+      // `facilitatorAddress` is guaranteed non-empty here — the early throw above rejects
+      // an upto accept without it. Spread-with-guard would be dead code.
+      extra: { name: tokenName, version: tokenVersion, facilitatorAddress },
     },
   };
 
