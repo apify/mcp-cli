@@ -165,8 +165,8 @@ MCP session commands (after connecting):
   <@session> resources-subscribe <uri>
   <@session> resources-unsubscribe <uri>
   <@session> resources-templates-list
-  <@session> skills-list             [EXPERIMENTAL] List Agent Skills (SEP-2640)
-  <@session> skills-get <name> [--raw] [EXPERIMENTAL] Read a skill's SKILL.md
+  <@session> skills-list
+  <@session> skills-get <name> [--raw]
   <@session> tasks-list
   <@session> tasks-get <taskId>
   <@session> tasks-result <taskId>

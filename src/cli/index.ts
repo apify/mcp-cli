@@ -417,8 +417,8 @@ ${chalk.bold('MCP session commands (after connecting):')}
   <@session> ${theme.cyan('resources-subscribe')} <uri>
   <@session> ${theme.cyan('resources-unsubscribe')} <uri>
   <@session> ${theme.cyan('resources-templates-list')}
-  <@session> ${theme.cyan('skills-list')}             ${chalk.yellow('[EXPERIMENTAL]')} List Agent Skills (SEP-2640)
-  <@session> ${theme.cyan('skills-get')} <name> [--raw] ${chalk.yellow('[EXPERIMENTAL]')} Read a skill's SKILL.md
+  <@session> ${theme.cyan('skills-list')}
+  <@session> ${theme.cyan('skills-get')} <name> [--raw]
   <@session> ${theme.cyan('tasks-list')}
   <@session> ${theme.cyan('tasks-get')} <taskId>
   <@session> ${theme.cyan('tasks-result')} <taskId>
@@ -1188,34 +1188,16 @@ ${toolsCallCombinedJsonHelp}`
   // command surface here is marked EXPERIMENTAL accordingly.
   program
     .command('skills-list')
-    .description(
-      '[EXPERIMENTAL] List Agent Skills exposed by the server (MCP extension SEP-2640, may change).'
-    )
+    .description('[EXPERIMENTAL] List Agent Skills from the server (SEP-2640).')
     .addHelpText(
       'after',
       `
-${chalk.bold('Status:')} ${chalk.yellow('EXPERIMENTAL')} — implements the draft MCP skills
-  extension (SEP-2640). The spec is not yet finalized; the index shape,
-  recognized types, and capability key may change. Use at your own risk
-  and pin mcpc versions if you depend on the JSON shape.
-
-${chalk.bold('How discovery works:')}
-  Skills are not a new MCP primitive — they are markdown documents (SKILL.md
-  with YAML frontmatter) served as resources under \`skill://\` URIs. mcpc
-  first tries to read \`skill://index.json\`; if absent, it scans the server's
-  resources for \`skill://*/SKILL.md\` entries.
-
-${chalk.bold('Entry types (per SEP-2640):')}
-  skill-md               concrete skill — \`skills-get <name>\` reads SKILL.md
-  archive                .tar.gz / .zip bundle — fetch with \`resources-read <url>\`
-  mcp-resource-template  parameterized namespace (RFC 6570 URI template)
-
-${chalk.bold('Examples:')}
-  mcpc ${session} skills-list
-  mcpc ${session} skills-list --json | jq '.[].name'
+  Tries \`skill://index.json\`; falls back to scanning \`skill://*/SKILL.md\`
+  resources. Index entry types: \`skill-md\`, \`archive\` (.tar.gz/.zip — fetch
+  with \`resources-read <url>\`), \`mcp-resource-template\`.
 ${jsonHelp(
-  'Array of `Skill` objects',
-  '`[{ name: string, description: string, type?: "skill-md" | "archive" | "mcp-resource-template", url: string }, ...]`',
+  '`[{ name, description, type, url }, ...]`',
+  undefined,
   'https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2640'
 )}`
     )
@@ -1225,39 +1207,20 @@ ${jsonHelp(
 
   program
     .command('skills-get <name>')
-    .description(
-      '[EXPERIMENTAL] Read an Agent Skill (SKILL.md) by name (MCP extension SEP-2640, may change).'
-    )
+    .description("[EXPERIMENTAL] Read a skill's SKILL.md by name (SEP-2640).")
     .option('--raw', 'Print only the SKILL.md text (markdown), suitable for piping')
     .addHelpText(
       'after',
       `
-${chalk.bold('Status:')} ${chalk.yellow('EXPERIMENTAL')} — implements the draft MCP skills
-  extension (SEP-2640). Behavior and output shape may change.
-
-${chalk.bold('Name forms:')}
-  bare name           mcpc ${session} skills-get git-workflow
-                      → reads \`skill://git-workflow/SKILL.md\`
-  nested path         mcpc ${session} skills-get acme/billing/refunds
-                      → reads \`skill://acme/billing/refunds/SKILL.md\`
-  full URI            mcpc ${session} skills-get skill://git-workflow/SKILL.md
-
-  For \`archive\` skills, pass the URL from \`skills-list\` to
-  \`resources-read\` instead — \`skills-get\` expects a SKILL.md target.
-
-${chalk.bold('--raw mode:')}
-  Prints just the SKILL.md text content with no header or fences. Useful for
-  loading skill content into an LLM context (e.g. cat-style piping):
-    mcpc ${session} skills-get git-workflow --raw > /tmp/skill.md
-
+  Accepts a bare name (\`git-workflow\`), a nested path
+  (\`acme/billing/refunds\`), or a full \`skill://...\` URI. For \`archive\`
+  skills, use \`resources-read <url>\` instead. With --json, --raw is
+  ignored; pull markdown via \`jq -r '.contents[0].text'\`.
 ${jsonHelp(
-  '`ReadResourceResult` object',
-  '`{ contents: [{ uri, mimeType?, text? | blob? }] }`',
+  '`ReadResourceResult`: `{ contents: [{ uri, mimeType?, text? | blob? }] }`',
+  undefined,
   `${SCHEMA_BASE}#readresourceresult`
-)}  In --json mode, --raw is ignored; the full \`ReadResourceResult\` is emitted
-  so callers can inspect mimeType and metadata. Pull the markdown via:
-    mcpc ${session} skills-get <name> --json | jq -r '.contents[0].text'
-`
+)}`
     )
     .action(async (name, options, command) => {
       await skills.getSkill(session, name, {
