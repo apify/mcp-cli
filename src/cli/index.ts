@@ -100,7 +100,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.timeout) {
     const timeout = parseInt(opts.timeout as string, 10);
     if (isNaN(timeout) || timeout <= 0) {
-      throw new Error(
+      throw new ClientError(
         `Invalid --timeout value: "${opts.timeout as string}". Must be a positive number (seconds).`
       );
     }
@@ -120,7 +120,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
     options.x402 = 'auto';
   } else if (typeof opts.x402 === 'string') {
     if (!(X402_SCHEME_PREFERENCES as readonly string[]).includes(opts.x402)) {
-      throw new Error(
+      throw new ClientError(
         `Invalid --x402 value: "${opts.x402}". Expected one of ${X402_SCHEME_PREFERENCES.join(', ')}, or pass --x402 with no value for the default.`
       );
     }
@@ -131,7 +131,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.schemaMode) {
     const mode = opts.schemaMode as string;
     if (mode !== 'strict' && mode !== 'compatible' && mode !== 'ignore') {
-      throw new Error(
+      throw new ClientError(
         `Invalid --schema-mode value: "${mode}". Valid modes are: strict, compatible, ignore`
       );
     }
@@ -141,7 +141,7 @@ function getOptionsFromCommand(command: Command): HandlerOptions {
   if (opts.maxChars) {
     const maxChars = parseInt(opts.maxChars as string, 10);
     if (isNaN(maxChars) || maxChars <= 0) {
-      throw new Error(
+      throw new ClientError(
         `Invalid --max-chars value: "${opts.maxChars as string}". Must be a positive number (characters).`
       );
     }
