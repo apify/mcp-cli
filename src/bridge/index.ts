@@ -1113,7 +1113,7 @@ class BridgeProcess {
     const paymentRequired = extractPaymentRequiredFromResult(toolResult);
     if (!paymentRequired) return { handled: false };
 
-    const parsed = extractAcceptFromPaymentRequired(paymentRequired);
+    const parsed = extractAcceptFromPaymentRequired(paymentRequired, this.options.x402Scheme);
     if (!parsed) {
       logger.warn('Payment-required tool result but could not extract supported payment terms');
       return { handled: false };
