@@ -240,7 +240,7 @@ async function main(): Promise<void> {
     if (!json) {
       console.log('');
       if (hasSessions) {
-        console.log(chalk.dim('  ↳ view a session: mcpc @sessionname'));
+        console.log('Run "mcpc @sessionname" to view session details.');
       }
       console.log('Run "mcpc --help" for usage information.');
       console.log('');
@@ -837,7 +837,7 @@ ${jsonHelp('`[{ sessionName, tools?: Tool[], resources?: Resource[], prompts?: P
     if (!json) {
       console.log('');
       if (hasSessions) {
-        console.log(chalk.dim('  ↳ view a session: mcpc @sessionname'));
+        console.log('Run "mcpc @sessionname" to view session details.');
       }
       console.log('Run "mcpc --help" for usage information.');
       console.log('');

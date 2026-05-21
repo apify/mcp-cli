@@ -673,8 +673,12 @@ export function formatTimeAgo(isoDate: string | undefined): string {
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays === 1) return 'yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  return `${Math.floor(diffDays / 30)} months ago`;
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+  }
+  const months = Math.floor(diffDays / 30);
+  return `${months} ${months === 1 ? 'month' : 'months'} ago`;
 }
 
 /**
