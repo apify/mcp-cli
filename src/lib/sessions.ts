@@ -6,7 +6,8 @@
 
 import { readFile, writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
-import type { SessionData, SessionsStorage } from './types.js';
+import type { SessionData, SessionsStorage, X402SchemePreference } from './types.js';
+import { X402_SCHEME_PREFERENCES } from './types.js';
 import {
   getSessionsFilePath,
   getSocketPath,
@@ -42,6 +43,10 @@ async function loadSessionsInternal(): Promise<SessionsStorage> {
     if (!storage.sessions || typeof storage.sessions !== 'object') {
       logger.warn('Invalid sessions file format, returning empty sessions');
       return { sessions: {} };
+    }
+
+    for (const session of Object.values(storage.sessions)) {
+      normaliseLegacyX402(session);
     }
 
     return storage;
@@ -85,6 +90,36 @@ async function saveSessionsInternal(storage: SessionsStorage): Promise<void> {
 }
 
 const SESSIONS_DEFAULT_CONTENT = JSON.stringify({ sessions: {} }, null, 2);
+
+/**
+ * Normalise the legacy two-field x402 shape into the consolidated single field.
+ *
+ * Legacy (pre-consolidation): `{ x402: boolean, x402Scheme?: 'auto'|'upto'|'exact' }`.
+ * Current: `{ x402?: 'auto'|'upto'|'exact' }` — presence enables, value is the preference.
+ *
+ * Mutates the session in place; the next `saveSession`/`updateSession` writes the
+ * normalised shape back to disk, so the migration cost is one read.
+ */
+export function normaliseLegacyX402(
+  session: SessionData & { x402Scheme?: X402SchemePreference }
+): void {
+  const rawX402: unknown = session.x402;
+  const legacyScheme = session.x402Scheme;
+
+  delete session.x402Scheme;
+  delete (session as { x402?: unknown }).x402;
+
+  if (typeof rawX402 === 'boolean') {
+    if (rawX402) session.x402 = legacyScheme ?? 'auto';
+    return;
+  }
+  if (
+    typeof rawX402 === 'string' &&
+    (X402_SCHEME_PREFERENCES as readonly string[]).includes(rawX402)
+  ) {
+    session.x402 = rawX402 as X402SchemePreference;
+  }
+}
 
 /**
  * Load sessions from storage (with locking)
