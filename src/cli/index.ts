@@ -417,8 +417,8 @@ ${chalk.bold('MCP session commands (after connecting):')}
   <@session> ${theme.cyan('resources-subscribe')} <uri>
   <@session> ${theme.cyan('resources-unsubscribe')} <uri>
   <@session> ${theme.cyan('resources-templates-list')}
-  <@session> ${theme.cyan('skills-list')}
-  <@session> ${theme.cyan('skills-get')} <name> [--raw]
+  <@session> ${theme.cyan('skills-list')}             ${chalk.yellow('[EXPERIMENTAL]')} List Agent Skills (SEP-2640)
+  <@session> ${theme.cyan('skills-get')} <name> [--raw] ${chalk.yellow('[EXPERIMENTAL]')} Read a skill's SKILL.md
   <@session> ${theme.cyan('tasks-list')}
   <@session> ${theme.cyan('tasks-get')} <taskId>
   <@session> ${theme.cyan('tasks-result')} <taskId>
@@ -1183,26 +1183,40 @@ ${toolsCallCombinedJsonHelp}`
 
   // Skills commands (experimental MCP extension: io.modelcontextprotocol/skills)
   // Sugar over resources-read using the `skill://` URI convention.
-  // Spec: https://github.com/modelcontextprotocol/experimental-ext-skills
+  // Spec: https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2640
+  // NOTE: This extension is still in draft (SEP-2640) and may change. The
+  // command surface here is marked EXPERIMENTAL accordingly.
   program
     .command('skills-list')
-    .description('List Agent Skills exposed by the server (experimental MCP extension).')
+    .description(
+      '[EXPERIMENTAL] List Agent Skills exposed by the server (MCP extension SEP-2640, may change).'
+    )
     .addHelpText(
       'after',
       `
+${chalk.bold('Status:')} ${chalk.yellow('EXPERIMENTAL')} — implements the draft MCP skills
+  extension (SEP-2640). The spec is not yet finalized; the index shape,
+  recognized types, and capability key may change. Use at your own risk
+  and pin mcpc versions if you depend on the JSON shape.
+
 ${chalk.bold('How discovery works:')}
   Skills are not a new MCP primitive — they are markdown documents (SKILL.md
   with YAML frontmatter) served as resources under \`skill://\` URIs. mcpc
   first tries to read \`skill://index.json\`; if absent, it scans the server's
   resources for \`skill://*/SKILL.md\` entries.
 
+${chalk.bold('Entry types (per SEP-2640):')}
+  skill-md               concrete skill — \`skills-get <name>\` reads SKILL.md
+  archive                .tar.gz / .zip bundle — fetch with \`resources-read <url>\`
+  mcp-resource-template  parameterized namespace (RFC 6570 URI template)
+
 ${chalk.bold('Examples:')}
   mcpc ${session} skills-list
   mcpc ${session} skills-list --json | jq '.[].name'
 ${jsonHelp(
   'Array of `Skill` objects',
-  '`[{ name: string, description: string, type?: "skill-md" | "mcp-resource-template", url: string }, ...]`',
-  'https://github.com/modelcontextprotocol/experimental-ext-skills/blob/main/docs/sep-draft-skills-extension.md'
+  '`[{ name: string, description: string, type?: "skill-md" | "archive" | "mcp-resource-template", url: string }, ...]`',
+  'https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2640'
 )}`
     )
     .action(async (_options, command) => {
@@ -1211,17 +1225,25 @@ ${jsonHelp(
 
   program
     .command('skills-get <name>')
-    .description('Read an Agent Skill (SKILL.md) by name (experimental MCP extension).')
+    .description(
+      '[EXPERIMENTAL] Read an Agent Skill (SKILL.md) by name (MCP extension SEP-2640, may change).'
+    )
     .option('--raw', 'Print only the SKILL.md text (markdown), suitable for piping')
     .addHelpText(
       'after',
       `
+${chalk.bold('Status:')} ${chalk.yellow('EXPERIMENTAL')} — implements the draft MCP skills
+  extension (SEP-2640). Behavior and output shape may change.
+
 ${chalk.bold('Name forms:')}
   bare name           mcpc ${session} skills-get git-workflow
                       → reads \`skill://git-workflow/SKILL.md\`
   nested path         mcpc ${session} skills-get acme/billing/refunds
                       → reads \`skill://acme/billing/refunds/SKILL.md\`
   full URI            mcpc ${session} skills-get skill://git-workflow/SKILL.md
+
+  For \`archive\` skills, pass the URL from \`skills-list\` to
+  \`resources-read\` instead — \`skills-get\` expects a SKILL.md target.
 
 ${chalk.bold('--raw mode:')}
   Prints just the SKILL.md text content with no header or fences. Useful for

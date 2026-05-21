@@ -52,7 +52,7 @@ test_pass
 test_case "skills-list human output shows count and descriptions"
 run_mcpc "$SESSION" skills-list
 assert_success
-assert_contains "$STDOUT" "Skills (2):"
+assert_contains "$STDOUT" "Skills (3):"
 assert_contains "$STDOUT" "Helpers for everyday Git workflows"
 assert_contains "$STDOUT" "How acme processes refund requests"
 test_pass
@@ -69,12 +69,18 @@ run_mcpc --json "$SESSION" skills-list
 assert_success
 assert_json_valid "$STDOUT"
 assert_json "$STDOUT" '. | type == "array"'
-assert_json "$STDOUT" '. | length == 2'
+# 4 entries in the index, but the one with an unrecognized `type` is
+# skipped per SEP-2640, leaving 3: 2 skill-md + 1 archive.
+assert_json "$STDOUT" '. | length == 3'
 # Each entry has the SEP-2640 fields
 assert_json "$STDOUT" '.[0].name'
 assert_json "$STDOUT" '.[0].description'
 assert_json "$STDOUT" '.[0].url'
 assert_json "$STDOUT" '.[0].type == "skill-md"'
+# `archive` entries from the index are included (with type preserved)
+assert_json "$STDOUT" '[.[] | .type] | any(. == "archive")'
+# Unrecognized types are skipped — `future-thing` MUST NOT appear
+assert_json "$STDOUT" '[.[] | .name] | any(. == "future-thing") | not'
 test_pass
 
 test_case "skills-list --json contains expected URIs"
@@ -82,6 +88,7 @@ run_mcpc --json "$SESSION" skills-list
 assert_success
 assert_json "$STDOUT" '[.[] | .url] | any(. == "skill://git-workflow/SKILL.md")'
 assert_json "$STDOUT" '[.[] | .url] | any(. == "skill://acme/billing/refunds/SKILL.md")'
+assert_json "$STDOUT" '[.[] | .url] | any(. == "skill://big-skill/big-skill.tar.gz")'
 test_pass
 
 # -----------------------------------------------------------------------------

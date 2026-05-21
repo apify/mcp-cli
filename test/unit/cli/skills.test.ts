@@ -3,6 +3,11 @@
  * MCP skills extension (SEP-2640).
  */
 
+// In Jest ESM mode (`useESM: true` via ts-jest), `jest` is not always
+// available as a global at module-evaluation time. Import it explicitly so
+// the file works under every CI Node version we support.
+import { jest } from '@jest/globals';
+
 // Mock chalk to return plain strings (Jest can't handle chalk's ESM imports).
 // Matches the mock shape used in output.test.ts — the `theme` object in
 // src/cli/output.ts calls chalk.hex(...) at module load, so hex must return
@@ -144,12 +149,14 @@ describe('parseIndex', () => {
     expect(skills[0]?.type).toBe('mcp-resource-template');
   });
 
-  it('omits the type field when absent', () => {
+  it('defaults missing type to skill-md', () => {
+    // SEP-2640 says `type` is required, but for forwards-compat with older
+    // drafts that omitted it, mcpc treats a missing `type` as `skill-md`.
     const text = JSON.stringify({
       skills: [{ name: 'x', description: 'y', url: 'skill://x/SKILL.md' }],
     });
     const skills = parseIndex(text);
-    expect(skills[0]).not.toHaveProperty('type');
+    expect(skills[0]?.type).toBe('skill-md');
   });
 
   it('treats missing description as empty string', () => {
@@ -183,6 +190,51 @@ describe('parseIndex', () => {
     const skills = parseIndex(text);
     expect(skills).toHaveLength(1);
     expect(skills[0]?.name).toBe('good');
+  });
+
+  it('keeps `archive` entries with name (requires same as skill-md)', () => {
+    const text = JSON.stringify({
+      skills: [
+        {
+          name: 'big-skill',
+          type: 'archive',
+          description: 'Bundled as .tar.gz',
+          url: 'skill://big-skill/big-skill.tar.gz',
+        },
+        // archive without name → dropped per spec
+        {
+          type: 'archive',
+          description: 'no name',
+          url: 'skill://x/x.tar.gz',
+        },
+      ],
+    });
+    const skills = parseIndex(text);
+    expect(skills).toHaveLength(1);
+    expect(skills[0]?.name).toBe('big-skill');
+    expect(skills[0]?.type).toBe('archive');
+  });
+
+  it('skips entries with an unrecognized `type` (per SEP-2640)', () => {
+    const text = JSON.stringify({
+      skills: [
+        {
+          name: 'ok',
+          type: 'skill-md',
+          description: 'kept',
+          url: 'skill://ok/SKILL.md',
+        },
+        {
+          name: 'bad',
+          type: 'something-new',
+          description: 'dropped',
+          url: 'skill://bad/SKILL.md',
+        },
+      ],
+    });
+    const skills = parseIndex(text);
+    expect(skills).toHaveLength(1);
+    expect(skills[0]?.name).toBe('ok');
   });
 
   it('keeps mcp-resource-template entries without a name (spec allows it)', () => {

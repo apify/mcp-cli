@@ -117,9 +117,16 @@ export function parseIndex(text: string): Skill[] {
     const e = entry as RawIndexEntry;
     if (typeof e.url !== 'string') continue;
 
-    // SEP-2640: `name` is required for `skill-md` but optional for
-    // `mcp-resource-template` (parameterized namespaces).
-    const type = typeof e.type === 'string' ? e.type : undefined;
+    // SEP-2640 defines three valid `type` values. The spec says clients
+    // SHOULD skip entries with an unrecognized `type`. Treat an absent
+    // `type` as `skill-md` for backwards compatibility with older drafts.
+    const type = typeof e.type === 'string' ? e.type : 'skill-md';
+    if (type !== 'skill-md' && type !== 'archive' && type !== 'mcp-resource-template') {
+      continue;
+    }
+
+    // `name` is required for `skill-md` and `archive` entries, and optional
+    // for `mcp-resource-template` (parameterized namespaces).
     const isTemplate = type === 'mcp-resource-template';
     let name: string;
     if (typeof e.name === 'string' && e.name.length > 0) {
@@ -128,7 +135,7 @@ export function parseIndex(text: string): Skill[] {
       // Derive a display name from the template URL for nameless templates.
       name = displayNameFromUrl(e.url);
     } else {
-      // skill-md without a name violates the spec — drop silently.
+      // skill-md / archive without a name violates the spec — drop silently.
       continue;
     }
 

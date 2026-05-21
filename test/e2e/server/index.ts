@@ -227,6 +227,20 @@ const SKILL_INDEX_BODY = JSON.stringify(
         description: 'How acme processes refund requests',
         url: 'skill://acme/billing/refunds/SKILL.md',
       },
+      // SEP-2640 type: bundled skill delivered as a single archive resource.
+      {
+        name: 'big-skill',
+        type: 'archive',
+        description: 'A bundled skill delivered as .tar.gz',
+        url: 'skill://big-skill/big-skill.tar.gz',
+      },
+      // Entry with unrecognized type — clients SHOULD skip it.
+      {
+        name: 'future-thing',
+        type: 'something-not-in-spec',
+        description: 'Reserved for a future spec version',
+        url: 'skill://future-thing/SKILL.md',
+      },
     ],
   },
   null,
