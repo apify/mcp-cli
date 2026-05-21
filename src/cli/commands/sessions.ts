@@ -683,7 +683,7 @@ export function formatTimeAgo(isoDate: string | undefined): string {
  */
 export async function listSessionsAndAuthProfiles(options: {
   outputMode: OutputMode;
-}): Promise<void> {
+}): Promise<{ hasSessions: boolean }> {
   // Consolidate sessions first (cleans up crashed bridges, removes expired sessions)
   const consolidateResult = await consolidateSessions(false);
   const sessions = Object.values(consolidateResult.sessions);
@@ -744,7 +744,6 @@ export async function listSessionsAndAuthProfiles(options: {
           console.log(chalk.dim(`    ↳ run: mcpc ${session.name} restart`));
         }
       }
-      console.log(chalk.dim('  ↳ view a session: mcpc @sessionname'));
     }
 
     // Display auth profiles
@@ -773,6 +772,8 @@ export async function listSessionsAndAuthProfiles(options: {
       }
     }
   }
+
+  return { hasSessions: sessions.length > 0 };
 }
 
 /**
