@@ -3,16 +3,11 @@
  * MCP skills extension (SEP-2640).
  */
 
-// In Jest ESM mode (`useESM: true` via ts-jest), `jest` is not always
-// available as a global at module-evaluation time. Import it explicitly so
-// the file works under every CI Node version we support.
-import { jest } from '@jest/globals';
-
-// Mock chalk to return plain strings (Jest can't handle chalk's ESM imports).
-// Matches the mock shape used in output.test.ts — the `theme` object in
-// src/cli/output.ts calls chalk.hex(...) at module load, so hex must return
-// a function that yields a string-passthrough callable.
-jest.mock('chalk', () => {
+// Mock chalk to return plain strings (the runner can't import chalk's ESM
+// at module-load). Matches the mock shape used in output.test.ts — the
+// `theme` object in src/cli/output.ts calls chalk.hex(...) at module load,
+// so hex must return a function that yields a string-passthrough callable.
+vi.mock('chalk', () => {
   const identity = (s: string): string => s;
   const hex = (): ((s: string) => string) => identity;
   const palette = {
@@ -33,8 +28,8 @@ jest.mock('chalk', () => {
 });
 
 // Mock sessions module to avoid loading session state during import
-jest.mock('../../../src/lib/sessions.js', () => ({
-  getSession: jest.fn().mockResolvedValue(null),
+vi.mock('../../../src/lib/sessions.js', () => ({
+  getSession: vi.fn().mockResolvedValue(null),
 }));
 
 import type { ReadResourceResult, Resource } from '@modelcontextprotocol/sdk/types.js';
@@ -406,7 +401,7 @@ function makeMockClient(opts: {
   const readResourceCalls: string[] = [];
   const listResourcesCalls: Array<string | undefined> = [];
 
-  const readResource = jest.fn(async (uri: string): Promise<ReadResourceResult> => {
+  const readResource = vi.fn(async (uri: string): Promise<ReadResourceResult> => {
     readResourceCalls.push(uri);
     if (uri === 'skill://index.json') {
       if (opts.index === null) {
@@ -421,7 +416,7 @@ function makeMockClient(opts: {
     throw new Error(`unexpected uri: ${uri}`);
   });
 
-  const listResources = jest.fn(async (cursor?: string) => {
+  const listResources = vi.fn(async (cursor?: string) => {
     listResourcesCalls.push(cursor);
     if (opts.resourcePages) {
       const page = opts.resourcePages.shift();
