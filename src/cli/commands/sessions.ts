@@ -304,8 +304,7 @@ export async function connectSession(
     noProfile?: boolean;
     proxy?: string;
     proxyBearerToken?: string;
-    x402?: boolean;
-    x402Scheme?: X402SchemePreference;
+    x402?: X402SchemePreference;
     insecure?: boolean;
     skipDetails?: boolean;
     quiet?: boolean;
@@ -467,8 +466,7 @@ export async function connectSession(
     server: sessionTransportConfig,
     ...(profileName && { profileName }),
     ...(proxyConfig && { proxy: proxyConfig }),
-    ...(options.x402 && { x402: true }),
-    ...(options.x402 && options.x402Scheme && { x402Scheme: options.x402Scheme }),
+    ...(options.x402 && { x402: options.x402 }),
     ...(options.insecure && { insecure: true }),
     // Clear any previous error status (unauthorized, expired) when reconnecting
     ...(isReconnect && { status: 'active' }),
@@ -505,10 +503,7 @@ export async function connectSession(
       bridgeOptions.proxyConfig = proxyConfig;
     }
     if (options.x402) {
-      bridgeOptions.x402 = true;
-    }
-    if (options.x402 && options.x402Scheme) {
-      bridgeOptions.x402Scheme = options.x402Scheme;
+      bridgeOptions.x402 = options.x402;
     }
     if (options.insecure) {
       bridgeOptions.insecure = true;
@@ -967,10 +962,6 @@ export async function restartSession(
       bridgeOptions.x402 = session.x402;
     }
 
-    if (session.x402 && session.x402Scheme) {
-      bridgeOptions.x402Scheme = session.x402Scheme;
-    }
-
     if (session.insecure) {
       bridgeOptions.insecure = session.insecure;
     }
@@ -1033,8 +1024,7 @@ type BulkConnectOptions = {
   proxy?: string;
   proxyBearerToken?: string;
   stdio?: boolean;
-  x402?: boolean;
-  x402Scheme?: X402SchemePreference;
+  x402?: X402SchemePreference;
   insecure?: boolean;
 };
 

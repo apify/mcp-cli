@@ -106,8 +106,8 @@ export interface StartBridgeOptions {
   headers?: Record<string, string>; // Headers to send via IPC (caller stores in keychain)
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
-  x402?: boolean; // Enable x402 auto-payment using the wallet
-  x402Scheme?: X402SchemePreference; // x402 scheme preference; only meaningful with x402: true
+  /** x402 scheme preference; presence enables x402 auto-payment, absence disables. */
+  x402?: X402SchemePreference;
   insecure?: boolean; // Skip TLS certificate verification
 }
 
@@ -140,7 +140,6 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
     proxyConfig,
     mcpSessionId,
     x402,
-    x402Scheme,
     insecure,
   } = options;
 
@@ -196,16 +195,10 @@ export async function startBridge(options: StartBridgeOptions): Promise<StartBri
     logger.debug(`Passing MCP session ID for resumption: ${mcpSessionId}`);
   }
 
-  // Pass x402 flag (if enabled)
+  // Pass x402 scheme preference (presence enables x402).
   if (x402) {
-    args.push('--x402');
-    logger.debug('Passing x402 flag to bridge');
-  }
-
-  // Pass x402 scheme preference (only meaningful when x402 is enabled)
-  if (x402 && x402Scheme) {
-    args.push('--x402-scheme', x402Scheme);
-    logger.debug(`Passing x402 scheme preference: ${x402Scheme}`);
+    args.push('--x402', x402);
+    logger.debug(`Passing x402 scheme preference: ${x402}`);
   }
 
   // Pass insecure flag (if enabled)
@@ -441,11 +434,7 @@ export async function restartBridge(sessionName: string): Promise<StartBridgeRes
   }
   if (session.x402) {
     bridgeOptions.x402 = session.x402;
-    logger.debug('Using saved x402 flag');
-  }
-  if (session.x402 && session.x402Scheme) {
-    bridgeOptions.x402Scheme = session.x402Scheme;
-    logger.debug(`Using saved x402 scheme preference: ${session.x402Scheme}`);
+    logger.debug(`Using saved x402 scheme preference: ${session.x402}`);
   }
   if (session.insecure) {
     bridgeOptions.insecure = session.insecure;

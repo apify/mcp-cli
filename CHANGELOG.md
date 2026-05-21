@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mcpc connect` (with no arguments) now auto-discovers standard MCP config files (`.mcp.json`, `mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `~/.claude.json`, Claude Desktop, Windsurf, Kiro, etc.) in the current directory and home directory, and connects every server defined across them. Entries with duplicate session names are deduplicated (project-scoped files win over global ones). VS Code's `"servers"` key is also supported.
 - `mcpc connect` auto-connects to `mcp.apify.com` as `@apify` when the `APIFY_API_TOKEN` environment variable is set, using it as a Bearer token. Existing live sessions are reused without restart.
 - `mcpc x402 sign` supports the x402 `upto` scheme alongside `exact`. Use `--scheme <auto|upto|exact>` to pick a preference (default `auto` prefers `upto`, falls back to `exact`). The signer auto-grants a one-time `USDC.approve(PERMIT2, MAX_UINT256)` allowance on first upto sign; pass `--no-approve` to skip.
-- `mcpc connect --x402-scheme <auto|upto|exact>` pins the scheme preference on the session. The choice is persisted to `sessions.json` and reused on `mcpc restart`. Requires `--x402`.
+- `mcpc connect --x402 [auto|upto|exact]` enables x402 auto-payment with an optional scheme preference. Bare `--x402` defaults to `auto` (prefer upto, fall back to exact). The choice is persisted to `sessions.json` and reused on `mcpc restart`. Use `--x402=<scheme>` when the flag is followed by positional arguments to avoid Commander's greedy parsing of the next token.
 - Sessions using x402 auto-payment now show a yellow `[x402]` marker in session listings, alongside the existing OAuth and proxy markers.
 
 ### Changed
@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `mcpc connect` and `mcpc restart` no longer fail with `ENOENT` when the macOS Keychain prompts for a password. Credentials are now read from the keychain *before* the bridge process is spawned, so the bridge's IPC startup timer no longer races a foreground password dialog (#55)
+- `mcpc connect` and `mcpc restart` no longer fail with `ENOENT` when the macOS Keychain prompts for a password. Credentials are now read from the keychain _before_ the bridge process is spawned, so the bridge's IPC startup timer no longer races a foreground password dialog (#55)
 - Background auto-reconnect now correctly marks sessions as `unauthorized` when the server returns 401/403, instead of leaving them stuck in `connecting` after the bridge crashed on an unhandled rejection
 - Sessions using a static bearer token (via `--header "Authorization: ..."`) no longer flip between `unauthorized` and `connecting` on every `mcpc` invocation — they stay `unauthorized` until you `mcpc login` or reconnect. OAuth-profile sessions still auto-retry because tokens may have been refreshed by another session
 - Stdio servers no longer fail silently: the bridge now captures the child's stderr, writes it to `~/.mcpc/logs/bridge-<session>.log`, and appends a tail of the most recent lines to `mcpc connect` errors. This makes it obvious when a stdio server crashes on startup due to e.g. missing TLS trust (`NODE_EXTRA_CA_CERTS`), missing proxy vars, or missing credentials (#195)

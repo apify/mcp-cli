@@ -146,8 +146,16 @@ export interface SessionData {
   name: string;
   server: ServerConfig; // Transport configuration (header values redacted to "<redacted>")
   profileName?: string; // Name of auth profile (for OAuth servers)
-  x402?: boolean; // x402 auto-payment enabled for this session
-  x402Scheme?: X402SchemePreference; // x402 scheme preference (default: auto = prefer upto, fall back to exact)
+  /**
+   * x402 auto-payment scheme preference. Presence enables x402 for the session;
+   * the value is the preference (`auto` = prefer upto, fall back to exact).
+   * Absent / undefined means x402 is disabled.
+   *
+   * Legacy shape (pre-consolidation): `x402: boolean` + a sibling `x402Scheme`. The
+   * session loader normalises both shapes on read — see `normaliseLegacyX402` in
+   * `src/lib/sessions.ts`.
+   */
+  x402?: X402SchemePreference;
   insecure?: boolean; // Skip TLS certificate verification
   pid?: number; // Bridge process PID
   protocolVersion?: string; // Negotiated MCP version

@@ -39,8 +39,8 @@ const MCP_PAYMENT_META_KEY = 'x402/payment';
  *
  * Apify exposes two shapes side-by-side:
  * - **`accepts[]`** carries every advertised scheme (post apify-mcp-server #876).
- *   Walk this when present — it's the only way to honor `--x402-scheme` against
- *   servers that advertise multiple schemes.
+ *   Walk this when present — it's the only way to honor the session's `--x402 <scheme>`
+ *   preference against servers that advertise multiple schemes.
  * - **Flat preferred fields** mirror the server's preferred entry for back-compat
  *   with clients that don't iterate `accepts[]`. Used as a fallback.
  */

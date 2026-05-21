@@ -485,13 +485,13 @@ always win over stored profiles, and credentials are never silently downgraded. 
 is missing, expired, or invalid, `mcpc` fails with an error that includes the right
 `mcpc login` command to recover.
 
-| Flag                            | Behavior                                                                                    |
-| ------------------------------- | ------------------------------------------------------------------------------------------- |
-| `--header "Authorization: ..."` | Use explicit header; skip OAuth auto-detection. Cannot combine with `--profile`.            |
-| `--profile <name>`              | Require the named profile to exist.                                                         |
-| `--no-profile`                  | Connect anonymously even if a `default` profile exists.                                     |
-| `--x402`                        | Skip OAuth auto-detection; use x402 payments instead. Combine with `--profile` to use both. |
-| _(none)_                        | Use `default` profile if it exists; otherwise connect anonymously.                          |
+| Flag                            | Behavior                                                                                                                                        |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--header "Authorization: ..."` | Use explicit header; skip OAuth auto-detection. Cannot combine with `--profile`.                                                                |
+| `--profile <name>`              | Require the named profile to exist.                                                                                                             |
+| `--no-profile`                  | Connect anonymously even if a `default` profile exists.                                                                                         |
+| `--x402 [scheme]`               | Skip OAuth auto-detection; use x402 payments instead. Optional scheme: `auto` (default), `upto`, `exact`. Combine with `--profile` to use both. |
+| _(none)_                        | Use `default` profile if it exists; otherwise connect anonymously.                                                                              |
 
 Config file headers (from `--config`) apply to servers loaded from that file.
 
@@ -750,24 +750,29 @@ that can be used directly with other MCP clients.
 
 ### Using x402 with MCP servers
 
-Pass the `--x402` flag when connecting to a session or running direct commands:
+Pass the `--x402` flag when connecting to a session. It accepts an optional scheme preference
+(`auto`, `upto`, or `exact`); bare `--x402` defaults to `auto`.
 
 ```bash
-# Create a session with x402 payment support (auto selects best scheme)
+# Create a session with x402 payment support (auto picks the best advertised scheme)
 mcpc connect mcp.apify.com @apify --x402
 
-# Force a specific scheme preference (auto, upto, exact)
-mcpc connect mcp.apify.com @apify --x402 --x402-scheme exact
+# Pin a specific scheme — value goes after the flag
+mcpc connect mcp.apify.com @apify --x402 exact
+
+# When --x402 precedes positional args, use the equals form to avoid Commander's
+# greedy [optional] argument parser eating the URL/session as the value.
+mcpc connect --x402=upto mcp.apify.com @apify
 
 # The session now automatically handles 402 responses using your preference
 mcpc @apify tools-call expensive-tool query:="hello"
 
-# Restart a session with x402 enabled or update scheme preference
-mcpc @apify restart --x402-scheme upto
+# Restart re-uses the saved scheme from sessions.json — no need to repeat the flag
+mcpc @apify restart
 ```
 
-When `--x402` or `--x402-scheme` is active, a fetch middleware wraps all HTTP requests to the MCP server.
-If any request returns HTTP 402, the middleware transparently signs and retries. Your scheme preference is persisted inside `sessions.json` and reused automatically across reconnects or restarts.
+When `--x402` is active, a fetch middleware wraps all HTTP requests to the MCP server.
+If any request returns HTTP 402, the middleware transparently signs and retries. Your scheme preference is persisted in `sessions.json` and reused on every reconnect or restart.
 
 ### Supported networks
 

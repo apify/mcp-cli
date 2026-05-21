@@ -74,8 +74,8 @@ interface BridgeOptions {
   profileName?: string; // Auth profile name for token refresh
   proxyConfig?: ProxyConfig; // Proxy server configuration
   mcpSessionId?: string; // MCP session ID for resumption (Streamable HTTP only)
-  x402?: boolean; // Enable x402 auto-payment
-  x402Scheme?: X402SchemePreference; // x402 scheme preference (only with x402: true)
+  /** x402 scheme preference; presence enables x402 auto-payment, absence disables. */
+  x402?: X402SchemePreference;
   insecure?: boolean; // Skip TLS certificate verification
 }
 
@@ -616,7 +616,7 @@ class BridgeProcess {
         wallet,
         getToolByName,
         paymentCache: this.x402PaymentCache,
-        ...(this.options.x402Scheme && { schemePreference: this.options.x402Scheme }),
+        ...(this.options.x402 && { schemePreference: this.options.x402 }),
       });
     }
 
@@ -1113,7 +1113,7 @@ class BridgeProcess {
     const paymentRequired = extractPaymentRequiredFromResult(toolResult);
     if (!paymentRequired) return { handled: false };
 
-    const parsed = extractAcceptFromPaymentRequired(paymentRequired, this.options.x402Scheme);
+    const parsed = extractAcceptFromPaymentRequired(paymentRequired, this.options.x402);
     if (!parsed) {
       logger.warn('Payment-required tool result but could not extract supported payment terms');
       return { handled: false };
@@ -1615,7 +1615,7 @@ async function main(): Promise<void> {
 
   if (args.length < 2) {
     console.error(
-      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--x402] [--x402-scheme <auto|upto|exact>] [--insecure]'
+      'Usage: mcpc-bridge <sessionName> <transportConfigJson> [--verbose] [--profile <name>] [--proxy-host <host>] [--proxy-port <port>] [--mcp-session-id <id>] [--x402 <auto|upto|exact>] [--insecure]'
     );
     process.exit(1);
   }
@@ -1650,19 +1650,17 @@ async function main(): Promise<void> {
     mcpSessionId = args[mcpSessionIdIndex + 1];
   }
 
-  // Parse --x402 flag (for x402 payment signing)
-  const x402 = args.includes('--x402');
-
-  // Parse --x402-scheme argument. Validated at the CLI layer; the bridge silently
-  // ignores invalid values to keep the spawn surface tolerant.
-  let x402Scheme: X402SchemePreference | undefined;
-  const x402SchemeIndex = args.indexOf('--x402-scheme');
-  const x402SchemeArg = x402SchemeIndex !== -1 ? args[x402SchemeIndex + 1] : undefined;
-  if (
-    x402SchemeArg !== undefined &&
-    (X402_SCHEME_PREFERENCES as readonly string[]).includes(x402SchemeArg)
-  ) {
-    x402Scheme = x402SchemeArg as X402SchemePreference;
+  // Parse `--x402 <scheme>`. The CLI always spawns the bridge with an explicit
+  // scheme value; if a bare `--x402` slips through (no value, or invalid value)
+  // we default to `auto` to keep the spawn surface tolerant.
+  let x402: X402SchemePreference | undefined;
+  const x402Index = args.indexOf('--x402');
+  if (x402Index !== -1) {
+    const value = args[x402Index + 1];
+    x402 =
+      value !== undefined && (X402_SCHEME_PREFERENCES as readonly string[]).includes(value)
+        ? (value as X402SchemePreference)
+        : 'auto';
   }
 
   // Parse --insecure flag (skip TLS certificate verification)
@@ -1688,10 +1686,7 @@ async function main(): Promise<void> {
       bridgeOptions.mcpSessionId = mcpSessionId;
     }
     if (x402) {
-      bridgeOptions.x402 = true;
-    }
-    if (x402Scheme) {
-      bridgeOptions.x402Scheme = x402Scheme;
+      bridgeOptions.x402 = x402;
     }
     if (insecure) {
       bridgeOptions.insecure = true;
