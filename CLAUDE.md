@@ -31,21 +31,21 @@ After all, UNIX-compatible shell script is THE most universal coding language, f
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Build the project
-npm run build
+pnpm run build
 
 # Run tests
-npm test
+pnpm test
 
 # Test locally after building
-npm link
+pnpm link --global
 mcpc --help
 
 # Run linter/formatter (if configured)
-npm run lint
-npm run format
+pnpm run lint
+pnpm run format
 ```
 
 ## Quick Start Examples
@@ -599,11 +599,11 @@ Example: `mcpc @apify logging-set-level debug`
 
 ## Common Implementation Patterns
 
-After making any code changes, always run `npm run lint` and fix **all** errors before committing. Do not skip or ignore lint failures. The lint command checks both ESLint rules and Prettier formatting. To auto-fix issues, run `npm run lint:fix`. If auto-fix doesn't resolve everything, manually fix the remaining errors. Never commit code that fails `npm run lint`. **As the very last step of every task**, run `npm run lint` once more and fix any remaining issues before considering the work done.
+After making any code changes, always run `pnpm run lint` and fix **all** errors before committing. Do not skip or ignore lint failures. The lint command checks both ESLint rules and Prettier formatting. To auto-fix issues, run `pnpm run lint:fix`. If auto-fix doesn't resolve everything, manually fix the remaining errors. Never commit code that fails `pnpm run lint`. **As the very last step of every task**, run `pnpm run lint` once more and fix any remaining issues before considering the work done.
 
-After lint passes, run `npm run build` and fix any TypeScript compilation errors before committing. The CI runs `tsc` with strict settings (including `noUnusedLocals`) that may catch errors not reported by ESLint alone, such as unused imports or type errors. Never commit code that fails `npm run build`.
+After lint passes, run `pnpm run build` and fix any TypeScript compilation errors before committing. The CI runs `tsc` with strict settings (including `noUnusedLocals`) that may catch errors not reported by ESLint alone, such as unused imports or type errors. Never commit code that fails `pnpm run build`.
 
-After build passes, run `npm run test:unit` and fix any failures before committing. If a test fails due to your changes, update the test or fix the code so all tests pass. Never commit code that fails unit tests.
+After build passes, run `pnpm run test:unit` and fix any failures before committing. If a test fails due to your changes, update the test or fix the code so all tests pass. Never commit code that fails unit tests.
 
 For any non-trivial change (new feature, bug fix, behaviour change, or notable refactor), add an entry to the `[Unreleased]` section of `CHANGELOG.md` before finishing. Use the appropriate category (`Added`, `Changed`, `Fixed`, `Removed`). Skip purely internal changes such as test-only edits, code style fixes, or minor cosmetic/styling tweaks (e.g. changing colors, adjusting whitespace, renaming labels). The changelog is for **users reading release notes** — only include entries that a user would care about. Do not add entries for: new warnings or deprecation notices on existing commands, minor help text changes, test infrastructure, CI/CD changes, or internal refactors. When in doubt, leave it out.
 
@@ -726,17 +726,17 @@ All MCP operations go through named sessions. Sessions are persistent bridge pro
 
 ## Releasing
 
-The release process is automated via GitHub Actions (`release.yml`). The local `npm run release` command is a thin wrapper that validates preconditions and triggers the workflow.
+The release process is automated via GitHub Actions (`release.yml`). The local `pnpm run release` command is a thin wrapper that validates preconditions and triggers the workflow.
 
 Before releasing:
 
 1. **Update CHANGELOG.md** with all changes since the last release
 2. Ensure your branch is clean, up-to-date with `origin/main`, and all CI checks pass
-3. Run `npm run release` (or `npm run release:minor` / `npm run release:major`)
+3. Run `pnpm run release` (or `pnpm run release:minor` / `pnpm run release:major`)
 
 The script validates preconditions locally, then triggers the `release.yml` GitHub Actions workflow which handles: lint, build, test, version bump, changelog update, README update, git commit/tag/push, npm publish (with provenance), and GitHub release creation.
 
-For pre-releases: `npm run release:pre` (or `npm run release:pre -- minor`)
+For pre-releases: `pnpm run release:pre` (or `pnpm run release:pre -- minor`)
 
 Monitor the release progress at the GitHub Actions URL that opens automatically.
 
