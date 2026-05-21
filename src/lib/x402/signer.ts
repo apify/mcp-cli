@@ -17,6 +17,7 @@ import {
 import { base, baseSepolia } from 'viem/chains';
 import { ClientError } from '../errors.js';
 import { createLogger } from '../logger.js';
+import type { X402SchemePreference } from '../types.js';
 
 const logger = createLogger('x402-signer');
 
@@ -142,7 +143,7 @@ export interface PaymentRequiredHeader {
   accepts: PaymentRequiredAccept[];
 }
 
-export type SchemePreference = 'auto' | 'exact' | 'upto';
+export type SchemePreference = X402SchemePreference;
 
 /** Minimal wallet info needed for signing */
 export interface SignerWallet {
